@@ -1,30 +1,59 @@
 "use client";
 // ════════════════════════════════════════════════════════════
-// src/app/page.tsx — Root page (mirrors original index.html SPA)
-// All navigation is client-side (no page reloads), same as original.
+// src/app/page.tsx — Root page
 // ════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from "react";
 import { getSupabaseClient, resolveAdminStatus } from "@/lib/supabase";
 import type { User } from "@/types/database";
 
-// Page components (lazy-imported for bundle splitting)
 import dynamic from "next/dynamic";
-const HomePage = dynamic(() => import("@/components/pages/HomePage"));
-const ProblemsPage = dynamic(() => import("@/components/pages/ProblemsPage"));
+
+// Inline loading fallback — a simple fade-in skeleton so Suspense always resolves
+function PageSkeleton() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-[#00e87a] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+const HomePage = dynamic(() => import("@/components/pages/HomePage"), {
+  loading: PageSkeleton,
+  ssr: false,
+});
+const ProblemsPage = dynamic(() => import("@/components/pages/ProblemsPage"), {
+  loading: PageSkeleton,
+  ssr: false,
+});
 const LeaderboardPage = dynamic(
   () => import("@/components/pages/LeaderboardPage"),
+  { loading: PageSkeleton, ssr: false },
 );
-const ArenaPage = dynamic(() => import("@/components/pages/ArenaPage"));
-const AdminPage = dynamic(() => import("@/components/pages/AdminPage"));
+const ArenaPage = dynamic(() => import("@/components/pages/ArenaPage"), {
+  loading: PageSkeleton,
+  ssr: false,
+});
+const AdminPage = dynamic(() => import("@/components/pages/AdminPage"), {
+  loading: PageSkeleton,
+  ssr: false,
+});
 
 type PageId = "home" | "problems" | "leaderboard" | "arena" | "admin";
 
-function PageSkeleton() {
+// Full-screen loader shown while auth resolves
+function AuthLoader() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-      <div className="text-[#333] text-sm font-mono animate-pulse">
-        Loading...
+      <div className="flex flex-col items-center gap-4">
+        <img
+          src="/logo.png"
+          alt="BitByBit"
+          className="w-28 h-28 object-contain animate-pulse"
+        />
+        <div className="w-32 h-[1px] bg-[#1a1a1a] overflow-hidden rounded">
+          <div className="h-full w-1/2 bg-[#00e87a] animate-[slide_1s_ease-in-out_infinite]" />
+        </div>
       </div>
     </div>
   );
@@ -37,14 +66,34 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [arenaLocked, setArenaLocked] = useState(false);
 
-  // ── Session init ─────────────────────────────────────────
   useEffect(() => {
-    // onAuthStateChange fires for INITIAL_SESSION, SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, etc.
-    // It reliably fires on every page load (including hard refreshes and OAuth redirects),
-    // so we use it as the single source of truth for both loading state and user state.
+    // Safety net: if auth never resolves within 5s, stop the spinner
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
+    // Also try getSession immediately — onAuthStateChange can miss the initial
+    // session on some Supabase configs (e.g. PKCE with hash fragments)
+    db.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        clearTimeout(timeout);
+        const github = session.user.user_metadata.user_name as string;
+        resolveAdminStatus(github).then((isAdmin) => {
+          setUser({
+            name: session.user.user_metadata.full_name || github,
+            github,
+            is_admin: isAdmin,
+          });
+          setLoading(false);
+        });
+      }
+    });
+
     const {
       data: { subscription },
     } = db.auth.onAuthStateChange(async (event, session) => {
+      clearTimeout(timeout);
+
       if (session) {
         const github = session.user.user_metadata.user_name as string;
         const isAdmin = await resolveAdminStatus(github);
@@ -56,12 +105,14 @@ export default function App() {
       } else {
         setUser(null);
       }
-      // Always clear loading once we know the auth state,
-      // whether the user is signed in or not.
+
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   function navigate(id: PageId) {
@@ -94,25 +145,17 @@ export default function App() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner" />
-      </div>
-    );
+    return <AuthLoader />;
   }
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* ── Header ──────────────────────────────────────── */}
-      <header
-        className="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur border-b border-[#1a1a1a]
-        flex items-center justify-between px-6 h-14"
-      >
+      <header className="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur border-b border-[#1a1a1a] flex items-center justify-between px-6 h-14">
         <div
           className="flex items-center gap-2 cursor-pointer"
           onClick={() => navigate("home")}
         >
-          {/* Replaced generic "B" box with your custom logo asset */}
           <img
             src="/logo.png"
             alt="BitByBit Logo"
@@ -130,11 +173,7 @@ export default function App() {
                 key={id}
                 onClick={() => navigate(id)}
                 className={`px-4 py-1.5 rounded-lg font-mono text-sm capitalize transition-all
-                ${
-                  page === id
-                    ? "text-[#00e87a] bg-[#00e87a10]"
-                    : "text-[#666] hover:text-[#e0e0e0]"
-                }`}
+                ${page === id ? "text-[#00e87a] bg-[#00e87a10]" : "text-[#666] hover:text-[#e0e0e0]"}`}
               >
                 {id}
               </button>
