@@ -7,24 +7,31 @@ import type { Database } from '@/types/database';
 const SUPABASE_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-// ── Browser client (singleton) ──────────────────────────────
-let _client: ReturnType<typeof createClient<Database>> | null = null;
+// ── Browser client ───────────────────────────────────────────
+// We pin the singleton on `globalThis` so it survives Next.js
+// hot-reloads and chunk re-evaluations.  A plain module-level
+// `let _client` gets reset to null every time the module is
+// re-initialised (fast-refresh, chunk split, etc.), which
+// creates a brand-new Supabase instance that hasn't read its
+// token from localStorage yet — causing a spurious logged-out
+// state on refresh.
+const G = globalThis as typeof globalThis & {
+  __bbSupabaseClient?: ReturnType<typeof createClient<Database>>;
+};
 
 export function getSupabaseClient() {
-  if (!_client) {
-    _client = createClient<Database>(SUPABASE_URL, SUPABASE_ANON, {
+  if (!G.__bbSupabaseClient) {
+    G.__bbSupabaseClient = createClient<Database>(SUPABASE_URL, SUPABASE_ANON, {
       auth: {
-        persistSession: true,
-        autoRefreshToken: true,
+        persistSession:    true,
+        autoRefreshToken:  true,
         detectSessionInUrl: true,
-        storageKey: 'bitbybit-auth',
-        // Use implicit flow — PKCE can hang on Vercel when the
-        // code_verifier in localStorage doesn't match the redirect
-        flowType: 'implicit',
+        storageKey:        'bitbybit-auth',
+        flowType:          'implicit',
       },
     });
   }
-  return _client;
+  return G.__bbSupabaseClient;
 }
 
 // ── Server-side client (fresh per request) ──────────────────

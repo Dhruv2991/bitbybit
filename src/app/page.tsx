@@ -1,15 +1,11 @@
 "use client";
 // ════════════════════════════════════════════════════════════
 // src/app/page.tsx — Root page
-// FIX 1: Persist active page in sessionStorage so refresh doesn't
-//         kick the user back to "home".
-// FIX 2: Raise auth timeout from 3 s → 8 s to survive cold starts.
 // ════════════════════════════════════════════════════════════
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient, resolveAdminStatus } from "@/lib/supabase";
 import type { User } from "@/types/database";
-
 import dynamic from "next/dynamic";
 
 function PageSkeleton() {
@@ -20,40 +16,20 @@ function PageSkeleton() {
   );
 }
 
-const HomePage = dynamic(() => import("@/components/pages/HomePage"), {
-  loading: PageSkeleton,
-  ssr: false,
-});
-const ProblemsPage = dynamic(() => import("@/components/pages/ProblemsPage"), {
-  loading: PageSkeleton,
-  ssr: false,
-});
-const LeaderboardPage = dynamic(
-  () => import("@/components/pages/LeaderboardPage"),
-  { loading: PageSkeleton, ssr: false },
-);
-const ArenaPage = dynamic(() => import("@/components/pages/ArenaPage"), {
-  loading: PageSkeleton,
-  ssr: false,
-});
-const AdminPage = dynamic(() => import("@/components/pages/AdminPage"), {
-  loading: PageSkeleton,
-  ssr: false,
-});
+const HomePage      = dynamic(() => import("@/components/pages/HomePage"),      { loading: PageSkeleton, ssr: false });
+const ProblemsPage  = dynamic(() => import("@/components/pages/ProblemsPage"),  { loading: PageSkeleton, ssr: false });
+const LeaderboardPage = dynamic(() => import("@/components/pages/LeaderboardPage"), { loading: PageSkeleton, ssr: false });
+const ArenaPage     = dynamic(() => import("@/components/pages/ArenaPage"),     { loading: PageSkeleton, ssr: false });
+const AdminPage     = dynamic(() => import("@/components/pages/AdminPage"),     { loading: PageSkeleton, ssr: false });
 
 type PageId = "home" | "problems" | "leaderboard" | "arena" | "admin";
-
-const PAGE_KEY = "bb_page"; // sessionStorage key
+const PAGE_KEY = "bb_page";
 
 function AuthLoader() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <img
-          src="/logo.png"
-          alt="BitByBit"
-          className="w-28 h-28 object-contain animate-pulse"
-        />
+        <img src="/logo.png" alt="BitByBit" className="w-28 h-28 object-contain animate-pulse" />
         <div className="w-32 h-[1px] bg-[#1a1a1a] overflow-hidden rounded">
           <div className="h-full w-1/2 bg-[#00e87a] animate-[slide_1s_ease-in-out_infinite]" />
         </div>
@@ -63,18 +39,21 @@ function AuthLoader() {
 }
 
 export default function App() {
-  // ── Restore the last page from sessionStorage (survives refresh, not new tab)
   const [page, setPageState] = useState<PageId>("home");
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser]      = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [arenaLocked, setArenaLocked] = useState(false);
+
+  // Track whether we've confirmed auth state at least once so we never
+  // show a logged-out flash before the session is confirmed.
+  const authConfirmed = useRef(false);
 
   function setPage(id: PageId) {
     setPageState(id);
     try { sessionStorage.setItem(PAGE_KEY, id); } catch { /* private mode */ }
   }
 
-  // Restore page on first render (client-only)
+  // Restore last page from sessionStorage on first render
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem(PAGE_KEY) as PageId | null;
@@ -83,90 +62,116 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    let resolved = false;
+    const db = getSupabaseClient();
+    let isMounted = true;
 
-    function resolve(sessionUser: User | null) {
-      if (resolved) return;
-      resolved = true;
-      setUser(sessionUser);
-      setLoading(false);
+    async function buildUser(supabaseUser: NonNullable<Awaited<ReturnType<typeof db.auth.getUser>>["data"]["user"]>): Promise<User> {
+      const github  = supabaseUser.user_metadata.user_name as string;
+      const isAdmin = await resolveAdminStatus(github);
+      return {
+        name:     supabaseUser.user_metadata.full_name || github,
+        github,
+        is_admin: isAdmin,
+      };
     }
 
-    // Raised to 8 s — Supabase can be slow on cold starts / Vercel edge
-    const timeout = setTimeout(() => {
-      console.warn("[auth] Timed out waiting for Supabase auth — treating as logged out");
-      resolve(null);
-    }, 8000);
-
-    async function init() {
-      try {
-        const db = getSupabaseClient();
-
-        // getSession is the fastest path — try it first
-        db.auth.getSession().then(async ({ data: { session }, error }) => {
-          if (error) {
-            console.warn("[auth] getSession error:", error.message);
-            resolve(null);
-            return;
-          }
+    // ── Step 1: try getUser() first ──────────────────────────────────────
+    // getUser() makes a real network call to Supabase to validate the token.
+    // This is more reliable than getSession() which only reads localStorage
+    // and can return stale/empty data before the client has fully initialised.
+    db.auth.getUser().then(async ({ data: { user: sbUser }, error }) => {
+      if (!isMounted) return;
+      if (error || !sbUser) {
+        // No valid session — but only treat as logged-out once we've
+        // also confirmed via getSession (covers the case where getUser
+        // races with the token being read from storage).
+        db.auth.getSession().then(async ({ data: { session } }) => {
+          if (!isMounted) return;
           if (session?.user) {
-            const github = session.user.user_metadata.user_name as string;
-            const isAdmin = await resolveAdminStatus(github);
-            resolve({
-              name: session.user.user_metadata.full_name || github,
-              github,
-              is_admin: isAdmin,
-            });
+            const u = await buildUser(session.user);
+            if (!isMounted) return;
+            setUser(u);
           } else {
-            resolve(null);
+            setUser(null);
           }
-        }).catch(() => resolve(null));
-
-        // Subscribe to future sign-in / sign-out events
-        const { data: { subscription } } = db.auth.onAuthStateChange(async (event, session) => {
-          if (!resolved) {
-            if (session?.user) {
-              const github = session.user.user_metadata.user_name as string;
-              const isAdmin = await resolveAdminStatus(github);
-              resolve({
-                name: session.user.user_metadata.full_name || github,
-                github,
-                is_admin: isAdmin,
-              });
-            } else {
-              resolve(null);
-            }
-          } else {
-            // Subsequent events (sign in / out after page loaded)
-            if (session?.user) {
-              const github = session.user.user_metadata.user_name as string;
-              const isAdmin = await resolveAdminStatus(github);
-              setUser({
-                name: session.user.user_metadata.full_name || github,
-                github,
-                is_admin: isAdmin,
-              });
-            } else {
-              setUser(null);
-              setPage("home");
-            }
-          }
+          authConfirmed.current = true;
+          setLoading(false);
+        }).catch(() => {
+          if (!isMounted) return;
+          setUser(null);
+          authConfirmed.current = true;
+          setLoading(false);
         });
-
-        return () => {
-          subscription.unsubscribe();
-        };
-      } catch (err) {
-        console.error("[auth] Fatal init error:", err);
-        resolve(null);
+        return;
       }
-    }
+      const u = await buildUser(sbUser);
+      if (!isMounted) return;
+      setUser(u);
+      authConfirmed.current = true;
+      setLoading(false);
+    }).catch(() => {
+      // Network down — fall back to getSession (cached token)
+      db.auth.getSession().then(async ({ data: { session } }) => {
+        if (!isMounted) return;
+        if (session?.user) {
+          const u = await buildUser(session.user);
+          if (!isMounted) return;
+          setUser(u);
+        } else {
+          setUser(null);
+        }
+        authConfirmed.current = true;
+        setLoading(false);
+      }).catch(() => {
+        if (!isMounted) return;
+        setUser(null);
+        authConfirmed.current = true;
+        setLoading(false);
+      });
+    });
 
-    const cleanupPromise = init();
+    // ── Step 2: subscribe to auth events for subsequent changes ─────────
+    // Only act on SIGNED_IN and SIGNED_OUT — ignore INITIAL_SESSION,
+    // TOKEN_REFRESHED, USER_UPDATED etc. to avoid spurious logouts.
+    const { data: { subscription } } = db.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      console.debug("[auth] event:", event);
+
+      if (event === "SIGNED_IN" && session?.user) {
+        const u = await buildUser(session.user);
+        if (!isMounted) return;
+        setUser(u);
+        // If getUser() hasn't resolved yet, finish loading now
+        if (!authConfirmed.current) {
+          authConfirmed.current = true;
+          setLoading(false);
+        }
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+        setPage("home");
+        if (!authConfirmed.current) {
+          authConfirmed.current = true;
+          setLoading(false);
+        }
+      }
+      // All other events (INITIAL_SESSION, TOKEN_REFRESHED, USER_UPDATED…)
+      // are intentionally ignored to prevent refresh-induced logouts.
+    });
+
+    // Safety net: resolve loading after 10 s no matter what
+    const timeout = setTimeout(() => {
+      if (!isMounted) return;
+      console.warn("[auth] timeout — resolving as logged out");
+      if (!authConfirmed.current) {
+        authConfirmed.current = true;
+        setLoading(false);
+      }
+    }, 10_000);
 
     return () => {
+      isMounted = false;
       clearTimeout(timeout);
-      cleanupPromise.then((cleanup) => cleanup?.());
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -184,58 +189,41 @@ export default function App() {
 
   async function signIn() {
     const db = getSupabaseClient();
-    const origin = window.location.origin;
-    const redirect = origin.includes("localhost")
-      ? origin
-      : "https://bitbybit-alpha.vercel.app/";
-    await db.auth.signInWithOAuth({
-      provider: "github",
-      options: { redirectTo: redirect },
-    });
+    const origin   = window.location.origin;
+    const redirect = origin.includes("localhost") ? origin : "https://bitbybit-alpha.vercel.app/";
+    await db.auth.signInWithOAuth({ provider: "github", options: { redirectTo: redirect } });
   }
 
   async function signOut() {
     const db = getSupabaseClient();
     await db.auth.signOut();
-    setUser(null);
-    setPage("home");
+    // SIGNED_OUT event will call setUser(null) + setPage("home")
   }
 
-  if (loading) {
-    return <AuthLoader />;
-  }
+  if (loading) return <AuthLoader />;
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* ── Header ──────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur border-b border-[#1a1a1a] flex items-center justify-between px-6 h-14">
-        <div
-          className="flex items-center gap-2 cursor-pointer"
-          onClick={() => navigate("home")}
-        >
-          <img
-            src="/logo.png"
-            alt="BitByBit Logo"
-            className="w-7 h-7 object-contain"
-          />
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("home")}>
+          <img src="/logo.png" alt="BitByBit Logo" className="w-7 h-7 object-contain" />
           <span className="font-display font-bold text-lg select-none">
             BitBy<span className="text-[#00e87a]">Bit</span>
           </span>
         </div>
 
         <nav className="hidden md:flex items-center gap-1">
-          {(["home", "problems", "leaderboard", "arena"] as PageId[]).map(
-            (id) => (
-              <button
-                key={id}
-                onClick={() => navigate(id)}
-                className={`px-4 py-1.5 rounded-lg font-mono text-sm capitalize transition-all
+          {(["home", "problems", "leaderboard", "arena"] as PageId[]).map((id) => (
+            <button
+              key={id}
+              onClick={() => navigate(id)}
+              className={`px-4 py-1.5 rounded-lg font-mono text-sm capitalize transition-all
                 ${page === id ? "text-[#00e87a] bg-[#00e87a10]" : "text-[#666] hover:text-[#e0e0e0]"}`}
-              >
-                {id}
-              </button>
-            ),
-          )}
+            >
+              {id}
+            </button>
+          ))}
           {user?.is_admin && (
             <button
               onClick={() => navigate("admin")}
@@ -251,9 +239,7 @@ export default function App() {
           {user && (
             <div className="flex items-center gap-2 bg-[#111] border border-[#1f1f1f] rounded-full px-3 py-1">
               <span className="w-2 h-2 bg-[#00e87a] rounded-full animate-pulse" />
-              <span className="text-sm font-mono text-[#e0e0e0]">
-                {user.name}
-              </span>
+              <span className="text-sm font-mono text-[#e0e0e0]">{user.name}</span>
             </div>
           )}
           <button
@@ -271,13 +257,11 @@ export default function App() {
 
       {/* ── Page content ─────────────────────────────────── */}
       <main className="flex-1 px-4 md:px-6 py-6 max-w-7xl mx-auto w-full">
-        {page === "home" && <HomePage user={user} onNavigate={navigate} />}
-        {page === "problems" && <ProblemsPage user={user} />}
+        {page === "home"        && <HomePage      user={user} onNavigate={navigate} />}
+        {page === "problems"    && <ProblemsPage  user={user} />}
         {page === "leaderboard" && <LeaderboardPage />}
-        {page === "arena" && (
-          <ArenaPage user={user} onArenaLockChange={setArenaLocked} />
-        )}
-        {page === "admin" && user?.is_admin && <AdminPage user={user} />}
+        {page === "arena"       && <ArenaPage     user={user} onArenaLockChange={setArenaLocked} />}
+        {page === "admin"       && user?.is_admin && <AdminPage user={user} />}
       </main>
     </div>
   );
