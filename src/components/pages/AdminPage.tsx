@@ -682,7 +682,89 @@ export default function AdminPage({ user }: AdminPageProps) {
   }
 
   useEffect(() => {
-    if (user.is_admin) loadAll();
+    if (!user.is_admin) return;
+
+    // ── Initial load ─────────────────────────────────────
+    loadAll();
+
+    // ── Realtime subscriptions ────────────────────────────
+    // Each channel listens for INSERT / UPDATE / DELETE on a table and
+    // re-fetches only that slice so the UI stays live without a full reload.
+    const channel = db
+      .channel('admin-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'submissions' },
+        async () => {
+          const { data } = await db
+            .from('submissions')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200);
+          setSubs(data || []);
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'arena_submissions' },
+        async () => {
+          const { data } = await db
+            .from('arena_submissions')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(200);
+          setArenaSubs((data as ArenaSubmission[]) || []);
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'members' },
+        async () => {
+          const { data } = await db
+            .from('members')
+            .select('*')
+            .order('total_points', { ascending: false });
+          setMembers(data || []);
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'contest_registrations' },
+        async () => {
+          const { data } = await db
+            .from('contest_registrations')
+            .select('*')
+            .order('created_at', { ascending: false });
+          setRegs((data as ContestRegistration[]) || []);
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'contests' },
+        async () => {
+          const { data } = await db
+            .from('contests')
+            .select('*')
+            .order('created_at', { ascending: false });
+          setContests(data || []);
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'problems' },
+        async () => {
+          const { data } = await db
+            .from('problems')
+            .select('*')
+            .order('created_at', { ascending: false });
+          setProbs(data || []);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      db.removeChannel(channel);
+    };
   }, []);
 
   // ── Submission actions (regular problems) ────────────────

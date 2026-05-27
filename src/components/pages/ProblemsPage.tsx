@@ -60,6 +60,7 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
     const s = JSON.parse(localStorage.getItem('bb_solved') || '[]');
     setSolved(s);
 
+    // ── Initial fetch ─────────────────────────────────────
     (async () => {
       try {
         const { data } = await db.from('problems').select('*').order('created_at', { ascending: false });
@@ -68,6 +69,31 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
         setProblems(STATIC_PROBLEMS);
       }
     })();
+
+    // ── Realtime: admin adds / edits / deletes a problem ──
+    // Users see the new problem list immediately without refreshing.
+    const channel = db
+      .channel('problems-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'problems' },
+        async () => {
+          try {
+            const { data } = await db
+              .from('problems')
+              .select('*')
+              .order('created_at', { ascending: false });
+            setProblems([...(data || []), ...STATIC_PROBLEMS]);
+          } catch {
+            // keep existing list on network error
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      db.removeChannel(channel);
+    };
   }, []);
 
   const filtered = filter === 'all'

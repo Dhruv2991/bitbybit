@@ -1,6 +1,9 @@
 "use client";
 // ════════════════════════════════════════════════════════════
 // src/app/page.tsx — Root page
+// FIX 1: Persist active page in sessionStorage so refresh doesn't
+//         kick the user back to "home".
+// FIX 2: Raise auth timeout from 3 s → 8 s to survive cold starts.
 // ════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from "react";
@@ -40,6 +43,8 @@ const AdminPage = dynamic(() => import("@/components/pages/AdminPage"), {
 
 type PageId = "home" | "problems" | "leaderboard" | "arena" | "admin";
 
+const PAGE_KEY = "bb_page"; // sessionStorage key
+
 function AuthLoader() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
@@ -58,10 +63,24 @@ function AuthLoader() {
 }
 
 export default function App() {
-  const [page, setPage] = useState<PageId>("home");
+  // ── Restore the last page from sessionStorage (survives refresh, not new tab)
+  const [page, setPageState] = useState<PageId>("home");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [arenaLocked, setArenaLocked] = useState(false);
+
+  function setPage(id: PageId) {
+    setPageState(id);
+    try { sessionStorage.setItem(PAGE_KEY, id); } catch { /* private mode */ }
+  }
+
+  // Restore page on first render (client-only)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(PAGE_KEY) as PageId | null;
+      if (saved) setPageState(saved);
+    } catch { /* private mode */ }
+  }, []);
 
   useEffect(() => {
     let resolved = false;
@@ -73,19 +92,18 @@ export default function App() {
       setLoading(false);
     }
 
-    // Hard timeout — always fires after 3s no matter what
+    // Raised to 8 s — Supabase can be slow on cold starts / Vercel edge
     const timeout = setTimeout(() => {
       console.warn("[auth] Timed out waiting for Supabase auth — treating as logged out");
       resolve(null);
-    }, 3000);
+    }, 8000);
 
-    // Kick off auth detection
     async function init() {
       try {
         const db = getSupabaseClient();
 
-        // Race: getSession vs onAuthStateChange — whichever fires first wins
-        const sessionPromise = db.auth.getSession().then(async ({ data: { session }, error }) => {
+        // getSession is the fastest path — try it first
+        db.auth.getSession().then(async ({ data: { session }, error }) => {
           if (error) {
             console.warn("[auth] getSession error:", error.message);
             resolve(null);
@@ -104,10 +122,9 @@ export default function App() {
           }
         }).catch(() => resolve(null));
 
-        // Also subscribe to changes for sign-in/sign-out after initial load
+        // Subscribe to future sign-in / sign-out events
         const { data: { subscription } } = db.auth.onAuthStateChange(async (event, session) => {
           if (!resolved) {
-            // First event — use it to resolve initial auth
             if (session?.user) {
               const github = session.user.user_metadata.user_name as string;
               const isAdmin = await resolveAdminStatus(github);
@@ -120,7 +137,7 @@ export default function App() {
               resolve(null);
             }
           } else {
-            // Subsequent events (sign in/out after page loaded)
+            // Subsequent events (sign in / out after page loaded)
             if (session?.user) {
               const github = session.user.user_metadata.user_name as string;
               const isAdmin = await resolveAdminStatus(github);
