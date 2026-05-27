@@ -9,7 +9,6 @@ import type { User } from "@/types/database";
 
 import dynamic from "next/dynamic";
 
-// Inline loading fallback — a simple fade-in skeleton so Suspense always resolves
 function PageSkeleton() {
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
@@ -41,7 +40,6 @@ const AdminPage = dynamic(() => import("@/components/pages/AdminPage"), {
 
 type PageId = "home" | "problems" | "leaderboard" | "arena" | "admin";
 
-// Full-screen loader shown while auth resolves
 function AuthLoader() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
@@ -60,58 +58,98 @@ function AuthLoader() {
 }
 
 export default function App() {
-  const db = getSupabaseClient();
   const [page, setPage] = useState<PageId>("home");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [arenaLocked, setArenaLocked] = useState(false);
 
   useEffect(() => {
-    // Safety net: if auth never resolves within 5s, stop the spinner
+    let resolved = false;
+
+    function resolve(sessionUser: User | null) {
+      if (resolved) return;
+      resolved = true;
+      setUser(sessionUser);
+      setLoading(false);
+    }
+
+    // Hard timeout — always fires after 3s no matter what
     const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
+      console.warn("[auth] Timed out waiting for Supabase auth — treating as logged out");
+      resolve(null);
+    }, 3000);
 
-    // Also try getSession immediately — onAuthStateChange can miss the initial
-    // session on some Supabase configs (e.g. PKCE with hash fragments)
-    db.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        clearTimeout(timeout);
-        const github = session.user.user_metadata.user_name as string;
-        resolveAdminStatus(github).then((isAdmin) => {
-          setUser({
-            name: session.user.user_metadata.full_name || github,
-            github,
-            is_admin: isAdmin,
-          });
-          setLoading(false);
+    // Kick off auth detection
+    async function init() {
+      try {
+        const db = getSupabaseClient();
+
+        // Race: getSession vs onAuthStateChange — whichever fires first wins
+        const sessionPromise = db.auth.getSession().then(async ({ data: { session }, error }) => {
+          if (error) {
+            console.warn("[auth] getSession error:", error.message);
+            resolve(null);
+            return;
+          }
+          if (session?.user) {
+            const github = session.user.user_metadata.user_name as string;
+            const isAdmin = await resolveAdminStatus(github);
+            resolve({
+              name: session.user.user_metadata.full_name || github,
+              github,
+              is_admin: isAdmin,
+            });
+          } else {
+            resolve(null);
+          }
+        }).catch(() => resolve(null));
+
+        // Also subscribe to changes for sign-in/sign-out after initial load
+        const { data: { subscription } } = db.auth.onAuthStateChange(async (event, session) => {
+          if (!resolved) {
+            // First event — use it to resolve initial auth
+            if (session?.user) {
+              const github = session.user.user_metadata.user_name as string;
+              const isAdmin = await resolveAdminStatus(github);
+              resolve({
+                name: session.user.user_metadata.full_name || github,
+                github,
+                is_admin: isAdmin,
+              });
+            } else {
+              resolve(null);
+            }
+          } else {
+            // Subsequent events (sign in/out after page loaded)
+            if (session?.user) {
+              const github = session.user.user_metadata.user_name as string;
+              const isAdmin = await resolveAdminStatus(github);
+              setUser({
+                name: session.user.user_metadata.full_name || github,
+                github,
+                is_admin: isAdmin,
+              });
+            } else {
+              setUser(null);
+              setPage("home");
+            }
+          }
         });
+
+        return () => {
+          subscription.unsubscribe();
+        };
+      } catch (err) {
+        console.error("[auth] Fatal init error:", err);
+        resolve(null);
       }
-    });
+    }
 
-    const {
-      data: { subscription },
-    } = db.auth.onAuthStateChange(async (event, session) => {
-      clearTimeout(timeout);
-
-      if (session) {
-        const github = session.user.user_metadata.user_name as string;
-        const isAdmin = await resolveAdminStatus(github);
-        setUser({
-          name: session.user.user_metadata.full_name || github,
-          github,
-          is_admin: isAdmin,
-        });
-      } else {
-        setUser(null);
-      }
-
-      setLoading(false);
-    });
+    const cleanupPromise = init();
 
     return () => {
       clearTimeout(timeout);
-      subscription.unsubscribe();
+      cleanupPromise.then((cleanup) => cleanup?.());
     };
   }, []);
 
@@ -128,6 +166,7 @@ export default function App() {
   }
 
   async function signIn() {
+    const db = getSupabaseClient();
     const origin = window.location.origin;
     const redirect = origin.includes("localhost")
       ? origin
@@ -139,6 +178,7 @@ export default function App() {
   }
 
   async function signOut() {
+    const db = getSupabaseClient();
     await db.auth.signOut();
     setUser(null);
     setPage("home");
