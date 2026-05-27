@@ -18,6 +18,16 @@ const AdminPage      = dynamic(() => import('@/components/pages/AdminPage'));
 
 type PageId = 'home' | 'problems' | 'leaderboard' | 'arena' | 'admin';
 
+function PageSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+      <div className="text-[#333] text-sm font-mono animate-pulse">
+        Loading...
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const db = getSupabaseClient();
   const [page,    setPage]    = useState<PageId>('home');

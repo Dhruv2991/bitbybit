@@ -78,3 +78,9 @@
     @apply w-5 h-5 border-2 border-[#00e87a] border-t-transparent rounded-full animate-spin;
   }
 }
+
+@keyframes slide {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(200%); }
+  100% { transform: translateX(-100%); }
+}
