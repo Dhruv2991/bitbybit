@@ -5,8 +5,30 @@
 // ════════════════════════════════════════════════════════════
 
 import { useRef, useEffect } from 'react';
-import Editor, { OnMount, BeforeMount } from '@monaco-editor/react';
+import dynamic from 'next/dynamic';
+import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { SupportedLang } from '@/types/database';
+
+const Editor = dynamic(
+  () => import('@monaco-editor/react').then(mod => mod.default),
+  {
+    ssr: false,
+    loading: () => (
+      <div style={{
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#555',
+        fontSize: '13px',
+        fontFamily: '"JetBrains Mono", monospace',
+        background: '#0f0f0f',
+      }}>
+        Loading editor...
+      </div>
+    ),
+  }
+);
 
 const MONACO_LANG_MAP: Record<SupportedLang, string> = {
   python:     'python',
