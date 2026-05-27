@@ -39,27 +39,12 @@ export default function App() {
 
   // ── Session init ─────────────────────────────────────────
   useEffect(() => {
-    (async () => {
-      try {
-        const {
-          data: { session },
-        } = await db.auth.getSession();
-        if (session) {
-          const github = session.user.user_metadata.user_name as string;
-          const isAdmin = await resolveAdminStatus(github);
-          setUser({
-            name: session.user.user_metadata.full_name || github,
-            github,
-            is_admin: isAdmin,
-          });
-        }
-      } catch {}
-      setLoading(false);
-    })();
-
+    // onAuthStateChange fires for INITIAL_SESSION, SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, etc.
+    // It reliably fires on every page load (including hard refreshes and OAuth redirects),
+    // so we use it as the single source of truth for both loading state and user state.
     const {
       data: { subscription },
-    } = db.auth.onAuthStateChange(async (_event, session) => {
+    } = db.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         const github = session.user.user_metadata.user_name as string;
         const isAdmin = await resolveAdminStatus(github);
@@ -71,6 +56,9 @@ export default function App() {
       } else {
         setUser(null);
       }
+      // Always clear loading once we know the auth state,
+      // whether the user is signed in or not.
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
