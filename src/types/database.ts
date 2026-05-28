@@ -94,11 +94,117 @@ export const LANG_KEYS: Record<SupportedLang, string> = {
 export const LANG_LABELS: Record<SupportedLang, string> = {
   python:'Python 3', javascript:'JavaScript', cpp:'C++', java:'Java', rust:'Rust', go:'Go',
 };
+
+// Extract function name and params from a Python def line
+// e.g. "def twoSum(nums, target):" → { name: 'twoSum', params: ['nums', 'target'] }
+function parsePythonDef(starterCode: string): { name: string; params: string[] } {
+  const match = starterCode.match(/def\s+(\w+)\s*\(([^)]*)\)/);
+  if (!match) return { name: 'solution', params: [] };
+  const name = match[1];
+  const params = match[2].split(',').map(p => p.trim()).filter(Boolean);
+  return { name, params };
+}
+
 export const STARTER_CODE: Record<SupportedLang, (p?: Problem) => string> = {
-  python: (p) => p?.starter_code || 'import sys\ninput = sys.stdin.read\n\ndef solution():\n    pass\n\nprint(solution())',
-  javascript: () => 'const lines = require("fs").readFileSync("/dev/stdin","utf8").trim().split("\\n");\n\nfunction solution() {\n  // Write your solution here\n}\n\nconsole.log(solution());',
-  cpp: () => '#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    ios_base::sync_with_stdio(false);\n    cin.tie(NULL);\n    return 0;\n}',
-  java: () => 'import java.util.*;\nimport java.io.*;\n\npublic class Main {\n    public static void main(String[] args) throws Exception {\n        Scanner sc = new Scanner(System.in);\n    }\n}',
-  rust: () => 'use std::io::{self, BufRead};\n\nfn main() {\n    let stdin = io::stdin();\n    let mut lines = stdin.lock().lines();\n}',
-  go: () => 'package main\n\nimport (\n    "bufio"\n    "fmt"\n    "os"\n)\n\nfunc main() {\n    reader := bufio.NewReader(os.Stdin)\n    _ = reader\n    fmt.Println()\n}',
+  python: (p) => p?.starter_code ||
+    'import sys\ninput = sys.stdin.read\n\ndef solution():\n    pass\n\nprint(solution())',
+
+  javascript: (p) => {
+    const { name, params } = parsePythonDef(p?.starter_code || '');
+    const args = params.join(', ');
+    return [
+      `const lines = require("fs").readFileSync("/dev/stdin","utf8").trim().split("\\n");`,
+      ``,
+      `function ${name}(${args}) {`,
+      `  // Write your solution here`,
+      `}`,
+      ``,
+      `console.log(${name}(${args}));`,
+    ].join('\n');
+  },
+
+  cpp: (p) => {
+    const { name, params } = parsePythonDef(p?.starter_code || '');
+    const paramList = params.map(p => `auto ${p}`).join(', ');
+    return [
+      `#include <bits/stdc++.h>`,
+      `using namespace std;`,
+      ``,
+      `auto ${name}(${paramList}) {`,
+      `    // Write your solution here`,
+      `}`,
+      ``,
+      `int main() {`,
+      `    ios_base::sync_with_stdio(false);`,
+      `    cin.tie(NULL);`,
+      `    // Parse input and call ${name}()`,
+      `    return 0;`,
+      `}`,
+    ].join('\n');
+  },
+
+  java: (p) => {
+    const { name, params } = parsePythonDef(p?.starter_code || '');
+    const paramList = params.map(p => `Object ${p}`).join(', ');
+    return [
+      `import java.util.*;`,
+      `import java.io.*;`,
+      ``,
+      `public class Main {`,
+      `    public static Object ${name}(${paramList}) {`,
+      `        // Write your solution here`,
+      `        return null;`,
+      `    }`,
+      ``,
+      `    public static void main(String[] args) throws Exception {`,
+      `        Scanner sc = new Scanner(System.in);`,
+      `        System.out.println(${name}(${params.map(() => 'null').join(', ')}));`,
+      `    }`,
+      `}`,
+    ].join('\n');
+  },
+
+  rust: (p) => {
+    const { name, params } = parsePythonDef(p?.starter_code || '');
+    const paramList = params.map(p => `${p}: &str`).join(', ');
+    return [
+      `use std::io::{self, BufRead};`,
+      ``,
+      `fn ${name}(${paramList}) -> String {`,
+      `    // Write your solution here`,
+      `    String::new()`,
+      `}`,
+      ``,
+      `fn main() {`,
+      `    let stdin = io::stdin();`,
+      `    let mut lines = stdin.lock().lines();`,
+      `    println!("{}", ${name}(${params.map(() => '""').join(', ')}));`,
+      `}`,
+    ].join('\n');
+  },
+
+  go: (p) => {
+    const { name, params } = parsePythonDef(p?.starter_code || '');
+    const paramList = params.map(p => `${p} interface{}`).join(', ');
+    return [
+      `package main`,
+      ``,
+      `import (`,
+      `    "bufio"`,
+      `    "fmt"`,
+      `    "os"`,
+      `)`,
+      ``,
+      `func ${name}(${paramList}) interface{} {`,
+      `    // Write your solution here`,
+      `    return nil`,
+      `}`,
+      ``,
+      `func main() {`,
+      `    reader := bufio.NewReader(os.Stdin)`,
+      `    _ = reader`,
+      `    fmt.Println(${name}(${params.map(() => 'nil').join(', ')}));`,
+      `}`,
+    ].join('\n');
+  },
 };
