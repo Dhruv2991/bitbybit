@@ -1,9 +1,4 @@
 'use client';
-// ════════════════════════════════════════════════════════════
-// src/components/pages/ProblemsPage.tsx
-// Contest-only problems (is_contest_problem = true) are hidden here
-// ════════════════════════════════════════════════════════════
-
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -24,7 +19,7 @@ const STATIC_PROBLEMS: Problem[] = [
     starter_code:'def isPalindrome(s):\n    pass',
     submission_count:8, created_at:'', updated_at:'', test_cases:[] },
   { id:'static-3', title:'Container With Most Water', difficulty:'Medium', points:200, tags:['Arrays','Two Pointers'],
-    description:'<p>Find two lines that together with the x-axis forms a container such that it contains the most water.</p>',
+    description:'<p>Find two lines that together with the x-axis forms a container that contains the most water.</p>',
     example:'Input: height = [1,8,6,2,5,4,8,3,7]\nOutput: 49',
     starter_code:'def maxArea(height):\n    pass',
     submission_count:5, created_at:'', updated_at:'', test_cases:[] },
@@ -51,50 +46,37 @@ interface ProblemsPageProps { user: User | null }
 
 export default function ProblemsPage({ user }: ProblemsPageProps) {
   const db = getSupabaseClient();
-  const [problems,  setProblems]  = useState<Problem[]>([]);
-  const [filter,    setFilter]    = useState<string>('all');
-  const [selected,  setSelected]  = useState<Problem | null>(null);
-  const [solved,    setSolved]    = useState<string[]>([]);
+  const [problems, setProblems] = useState<Problem[]>(STATIC_PROBLEMS); // show static immediately
+  const [filter,   setFilter]   = useState<string>('all');
+  const [selected, setSelected] = useState<Problem | null>(null);
+  const [solved,   setSolved]   = useState<string[]>([]);
 
   useEffect(() => {
-    const s = JSON.parse(localStorage.getItem('bb_solved') || '[]');
-    setSolved(s);
+    try { setSolved(JSON.parse(localStorage.getItem('bb_solved') || '[]')); } catch {}
 
-    (async () => {
+    async function load() {
       try {
-        const { data } = await (db.from('problems') as any)
+        const { data, error } = await db
+          .from('problems')
           .select('*')
-          .eq('is_contest_problem', false)
           .order('created_at', { ascending: false });
-        // Also include rows where is_contest_problem is null (legacy problems)
-        const { data: legacy } = await (db.from('problems') as any)
-          .select('*')
-          .is('is_contest_problem', null)
-          .order('created_at', { ascending: false });
-        const combined = [...(data || []), ...(legacy || [])];
-        // Deduplicate by id
-        const seenIds: Record<string, boolean> = {};
-        const deduped = combined.filter(p => { if (seenIds[p.id]) return false; seenIds[p.id] = true; return true; });
-        setProblems([...deduped, ...STATIC_PROBLEMS]);
+        if (error || !data) return;
+        // Filter out contest-only problems on the client side
+        // (avoids TypeScript errors from the new column not being in generated types yet)
+        const publicProbs = data.filter((p: any) => !p.is_contest_problem);
+        // Merge DB problems with static ones (DB takes priority, no dupes)
+        const dbIds = new Set(publicProbs.map((p: any) => p.id));
+        const statics = STATIC_PROBLEMS.filter(p => !dbIds.has(p.id));
+        setProblems([...publicProbs, ...statics]);
       } catch {
-        setProblems(STATIC_PROBLEMS);
+        // Keep showing static problems on error
       }
-    })();
+    }
+    load();
 
     const channel = db
       .channel('problems-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'problems' }, async () => {
-        try {
-          const { data } = await (db.from('problems') as any)
-            .select('*').eq('is_contest_problem', false).order('created_at', { ascending: false });
-          const { data: legacy } = await (db.from('problems') as any)
-            .select('*').is('is_contest_problem', null).order('created_at', { ascending: false });
-          const combined = [...(data || []), ...(legacy || [])];
-          const seenIds: Record<string, boolean> = {};
-          const deduped = combined.filter(p => { if (seenIds[p.id]) return false; seenIds[p.id] = true; return true; });
-          setProblems([...deduped, ...STATIC_PROBLEMS]);
-        } catch {}
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'problems' }, load)
       .subscribe();
 
     return () => { db.removeChannel(channel); };
@@ -116,49 +98,49 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
           {DIFFICULTIES.map(d => (
             <button key={d} onClick={() => setFilter(d)}
               className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-mono transition-all
-                ${filter === d ? 'bg-[#00e87a] text-black font-bold' : 'bg-[#111] border border-[#1f1f1f] text-[#666] hover:text-[#e0e0e0]'}`}>
+                ${filter === d
+                  ? 'bg-[#00e87a] text-black font-bold'
+                  : 'bg-[#111] border border-[#1f1f1f] text-[#666] hover:text-[#e0e0e0]'}`}>
               {d === 'all' ? 'All' : d}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Mobile: card list */}
+      {/* Mobile card list */}
       <div className="md:hidden space-y-2">
-        {filtered.length === 0 ? (
-          <div className="text-center py-16 text-[#444] font-mono text-sm">No problems match this filter.</div>
-        ) : filtered.map((p, i) => {
+        {filtered.map((p, i) => {
           const isSolved = solved.includes(p.id);
           return (
             <div key={p.id} onClick={() => setSelected(p)}
-              className="bg-[#111] border border-[#1f1f1f] rounded-xl px-4 py-3 flex items-center gap-3 active:bg-[#161616] cursor-pointer">
+              className="bg-[#111] border border-[#1f1f1f] rounded-xl px-4 py-3 flex items-center gap-3 cursor-pointer active:bg-[#161616]">
               <div className="text-[#333] text-sm font-mono w-6 shrink-0">{i + 1}</div>
               <div className="flex-1 min-w-0">
                 <div className="text-[#e0e0e0] font-mono text-sm truncate">{p.title}</div>
                 <div className="flex items-center gap-2 mt-1">
                   <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded
                     ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a15]' :
-                      p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42915]' : 'text-[#ff4d4d] bg-[#ff4d4d15]'}`}>
+                      p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42915]' :
+                      'text-[#ff4d4d] bg-[#ff4d4d15]'}`}>
                     {p.difficulty}
                   </span>
                   <span className="text-[#a78bfa] text-[10px] font-mono">{p.points}pts</span>
                 </div>
               </div>
-              <div className="shrink-0">
-                {isSolved
-                  ? <span className="text-[#00e87a] text-xs font-mono">✓</span>
-                  : <span className="text-[#333] text-xs font-mono">→</span>}
-              </div>
+              <span className={`text-xs font-mono shrink-0 ${isSolved ? 'text-[#00e87a]' : 'text-[#333]'}`}>
+                {isSolved ? '✓' : '→'}
+              </span>
             </div>
           );
         })}
       </div>
 
-      {/* Desktop: table */}
+      {/* Desktop table */}
       <div className="hidden md:block bg-[#111] border border-[#1f1f1f] rounded-xl overflow-hidden">
         <div className="grid grid-cols-[2rem_1fr_auto_auto_auto_auto] gap-4 px-5 py-3
           border-b border-[#1a1a1a] text-xs text-[#444] font-mono uppercase tracking-wider">
-          <div>#</div><div>Title</div><div>Difficulty</div><div>Points</div><div>Submissions</div><div>Status</div>
+          <div>#</div><div>Title</div><div>Difficulty</div>
+          <div>Points</div><div>Submissions</div><div>Status</div>
         </div>
         {filtered.length === 0 ? (
           <div className="text-center py-16 text-[#444] font-mono">No problems match this filter.</div>
@@ -167,7 +149,8 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
           return (
             <div key={p.id} onClick={() => setSelected(p)}
               className="grid grid-cols-[2rem_1fr_auto_auto_auto_auto] gap-4 px-5 py-4
-                border-b border-[#161616] last:border-0 hover:bg-[#161616] cursor-pointer transition-colors group items-center">
+                border-b border-[#161616] last:border-0 hover:bg-[#161616] cursor-pointer
+                transition-colors group items-center">
               <div className="text-[#444] text-sm font-mono">{i + 1}</div>
               <div>
                 <div className="text-[#e0e0e0] font-mono text-sm group-hover:text-[#00e87a] transition-colors">{p.title}</div>
@@ -180,7 +163,8 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
               <div>
                 <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded
                   ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a15]' :
-                    p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42915]' : 'text-[#ff4d4d] bg-[#ff4d4d15]'}`}>
+                    p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42915]' :
+                    'text-[#ff4d4d] bg-[#ff4d4d15]'}`}>
                   {p.difficulty}
                 </span>
               </div>

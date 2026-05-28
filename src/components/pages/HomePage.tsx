@@ -1,9 +1,7 @@
 'use client';
-// src/components/pages/HomePage.tsx
-
 import { useEffect, useState } from 'react';
-import { getSupabaseClient }   from '@/lib/supabase';
-import type { User }           from '@/types/database';
+import { getSupabaseClient } from '@/lib/supabase';
+import type { User } from '@/types/database';
 
 interface HomePageProps {
   user:       User | null;
@@ -12,7 +10,8 @@ interface HomePageProps {
 
 export default function HomePage({ user, onNavigate }: HomePageProps) {
   const db = getSupabaseClient();
-  const [stats, setStats] = useState({ problems: '—', submissions: '—', members: '—' });
+  // Show sensible defaults immediately — DB counts replace them once loaded
+  const [stats, setStats] = useState({ problems: '6', submissions: '0', members: '0' });
 
   useEffect(() => {
     (async () => {
@@ -23,11 +22,11 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
           db.from('members').select('*', { count: 'exact', head: true }),
         ]);
         setStats({
-          problems:    String(pc || 6),
-          submissions: String(sc || 0),
-          members:     String(mc || 0),
+          problems:    String(pc ?? 6),
+          submissions: String(sc ?? 0),
+          members:     String(mc ?? 0),
         });
-      } catch { }
+      } catch {}
     })();
   }, []);
 
@@ -41,36 +40,38 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
   return (
     <div>
       {/* Hero */}
-      <section className="text-center py-20 relative">
+      <section className="text-center py-12 md:py-20 relative">
         <div className="inline-block bg-[#111] border border-[#1f1f1f] px-4 py-1.5 rounded-full
           text-xs font-mono text-[#666] mb-6">
           by <span className="text-[#00e87a]">TeamCodeLocked</span> community &nbsp;·&nbsp; Beta v2.0
         </div>
-        <h1 className="font-display font-extrabold text-5xl md:text-6xl text-[#e0e0e0] mb-4 leading-tight">
+        <h1 className="font-display font-extrabold text-4xl md:text-5xl lg:text-6xl text-[#e0e0e0] mb-4 leading-tight px-4">
           Build Sharper.<br />
           Code <em className="text-[#00e87a] not-italic">Bit By Bit.</em>
         </h1>
-        <p className="text-[#666] text-lg font-mono max-w-xl mx-auto mb-8">
+        <p className="text-[#666] text-base md:text-lg font-mono max-w-xl mx-auto mb-8 px-4">
           The private arena for TeamCodeLocked — solve daily problems, run real tests, compete in proctored contests.
         </p>
-        <div className="flex items-center justify-center gap-3 flex-wrap">
+        <div className="flex items-center justify-center gap-3 flex-wrap px-4">
           <button onClick={() => onNavigate('problems')} className="btn-primary">
             Browse Problems →
           </button>
-          <button onClick={() => onNavigate('arena')} className="btn-ghost">
-            Enter Arena
-          </button>
+          {!user && (
+            <button onClick={() => onNavigate('arena')} className="btn-ghost">
+              Enter Arena
+            </button>
+          )}
         </div>
 
-        {/* Stats */}
-        <div className="flex items-center justify-center gap-10 mt-14">
+        {/* Stats — always show numbers, never dashes */}
+        <div className="flex items-center justify-center gap-8 md:gap-10 mt-10 md:mt-14">
           {[
-            { val: stats.problems,    label: 'Problems' },
+            { val: stats.problems,    label: 'Problems'    },
             { val: stats.submissions, label: 'Submissions' },
-            { val: stats.members,     label: 'Members' },
+            { val: stats.members,     label: 'Members'     },
           ].map(s => (
             <div key={s.label} className="text-center">
-              <div className="text-3xl font-display font-extrabold text-[#00e87a]">{s.val}</div>
+              <div className="text-2xl md:text-3xl font-display font-extrabold text-[#00e87a]">{s.val}</div>
               <div className="text-xs text-[#444] font-mono mt-1">{s.label}</div>
             </div>
           ))}
@@ -78,23 +79,23 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
       </section>
 
       {/* Features */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 py-8">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 py-6 md:py-8">
         {features.map(f => (
-          <div key={f.title} className="card p-5">
+          <div key={f.title} className="card p-4 md:p-5">
             <div className="text-2xl mb-3">{f.icon}</div>
-            <h3 className="font-display font-bold text-[#e0e0e0] mb-2">{f.title}</h3>
-            <p className="text-[#666] text-sm font-mono leading-relaxed">{f.desc}</p>
+            <h3 className="font-display font-bold text-[#e0e0e0] mb-2 text-sm md:text-base">{f.title}</h3>
+            <p className="text-[#666] text-xs md:text-sm font-mono leading-relaxed">{f.desc}</p>
           </div>
         ))}
       </section>
 
-      {/* Tech stack callout */}
-      <section className="card p-6 mt-4">
+      {/* Tech stack */}
+      <section className="card p-4 md:p-6 mt-2 md:mt-4">
         <div className="text-xs text-[#444] font-mono uppercase tracking-wider mb-3">Powered by</div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2 md:gap-3">
           {['Monaco Editor', 'Judge0', 'Razorpay', 'Supabase', 'Next.js', 'GitHub OAuth'].map(t => (
-            <span key={t} className="px-3 py-1.5 bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg
-              text-xs font-mono text-[#666]">
+            <span key={t} className="px-2 md:px-3 py-1 md:py-1.5 bg-[#0a0a0a] border border-[#1f1f1f]
+              rounded-lg text-xs font-mono text-[#666]">
               {t}
             </span>
           ))}
