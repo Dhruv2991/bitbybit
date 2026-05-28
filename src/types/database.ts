@@ -8,6 +8,18 @@ export type ContestStatus    = 'upcoming' | 'live' | 'ended';
 export type RegStatus        = 'pending' | 'confirmed' | 'rejected';
 export type ArenaStatus      = 'submitted' | 'disqualified' | 'reviewed';
 
+/**
+ * A single test case.
+ *
+ * `input`    — JSON object whose keys match the function's parameter names.
+ *              e.g.  { "nums": [2,7,11,15], "target": 9 }
+ *
+ * `expected` — JSON value that the function must return.
+ *              e.g.  [0, 1]
+ *
+ * The executor deserialises both fields, calls the function directly
+ * (no stdin/stdout parsing needed), then deep-compares the return value.
+ */
 export interface TestCase { input: string; expected: string; }
 
 export interface Problem {
@@ -18,10 +30,15 @@ export interface Problem {
   tags: string[];
   description: string;
   example: string;
+  /**
+   * A Python `def` line that declares the function signature.
+   * e.g.  "def twoSum(nums, target):"
+   * The platform derives the function name + params for all 6 language templates.
+   */
   starter_code: string;
   test_cases: TestCase[];
   submission_count: number;
-  // When true this problem is arena-only and hidden from the public Problems page
+  /** When true this problem is arena-only and hidden from the public Problems page */
   is_contest_problem?: boolean;
   created_at: string;
   updated_at: string;
@@ -49,9 +66,7 @@ export interface Contest {
   upi_id: string;
   prize_note: string;
   leaderboard_discount: number;
-  // Legacy single-problem field (kept for DB compat)
   problem_id: string | null;
-  // Multi-problem support: array of problem IDs for this contest
   problem_ids: string[];
   status: ContestStatus;
   created_at: string;
@@ -95,115 +110,141 @@ export const LANG_LABELS: Record<SupportedLang, string> = {
   python:'Python 3', javascript:'JavaScript', cpp:'C++', java:'Java', rust:'Rust', go:'Go',
 };
 
-// Extract function name and params from a Python def line
-// e.g. "def twoSum(nums, target):" → { name: 'twoSum', params: ['nums', 'target'] }
-function parsePythonDef(starterCode: string): { name: string; params: string[] } {
+// ── Parse the Python def line ─────────────────────────────────
+// "def twoSum(nums, target):" → { name: 'twoSum', params: ['nums', 'target'] }
+export function parsePythonDef(starterCode: string): { name: string; params: string[] } {
   const match = starterCode.match(/def\s+(\w+)\s*\(([^)]*)\)/);
   if (!match) return { name: 'solution', params: [] };
-  const name = match[1];
+  const name   = match[1];
   const params = match[2].split(',').map(p => p.trim()).filter(Boolean);
   return { name, params };
 }
 
-export const STARTER_CODE: Record<SupportedLang, (p?: Problem) => string> = {
-  python: (p) => p?.starter_code ||
-    'import sys\ninput = sys.stdin.read\n\ndef solution():\n    pass\n\nprint(solution())',
+// ── Starter code templates ────────────────────────────────────
+//
+// Pure function bodies only — no stdin, no print, no main().
+// The executor wraps these with a JSON harness that:
+//   1. Deserialises the JSON input into typed arguments.
+//   2. Calls the function.
+//   3. Serialises the return value for comparison.
+//
+// Admin only needs to write one Python def line, e.g.:
+//   def twoSum(nums, target):
+// All 6 language stubs are generated automatically from it.
 
+export const STARTER_CODE: Record<SupportedLang, (p?: Problem) => string> = {
+
+  // ── Python ───────────────────────────────────────────────────
+  // Clean function stub — just pass, no comments to misalign against.
+  python: (p) => {
+    if (!p?.starter_code) return 'def solution():\n    pass\n';
+    const { name, params } = parsePythonDef(p.starter_code);
+    return `def ${name}(${params.join(', ')}):\n    pass\n`;
+  },
+
+  // ── JavaScript ───────────────────────────────────────────────
+  // Args arrive as plain JS values (arrays, numbers, strings, etc.)
+  // — no parsing needed, just write the logic.
   javascript: (p) => {
     const { name, params } = parsePythonDef(p?.starter_code || '');
-    const args = params.join(', ');
     return [
-      `const lines = require("fs").readFileSync("/dev/stdin","utf8").trim().split("\\n");`,
+      `function ${name}(${params.join(', ')}) {`,
       ``,
-      `function ${name}(${args}) {`,
-      `  // Write your solution here`,
       `}`,
-      ``,
-      `console.log(${name}(${args}));`,
     ].join('\n');
   },
 
+  // ── C++ ──────────────────────────────────────────────────────
+  // Args are nlohmann::json values injected by the harness.
+  // Use .get<T>() to convert to the type you need:
+  //   vector<int> nums_ = nums.get<vector<int>>();
+  //   int target_       = target.get<int>();
+  // Return any json-serialisable value (vector, int, string, etc.)
   cpp: (p) => {
     const { name, params } = parsePythonDef(p?.starter_code || '');
-    const paramList = params.map(p => `auto ${p}`).join(', ');
+    const paramList = params.map(q => `json ${q}`).join(', ');
     return [
       `#include <bits/stdc++.h>`,
+      `#include <nlohmann/json.hpp>`,
       `using namespace std;`,
+      `using json = nlohmann::json;`,
       ``,
-      `auto ${name}(${paramList}) {`,
-      `    // Write your solution here`,
-      `}`,
+      `// Each param is a nlohmann::json value.`,
+      `// Convert with .get<T>(), e.g.:`,
+      `//   vector<int> v = nums.get<vector<int>>();`,
+      `//   int t = target.get<int>();`,
+      `json ${name}(${paramList}) {`,
       ``,
-      `int main() {`,
-      `    ios_base::sync_with_stdio(false);`,
-      `    cin.tie(NULL);`,
-      `    // Parse input and call ${name}()`,
-      `    return 0;`,
       `}`,
     ].join('\n');
   },
 
+  // ── Java ─────────────────────────────────────────────────────
+  // Args arrive as Object (boxed from Gson JsonElement).
+  // Cast to the type you need, e.g.:
+  //   List<Integer> nums_ = (List<Integer>) nums;
+  //   int target_         = ((Double) target).intValue();
   java: (p) => {
     const { name, params } = parsePythonDef(p?.starter_code || '');
-    const paramList = params.map(p => `Object ${p}`).join(', ');
+    const paramList = params.map(q => `Object ${q}`).join(', ');
     return [
       `import java.util.*;`,
-      `import java.io.*;`,
       ``,
+      `// Each param is a plain Java Object (List, Double, String, etc.)`,
+      `// Cast to the type you need, e.g.:`,
+      `//   List<Object> list = (List<Object>) nums;`,
+      `//   int t = ((Double) target).intValue();`,
       `public class Main {`,
       `    public static Object ${name}(${paramList}) {`,
-      `        // Write your solution here`,
+      ``,
       `        return null;`,
       `    }`,
-      ``,
-      `    public static void main(String[] args) throws Exception {`,
-      `        Scanner sc = new Scanner(System.in);`,
-      `        System.out.println(${name}(${params.map(() => 'null').join(', ')}));`,
-      `    }`,
       `}`,
     ].join('\n');
   },
 
+  // ── Rust ─────────────────────────────────────────────────────
+  // Args are serde_json::Value — pattern-match or use helper methods:
+  //   let nums_vec: Vec<i64> = nums.as_array().unwrap()
+  //       .iter().map(|x| x.as_i64().unwrap()).collect();
+  //   let target_i = target.as_i64().unwrap();
   rust: (p) => {
     const { name, params } = parsePythonDef(p?.starter_code || '');
-    const paramList = params.map(p => `${p}: &str`).join(', ');
+    const paramList = params.map(q => `${q}: serde_json::Value`).join(', ');
     return [
-      `use std::io::{self, BufRead};`,
+      `use serde_json::Value;`,
       ``,
-      `fn ${name}(${paramList}) -> String {`,
-      `    // Write your solution here`,
-      `    String::new()`,
-      `}`,
+      `// Each param is a serde_json::Value.`,
+      `// Extract with helpers, e.g.:`,
+      `//   let v: Vec<i64> = nums.as_array().unwrap()`,
+      `//       .iter().map(|x| x.as_i64().unwrap()).collect();`,
+      `//   let t = target.as_i64().unwrap();`,
+      `fn ${name}(${paramList}) -> Value {`,
       ``,
-      `fn main() {`,
-      `    let stdin = io::stdin();`,
-      `    let mut lines = stdin.lock().lines();`,
-      `    println!("{}", ${name}(${params.map(() => '""').join(', ')}));`,
+      `    Value::Null`,
       `}`,
     ].join('\n');
   },
 
+  // ── Go ───────────────────────────────────────────────────────
+  // Args are interface{} decoded from JSON (float64 for numbers,
+  // []interface{} for arrays, map[string]interface{} for objects).
+  // Type-assert to the concrete type you need:
+  //   numsRaw := nums.([]interface{})
+  //   target_ := int(target.(float64))
   go: (p) => {
     const { name, params } = parsePythonDef(p?.starter_code || '');
-    const paramList = params.map(p => `${p} interface{}`).join(', ');
+    const paramList = params.map(q => `${q} interface{}`).join(', ');
     return [
       `package main`,
       ``,
-      `import (`,
-      `    "bufio"`,
-      `    "fmt"`,
-      `    "os"`,
-      `)`,
-      ``,
+      `// Each param is interface{} decoded from JSON.`,
+      `// Type-assert to the concrete type you need, e.g.:`,
+      `//   nums_ := nums.([]interface{})`,
+      `//   target_ := int(target.(float64))`,
       `func ${name}(${paramList}) interface{} {`,
-      `    // Write your solution here`,
-      `    return nil`,
-      `}`,
       ``,
-      `func main() {`,
-      `    reader := bufio.NewReader(os.Stdin)`,
-      `    _ = reader`,
-      `    fmt.Println(${name}(${params.map(() => 'nil').join(', ')}));`,
+      `    return nil`,
       `}`,
     ].join('\n');
   },

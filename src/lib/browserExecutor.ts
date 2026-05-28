@@ -2,30 +2,50 @@
 // src/lib/browserExecutor.ts
 // Client-side code execution — zero API, zero auth
 //
-//  Python     → Pyodide (CPython 3.11 compiled to WASM)
-//               Loads once from CDN, cached by browser forever after.
-//               stdin is simulated by monkey-patching input().
+// Python     → Pyodide (CPython 3.11 WASM, runs in browser)
+// JavaScript → Isolated Web Worker (5s timeout)
+// C++/Java/Go/Rust → /api/execute (Wandbox, no auth)
 //
-//  JavaScript → Isolated Web Worker with 5s timeout.
-//               console.log captured and returned as stdout.
-//               Worker is terminated on timeout to prevent hangs.
+// JSON HARNESS
+// ─────────────
+// test_cases[i].input    — JSON object keyed by param name
+//                          e.g. { "nums": [2,7,11,15], "target": 9 }
+// test_cases[i].expected — JSON value the function must return
+//                          e.g. [0, 1]
 //
-//  C++/Java/Go/Rust → Sent to /api/execute (Wandbox, no auth).
+// The harness deserialises input, calls the user's function with
+// the correct args, serialises the return value, compares to expected.
+// Users only write the function body — no stdin/stdout needed.
 // ════════════════════════════════════════════════════════════
 
+import { parsePythonDef } from '@/types/database';
 import type { RunResult, TestResult } from './executor';
 export type { RunResult, TestResult };
 
-// ── Pyodide loader (singleton) ───────────────────────────────
+// ── Deep-equal for JSON values ────────────────────────────────
+function jsonEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(normalise(a)) === JSON.stringify(normalise(b));
+}
+function normalise(v: unknown): unknown {
+  if (Array.isArray(v)) return [...v].map(normalise).sort(
+    (x, y) => (JSON.stringify(x) < JSON.stringify(y) ? -1 : 1)
+  );
+  if (v !== null && typeof v === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(v as object).sort()) out[k] = normalise((v as any)[k]);
+    return out;
+  }
+  return v;
+}
+
+// ── Pyodide loader (singleton) ────────────────────────────────
 let pyodideInstance: any = null;
 let pyodideLoading: Promise<any> | null = null;
 
 async function getPyodide(): Promise<any> {
   if (pyodideInstance) return pyodideInstance;
   if (pyodideLoading)  return pyodideLoading;
-
   pyodideLoading = (async () => {
-    // Load Pyodide from jsDelivr CDN
     await new Promise<void>((resolve, reject) => {
       if ((window as any).loadPyodide) { resolve(); return; }
       const script   = document.createElement('script');
@@ -39,88 +59,79 @@ async function getPyodide(): Promise<any> {
     });
     return pyodideInstance;
   })();
-
   return pyodideLoading;
 }
 
-// ── Run Python via Pyodide ───────────────────────────────────
+// ── Python via Pyodide ────────────────────────────────────────
+// Wraps the user's function in a harness that:
+//   1. json.loads the input object
+//   2. Calls fn(**kwargs) so param order doesn't matter
+//   3. json.dumps the return value to stdout
 async function runPython(
-  code:  string,
-  stdin: string
+  userCode:  string,
+  fnName:    string,
+  inputJson: string,
 ): Promise<{ stdout: string; stderr: string }> {
   const pyodide = await getPyodide();
 
-  // Capture stdout + stderr
   let stdout = '';
   let stderr = '';
   pyodide.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
   pyodide.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
 
-  // Simulate stdin: pre-split lines, patch builtins.input()
-  const lines = stdin ? stdin.split('\n') : [];
-  pyodide.globals.set('__stdin_lines__', pyodide.toPy(lines));
-  pyodide.runPython(`
-import builtins as __builtins__
-__stdin_idx__ = 0
-def __patched_input__(prompt=''):
-    global __stdin_idx__
-    line = __stdin_lines__[__stdin_idx__] if __stdin_idx__ < len(__stdin_lines__) else ''
-    __stdin_idx__ += 1
-    return line
-__builtins__.input = __patched_input__
-import sys
-sys.stdin = __import__('io').StringIO(${JSON.stringify(stdin || '')})
-  `);
+  // Reset any leftover state from previous test cases
+  pyodide.runPython('import sys; sys.modules.pop("__user__", None)');
+
+  const harness = `
+import json as _json
+
+${userCode}
+
+_input  = _json.loads(${JSON.stringify(inputJson)})
+_result = ${fnName}(**_input)
+print(_json.dumps(_result, separators=(',', ':')))
+`.trim();
 
   try {
-    await pyodide.runPythonAsync(code);
+    await pyodide.runPythonAsync(harness);
   } catch (e: any) {
-    stderr += e.message || String(e);
+    // Clean up the Pyodide internal traceback noise —
+    // only keep lines that reference user code (no _pyodide/_base paths)
+    const raw: string = e.message || String(e);
+    const cleaned = raw
+      .split('\n')
+      .filter((l: string) => !l.includes('_pyodide') && !l.includes('_base.py') && l.trim())
+      .join('\n');
+    stderr += cleaned || raw;
   }
 
   return { stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
 }
 
-// ── Run JavaScript in an isolated Web Worker ─────────────────
+// ── JavaScript via Web Worker ─────────────────────────────────
+// Wraps the user's function in an isolated Worker that:
+//   1. JSON.parses the input object
+//   2. Calls fn(...args) with params in declaration order
+//   3. JSON.stringifies the return value and postMessages it
 function runJavaScript(
-  code:    string,
-  stdin:   string,
-  timeout: number = 5000
+  userCode:  string,
+  fnName:    string,
+  params:    string[],
+  inputJson: string,
+  timeout    = 5000,
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     const workerCode = `
-      const __lines__ = ${JSON.stringify(stdin ? stdin.split('\\n') : [])};
-      let __lineIdx__ = 0;
-      const __logs__ = [];
-
-      // Patch console.log
-      self.console = {
-        log:   (...a) => __logs__.push(a.map(String).join(' ')),
-        error: (...a) => __logs__.push('[err] ' + a.map(String).join(' ')),
-        warn:  (...a) => __logs__.push('[warn] ' + a.map(String).join(' ')),
-      };
-
-      // Fake readline / input helpers common in competitive coding
-      self.readline  = () => __lines__[__lineIdx__++] ?? '';
-      self.readLine  = self.readline;
-      self.input     = self.readline;
-      self.requires  = () => {};
-
-      // Fake require('fs').readFileSync('/dev/stdin') pattern
-      self.require = (mod) => {
-        if (mod === 'fs') {
-          return {
-            readFileSync: () => ${JSON.stringify(stdin || '')},
-          };
-        }
-        throw new Error('require is not supported in browser sandbox');
-      };
-
       try {
-        eval(${JSON.stringify(code)});
-        self.postMessage({ ok: true, stdout: __logs__.join('\\n'), stderr: '' });
-      } catch(e) {
-        self.postMessage({ ok: false, stdout: __logs__.join('\\n'), stderr: e.message });
+        ${userCode}
+
+        const __input__  = JSON.parse(${JSON.stringify(inputJson)});
+        const __args__   = ${JSON.stringify(params)}.map(k => __input__[k]);
+        const __result__ = ${fnName}(...__args__);
+
+        self.postMessage({ ok: true, stdout: JSON.stringify(__result__), stderr: '' });
+      } catch (e) {
+        self.postMessage({ ok: false, stdout: '', stderr: e.message });
       }
     `;
 
@@ -150,46 +161,61 @@ function runJavaScript(
   });
 }
 
-// ── Main entrypoint ──────────────────────────────────────────
+// ── Strategy ─────────────────────────────────────────────────
 export type ExecutionStrategy = 'browser' | 'server';
 
 export function getStrategy(language: string): ExecutionStrategy {
   return language === 'python' || language === 'javascript' ? 'browser' : 'server';
 }
 
+// ── runInBrowser ──────────────────────────────────────────────
 export async function runInBrowser(
   sourceCode: string,
   language:   string,
+  fnName:     string,
+  params:     string[],
   testCases:  { input: string; expected: string }[],
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number, total: number) => void,
 ): Promise<RunResult> {
   if (!testCases.length) return { passed: 0, total: 0, results: [] };
 
   const results: TestResult[] = [];
 
-  // Run sequentially so Pyodide state doesn't collide between test cases
+  // Sequential — Pyodide is single-threaded and shares global state
   for (let i = 0; i < testCases.length; i++) {
     const tc = testCases[i];
     try {
       const t0  = Date.now();
       const out = language === 'python'
-        ? await runPython(sourceCode, tc.input)
-        : await runJavaScript(sourceCode, tc.input);
+        ? await runPython(sourceCode, fnName, tc.input)
+        : await runJavaScript(sourceCode, fnName, params, tc.input);
       const ms = Date.now() - t0;
 
-      const actual   = (out.stdout || '').trim();
-      const expected = String(tc.expected).trim();
-      const ok       = actual === expected;
+      let actual: unknown;
+      try   { actual = JSON.parse(out.stdout); }
+      catch { actual = out.stdout; }
+
+      let expected: unknown;
+      try   { expected = JSON.parse(tc.expected); }
+      catch { expected = tc.expected; }
+
+      const ok = !out.stderr && jsonEqual(actual, expected);
 
       results.push({
-        input: tc.input, expected, actual, ok,
-        error: out.stderr || undefined,
-        time:  `${ms}ms`,
+        input:    tc.input,
+        expected: tc.expected,
+        actual:   out.stdout || '',
+        ok,
+        error:    out.stderr || undefined,
+        time:     `${ms}ms`,
       });
     } catch (e: any) {
       results.push({
-        input: tc.input, expected: String(tc.expected).trim(),
-        actual: '', ok: false, error: e.message || 'Execution error',
+        input:    tc.input,
+        expected: tc.expected,
+        actual:   '',
+        ok:       false,
+        error:    e.message || 'Execution error',
       });
     }
     onProgress?.(i + 1, testCases.length);
@@ -198,15 +224,24 @@ export async function runInBrowser(
   return { passed: results.filter(r => r.ok).length, total: results.length, results };
 }
 
+// ── runOnServer ───────────────────────────────────────────────
 export async function runOnServer(
   sourceCode: string,
   language:   string,
-  testCases:  { input: string; expected: string }[]
+  fnName:     string,
+  params:     string[],
+  testCases:  { input: string; expected: string }[],
 ): Promise<RunResult> {
   const res = await fetch('/api/execute', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: sourceCode, language, test_cases: testCases }),
+    body: JSON.stringify({
+      code:       sourceCode,
+      language,
+      fn_name:    fnName,
+      params,
+      test_cases: testCases,
+    }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Execution failed');
