@@ -9,7 +9,7 @@
 //      instead of only picking from existing problems
 // ════════════════════════════════════════════════════════════
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import type {
   User,
@@ -22,7 +22,13 @@ import type {
   Difficulty,
 } from "@/types/database";
 
-type Section = "overview" | "submissions" | "arena" | "problems" | "members" | "contests";
+type Section =
+  | "overview"
+  | "submissions"
+  | "arena"
+  | "problems"
+  | "members"
+  | "contests";
 
 // ── blank templates ──────────────────────────────────────────
 const blankProblem = (): Omit<Problem, "id" | "created_at" | "updated_at"> => ({
@@ -376,31 +382,38 @@ function ContestForm({
     ...initial,
     problem_ids: (initial as any).problem_ids || [],
   });
-  const [saving,            setSaving]            = useState(false);
-  const [err,               setErr]               = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
   const [showInlineProblem, setShowInlineProblem] = useState(false);
-  const [creatingProblem,   setCreatingProblem]   = useState(false);
+  const [creatingProblem, setCreatingProblem] = useState(false);
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
   function toggleProblemId(id: string) {
-    setForm(f => {
+    setForm((f) => {
       const ids = f.problem_ids || [];
       return {
         ...f,
-        problem_ids: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id],
+        problem_ids: ids.includes(id)
+          ? ids.filter((x) => x !== id)
+          : [...ids, id],
         // Keep legacy problem_id in sync with first selected
         problem_id: ids.includes(id)
-          ? (ids.filter(x => x !== id)[0] || null)
-          : (f.problem_ids?.length === 0 ? id : f.problem_id),
+          ? ids.filter((x) => x !== id)[0] || null
+          : f.problem_ids?.length === 0
+            ? id
+            : f.problem_id,
       };
     });
   }
 
   async function handleSave() {
-    if (!form.name.trim()) { setErr("Contest name is required."); return; }
+    if (!form.name.trim()) {
+      setErr("Contest name is required.");
+      return;
+    }
     setSaving(true);
     setErr("");
     try {
@@ -419,13 +432,15 @@ function ContestForm({
     const payload = { ...problemData, is_contest_problem: true };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (db.from("problems") as any)
-      .insert([payload]).select().single();
+      .insert([payload])
+      .select()
+      .single();
     setCreatingProblem(false);
     if (error) throw new Error((error as any).message);
     const newProb = data as Problem;
     onProblemCreated(newProb);
     // Auto-add to selected problems
-    setForm(f => ({
+    setForm((f) => ({
       ...f,
       problem_ids: [...(f.problem_ids || []), newProb.id],
       problem_id: f.problem_id || newProb.id,
@@ -445,18 +460,45 @@ function ContestForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[
-          { label: "Contest Name *", key: "name",         ph: "BitByBit Weekly #1",   type: "text"   },
-          { label: "Entry Fee (₹)",  key: "entry_fee",    ph: "50",                   type: "number" },
-          { label: "Duration (min)", key: "duration_mins",ph: "60",                   type: "number" },
-          { label: "Prize Note",     key: "prize_note",   ph: "Top 3 split the pool", type: "text"   },
-          { label: "UPI ID",         key: "upi_id",       ph: "yourname@upi",         type: "text"   },
+          {
+            label: "Contest Name *",
+            key: "name",
+            ph: "BitByBit Weekly #1",
+            type: "text",
+          },
+          {
+            label: "Entry Fee (₹)",
+            key: "entry_fee",
+            ph: "50",
+            type: "number",
+          },
+          {
+            label: "Duration (min)",
+            key: "duration_mins",
+            ph: "60",
+            type: "number",
+          },
+          {
+            label: "Prize Note",
+            key: "prize_note",
+            ph: "Top 3 split the pool",
+            type: "text",
+          },
+          { label: "UPI ID", key: "upi_id", ph: "yourname@upi", type: "text" },
         ].map(({ label, key, ph, type }) => (
           <div key={key}>
-            <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">{label}</label>
+            <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+              {label}
+            </label>
             <input
               type={type}
               value={(form as any)[key]}
-              onChange={(e) => set(key as any, type === "number" ? Number(e.target.value) : e.target.value)}
+              onChange={(e) =>
+                set(
+                  key as any,
+                  type === "number" ? Number(e.target.value) : e.target.value,
+                )
+              }
               className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2
                 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
               placeholder={ph}
@@ -472,7 +514,7 @@ function ContestForm({
             Contest Problems ({selectedIds.length} selected)
           </label>
           <button
-            onClick={() => setShowInlineProblem(v => !v)}
+            onClick={() => setShowInlineProblem((v) => !v)}
             className="px-3 py-1 bg-[#00e87a15] text-[#00e87a] text-xs font-mono rounded-lg
               hover:bg-[#00e87a25] border border-[#00e87a30] transition-all"
           >
@@ -483,37 +525,60 @@ function ContestForm({
         {/* Checklist of existing problems */}
         <div className="max-h-48 overflow-y-auto space-y-1 bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg p-2">
           {problems.length === 0 ? (
-            <div className="text-xs text-[#444] font-mono py-2 text-center">No problems yet — create one below</div>
-          ) : problems.map(p => {
-            const checked = selectedIds.includes(p.id);
-            return (
-              <label key={p.id}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all
-                  ${checked ? "bg-[#00e87a10] border border-[#00e87a20]" : "hover:bg-[#111]"}`}>
-                <input type="checkbox" checked={checked} onChange={() => toggleProblemId(p.id)}
-                  className="accent-[#00e87a] w-3.5 h-3.5 shrink-0" />
-                <span className="text-sm font-mono text-[#e0e0e0] truncate flex-1">{p.title}</span>
-                <span className={`text-[10px] font-mono shrink-0
-                  ${p.difficulty === "Easy" ? "text-[#00e87a]" : p.difficulty === "Medium" ? "text-[#f0b429]" : "text-[#ff4d4d]"}`}>
-                  {p.difficulty}
-                </span>
-                {p.is_contest_problem && (
-                  <span className="text-[10px] font-mono text-[#a78bfa] shrink-0">arena</span>
-                )}
-              </label>
-            );
-          })}
+            <div className="text-xs text-[#444] font-mono py-2 text-center">
+              No problems yet — create one below
+            </div>
+          ) : (
+            problems.map((p) => {
+              const checked = selectedIds.includes(p.id);
+              return (
+                <label
+                  key={p.id}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all
+                  ${checked ? "bg-[#00e87a10] border border-[#00e87a20]" : "hover:bg-[#111]"}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleProblemId(p.id)}
+                    className="accent-[#00e87a] w-3.5 h-3.5 shrink-0"
+                  />
+                  <span className="text-sm font-mono text-[#e0e0e0] truncate flex-1">
+                    {p.title}
+                  </span>
+                  <span
+                    className={`text-[10px] font-mono shrink-0
+                  ${p.difficulty === "Easy" ? "text-[#00e87a]" : p.difficulty === "Medium" ? "text-[#f0b429]" : "text-[#ff4d4d]"}`}
+                  >
+                    {p.difficulty}
+                  </span>
+                  {p.is_contest_problem && (
+                    <span className="text-[10px] font-mono text-[#a78bfa] shrink-0">
+                      arena
+                    </span>
+                  )}
+                </label>
+              );
+            })
+          )}
         </div>
 
         {selectedIds.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {selectedIds.map((id, i) => {
-              const p = problems.find(x => x.id === id);
+              const p = problems.find((x) => x.id === id);
               return (
-                <span key={id}
-                  className="flex items-center gap-1 bg-[#00e87a15] text-[#00e87a] text-xs font-mono px-2 py-0.5 rounded border border-[#00e87a20]">
-                  P{i+1}: {p?.title || id.slice(0,8)}
-                  <button onClick={() => toggleProblemId(id)} className="text-[#00e87a60] hover:text-[#ff4d4d] ml-0.5">×</button>
+                <span
+                  key={id}
+                  className="flex items-center gap-1 bg-[#00e87a15] text-[#00e87a] text-xs font-mono px-2 py-0.5 rounded border border-[#00e87a20]"
+                >
+                  P{i + 1}: {p?.title || id.slice(0, 8)}
+                  <button
+                    onClick={() => toggleProblemId(id)}
+                    className="text-[#00e87a60] hover:text-[#ff4d4d] ml-0.5"
+                  >
+                    ×
+                  </button>
                 </span>
               );
             })}
@@ -527,7 +592,8 @@ function ContestForm({
               ✦ Create Arena Problem (hidden from public Problems page)
             </div>
             <p className="text-[10px] text-[#444] font-mono mb-4">
-              This problem will be marked arena-only and won't appear in the Problems tab.
+              This problem will be marked arena-only and won't appear in the
+              Problems tab.
             </p>
             <ProblemForm
               initial={{}}
@@ -540,16 +606,25 @@ function ContestForm({
       </div>
 
       <div>
-        <label className="block text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">Status</label>
+        <label className="block text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">
+          Status
+        </label>
         <div className="flex gap-2">
           {(["upcoming", "live", "ended"] as const).map((s) => (
-            <button key={s} onClick={() => set("status", s)}
+            <button
+              key={s}
+              onClick={() => set("status", s)}
               className={`px-4 py-1.5 rounded-lg text-xs font-mono font-bold transition-all capitalize
-                ${form.status === s
-                  ? s === "live"     ? "bg-[#00e87a] text-black"
-                  : s === "upcoming" ? "bg-[#f0b429] text-black"
-                  :                   "bg-[#333] text-[#e0e0e0]"
-                  : "bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]"}`}>
+                ${
+                  form.status === s
+                    ? s === "live"
+                      ? "bg-[#00e87a] text-black"
+                      : s === "upcoming"
+                        ? "bg-[#f0b429] text-black"
+                        : "bg-[#333] text-[#e0e0e0]"
+                    : "bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]"
+                }`}
+            >
               {s}
             </button>
           ))}
@@ -557,10 +632,20 @@ function ContestForm({
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button onClick={handleSave} disabled={saving || creatingProblem} className="btn-primary disabled:opacity-50">
-          {saving ? "Saving…" : initial.id ? "Update Contest" : "Create Contest"}
+        <button
+          onClick={handleSave}
+          disabled={saving || creatingProblem}
+          className="btn-primary disabled:opacity-50"
+        >
+          {saving
+            ? "Saving…"
+            : initial.id
+              ? "Update Contest"
+              : "Create Contest"}
         </button>
-        <button onClick={onCancel} className="btn-ghost">Cancel</button>
+        <button onClick={onCancel} className="btn-ghost">
+          Cancel
+        </button>
       </div>
     </div>
   );
@@ -569,8 +654,8 @@ function ContestForm({
 // ── Code viewer (expandable + copy) ─────────────────────────
 function CodeViewer({ code, lang }: { code: string; lang: string }) {
   const [expanded, setExpanded] = useState(false);
-  const [copied,   setCopied]   = useState(false);
-  const lines   = code.split("\n");
+  const [copied, setCopied] = useState(false);
+  const lines = code.split("\n");
   const hasMore = lines.length > 6;
   const display = expanded ? code : lines.slice(0, 6).join("\n");
 
@@ -584,7 +669,9 @@ function CodeViewer({ code, lang }: { code: string; lang: string }) {
   return (
     <div className="mt-2 bg-[#080808] border border-[#1a1a1a] rounded-lg overflow-hidden">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#1a1a1a] bg-[#0d0d0d]">
-        <span className="text-[10px] font-mono text-[#444] uppercase tracking-wider">{lang}</span>
+        <span className="text-[10px] font-mono text-[#444] uppercase tracking-wider">
+          {lang}
+        </span>
         <div className="flex items-center gap-3">
           <button
             onClick={copy}
@@ -605,9 +692,208 @@ function CodeViewer({ code, lang }: { code: string; lang: string }) {
       <pre className="text-xs font-mono text-[#a0a0a0] p-3 overflow-x-auto whitespace-pre leading-relaxed max-h-[480px] overflow-y-auto">
         {display}
         {!expanded && hasMore && (
-          <span className="text-[#2a2a2a]">{"\n"}  ⋯ {lines.length - 6} more lines</span>
+          <span className="text-[#2a2a2a]">
+            {"\n"} ⋯ {lines.length - 6} more lines
+          </span>
         )}
       </pre>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// ── Inline Modal (replaces window.prompt / window.confirm) ───
+// ════════════════════════════════════════════════════════════
+interface ModalState {
+  type:
+    | "approve-sub"
+    | "reject-sub"
+    | "approve-arena"
+    | "reject-arena"
+    | "reject-reg"
+    | "confirm-delete"
+    | null;
+  id: string;
+  github: string;
+  suggestedPoints?: number;
+  arenaSubRef?: ArenaSubmission;
+  basePoints?: number;
+  confirmMsg?: string;
+  onConfirmDelete?: () => void;
+}
+
+function ActionModal({
+  modal,
+  onConfirm,
+  onCancel,
+}: {
+  modal: ModalState;
+  onConfirm: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState("");
+  const isApprove =
+    modal.type === "approve-sub" || modal.type === "approve-arena";
+
+  useEffect(() => {
+    if (modal.type === "approve-sub")
+      setValue(String(modal.suggestedPoints ?? 100));
+    if (modal.type === "approve-arena") {
+      const sub = modal.arenaSubRef!;
+      const strikePenalty = 1 - (sub.strikes || 0) * 0.1;
+      const suggested = Math.max(
+        10,
+        Math.floor(
+          (modal.basePoints ?? 100) *
+            Math.max(0, strikePenalty) *
+            (sub.strike_penalty_factor || 1),
+        ),
+      );
+      setValue(String(suggested));
+    }
+    if (
+      modal.type === "reject-sub" ||
+      modal.type === "reject-arena" ||
+      modal.type === "reject-reg"
+    ) {
+      setValue("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modal.type, modal.id]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (modal.type === "confirm-delete") {
+      modal.onConfirmDelete?.();
+      onCancel();
+      return;
+    }
+    onConfirm(value);
+  }
+
+  const title =
+    modal.type === "approve-sub"
+      ? `Approve submission — @${modal.github}`
+      : modal.type === "reject-sub"
+        ? `Reject submission — @${modal.github}`
+        : modal.type === "approve-arena"
+          ? `Approve arena entry — @${modal.github}`
+          : modal.type === "reject-arena"
+            ? `Disqualify entry — @${modal.github}`
+            : modal.type === "reject-reg"
+              ? `Reject registration — @${modal.github}`
+              : modal.type === "confirm-delete"
+                ? "Confirm Delete"
+                : "";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(e) => e.target === e.currentTarget && onCancel()}
+    >
+      <div className="absolute inset-0 bg-black/70" />
+      <div className="relative bg-[#111] border border-[#2a2a2a] rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+        <h3 className="font-display font-bold text-[#e0e0e0] mb-1 text-base">
+          {title}
+        </h3>
+
+        {isApprove && (
+          <p className="text-xs text-[#555] font-mono mb-4">
+            Points are auto-calculated from test results. Adjust before
+            confirming.
+          </p>
+        )}
+        {modal.type === "approve-arena" && modal.arenaSubRef && (
+          <div className="mb-3 p-2.5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono space-y-1">
+            <div className="flex justify-between">
+              <span className="text-[#444]">Strikes</span>
+              <span className="text-[#f0b429]">
+                {modal.arenaSubRef.strikes}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#444]">Time factor</span>
+              <span className="text-[#a78bfa]">
+                {(modal.arenaSubRef.strike_penalty_factor || 1).toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#444]">Base pts</span>
+              <span className="text-[#e0e0e0]">{modal.basePoints}</span>
+            </div>
+          </div>
+        )}
+        {modal.type === "confirm-delete" && (
+          <p className="text-xs text-[#666] font-mono mb-4">
+            {modal.confirmMsg}
+          </p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {isApprove && (
+            <div>
+              <label className="block text-[10px] text-[#444] font-mono uppercase mb-1">
+                Points to award
+              </label>
+              <input
+                autoFocus
+                type="number"
+                min={0}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                aria-label="Enter quantity" // <-- paste this line here
+                className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a60]"
+              />
+            </div>
+          )}
+          {(modal.type === "reject-sub" ||
+            modal.type === "reject-arena" ||
+            modal.type === "reject-reg") && (
+            <div>
+              <label className="block text-[10px] text-[#444] font-mono uppercase mb-1">
+                Reason{" "}
+                <span className="normal-case text-[#333]">(optional)</span>
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="Does not meet requirements"
+                className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2
+                  text-sm font-mono text-[#e0e0e0] placeholder-[#2a2a2a]
+                  focus:outline-none focus:border-[#ff4d4d40]"
+              />
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold transition-all
+                ${
+                  isApprove
+                    ? "bg-[#00e87a] text-black hover:bg-[#00ff88]"
+                    : "bg-[#ff4d4d20] text-[#ff4d4d] hover:bg-[#ff4d4d30] border border-[#ff4d4d20]"
+                }`}
+            >
+              {isApprove
+                ? "✓ Confirm Approval"
+                : modal.type === "confirm-delete"
+                  ? "🗑 Delete"
+                  : "✗ Confirm"}
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 rounded-lg text-xs font-mono text-[#444] hover:text-[#888] transition-all"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -636,6 +922,33 @@ export default function AdminPage({ user }: AdminPageProps) {
   const [showContestForm, setShowContestForm] = useState(false);
   const [editingContest, setEditingContest] = useState<Contest | null>(null);
 
+  // ── Inline modal (replaces window.prompt / window.confirm) ──
+  const [modal, setModal] = useState<ModalState>({
+    type: null,
+    id: "",
+    github: "",
+  });
+  const modalResolve = useRef<((v: string) => void) | null>(null);
+
+  function openModal(
+    m: Omit<ModalState, "type"> & { type: NonNullable<ModalState["type"]> },
+  ): Promise<string | null> {
+    return new Promise((resolve) => {
+      modalResolve.current = resolve;
+      setModal(m);
+    });
+  }
+  function closeModal(value: string) {
+    modalResolve.current?.(value);
+    modalResolve.current = null;
+    setModal({ type: null, id: "", github: "" });
+  }
+  function cancelModal() {
+    modalResolve.current?.(null as any);
+    modalResolve.current = null;
+    setModal({ type: null, id: "", github: "" });
+  }
+
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 3500);
@@ -643,35 +956,35 @@ export default function AdminPage({ user }: AdminPageProps) {
 
   async function loadAll() {
     setLoading(true);
-    const [{ data: s }, { data: a }, { data: p }, { data: m }, { data: c }, { data: r }] =
-      await Promise.all([
-        db
-          .from("submissions")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(200),
-        db
-          .from("arena_submissions")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(200),
-        db
-          .from("problems")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        db
-          .from("members")
-          .select("*")
-          .order("total_points", { ascending: false }),
-        db
-          .from("contests")
-          .select("*")
-          .order("created_at", { ascending: false }),
-        db
-          .from("contest_registrations")
-          .select("*")
-          .order("created_at", { ascending: false }),
-      ]);
+    const [
+      { data: s },
+      { data: a },
+      { data: p },
+      { data: m },
+      { data: c },
+      { data: r },
+    ] = await Promise.all([
+      db
+        .from("submissions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(200),
+      db
+        .from("arena_submissions")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(200),
+      db.from("problems").select("*").order("created_at", { ascending: false }),
+      db
+        .from("members")
+        .select("*")
+        .order("total_points", { ascending: false }),
+      db.from("contests").select("*").order("created_at", { ascending: false }),
+      db
+        .from("contest_registrations")
+        .select("*")
+        .order("created_at", { ascending: false }),
+    ]);
     setSubs(s || []);
     setArenaSubs((a as ArenaSubmission[]) || []);
     setProbs(p || []);
@@ -691,72 +1004,72 @@ export default function AdminPage({ user }: AdminPageProps) {
     // Each channel listens for INSERT / UPDATE / DELETE on a table and
     // re-fetches only that slice so the UI stays live without a full reload.
     const channel = db
-      .channel('admin-realtime')
+      .channel("admin-realtime")
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'submissions' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "submissions" },
         async () => {
           const { data } = await db
-            .from('submissions')
-            .select('*')
-            .order('created_at', { ascending: false })
+            .from("submissions")
+            .select("*")
+            .order("created_at", { ascending: false })
             .limit(200);
           setSubs(data || []);
         },
       )
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'arena_submissions' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "arena_submissions" },
         async () => {
           const { data } = await db
-            .from('arena_submissions')
-            .select('*')
-            .order('created_at', { ascending: false })
+            .from("arena_submissions")
+            .select("*")
+            .order("created_at", { ascending: false })
             .limit(200);
           setArenaSubs((data as ArenaSubmission[]) || []);
         },
       )
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'members' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "members" },
         async () => {
           const { data } = await db
-            .from('members')
-            .select('*')
-            .order('total_points', { ascending: false });
+            .from("members")
+            .select("*")
+            .order("total_points", { ascending: false });
           setMembers(data || []);
         },
       )
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'contest_registrations' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "contest_registrations" },
         async () => {
           const { data } = await db
-            .from('contest_registrations')
-            .select('*')
-            .order('created_at', { ascending: false });
+            .from("contest_registrations")
+            .select("*")
+            .order("created_at", { ascending: false });
           setRegs((data as ContestRegistration[]) || []);
         },
       )
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'contests' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "contests" },
         async () => {
           const { data } = await db
-            .from('contests')
-            .select('*')
-            .order('created_at', { ascending: false });
+            .from("contests")
+            .select("*")
+            .order("created_at", { ascending: false });
           setContests(data || []);
         },
       )
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'problems' },
+        "postgres_changes",
+        { event: "*", schema: "public", table: "problems" },
         async () => {
           const { data } = await db
-            .from('problems')
-            .select('*')
-            .order('created_at', { ascending: false });
+            .from("problems")
+            .select("*")
+            .order("created_at", { ascending: false });
           setProbs(data || []);
         },
       )
@@ -768,13 +1081,26 @@ export default function AdminPage({ user }: AdminPageProps) {
   }, []);
 
   // ── Submission actions (regular problems) ────────────────
-  async function approveSubmission(id: string, github: string, suggestedPoints: number) {
-    const input = window.prompt(
-      `Points to award to @${github} (suggested based on test results: ${suggestedPoints}):`,
-      String(suggestedPoints),
-    );
+  async function approveSubmission(
+    id: string,
+    github: string,
+    suggestedPoints: number,
+  ) {
+    // Guard: already approved — don't double-award
+    const existing = subs.find((s) => s.id === id);
+    if (existing?.status === "approved") {
+      showToast("Already approved.");
+      return;
+    }
+
+    const input = await openModal({
+      type: "approve-sub",
+      id,
+      github,
+      suggestedPoints,
+    });
     if (input === null) return; // cancelled
-    const points = Math.max(0, parseInt(input, 10) || 0);
+    const points = Math.max(0, parseInt(input as string, 10) || 0);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db.from("submissions") as any)
@@ -792,17 +1118,18 @@ export default function AdminPage({ user }: AdminPageProps) {
   }
 
   async function rejectSubmission(id: string, github: string) {
-    const reason =
-      window.prompt("Rejection reason (optional):") ??
-      "Does not meet requirements";
+    const reason = await openModal({ type: "reject-sub", id, github });
+    if (reason === null) return;
+    const finalReason =
+      (reason as string).trim() || "Does not meet requirements";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db.from("submissions") as any)
-      .update({ status: "rejected", reject_reason: reason })
+      .update({ status: "rejected", reject_reason: finalReason })
       .eq("id", id);
     setSubs((prev) =>
       prev.map((s) =>
         s.id === id
-          ? { ...s, status: "rejected" as const, reject_reason: reason }
+          ? { ...s, status: "rejected" as const, reject_reason: finalReason }
           : s,
       ),
     );
@@ -813,18 +1140,25 @@ export default function AdminPage({ user }: AdminPageProps) {
   // Points are awarded based on solve time:
   //   base_points * (1 - strikes * 0.1) * time_factor
   // The admin can adjust the calculated points before approving.
-  async function approveArenaSubmission(sub: ArenaSubmission, basePoints: number) {
-    const strikePenalty = 1 - (sub.strikes || 0) * 0.1;
-    const suggested = Math.max(
-      10,
-      Math.floor(basePoints * Math.max(0, strikePenalty) * (sub.strike_penalty_factor || 1)),
-    );
-    const finalStr = window.prompt(
-      `Points to award for @${sub.github} (strikes: ${sub.strikes}, suggested: ${suggested}):`,
-      String(suggested),
-    );
+  async function approveArenaSubmission(
+    sub: ArenaSubmission,
+    basePoints: number,
+  ) {
+    // Guard: already reviewed
+    if (sub.status === "reviewed") {
+      showToast("Already reviewed.");
+      return;
+    }
+
+    const finalStr = await openModal({
+      type: "approve-arena",
+      id: sub.id,
+      github: sub.github,
+      arenaSubRef: sub,
+      basePoints,
+    });
     if (finalStr === null) return; // cancelled
-    const finalPts = Math.max(0, parseInt(finalStr, 10) || 0);
+    const finalPts = Math.max(0, parseInt(finalStr as string, 10) || 0);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db.from("arena_submissions") as any)
@@ -844,23 +1178,29 @@ export default function AdminPage({ user }: AdminPageProps) {
   }
 
   async function rejectArenaSubmission(id: string, github: string) {
-    const reason =
-      window.prompt("Rejection reason (optional):") ?? "Did not meet requirements";
+    const reason = await openModal({ type: "reject-arena", id, github });
+    if (reason === null) return;
+    const finalReason =
+      (reason as string).trim() || "Did not meet requirements";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db.from("arena_submissions") as any)
-      .update({ status: "disqualified" })
+      .update({ status: "disqualified", strike_penalty_factor: 0 }) // store rejection in penalty
       .eq("id", id);
     setArenaSubs((prev) =>
       prev.map((a) =>
         a.id === id ? { ...a, status: "disqualified" as const } : a,
       ),
     );
-    showToast(`✗ Arena rejected for @${github}: ${reason}`);
+    showToast(`✗ Arena rejected for @${github}: ${finalReason}`);
   }
 
   // ── Shared: award points to member leaderboard ───────────
   // isContest=true  → arena/contest submission (still counts as a problem solved)
-  async function awardPoints(github: string, points: number, isContest = false) {
+  async function awardPoints(
+    github: string,
+    points: number,
+    isContest = false,
+  ) {
     const now = new Date();
     const { data: ex } = await db
       .from("members")
@@ -876,17 +1216,17 @@ export default function AdminPage({ user }: AdminPageProps) {
         : 999;
       const newStreak =
         daysSinceLast === 0
-          ? (ex.streak || 1)          // same day — streak unchanged
+          ? ex.streak || 1 // same day — streak unchanged
           : daysSinceLast === 1
-            ? (ex.streak || 0) + 1    // consecutive day — extend streak
-            : 1;                      // gap — reset to 1
+            ? (ex.streak || 0) + 1 // consecutive day — extend streak
+            : 1; // gap — reset to 1
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (db.from("members") as any)
         .update({
-          total_points:   (ex.total_points || 0) + points,
+          total_points: (ex.total_points || 0) + points,
           problems_solved: (ex.problems_solved || 0) + 1, // both problem & arena count
-          streak:         newStreak,
+          streak: newStreak,
           last_solved_at: now.toISOString(),
         })
         .eq("github", github);
@@ -900,10 +1240,10 @@ export default function AdminPage({ user }: AdminPageProps) {
       await db.from("members").insert([
         {
           github,
-          name:           nameFromSub,
-          total_points:   points,
+          name: nameFromSub,
+          total_points: points,
           problems_solved: 1,
-          streak:         1,
+          streak: 1,
           last_solved_at: now.toISOString(),
         },
       ] as any);
@@ -946,7 +1286,19 @@ export default function AdminPage({ user }: AdminPageProps) {
   }
 
   async function deleteProblem(id: string) {
-    if (!window.confirm("Delete this problem? This cannot be undone.")) return;
+    const confirmed = await new Promise<boolean>((resolve) => {
+      setModal({
+        type: "confirm-delete",
+        id,
+        github: "",
+        confirmMsg: "Delete this problem? This cannot be undone.",
+        onConfirmDelete: () => resolve(true),
+      });
+      // store reject so cancel works
+      modalResolve.current = () => resolve(false);
+    });
+    setModal({ type: null, id: "", github: "" });
+    if (!confirmed) return;
     const { error } = await db.from("problems").delete().eq("id", id);
     if (error) {
       showToast("Delete failed: " + error.message);
@@ -992,7 +1344,18 @@ export default function AdminPage({ user }: AdminPageProps) {
   }
 
   async function deleteContest(id: string) {
-    if (!window.confirm("Delete this contest?")) return;
+    const confirmed = await new Promise<boolean>((resolve) => {
+      setModal({
+        type: "confirm-delete",
+        id,
+        github: "",
+        confirmMsg: "Delete this contest? This cannot be undone.",
+        onConfirmDelete: () => resolve(true),
+      });
+      modalResolve.current = () => resolve(false);
+    });
+    setModal({ type: null, id: "", github: "" });
+    if (!confirmed) return;
     await db.from("contests").delete().eq("id", id);
     setContests((prev) => prev.filter((c) => c.id !== id));
     showToast("Contest deleted");
@@ -1012,6 +1375,13 @@ export default function AdminPage({ user }: AdminPageProps) {
   }
 
   async function rejectReg(id: string) {
+    const reg = regs.find((r) => r.id === id);
+    const reason = await openModal({
+      type: "reject-reg",
+      id,
+      github: reg?.github || "",
+    });
+    if (reason === null) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db.from("contest_registrations") as any)
       .update({ status: "rejected" })
@@ -1059,6 +1429,15 @@ export default function AdminPage({ user }: AdminPageProps) {
 
   return (
     <div className="flex gap-6">
+      {/* Inline action modal */}
+      {modal.type && (
+        <ActionModal
+          modal={modal}
+          onConfirm={closeModal}
+          onCancel={cancelModal}
+        />
+      )}
+
       {toast && (
         <div className="fixed top-20 right-6 z-50 bg-[#00e87a] text-black px-4 py-2.5 rounded-lg font-mono text-sm shadow-xl">
           {toast}
@@ -1108,13 +1487,14 @@ export default function AdminPage({ user }: AdminPageProps) {
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                   {[
-                    { label: "Problems",    val: probs.length,   accent: false },
-                    { label: "Members",     val: members.length, accent: false },
-                    { label: "Submissions", val: subs.length,    accent: false },
+                    { label: "Problems", val: probs.length, accent: false },
+                    { label: "Members", val: members.length, accent: false },
+                    { label: "Submissions", val: subs.length, accent: false },
                     {
                       label: "Pending",
-                      val: subs.filter((s) => s.status === "pending").length
-                         + pendingArenaSubs.length,
+                      val:
+                        subs.filter((s) => s.status === "pending").length +
+                        pendingArenaSubs.length,
                       danger: true,
                     },
                   ].map((s) => (
@@ -1217,7 +1597,8 @@ export default function AdminPage({ user }: AdminPageProps) {
                           </div>
                           {s.approach && (
                             <div className="text-xs text-[#888] mt-1.5 font-mono bg-[#0a0a0a] rounded px-2 py-1 max-w-lg">
-                              <span className="text-[#444]">Approach: </span>{s.approach}
+                              <span className="text-[#444]">Approach: </span>
+                              {s.approach}
                             </div>
                           )}
                           {s.tests_total > 0 && (
@@ -1232,9 +1613,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                             </div>
                           )}
                           {/* ── Code viewer ── */}
-                          {s.code && (
-                            <CodeViewer code={s.code} lang={s.lang} />
-                          )}
+                          {s.code && <CodeViewer code={s.code} lang={s.lang} />}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span
@@ -1283,22 +1662,26 @@ export default function AdminPage({ user }: AdminPageProps) {
             {section === "arena" && (
               <div>
                 <div className="flex items-center justify-between mb-5">
-                  <h2 className="font-display font-bold text-xl">Arena Submissions</h2>
+                  <h2 className="font-display font-bold text-xl">
+                    Arena Submissions
+                  </h2>
                   <div className="flex gap-3 text-xs font-mono">
                     <span className="text-[#f0b429]">
                       {pendingArenaSubs.length} pending
                     </span>
                     <span className="text-[#444]">·</span>
                     <span className="text-[#00e87a]">
-                      {arenaSubs.filter((a) => a.status === "reviewed").length} reviewed
+                      {arenaSubs.filter((a) => a.status === "reviewed").length}{" "}
+                      reviewed
                     </span>
                   </div>
                 </div>
 
                 <div className="mb-4 p-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono text-[#666]">
-                  ℹ Points are calculated as: base × (1 − strikes×0.1) × time_factor.
-                  You can override the suggested points before approving.
-                  Approved arena submissions are added to the leaderboard.
+                  ℹ Points are calculated as: base × (1 − strikes×0.1) ×
+                  time_factor. You can override the suggested points before
+                  approving. Approved arena submissions are added to the
+                  leaderboard.
                 </div>
 
                 <div className="space-y-3">
@@ -1309,7 +1692,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                   )}
                   {arenaSubs.map((a) => {
                     const contest = contests.find((c) => c.id === a.contest_id);
-                    const prob    = contest?.problem_id
+                    const prob = contest?.problem_id
                       ? probs.find((p) => p.id === contest.problem_id)
                       : null;
                     const basePts = prob?.points || 200;
@@ -1340,11 +1723,12 @@ export default function AdminPage({ user }: AdminPageProps) {
                                 Problem: {prob.title} ({basePts} pts base)
                               </div>
                             )}
-                            {a.points_awarded > 0 && a.status === "reviewed" && (
-                              <div className="text-xs text-[#00e87a] font-mono mt-0.5">
-                                Awarded: {a.points_awarded} pts
-                              </div>
-                            )}
+                            {a.points_awarded > 0 &&
+                              a.status === "reviewed" && (
+                                <div className="text-xs text-[#00e87a] font-mono mt-0.5">
+                                  Awarded: {a.points_awarded} pts
+                                </div>
+                              )}
                             {/* ── Code viewer ── */}
                             {a.code && (
                               <CodeViewer code={a.code} lang={a.lang} />
@@ -1366,13 +1750,17 @@ export default function AdminPage({ user }: AdminPageProps) {
                             {a.status === "submitted" && (
                               <>
                                 <button
-                                  onClick={() => approveArenaSubmission(a, basePts)}
+                                  onClick={() =>
+                                    approveArenaSubmission(a, basePts)
+                                  }
                                   className="px-3 py-1.5 bg-[#00e87a] text-black text-xs font-mono font-bold rounded-lg hover:bg-[#00ff88] transition-all"
                                 >
                                   ✓ Approve
                                 </button>
                                 <button
-                                  onClick={() => rejectArenaSubmission(a.id, a.github)}
+                                  onClick={() =>
+                                    rejectArenaSubmission(a.id, a.github)
+                                  }
                                   className="px-3 py-1.5 bg-[#ff4d4d20] text-[#ff4d4d] text-xs font-mono rounded-lg hover:bg-[#ff4d4d30] transition-all"
                                 >
                                   ✗ Reject

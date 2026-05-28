@@ -1,13 +1,15 @@
 'use client';
 // ════════════════════════════════════════════════════════════
 // src/components/pages/ArenaPage.tsx
-// Multi-problem contest support + mobile UX
+// - alert() fully removed — toast-only
+// - Fullscreen NOT exited on problem submit (only on "Submit & Exit")
+// - Problem solved tracking per contest session
 // ════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useRef } from 'react';
-import dynamic                         from 'next/dynamic';
-import { getSupabaseClient }           from '@/lib/supabase';
-import PaymentButton                   from '@/components/arena/PaymentButton';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import dynamic                                       from 'next/dynamic';
+import { getSupabaseClient }                         from '@/lib/supabase';
+import PaymentButton                                 from '@/components/arena/PaymentButton';
 import type { Contest, ContestRegistration, Problem, User } from '@/types/database';
 
 const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false });
@@ -23,14 +25,16 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   const [userRegs,      setUserRegs]      = useState<ContestRegistration[]>([]);
   const [arenaProblems, setArenaProblems] = useState<Record<string, Problem>>({});
   const [loading,       setLoading]       = useState(true);
-  const [toast,         setToast]         = useState<{ msg: string; type: 'ok' | 'err' | 'info' } | null>(null);
+  const [toast,         setToast]         = useState<{ msg: string; type: 'ok' | 'err' | 'info' | 'warn' } | null>(null);
   const [activeContest, setActiveContest] = useState<Contest | null>(null);
   const [activeProblem, setActiveProblem] = useState<Problem | null>(null);
   const [problemIndex,  setProblemIndex]  = useState(0);
   const [strikes,       setStrikes]       = useState(0);
   const [timeLeft,      setTimeLeft]      = useState(0);
+  const [solved,        setSolved]        = useState<Set<string>>(new Set());
   const timerRef   = useRef<NodeJS.Timeout | null>(null);
   const visHandler = useRef<(() => void) | null>(null);
+  const toastTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => { loadContests(); }, [user]);
 
@@ -47,7 +51,6 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
       setContests(contestList);
       setUserRegs((r as ContestRegistration[]) || []);
 
-      // Pre-fetch all problems referenced by live contests
       const allIds = new Set<string>();
       contestList.filter(ct => ct.status === 'live').forEach(ct => {
         if (ct.problem_id) allIds.add(ct.problem_id);
@@ -64,15 +67,15 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   }
 
   function getContestProblemIds(ct: Contest): string[] {
-    // Support both new problem_ids array and legacy single problem_id
     const ids = [...(ct.problem_ids || [])];
     if (ct.problem_id && !ids.includes(ct.problem_id)) ids.unshift(ct.problem_id);
     return ids;
   }
 
-  function showToast(msg: string, type: 'ok' | 'err' | 'info' = 'info') {
+  function showToast(msg: string, type: 'ok' | 'err' | 'info' | 'warn' = 'info') {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 4000);
+    toastTimer.current = setTimeout(() => setToast(null), 4500);
   }
 
   async function startContest(contest: Contest) {
@@ -86,6 +89,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     setActiveProblem(firstProblem);
     setProblemIndex(0);
     setStrikes(0);
+    setSolved(new Set());
     setTimeLeft(contest.duration_mins * 60);
     onArenaLockChange(true);
 
@@ -93,6 +97,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
       if (document.hidden) {
         setStrikes(s => {
           const next = s + 1;
+          showToast(`⚠ Tab switch detected! ${next}/3 strikes.`, 'warn');
           if (next >= 3) endContest('disqualified');
           return next;
         });
@@ -103,6 +108,8 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
         if (t <= 1) { endContest('submitted'); return 0; }
+        if (t === 300) showToast('⏰ 5 minutes remaining!', 'warn');
+        if (t === 60)  showToast('⏰ 1 minute remaining!', 'err');
         return t - 1;
       });
     }, 1000);
@@ -116,16 +123,33 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   }
 
   function endContest(status: 'submitted' | 'disqualified') {
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current)   clearInterval(timerRef.current);
     if (visHandler.current) document.removeEventListener('visibilitychange', visHandler.current);
     setActiveContest(null);
     setActiveProblem(null);
+    setSolved(new Set());
     onArenaLockChange(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     showToast(
-      status === 'disqualified' ? '❌ Disqualified — too many violations.' : '✅ Contest ended.',
+      status === 'disqualified' ? '❌ Disqualified — too many tab-switch violations.' : '✅ Contest ended. Good work!',
       status === 'disqualified' ? 'err' : 'ok'
     );
+  }
+
+  // Called from Workspace onClose — in arena context just switch problem or show toast
+  // Does NOT exit fullscreen so the proctor session stays intact
+  function handleProblemClose() {
+    if (!activeContest) return;
+    // Mark the current problem as attempted and move to next if possible
+    if (activeProblem) setSolved(prev => new Set(prev).add(activeProblem.id));
+    const ids = getContestProblemIds(activeContest);
+    const nextIdx = problemIndex + 1;
+    if (nextIdx < ids.length) {
+      switchProblem(activeContest, nextIdx);
+      showToast(`Problem ${problemIndex + 1} done! Moving to Problem ${nextIdx + 1}…`, 'ok');
+    } else {
+      showToast('All problems attempted! You can submit & exit now.', 'info');
+    }
   }
 
   const fmtTime = (s: number) =>
@@ -136,6 +160,18 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     const ids = getContestProblemIds(activeContest);
     return (
       <div className="min-h-screen bg-[#0a0a0a]">
+        {/* Persistent toast inside arena */}
+        {toast && (
+          <div className={`fixed top-16 right-4 left-4 md:left-auto md:right-6 md:w-auto z-[200]
+            px-4 py-3 rounded-lg font-mono text-sm shadow-xl pointer-events-none
+            ${toast.type === 'ok'   ? 'bg-[#00e87a] text-black' :
+              toast.type === 'err'  ? 'bg-[#ff4d4d] text-white' :
+              toast.type === 'warn' ? 'bg-[#f0b429] text-black' :
+                                      'bg-[#1f1f1f] text-[#e0e0e0] border border-[#2a2a2a]'}`}>
+            {toast.msg}
+          </div>
+        )}
+
         {/* Proctor bar */}
         <div className="bg-[#111] border-b border-[#1f1f1f] px-4 md:px-6 py-3 sticky top-0 z-50">
           <div className="flex items-center justify-between gap-2">
@@ -145,7 +181,9 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
               <span className="font-mono font-bold text-[#e0e0e0] text-sm truncate">{activeContest.name}</span>
             </div>
             <div className="flex items-center gap-2 md:gap-4 shrink-0">
-              <div className="font-mono text-xl md:text-2xl font-bold text-[#00e87a]">{fmtTime(timeLeft)}</div>
+              <div className={`font-mono text-xl md:text-2xl font-bold ${timeLeft <= 60 ? 'text-[#ff4d4d] animate-pulse' : 'text-[#00e87a]'}`}>
+                {fmtTime(timeLeft)}
+              </div>
               <div className={`text-xs font-mono px-2 py-1 rounded hidden sm:block
                 ${strikes > 0 ? 'text-[#ff4d4d] bg-[#ff4d4d15]' : 'text-[#444]'}`}>
                 ⚠ {strikes}/3
@@ -166,8 +204,11 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                   className={`px-3 py-1 rounded-lg text-xs font-mono whitespace-nowrap transition-all shrink-0
                     ${problemIndex === i
                       ? 'bg-[#00e87a] text-black font-bold'
-                      : 'bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]'}`}>
-                  Problem {i + 1}{arenaProblems[id] ? ` — ${arenaProblems[id].title}` : ''}
+                      : solved.has(id)
+                        ? 'bg-[#00e87a20] text-[#00e87a]'
+                        : 'bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]'}`}>
+                  {solved.has(id) ? '✓ ' : ''}Problem {i + 1}
+                  {arenaProblems[id] ? ` — ${arenaProblems[id].title}` : ''}
                 </button>
               ))}
             </div>
@@ -176,7 +217,12 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
 
         <div className="p-4 md:p-6">
           {activeProblem ? (
-            <Workspace problem={activeProblem} user={user} onClose={() => endContest('submitted')} />
+            <Workspace
+              problem={activeProblem}
+              user={user}
+              // In arena: closing a problem goes to next, doesn't exit fullscreen
+              onClose={handleProblemClose}
+            />
           ) : (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
               <div className="text-5xl mb-4">⏳</div>
@@ -194,10 +240,12 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   return (
     <div>
       {toast && (
-        <div className={`fixed top-20 right-4 left-4 md:left-auto md:right-6 md:w-auto z-50 px-4 py-3 rounded-lg font-mono text-sm shadow-xl
-          ${toast.type === 'ok'  ? 'bg-[#00e87a] text-black' :
-            toast.type === 'err' ? 'bg-[#ff4d4d] text-white' :
-                                   'bg-[#1f1f1f] text-[#e0e0e0] border border-[#2a2a2a]'}`}>
+        <div className={`fixed top-20 right-4 left-4 md:left-auto md:right-6 md:w-auto z-50
+          px-4 py-3 rounded-lg font-mono text-sm shadow-xl pointer-events-none
+          ${toast.type === 'ok'   ? 'bg-[#00e87a] text-black' :
+            toast.type === 'err'  ? 'bg-[#ff4d4d] text-white' :
+            toast.type === 'warn' ? 'bg-[#f0b429] text-black' :
+                                    'bg-[#1f1f1f] text-[#e0e0e0] border border-[#2a2a2a]'}`}>
           {toast.msg}
         </div>
       )}

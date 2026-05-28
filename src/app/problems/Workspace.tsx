@@ -1,10 +1,7 @@
 'use client';
 // ════════════════════════════════════════════════════════════
 // src/app/problems/Workspace.tsx
-// Code execution — zero API, zero auth:
-//   Python     → Pyodide WASM (runs in browser)
-//   JavaScript → Web Worker (runs in browser)
-//   C++/Java/Go/Rust → /api/execute → Wandbox (no auth)
+// All alerts replaced with inline toasts — no browser alert() calls
 // ════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -29,6 +26,14 @@ interface WorkspaceProps {
   onClose: () => void;
 }
 
+type ToastType = 'ok' | 'err' | 'info' | 'warn';
+
+interface Toast {
+  msg:  string;
+  type: ToastType;
+  id:   number;
+}
+
 export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
   const db = getSupabaseClient();
 
@@ -41,8 +46,16 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
   const [statusMsg,     setStatusMsg]     = useState('Ready to submit');
   const [submitBlocked, setSubmitBlocked] = useState(false);
   const [runError,      setRunError]      = useState<string | null>(null);
-  const [runStatus,     setRunStatus]     = useState('');   // e.g. "Loading Python…"
+  const [runStatus,     setRunStatus]     = useState('');
   const [progress,      setProgress]      = useState<{ done: number; total: number } | null>(null);
+  const [toasts,        setToasts]        = useState<Toast[]>([]);
+  const toastCounter = useRef(0);
+
+  function showToast(msg: string, type: ToastType = 'info') {
+    const id = ++toastCounter.current;
+    setToasts(prev => [...prev, { msg, type, id }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -91,7 +104,6 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
       let result: RunResult;
 
       if (strategy === 'browser') {
-        // Python or JS — runs in-browser, no network needed
         if (lang === 'python') {
           setRunStatus('Loading Python runtime… (first run takes ~5s)');
         } else {
@@ -103,7 +115,6 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
           setProgress({ done, total });
         });
       } else {
-        // Compiled lang — proxy to Wandbox (no auth)
         setRunStatus(`Compiling ${lang} on Wandbox…`);
         result = await runOnServer(code, lang, cases);
       }
@@ -119,9 +130,15 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
   }
 
   async function submitSolution() {
-    if (!user)            { alert('Sign in required to submit!'); return; }
-    if (!approach.trim()) { alert('Provide an approach description or GitHub PR link!'); return; }
-    if (submitBlocked)    return;
+    if (!user) {
+      showToast('Sign in required to submit!', 'err');
+      return;
+    }
+    if (!approach.trim()) {
+      showToast('Please provide an approach description or GitHub PR link!', 'warn');
+      return;
+    }
+    if (submitBlocked) return;
 
     setSubmitting(true);
     setStatusMsg('Uploading submission...');
@@ -138,6 +155,7 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
       if (existing?.length) {
         setStatusMsg('⏳ Duplicate blocked — submission already exists.');
         setSubmitBlocked(true);
+        showToast('Duplicate blocked — you already have a pending/approved submission.', 'warn');
         return;
       }
 
@@ -147,7 +165,7 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
         ? Math.floor((problem.points || 100) * (passed / total))
         : (problem.points || 100);
 
-      const { error } = await (db.from('submissions')as any).insert([{
+      const { error } = await (db.from('submissions') as any).insert([{
         problem_id:     problem.id,
         problem_title:  problem.title,
         name:           user.name,
@@ -166,17 +184,38 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
       setStatusMsg('⏳ Pending review — duplicates blocked.');
       setSubmitBlocked(true);
       setApproach('');
-      alert(`Submitted! "${problem.title}" — ${total > 0 ? `${passed}/${total} tests, potential ${pointsAwarded}pts` : 'pending admin review'}`);
+      showToast(
+        `✅ Submitted "${problem.title}" — ${total > 0 ? `${passed}/${total} tests passed, potential ${pointsAwarded}pts` : 'pending admin review'}`,
+        'ok'
+      );
     } catch (e: any) {
       setStatusMsg('Error — try again');
-      alert('Submission error: ' + (e.message || 'Unknown error'));
+      showToast('Submission error: ' + (e.message || 'Unknown error'), 'err');
     } finally {
       setSubmitting(false);
     }
   }
 
+  const toastColors: Record<ToastType, string> = {
+    ok:   'bg-[#00e87a] text-black',
+    err:  'bg-[#ff4d4d] text-white',
+    warn: 'bg-[#f0b429] text-black',
+    info: 'bg-[#1f1f1f] text-[#e0e0e0] border border-[#2a2a2a]',
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full min-h-screen">
+    <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-4 h-full min-h-screen">
+
+      {/* ── Toast notifications ──────────────────────────── */}
+      <div className="fixed bottom-6 right-4 md:right-6 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+        {toasts.map(t => (
+          <div key={t.id}
+            className={`${toastColors[t.type]} px-4 py-3 rounded-lg font-mono text-sm shadow-xl
+              animate-in slide-in-from-bottom-2 pointer-events-auto`}>
+            {t.msg}
+          </div>
+        ))}
+      </div>
 
       {/* ── Left: Problem description ───────────────────── */}
       <div className="bg-[#111] border border-[#1f1f1f] rounded-xl p-6 overflow-y-auto">
@@ -246,7 +285,6 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
 
         <div className="flex items-center justify-between">
           <LangTabs current={lang} onChange={handleLangChange} />
-          {/* Execution badge */}
           <span className={`text-[10px] font-mono px-2 py-0.5 rounded
             ${getStrategy(lang) === 'browser'
               ? 'bg-[#00e87a15] text-[#00e87a]'

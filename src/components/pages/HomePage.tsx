@@ -93,7 +93,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
       <section className="card p-4 md:p-6 mt-2 md:mt-4">
         <div className="text-xs text-[#444] font-mono uppercase tracking-wider mb-3">Powered by</div>
         <div className="flex flex-wrap gap-2 md:gap-3">
-          {['Monaco Editor', 'Judge0', 'Razorpay', 'Supabase', 'Next.js', 'GitHub OAuth'].map(t => (
+          {['Monaco Editor', 'Supabase', 'Next.js', 'GitHub OAuth'].map(t => (
             <span key={t} className="px-2 md:px-3 py-1 md:py-1.5 bg-[#0a0a0a] border border-[#1f1f1f]
               rounded-lg text-xs font-mono text-[#666]">
               {t}
