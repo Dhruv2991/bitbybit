@@ -1,7 +1,7 @@
 'use client';
 // ════════════════════════════════════════════════════════════
 // src/components/pages/ProblemsPage.tsx
-// Problem list + workspace (with Monaco editor)
+// Contest-only problems (is_contest_problem = true) are hidden here
 // ════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from 'react';
@@ -60,40 +60,44 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
     const s = JSON.parse(localStorage.getItem('bb_solved') || '[]');
     setSolved(s);
 
-    // ── Initial fetch ─────────────────────────────────────
     (async () => {
       try {
-        const { data } = await db.from('problems').select('*').order('created_at', { ascending: false });
-        setProblems([...(data || []), ...STATIC_PROBLEMS]);
+        const { data } = await (db.from('problems') as any)
+          .select('*')
+          .eq('is_contest_problem', false)
+          .order('created_at', { ascending: false });
+        // Also include rows where is_contest_problem is null (legacy problems)
+        const { data: legacy } = await (db.from('problems') as any)
+          .select('*')
+          .is('is_contest_problem', null)
+          .order('created_at', { ascending: false });
+        const combined = [...(data || []), ...(legacy || [])];
+        // Deduplicate by id
+        const seenIds: Record<string, boolean> = {};
+        const deduped = combined.filter(p => { if (seenIds[p.id]) return false; seenIds[p.id] = true; return true; });
+        setProblems([...deduped, ...STATIC_PROBLEMS]);
       } catch {
         setProblems(STATIC_PROBLEMS);
       }
     })();
 
-    // ── Realtime: admin adds / edits / deletes a problem ──
-    // Users see the new problem list immediately without refreshing.
     const channel = db
       .channel('problems-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'problems' },
-        async () => {
-          try {
-            const { data } = await db
-              .from('problems')
-              .select('*')
-              .order('created_at', { ascending: false });
-            setProblems([...(data || []), ...STATIC_PROBLEMS]);
-          } catch {
-            // keep existing list on network error
-          }
-        },
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'problems' }, async () => {
+        try {
+          const { data } = await (db.from('problems') as any)
+            .select('*').eq('is_contest_problem', false).order('created_at', { ascending: false });
+          const { data: legacy } = await (db.from('problems') as any)
+            .select('*').is('is_contest_problem', null).order('created_at', { ascending: false });
+          const combined = [...(data || []), ...(legacy || [])];
+          const seenIds: Record<string, boolean> = {};
+          const deduped = combined.filter(p => { if (seenIds[p.id]) return false; seenIds[p.id] = true; return true; });
+          setProblems([...deduped, ...STATIC_PROBLEMS]);
+        } catch {}
+      })
       .subscribe();
 
-    return () => {
-      db.removeChannel(channel);
-    };
+    return () => { db.removeChannel(channel); };
   }, []);
 
   const filtered = filter === 'all'
@@ -101,93 +105,95 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
     : problems.filter(p => p.difficulty === filter || (p.tags || []).includes(filter));
 
   if (selected) {
-    return (
-      <Workspace
-        problem={selected}
-        user={user}
-        onClose={() => setSelected(null)}
-      />
-    );
+    return <Workspace problem={selected} user={user} onClose={() => setSelected(null)} />;
   }
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
-        <h1 className="font-display font-bold text-2xl">Problems</h1>
+      <div className="mb-4 md:mb-6 flex items-center justify-between flex-wrap gap-3">
+        <h1 className="font-display font-bold text-xl md:text-2xl">Problems</h1>
         <div className="flex gap-2 flex-wrap">
           {DIFFICULTIES.map(d => (
-            <button
-              key={d}
-              onClick={() => setFilter(d)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-mono transition-all
-                ${filter === d
-                  ? 'bg-[#00e87a] text-black font-bold'
-                  : 'bg-[#111] border border-[#1f1f1f] text-[#666] hover:text-[#e0e0e0]'}`}
-            >
+            <button key={d} onClick={() => setFilter(d)}
+              className={`px-3 py-1.5 rounded-lg text-xs md:text-sm font-mono transition-all
+                ${filter === d ? 'bg-[#00e87a] text-black font-bold' : 'bg-[#111] border border-[#1f1f1f] text-[#666] hover:text-[#e0e0e0]'}`}>
               {d === 'all' ? 'All' : d}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Problem list */}
-      <div className="bg-[#111] border border-[#1f1f1f] rounded-xl overflow-hidden">
-        {/* Header */}
-        <div className="grid grid-cols-[2rem_1fr_auto_auto_auto_auto] gap-4 px-5 py-3
-          border-b border-[#1a1a1a] text-xs text-[#444] font-mono uppercase tracking-wider">
-          <div>#</div>
-          <div>Title</div>
-          <div>Difficulty</div>
-          <div>Points</div>
-          <div>Submissions</div>
-          <div>Status</div>
-        </div>
-
+      {/* Mobile: card list */}
+      <div className="md:hidden space-y-2">
         {filtered.length === 0 ? (
-          <div className="text-center py-16 text-[#444] font-mono">No problems match this filter.</div>
-        ) : (
-          filtered.map((p, i) => {
-            const isSolved = solved.includes(p.id);
-            return (
-              <div
-                key={p.id}
-                onClick={() => setSelected(p)}
-                className="grid grid-cols-[2rem_1fr_auto_auto_auto_auto] gap-4 px-5 py-4
-                  border-b border-[#161616] last:border-0 hover:bg-[#161616] cursor-pointer
-                  transition-colors group items-center"
-              >
-                <div className="text-[#444] text-sm font-mono">{i + 1}</div>
-                <div>
-                  <div className="text-[#e0e0e0] font-mono text-sm group-hover:text-[#00e87a] transition-colors">
-                    {p.title}
-                  </div>
-                  <div className="flex gap-1.5 mt-1 flex-wrap">
-                    {(p.tags || []).map(t => (
-                      <span key={t} className="text-[10px] text-[#444] bg-[#0f0f0f] px-1.5 py-0.5 rounded font-mono">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded
-                    ${p.difficulty === 'Easy'   ? 'text-[#00e87a] bg-[#00e87a15]' :
-                      p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42915]' :
-                                                  'text-[#ff4d4d] bg-[#ff4d4d15]'}`}>
+          <div className="text-center py-16 text-[#444] font-mono text-sm">No problems match this filter.</div>
+        ) : filtered.map((p, i) => {
+          const isSolved = solved.includes(p.id);
+          return (
+            <div key={p.id} onClick={() => setSelected(p)}
+              className="bg-[#111] border border-[#1f1f1f] rounded-xl px-4 py-3 flex items-center gap-3 active:bg-[#161616] cursor-pointer">
+              <div className="text-[#333] text-sm font-mono w-6 shrink-0">{i + 1}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[#e0e0e0] font-mono text-sm truncate">{p.title}</div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded
+                    ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a15]' :
+                      p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42915]' : 'text-[#ff4d4d] bg-[#ff4d4d15]'}`}>
                     {p.difficulty}
                   </span>
-                </div>
-                <div className="text-[#a78bfa] text-sm font-mono font-bold">{p.points}</div>
-                <div className="text-[#444] text-sm font-mono">{p.submission_count || 0}</div>
-                <div>
-                  {isSolved
-                    ? <span className="text-[#00e87a] text-xs font-mono font-bold">✓ Solved</span>
-                    : <span className="text-[#333] text-xs font-mono">Solve →</span>}
+                  <span className="text-[#a78bfa] text-[10px] font-mono">{p.points}pts</span>
                 </div>
               </div>
-            );
-          })
-        )}
+              <div className="shrink-0">
+                {isSolved
+                  ? <span className="text-[#00e87a] text-xs font-mono">✓</span>
+                  : <span className="text-[#333] text-xs font-mono">→</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop: table */}
+      <div className="hidden md:block bg-[#111] border border-[#1f1f1f] rounded-xl overflow-hidden">
+        <div className="grid grid-cols-[2rem_1fr_auto_auto_auto_auto] gap-4 px-5 py-3
+          border-b border-[#1a1a1a] text-xs text-[#444] font-mono uppercase tracking-wider">
+          <div>#</div><div>Title</div><div>Difficulty</div><div>Points</div><div>Submissions</div><div>Status</div>
+        </div>
+        {filtered.length === 0 ? (
+          <div className="text-center py-16 text-[#444] font-mono">No problems match this filter.</div>
+        ) : filtered.map((p, i) => {
+          const isSolved = solved.includes(p.id);
+          return (
+            <div key={p.id} onClick={() => setSelected(p)}
+              className="grid grid-cols-[2rem_1fr_auto_auto_auto_auto] gap-4 px-5 py-4
+                border-b border-[#161616] last:border-0 hover:bg-[#161616] cursor-pointer transition-colors group items-center">
+              <div className="text-[#444] text-sm font-mono">{i + 1}</div>
+              <div>
+                <div className="text-[#e0e0e0] font-mono text-sm group-hover:text-[#00e87a] transition-colors">{p.title}</div>
+                <div className="flex gap-1.5 mt-1 flex-wrap">
+                  {(p.tags || []).map(t => (
+                    <span key={t} className="text-[10px] text-[#444] bg-[#0f0f0f] px-1.5 py-0.5 rounded font-mono">{t}</span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded
+                  ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a15]' :
+                    p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42915]' : 'text-[#ff4d4d] bg-[#ff4d4d15]'}`}>
+                  {p.difficulty}
+                </span>
+              </div>
+              <div className="text-[#a78bfa] text-sm font-mono font-bold">{p.points}</div>
+              <div className="text-[#444] text-sm font-mono">{p.submission_count || 0}</div>
+              <div>
+                {isSolved
+                  ? <span className="text-[#00e87a] text-xs font-mono font-bold">✓ Solved</span>
+                  : <span className="text-[#333] text-xs font-mono">Solve →</span>}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

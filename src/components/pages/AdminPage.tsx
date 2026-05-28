@@ -44,6 +44,7 @@ const blankContest = (): Omit<Contest, "id" | "created_at"> => ({
   prize_note: "",
   leaderboard_discount: 0,
   problem_id: null,
+  problem_ids: [],
   status: "upcoming",
 });
 
@@ -355,7 +356,7 @@ function ProblemForm({
   );
 }
 
-// ── Contest form (with inline problem creation) ──────────────
+// ── Contest form (multi-problem + inline creation) ──────────
 function ContestForm({
   initial,
   problems,
@@ -373,10 +374,10 @@ function ContestForm({
   const [form, setForm] = useState<Omit<Contest, "id" | "created_at">>({
     ...blankContest(),
     ...initial,
+    problem_ids: (initial as any).problem_ids || [],
   });
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
-  // Inline problem creation state
+  const [saving,            setSaving]            = useState(false);
+  const [err,               setErr]               = useState("");
   const [showInlineProblem, setShowInlineProblem] = useState(false);
   const [creatingProblem,   setCreatingProblem]   = useState(false);
 
@@ -384,11 +385,22 @@ function ContestForm({
     setForm((f) => ({ ...f, [k]: v }));
   }
 
+  function toggleProblemId(id: string) {
+    setForm(f => {
+      const ids = f.problem_ids || [];
+      return {
+        ...f,
+        problem_ids: ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id],
+        // Keep legacy problem_id in sync with first selected
+        problem_id: ids.includes(id)
+          ? (ids.filter(x => x !== id)[0] || null)
+          : (f.problem_ids?.length === 0 ? id : f.problem_id),
+      };
+    });
+  }
+
   async function handleSave() {
-    if (!form.name.trim()) {
-      setErr("Contest name is required.");
-      return;
-    }
+    if (!form.name.trim()) { setErr("Contest name is required."); return; }
     setSaving(true);
     setErr("");
     try {
@@ -399,23 +411,29 @@ function ContestForm({
     }
   }
 
-  // Called when the inline ProblemForm saves
   async function handleInlineProblemSave(
     problemData: Omit<Problem, "id" | "created_at" | "updated_at">,
   ) {
     setCreatingProblem(true);
+    // Mark as contest-only so it's hidden from the public Problems page
+    const payload = { ...problemData, is_contest_problem: true };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (db.from("problems") as any)
-      .insert([problemData])
-      .select()
-      .single();
+      .insert([payload]).select().single();
     setCreatingProblem(false);
     if (error) throw new Error((error as any).message);
     const newProb = data as Problem;
-    onProblemCreated(newProb);           // bubble up to parent so probs list updates
-    set("problem_id", newProb.id);      // auto-assign to this contest
+    onProblemCreated(newProb);
+    // Auto-add to selected problems
+    setForm(f => ({
+      ...f,
+      problem_ids: [...(f.problem_ids || []), newProb.id],
+      problem_id: f.problem_id || newProb.id,
+    }));
     setShowInlineProblem(false);
   }
+
+  const selectedIds = form.problem_ids || [];
 
   return (
     <div className="space-y-5">
@@ -427,119 +445,111 @@ function ContestForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[
-          {
-            label: "Contest Name *",
-            key: "name",
-            ph: "BitByBit Weekly #1",
-            type: "text",
-          },
-          {
-            label: "Entry Fee (₹)",
-            key: "entry_fee",
-            ph: "50",
-            type: "number",
-          },
-          {
-            label: "Duration (min)",
-            key: "duration_mins",
-            ph: "60",
-            type: "number",
-          },
-          {
-            label: "Prize Note",
-            key: "prize_note",
-            ph: "Top 3 split the pool",
-            type: "text",
-          },
-          { label: "UPI ID", key: "upi_id", ph: "yourname@upi", type: "text" },
+          { label: "Contest Name *", key: "name",         ph: "BitByBit Weekly #1",   type: "text"   },
+          { label: "Entry Fee (₹)",  key: "entry_fee",    ph: "50",                   type: "number" },
+          { label: "Duration (min)", key: "duration_mins",ph: "60",                   type: "number" },
+          { label: "Prize Note",     key: "prize_note",   ph: "Top 3 split the pool", type: "text"   },
+          { label: "UPI ID",         key: "upi_id",       ph: "yourname@upi",         type: "text"   },
         ].map(({ label, key, ph, type }) => (
           <div key={key}>
-            <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
-              {label}
-            </label>
+            <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">{label}</label>
             <input
               type={type}
               value={(form as any)[key]}
-              onChange={(e) =>
-                set(
-                  key as any,
-                  type === "number" ? Number(e.target.value) : e.target.value,
-                )
-              }
+              onChange={(e) => set(key as any, type === "number" ? Number(e.target.value) : e.target.value)}
               className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2
                 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
               placeholder={ph}
             />
           </div>
         ))}
+      </div>
 
-        {/* Problem assignment with inline creation option */}
-        <div>
-          <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
-            Assign Problem
+      {/* Multi-problem selector */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs text-[#666] font-mono uppercase tracking-wider">
+            Contest Problems ({selectedIds.length} selected)
           </label>
-          <div className="flex gap-2">
-            <select
-              aria-label="Select Problem"
-              value={form.problem_id || ""}
-              onChange={(e) => set("problem_id", e.target.value || null)}
-              className="flex-1 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
-            >
-              <option value="">— Hidden / TBD —</option>
-              {problems.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
-            {/* Button to create a brand-new problem right here */}
-            <button
-              onClick={() => setShowInlineProblem((v) => !v)}
-              className="px-3 py-2 bg-[#00e87a15] text-[#00e87a] text-xs font-mono rounded-lg
-                hover:bg-[#00e87a25] border border-[#00e87a30] transition-all shrink-0"
-              title="Create a new problem for this contest"
-            >
-              {showInlineProblem ? "✕ Cancel" : "+ New"}
-            </button>
-          </div>
-
-          {/* Inline problem form */}
-          {showInlineProblem && (
-            <div className="mt-4 p-4 bg-[#0a0a0a] border border-[#00e87a20] rounded-xl">
-              <div className="text-xs text-[#00e87a] font-mono font-bold mb-4 uppercase tracking-wider">
-                ✦ Create Problem for This Contest
-              </div>
-              <ProblemForm
-                initial={{}}
-                onSave={handleInlineProblemSave}
-                onCancel={() => setShowInlineProblem(false)}
-                compact
-              />
-            </div>
-          )}
+          <button
+            onClick={() => setShowInlineProblem(v => !v)}
+            className="px-3 py-1 bg-[#00e87a15] text-[#00e87a] text-xs font-mono rounded-lg
+              hover:bg-[#00e87a25] border border-[#00e87a30] transition-all"
+          >
+            {showInlineProblem ? "✕ Cancel" : "+ Create New"}
+          </button>
         </div>
+
+        {/* Checklist of existing problems */}
+        <div className="max-h-48 overflow-y-auto space-y-1 bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg p-2">
+          {problems.length === 0 ? (
+            <div className="text-xs text-[#444] font-mono py-2 text-center">No problems yet — create one below</div>
+          ) : problems.map(p => {
+            const checked = selectedIds.includes(p.id);
+            return (
+              <label key={p.id}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all
+                  ${checked ? "bg-[#00e87a10] border border-[#00e87a20]" : "hover:bg-[#111]"}`}>
+                <input type="checkbox" checked={checked} onChange={() => toggleProblemId(p.id)}
+                  className="accent-[#00e87a] w-3.5 h-3.5 shrink-0" />
+                <span className="text-sm font-mono text-[#e0e0e0] truncate flex-1">{p.title}</span>
+                <span className={`text-[10px] font-mono shrink-0
+                  ${p.difficulty === "Easy" ? "text-[#00e87a]" : p.difficulty === "Medium" ? "text-[#f0b429]" : "text-[#ff4d4d]"}`}>
+                  {p.difficulty}
+                </span>
+                {p.is_contest_problem && (
+                  <span className="text-[10px] font-mono text-[#a78bfa] shrink-0">arena</span>
+                )}
+              </label>
+            );
+          })}
+        </div>
+
+        {selectedIds.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {selectedIds.map((id, i) => {
+              const p = problems.find(x => x.id === id);
+              return (
+                <span key={id}
+                  className="flex items-center gap-1 bg-[#00e87a15] text-[#00e87a] text-xs font-mono px-2 py-0.5 rounded border border-[#00e87a20]">
+                  P{i+1}: {p?.title || id.slice(0,8)}
+                  <button onClick={() => toggleProblemId(id)} className="text-[#00e87a60] hover:text-[#ff4d4d] ml-0.5">×</button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Inline problem creation */}
+        {showInlineProblem && (
+          <div className="mt-4 p-4 bg-[#0a0a0a] border border-[#00e87a20] rounded-xl">
+            <div className="text-xs text-[#00e87a] font-mono font-bold mb-1 uppercase tracking-wider">
+              ✦ Create Arena Problem (hidden from public Problems page)
+            </div>
+            <p className="text-[10px] text-[#444] font-mono mb-4">
+              This problem will be marked arena-only and won't appear in the Problems tab.
+            </p>
+            <ProblemForm
+              initial={{}}
+              onSave={handleInlineProblemSave}
+              onCancel={() => setShowInlineProblem(false)}
+              compact
+            />
+          </div>
+        )}
       </div>
 
       <div>
-        <label className="block text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">
-          Status
-        </label>
+        <label className="block text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">Status</label>
         <div className="flex gap-2">
           {(["upcoming", "live", "ended"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => set("status", s)}
+            <button key={s} onClick={() => set("status", s)}
               className={`px-4 py-1.5 rounded-lg text-xs font-mono font-bold transition-all capitalize
-                ${
-                  form.status === s
-                    ? s === "live"
-                      ? "bg-[#00e87a] text-black"
-                      : s === "upcoming"
-                        ? "bg-[#f0b429] text-black"
-                        : "bg-[#333] text-[#e0e0e0]"
-                    : "bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]"
-                }`}
-            >
+                ${form.status === s
+                  ? s === "live"     ? "bg-[#00e87a] text-black"
+                  : s === "upcoming" ? "bg-[#f0b429] text-black"
+                  :                   "bg-[#333] text-[#e0e0e0]"
+                  : "bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]"}`}>
               {s}
             </button>
           ))}
@@ -547,20 +557,10 @@ function ContestForm({
       </div>
 
       <div className="flex gap-3 pt-2">
-        <button
-          onClick={handleSave}
-          disabled={saving || creatingProblem}
-          className="btn-primary disabled:opacity-50"
-        >
-          {saving
-            ? "Saving…"
-            : initial.id
-              ? "Update Contest"
-              : "Create Contest"}
+        <button onClick={handleSave} disabled={saving || creatingProblem} className="btn-primary disabled:opacity-50">
+          {saving ? "Saving…" : initial.id ? "Update Contest" : "Create Contest"}
         </button>
-        <button onClick={onCancel} className="btn-ghost">
-          Cancel
-        </button>
+        <button onClick={onCancel} className="btn-ghost">Cancel</button>
       </div>
     </div>
   );

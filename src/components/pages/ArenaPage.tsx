@@ -1,6 +1,7 @@
 'use client';
 // ════════════════════════════════════════════════════════════
-// src/components/pages/ArenaPage.tsx — original UI + live problem load
+// src/components/pages/ArenaPage.tsx
+// Multi-problem contest support + mobile UX
 // ════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef } from 'react';
@@ -24,6 +25,8 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   const [loading,       setLoading]       = useState(true);
   const [toast,         setToast]         = useState<{ msg: string; type: 'ok' | 'err' | 'info' } | null>(null);
   const [activeContest, setActiveContest] = useState<Contest | null>(null);
+  const [activeProblem, setActiveProblem] = useState<Problem | null>(null);
+  const [problemIndex,  setProblemIndex]  = useState(0);
   const [strikes,       setStrikes]       = useState(0);
   const [timeLeft,      setTimeLeft]      = useState(0);
   const timerRef   = useRef<NodeJS.Timeout | null>(null);
@@ -44,12 +47,14 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
       setContests(contestList);
       setUserRegs((r as ContestRegistration[]) || []);
 
-      // Pre-fetch problems for live contests so arena can show them immediately
-      const problemIds = contestList
-        .filter(ct => ct.problem_id && ct.status === 'live')
-        .map(ct => ct.problem_id!);
-      if (problemIds.length) {
-        const { data: probs } = await db.from('problems').select('*').in('id', problemIds);
+      // Pre-fetch all problems referenced by live contests
+      const allIds = new Set<string>();
+      contestList.filter(ct => ct.status === 'live').forEach(ct => {
+        if (ct.problem_id) allIds.add(ct.problem_id);
+        (ct.problem_ids || []).forEach(id => allIds.add(id));
+      });
+      if (allIds.size) {
+        const { data: probs } = await db.from('problems').select('*').in('id', Array.from(allIds));
         const map: Record<string, Problem> = {};
         (probs || []).forEach((p: Problem) => { map[p.id] = p; });
         setArenaProblems(map);
@@ -58,21 +63,28 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     setLoading(false);
   }
 
+  function getContestProblemIds(ct: Contest): string[] {
+    // Support both new problem_ids array and legacy single problem_id
+    const ids = [...(ct.problem_ids || [])];
+    if (ct.problem_id && !ids.includes(ct.problem_id)) ids.unshift(ct.problem_id);
+    return ids;
+  }
+
   function showToast(msg: string, type: 'ok' | 'err' | 'info' = 'info') {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
-  }
-
-  function handlePaySuccess(contestId: string, txnId: string) {
-    showToast(`Payment submitted! Txn: ${txnId} — Awaiting admin review.`, 'info');
-    loadContests();
   }
 
   async function startContest(contest: Contest) {
     if (!user) { showToast('Sign in required', 'err'); return; }
     try { await document.documentElement.requestFullscreen?.(); } catch {}
 
+    const ids = getContestProblemIds(contest);
+    const firstProblem = ids.length ? arenaProblems[ids[0]] || null : null;
+
     setActiveContest(contest);
+    setActiveProblem(firstProblem);
+    setProblemIndex(0);
     setStrikes(0);
     setTimeLeft(contest.duration_mins * 60);
     onArenaLockChange(true);
@@ -96,10 +108,18 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     }, 1000);
   }
 
+  function switchProblem(contest: Contest, idx: number) {
+    const ids = getContestProblemIds(contest);
+    if (idx < 0 || idx >= ids.length) return;
+    setProblemIndex(idx);
+    setActiveProblem(arenaProblems[ids[idx]] || null);
+  }
+
   function endContest(status: 'submitted' | 'disqualified') {
     if (timerRef.current) clearInterval(timerRef.current);
     if (visHandler.current) document.removeEventListener('visibilitychange', visHandler.current);
     setActiveContest(null);
+    setActiveProblem(null);
     onArenaLockChange(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     showToast(
@@ -111,55 +131,58 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   const fmtTime = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
-  // ── Active arena view ────────────────────────────────────
+  // ── Active arena view ──────────────────────────────────────
   if (activeContest) {
-    const contestProblem = activeContest.problem_id
-      ? arenaProblems[activeContest.problem_id]
-      : null;
-
+    const ids = getContestProblemIds(activeContest);
     return (
       <div className="min-h-screen bg-[#0a0a0a]">
         {/* Proctor bar */}
-        <div className="bg-[#111] border-b border-[#1f1f1f] px-6 py-3 flex items-center justify-between sticky top-0 z-50">
-          <div className="flex items-center gap-3">
-            <span className="w-2 h-2 bg-[#ff4d4d] rounded-full animate-pulse" />
-            <span className="text-xs font-mono text-[#666] uppercase tracking-wider">Live Arena</span>
-            <span className="font-mono font-bold text-[#e0e0e0]">{activeContest.name}</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="font-mono text-2xl font-bold text-[#00e87a]">{fmtTime(timeLeft)}</div>
-            <div className={`text-xs font-mono px-2 py-1 rounded
-              ${strikes > 0 ? 'text-[#ff4d4d] bg-[#ff4d4d15]' : 'text-[#444]'}`}>
-              ⚠ Strikes: {strikes}/3
+        <div className="bg-[#111] border-b border-[#1f1f1f] px-4 md:px-6 py-3 sticky top-0 z-50">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
+              <span className="w-2 h-2 bg-[#ff4d4d] rounded-full animate-pulse shrink-0" />
+              <span className="hidden md:block text-xs font-mono text-[#666] uppercase tracking-wider">Live Arena</span>
+              <span className="font-mono font-bold text-[#e0e0e0] text-sm truncate">{activeContest.name}</span>
             </div>
-            <button
-              onClick={() => endContest('submitted')}
-              className="px-3 py-1.5 bg-[#1a1a1a] border border-[#2a2a2a] text-[#666]
-                hover:text-[#ff4d4d] hover:border-[#ff4d4d40] text-sm font-mono rounded-lg transition-all"
-            >
-              Submit & Exit
-            </button>
+            <div className="flex items-center gap-2 md:gap-4 shrink-0">
+              <div className="font-mono text-xl md:text-2xl font-bold text-[#00e87a]">{fmtTime(timeLeft)}</div>
+              <div className={`text-xs font-mono px-2 py-1 rounded hidden sm:block
+                ${strikes > 0 ? 'text-[#ff4d4d] bg-[#ff4d4d15]' : 'text-[#444]'}`}>
+                ⚠ {strikes}/3
+              </div>
+              <button onClick={() => endContest('submitted')}
+                className="px-2 md:px-3 py-1.5 bg-[#1a1a1a] border border-[#2a2a2a] text-[#666]
+                  hover:text-[#ff4d4d] hover:border-[#ff4d4d40] text-xs md:text-sm font-mono rounded-lg transition-all">
+                Submit & Exit
+              </button>
+            </div>
           </div>
+
+          {/* Problem tabs (multi-problem) */}
+          {ids.length > 1 && (
+            <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+              {ids.map((id, i) => (
+                <button key={id} onClick={() => switchProblem(activeContest, i)}
+                  className={`px-3 py-1 rounded-lg text-xs font-mono whitespace-nowrap transition-all shrink-0
+                    ${problemIndex === i
+                      ? 'bg-[#00e87a] text-black font-bold'
+                      : 'bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]'}`}>
+                  Problem {i + 1}{arenaProblems[id] ? ` — ${arenaProblems[id].title}` : ''}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="p-6">
-          {contestProblem ? (
-            <Workspace
-              problem={contestProblem}
-              user={user}
-              onClose={() => endContest('submitted')}
-            />
+        <div className="p-4 md:p-6">
+          {activeProblem ? (
+            <Workspace problem={activeProblem} user={user} onClose={() => endContest('submitted')} />
           ) : (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
               <div className="text-5xl mb-4">⏳</div>
               <div className="font-mono text-[#e0e0e0] text-lg mb-2">Waiting for admin to reveal the problem…</div>
-              <div className="text-sm text-[#666] font-mono mb-6">Stay on this page. The problem will appear here once released.</div>
-              <button
-                onClick={loadContests}
-                className="btn-ghost text-sm"
-              >
-                Refresh
-              </button>
+              <div className="text-sm text-[#666] font-mono mb-6">Stay on this page. The problem will appear once released.</div>
+              <button onClick={loadContests} className="btn-ghost text-sm">Refresh</button>
             </div>
           )}
         </div>
@@ -167,67 +190,67 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     );
   }
 
+  // ── Contest list view ──────────────────────────────────────
   return (
     <div>
       {toast && (
-        <div className={`fixed top-20 right-6 z-50 px-4 py-3 rounded-lg font-mono text-sm shadow-xl
+        <div className={`fixed top-20 right-4 left-4 md:left-auto md:right-6 md:w-auto z-50 px-4 py-3 rounded-lg font-mono text-sm shadow-xl
           ${toast.type === 'ok'  ? 'bg-[#00e87a] text-black' :
             toast.type === 'err' ? 'bg-[#ff4d4d] text-white' :
-                                   'bg-[#1f1f1f] text-[#e0e0e0]'}`}>
+                                   'bg-[#1f1f1f] text-[#e0e0e0] border border-[#2a2a2a]'}`}>
           {toast.msg}
         </div>
       )}
 
-      <div className="mb-6">
-        <h1 className="font-display font-bold text-2xl mb-1">Arena</h1>
-        <p className="text-[#666] text-sm font-mono">
+      <div className="mb-4 md:mb-6">
+        <h1 className="font-display font-bold text-xl md:text-2xl mb-1">Arena</h1>
+        <p className="text-[#666] text-xs md:text-sm font-mono">
           Pay entry fee → get confirmed → compete in proctored contest
         </p>
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[#666] font-mono">
+        <div className="flex items-center gap-2 text-[#666] font-mono text-sm">
           <div className="spinner" /> Scanning contests...
         </div>
       ) : contests.length === 0 ? (
         <div className="text-center py-20 text-[#444] font-mono">
           <div className="text-4xl mb-3">🏆</div>
-          <div>No active tournaments. Ask admin to schedule a match.</div>
+          <div className="text-sm">No active tournaments. Ask admin to schedule a match.</div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {contests.map(ct => {
             const reg = userRegs.find(r => r.contest_id === ct.id);
+            const problemCount = getContestProblemIds(ct).length;
             return (
-              <div key={ct.id} className={`card p-5 flex flex-col gap-4
-                ${ct.status === 'live'
-                  ? 'border-[#00e87a40] shadow-[0_0_20px_rgba(0,232,122,0.08)]'
-                  : ct.status === 'ended' ? 'opacity-60' : ''}`}>
+              <div key={ct.id} className={`card p-4 md:p-5 flex flex-col gap-3 md:gap-4
+                ${ct.status === 'live' ? 'border-[#00e87a40] shadow-[0_0_20px_rgba(0,232,122,0.08)]' :
+                  ct.status === 'ended' ? 'opacity-60' : ''}`}>
 
                 <div className="flex items-center justify-between">
                   <span className={`text-xs font-mono font-bold px-2 py-1 rounded
                     ${ct.status === 'live'     ? 'bg-[#00e87a20] text-[#00e87a]' :
                       ct.status === 'upcoming' ? 'bg-[#f0b42920] text-[#f0b429]' :
                                                  'bg-[#33333330] text-[#666]'}`}>
-                    {ct.status === 'live'     ? '● LIVE'     :
-                     ct.status === 'upcoming' ? '◌ UPCOMING' : '✓ ENDED'}
+                    {ct.status === 'live' ? '● LIVE' : ct.status === 'upcoming' ? '◌ UPCOMING' : '✓ ENDED'}
                   </span>
                   <span className="text-[#a78bfa] font-mono font-bold text-sm">₹{ct.entry_fee}</span>
                 </div>
 
                 <div>
-                  <div className="font-display font-bold text-[#e0e0e0] mb-1">{ct.name}</div>
+                  <div className="font-display font-bold text-[#e0e0e0] mb-1 text-sm md:text-base">{ct.name}</div>
                   <div className="text-xs text-[#666] font-mono">🎁 {ct.prize_note || 'Standard Allocation'}</div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center">
                   {[
-                    { val: `${ct.duration_mins}m`, label: 'Duration' },
+                    { val: `${ct.duration_mins}m`,  label: 'Duration' },
+                    { val: problemCount > 0 ? `${problemCount} set` : 'Hidden', label: 'Problems' },
                     { val: ct.status === 'live' ? 'Active' : ct.status === 'ended' ? 'Done' : 'Open', label: 'Phase' },
-                    { val: ct.problem_id ? 'Set' : 'Hidden', label: 'Problem' },
                   ].map(item => (
                     <div key={item.label} className="bg-[#0a0a0a] rounded-lg p-2">
-                      <div className="text-[#e0e0e0] font-mono font-bold text-sm">{item.val}</div>
+                      <div className="text-[#e0e0e0] font-mono font-bold text-xs md:text-sm">{item.val}</div>
                       <div className="text-[10px] text-[#444] font-mono mt-0.5">{item.label}</div>
                     </div>
                   ))}
@@ -247,10 +270,8 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                                                       '✗ Rejected — Re-apply'}
                       </div>
                       {reg.status === 'confirmed' && ct.status === 'live' && (
-                        <button
-                          onClick={() => startContest(ct)}
-                          className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-lg hover:bg-[#00ff88] transition-all"
-                        >
+                        <button onClick={() => startContest(ct)}
+                          className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-lg hover:bg-[#00ff88] transition-all active:scale-[0.98]">
                           Enter Live Arena →
                         </button>
                       )}
@@ -265,9 +286,8 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                     </button>
                   ) : (
                     <PaymentButton
-                      contest={ct}
-                      user={user}
-                      onSuccess={(txnId) => handlePaySuccess(ct.id, txnId)}
+                      contest={ct} user={user}
+                      onSuccess={(txnId) => { showToast(`Payment submitted! Txn: ${txnId} — Awaiting review.`, 'info'); loadContests(); }}
                       onError={(msg) => showToast(msg, 'err')}
                     />
                   )}
