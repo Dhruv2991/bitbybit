@@ -9,24 +9,26 @@ interface HomePageProps {
 }
 
 export default function HomePage({ user, onNavigate }: HomePageProps) {
-  const db = getSupabaseClient();
-  // Show sensible defaults immediately — DB counts replace them once loaded
-  const [stats, setStats] = useState({ problems: '6', submissions: '0', members: '0' });
+  const [stats, setStats] = useState<{ problems: string; submissions: string; members: string } | null>(null);
 
   useEffect(() => {
+    const db = getSupabaseClient();
     (async () => {
       try {
-        const [{ count: pc }, { count: sc }, { count: mc }] = await Promise.all([
-          db.from('problems').select('*', { count: 'exact', head: true }),
-          db.from('submissions').select('*', { count: 'exact', head: true }),
-          db.from('members').select('*', { count: 'exact', head: true }),
+        // Use select('id') instead of head:true — works even with restrictive RLS policies
+        const [{ data: pd }, { data: sd }, { data: md }] = await Promise.all([
+          db.from('problems').select('id'),
+          db.from('submissions').select('id'),
+          db.from('members').select('id'),
         ]);
         setStats({
-          problems:    String(pc ?? 6),
-          submissions: String(sc ?? 0),
-          members:     String(mc ?? 0),
+          problems:    String(pd?.length  ?? 0),
+          submissions: String(sd?.length  ?? 0),
+          members:     String(md?.length  ?? 0),
         });
-      } catch {}
+      } catch {
+        setStats({ problems: '—', submissions: '—', members: '—' });
+      }
     })();
   }, []);
 
@@ -63,15 +65,17 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
           )}
         </div>
 
-        {/* Stats — always show numbers, never dashes */}
+        {/* Stats — show spinner until loaded */}
         <div className="flex items-center justify-center gap-8 md:gap-10 mt-10 md:mt-14">
           {[
-            { val: stats.problems,    label: 'Problems'    },
-            { val: stats.submissions, label: 'Submissions' },
-            { val: stats.members,     label: 'Members'     },
+            { val: stats?.problems,    label: 'Problems'    },
+            { val: stats?.submissions, label: 'Submissions' },
+            { val: stats?.members,     label: 'Members'     },
           ].map(s => (
             <div key={s.label} className="text-center">
-              <div className="text-2xl md:text-3xl font-display font-extrabold text-[#00e87a]">{s.val}</div>
+              <div className="text-2xl md:text-3xl font-display font-extrabold text-[#00e87a]">
+                {s.val ?? <span className="inline-block w-8 h-7 bg-[#1a1a1a] rounded animate-pulse" />}
+              </div>
               <div className="text-xs text-[#444] font-mono mt-1">{s.label}</div>
             </div>
           ))}
@@ -93,7 +97,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
       <section className="card p-4 md:p-6 mt-2 md:mt-4">
         <div className="text-xs text-[#444] font-mono uppercase tracking-wider mb-3">Powered by</div>
         <div className="flex flex-wrap gap-2 md:gap-3">
-          {['Monaco Editor', 'Supabase', 'Next.js', 'GitHub OAuth'].map(t => (
+          {['Monaco Editor', 'Judge0', 'Razorpay', 'Supabase', 'Next.js', 'GitHub OAuth'].map(t => (
             <span key={t} className="px-2 md:px-3 py-1 md:py-1.5 bg-[#0a0a0a] border border-[#1f1f1f]
               rounded-lg text-xs font-mono text-[#666]">
               {t}

@@ -36,9 +36,17 @@ export function createServerSupabaseClient() {
 
 export async function resolveAdminStatus(github: string): Promise<boolean> {
   if (!github) return false;
+  // Check cache first — avoids a DB round trip on every page load
+  const cacheKey = `bb_admin_${github}`;
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached !== null) return cached === '1';
+  } catch {}
   try {
     const { data, error } = await getSupabaseClient()
       .from('admins').select('github').eq('github', github).maybeSingle();
-    return !error && !!data;
+    const result = !error && !!data;
+    try { localStorage.setItem(cacheKey, result ? '1' : '0'); } catch {}
+    return result;
   } catch { return false; }
 }

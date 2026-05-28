@@ -14,13 +14,15 @@ import type { Contest, ContestRegistration, Problem, User } from '@/types/databa
 
 const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false });
 
+// db outside component — stable reference, never triggers re-renders
+const db = getSupabaseClient();
+
 interface ArenaPageProps {
   user:              User | null;
   onArenaLockChange: (locked: boolean) => void;
 }
 
 export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
-  const db = getSupabaseClient();
   const [contests,      setContests]      = useState<Contest[]>([]);
   const [userRegs,      setUserRegs]      = useState<ContestRegistration[]>([]);
   const [arenaProblems, setArenaProblems] = useState<Record<string, Problem>>({});
@@ -138,8 +140,29 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
 
   // Called from Workspace onClose — in arena context just switch problem or show toast
   // Does NOT exit fullscreen so the proctor session stays intact
-  function handleProblemClose() {
+  async function handleProblemClose() {
     if (!activeContest) return;
+
+    // Record an arena_submission for this problem so admin can review it
+    if (activeProblem && user) {
+      try {
+        const elapsed = activeContest.duration_mins * 60 - timeLeft;
+        const timeFactor = Math.max(0.5, 1 - elapsed / (activeContest.duration_mins * 60) * 0.5);
+        await (db.from('arena_submissions') as any).insert([{
+          contest_id:            activeContest.id,
+          contest_name:          activeContest.name,
+          github:                user.github,
+          name:                  user.name,
+          lang:                  'unknown',       // Workspace doesn't expose lang here; admin sees code in submissions table
+          code:                  '',              // code is in the regular submission row
+          strikes,
+          status:                'submitted',
+          strike_penalty_factor: timeFactor,
+          points_awarded:        0,
+        }]);
+      } catch { /* non-fatal — submission already recorded in submissions table */ }
+    }
+
     // Mark the current problem as attempted and move to next if possible
     if (activeProblem) setSolved(prev => new Set(prev).add(activeProblem.id));
     const ids = getContestProblemIds(activeContest);

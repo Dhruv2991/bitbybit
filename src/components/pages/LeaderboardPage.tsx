@@ -1,20 +1,22 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
-import type { Member, Submission } from '@/types/database';
+import type { Member } from '@/types/database';
 
 type Tab = 'overall' | 'weekly' | 'monthly';
 
+// db outside component — stable reference, never causes re-renders
+const db = getSupabaseClient();
+
 interface EnrichedMember extends Member {
-  rank_change?: number; // +N up, -N down, 0 same
+  rank_change?: number;
 }
 
 export default function LeaderboardPage() {
-  const db = getSupabaseClient();
-  const [members,   setMembers]   = useState<EnrichedMember[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [tab,       setTab]       = useState<Tab>('overall');
-  const [search,    setSearch]    = useState('');
+  const [members, setMembers] = useState<EnrichedMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab,     setTab]     = useState<Tab>('overall');
+  const [search,  setSearch]  = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,7 +67,7 @@ export default function LeaderboardPage() {
         setMembers(ranked);
       }
     } catch {}
-    setLoading(false);
+    finally { setLoading(false); }
   }, [tab]);
 
   useEffect(() => { load(); }, [load]);
