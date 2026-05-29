@@ -12,6 +12,12 @@ export interface TestCase {
   input: string;
   expected: string;
 }
+import {
+  cppType,
+  javaType,
+  goType,
+  rustType
+} from '@/lib/typeHelpers';
 
 export interface Problem {
   id: string;
@@ -21,8 +27,14 @@ export interface Problem {
   tags: string[];
   description: string;
   example: string;
+
   starter_code: string;
+
+  param_types: string[];
+  return_type: string;
+
   test_cases: TestCase[];
+
   submission_count: number;
 
   is_contest_problem?: boolean;
@@ -333,26 +345,36 @@ export const STARTER_CODE: Record<
 
   // ───────────────────────────────────
   // C++
+  // Real typed parameters — no nlohmann/json wrappers.
+  // The harness infers C++ types from the test-case JSON values
+  // and injects native literals (e.g. std::vector<int>{2,7,11,15}).
+  // Return type is detected from the user's signature and serialized
+  // automatically — just write your logic and return the result.
   // ───────────────────────────────────
   cpp: (p) => {
 
-    const { name, params } = parsePythonDef(
-      p?.starter_code || ''
-    );
+  const { name, params } = parsePythonDef(
+    p?.starter_code || ''
+  );
 
-    const paramList = params
-      .map(p => `json ${p}`)
-      .join(', ');
+  const types = p?.param_types || [];
 
-    return `json ${name}(${paramList}) {
+  const paramList = params
+    .map(
+      (param, i) =>
+        `${cppType(types[i] || 'int')} ${param}`
+    )
+    .join(', ');
 
-    // Example:
-    // vector<int> arr = nums.get<vector<int>>();
-    // int targetVal = target.get<int>();
+  const returnType =
+    cppType(p?.return_type || 'int');
 
-    return json::array();
+  return `${returnType} ${name}(${paramList}) {
+
+    // Write your solution here
+
 }`;
-  },
+},
 
   // ───────────────────────────────────
   // Java
@@ -363,51 +385,78 @@ export const STARTER_CODE: Record<
     p?.starter_code || ''
   );
 
+  const types = p?.param_types || [];
+
   const paramList = params
-    .map(p => `String ${p}`)
+    .map(
+      (param, i) =>
+        `${javaType(types[i] || 'string')} ${param}`
+    )
     .join(', ');
 
-  return `public boolean ${name}(${paramList}) {
+  const returnType =
+    javaType(p?.return_type || 'bool');
 
-    return false;
+  return `public ${returnType} ${name}(${paramList}) {
+
 }`;
 },
 
   // ───────────────────────────────────
   // Rust
+  // Real typed parameters — no serde_json::Value wrappers.
+  // The harness injects native Rust literals (e.g. vec![2,7,11,15])
+  // and serializes the return value automatically via serde_json.
   // ───────────────────────────────────
   rust: (p) => {
 
-    const { name, params } = parsePythonDef(
-      p?.starter_code || ''
-    );
+  const { name, params } = parsePythonDef(
+    p?.starter_code || ''
+  );
 
-    const paramList = params
-      .map(p => `${p}: &Value`)
-      .join(', ');
+  const types = p?.param_types || [];
 
-    return `fn ${name}(${paramList}) -> Value {
+  const paramList = params
+    .map(
+      (param, i) =>
+        `${param}: ${rustType(types[i] || 'int')}`
+    )
+    .join(', ');
 
-    serde_json::json!([])
+  const returnType =
+    rustType(p?.return_type || 'int');
+
+  return `fn ${name}(${paramList}) -> ${returnType} {
+
 }`;
 },
 
   // ───────────────────────────────────
   // Go
+  // Real typed parameters — no interface{} wrappers for user code.
+  // The harness injects typed Go literals and marshals the result
+  // with encoding/json (stdlib, no external deps).
   // ───────────────────────────────────
-  go: (p) => {
+ go: (p) => {
 
-    const { name, params } = parsePythonDef(
-      p?.starter_code || ''
-    );
+  const { name, params } = parsePythonDef(
+    p?.starter_code || ''
+  );
 
-    const paramList = params
-      .map(p => `${p} interface{}`)
-      .join(', ');
+  const types = p?.param_types || [];
 
-    return `func ${name}(${paramList}) interface{} {
+  const paramList = params
+    .map(
+      (param, i) =>
+        `${param} ${goType(types[i] || 'int')}`
+    )
+    .join(', ');
 
-    return []int{}
+  const returnType =
+    goType(p?.return_type || 'int');
+
+  return `func ${name}(${paramList}) ${returnType} {
+
 }`;
 },
 };

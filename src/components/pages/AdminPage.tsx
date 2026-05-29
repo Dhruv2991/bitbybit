@@ -38,7 +38,12 @@ const blankProblem = (): Omit<Problem, "id" | "created_at" | "updated_at"> => ({
   tags: [],
   description: "",
   example: "",
+
   starter_code: "",
+
+  param_types: [],
+  return_type: "bool",
+
   test_cases: [],
   submission_count: 0,
 });
@@ -193,8 +198,12 @@ function ProblemForm({
   >({
     ...blankProblem(),
     ...initial,
+
     test_cases: initial.test_cases || [],
     tags: initial.tags || [],
+
+    param_types: initial.param_types || [],
+    return_type: initial.return_type || "bool",
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -324,6 +333,47 @@ function ProblemForm({
         <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
           Starter Code (Python)
         </label>
+        <div>
+          <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+            Parameter Types
+          </label>
+
+          <input
+            value={form.param_types.join(",")}
+            onChange={(e) =>
+              set(
+                "param_types",
+                e.target.value
+                  .split(",")
+                  .map((x) => x.trim())
+                  .filter(Boolean),
+              )
+            }
+            className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2
+      text-sm font-mono text-[#e0e0e0]
+      focus:outline-none focus:border-[#00e87a40]"
+            placeholder="string,int[],int"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+            Return Type
+          </label>
+
+          <select
+            value={form.return_type}
+            onChange={(e) => set("return_type", e.target.value)}
+            className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2
+      text-sm font-mono text-[#e0e0e0]
+      focus:outline-none focus:border-[#00e87a40]"
+          >
+            <option value="bool">bool</option>
+            <option value="int">int</option>
+            <option value="string">string</option>
+            <option value="int[]">int[]</option>
+            <option value="string[]">string[]</option>
+          </select>
+        </div>
         <textarea
           value={form.starter_code}
           onChange={(e) => set("starter_code", e.target.value)}
@@ -767,8 +817,7 @@ function ActionModal({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (modal.type === "confirm-delete") {
-      modal.onConfirmDelete?.();
-      onCancel();
+      onConfirm("confirmed");
       return;
     }
     onConfirm(value);
@@ -1265,6 +1314,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     form: Omit<Problem, "id" | "created_at" | "updated_at">,
   ) {
     if (editingProblem) {
+      console.log("FORM DATA:", form);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (db.from("problems") as any)
         .update(form)
@@ -1288,22 +1338,27 @@ export default function AdminPage({ user }: AdminPageProps) {
     setEditingProblem(null);
   }
 
-  async function deleteProblem(id: string) {
+  const deleteProblem = async (id: string) => {
     const result = await openModal({
       type: "confirm-delete",
       id,
       github: "",
       confirmMsg: "Delete this problem? This cannot be undone.",
     });
-    if (result === null) return; // cancelled
+
+    if (result === null) return;
+
     const { error } = await db.from("problems").delete().eq("id", id);
+
     if (error) {
       showToast("Delete failed: " + error.message);
       return;
     }
+
     setProbs((prev) => prev.filter((p) => p.id !== id));
+
     showToast("Problem deleted");
-  }
+  };
 
   // ── Contest CRUD ─────────────────────────────────────────
   async function saveContest(form: Omit<Contest, "id" | "created_at">) {
