@@ -10,7 +10,7 @@ import { getSupabaseClient }                         from '@/lib/supabase';
 import LangTabs                                      from '@/components/editor/LangTabs';
 import TestResults                                   from '@/components/editor/TestResults';
 import type { SupportedLang, Problem, User }         from '@/types/database';
-import { STARTER_CODE, parsePythonDef }              from '@/types/database';
+import { STARTER_CODE }                              from '@/types/database';
 import {
   runInBrowser,
   runOnServer,
@@ -36,9 +36,6 @@ interface Toast {
 
 export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
   const db = getSupabaseClient();
-
-  // Derive function name + params from the problem's starter_code once
-  const { name: fnName, params } = parsePythonDef(problem.starter_code || '');
 
   const [lang,          setLang]          = useState<SupportedLang>('python');
   const [code,          setCode]          = useState(STARTER_CODE['python'](problem));
@@ -113,13 +110,13 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
           setRunStatus('Running in browser sandbox…');
         }
 
-        result = await runInBrowser(code, lang, fnName, params, cases, (done, total) => {
+        result = await runInBrowser(code, lang, cases, (done, total) => {
           setRunStatus(`Running test ${done} / ${total}…`);
           setProgress({ done, total });
         });
       } else {
         setRunStatus(`Compiling ${lang} on Wandbox…`);
-        result = await runOnServer(code, lang, fnName, params, cases);
+        result = await runOnServer(code, lang, cases);
       }
 
       setTestResult(result);
@@ -251,7 +248,11 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
 
         <div
           className="prose prose-invert prose-sm max-w-none text-[#ccc] leading-relaxed mb-5"
-          dangerouslySetInnerHTML={{ __html: problem.description || '<p>No description provided.</p>' }}
+          dangerouslySetInnerHTML={{
+            __html: (problem.description || '<p>No description provided.</p>')
+              .replace(/<script[\s\S]*?<\/script>/gi, '')
+              .replace(/on\w+="[^"]*"/gi, '')
+          }}
         />
 
         {problem.example && (
@@ -264,25 +265,18 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
         {(problem.test_cases || []).length > 0 && (
           <div>
             <div className="text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">🧪 Test Cases</div>
+            <p className="text-[10px] text-[#444] font-mono mb-2">
+              Input = JSON array of arguments &nbsp;·&nbsp; Expected = JSON return value
+            </p>
             <div className="space-y-2">
-              {problem.test_cases.slice(0, 3).map((tc, i) => {
-                // Pretty-print the JSON input as key: value pairs for readability
-                let inputDisplay = tc.input;
-                try {
-                  const parsed = JSON.parse(tc.input);
-                  inputDisplay = Object.entries(parsed)
-                    .map(([k, v]) => `${k} = ${JSON.stringify(v)}`)
-                    .join(', ');
-                } catch {}
-                return (
-                  <div key={i} className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg px-3 py-2 text-xs font-mono">
-                    <span className="text-[#444]">In: </span>
-                    <code className="text-[#888]">{inputDisplay}</code>
-                    <span className="text-[#444] ml-3">Expected: </span>
-                    <code className="text-[#00e87a]">{tc.expected}</code>
-                  </div>
-                );
-              })}
+              {problem.test_cases.slice(0, 3).map((tc, i) => (
+                <div key={i} className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg px-3 py-2 text-xs font-mono">
+                  <span className="text-[#444]">Args: </span>
+                  <code className="text-[#888]">{tc.input}</code>
+                  <span className="text-[#444] ml-3">→ </span>
+                  <code className="text-[#00e87a]">{tc.expected}</code>
+                </div>
+              ))}
               {problem.test_cases.length > 3 && (
                 <div className="text-xs text-[#444] font-mono pl-2">
                   +{problem.test_cases.length - 3} hidden test cases

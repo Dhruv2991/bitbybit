@@ -127,7 +127,10 @@ function TestCaseEditor({
           <div className="flex-1 grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-[#444] font-mono uppercase">
-                Input
+                Input{" "}
+                <span className="normal-case text-[#333]">
+                  (JSON array of args)
+                </span>
               </label>
               <textarea
                 value={tc.input}
@@ -135,7 +138,7 @@ function TestCaseEditor({
                 rows={2}
                 className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1.5
                   text-xs font-mono text-[#e0e0e0] resize-none focus:outline-none focus:border-[#00e87a40]"
-                placeholder="e.g. [2,7,11,15], 9"
+                placeholder="JSON args e.g. [[2,7,11,15], 9]"
               />
             </div>
             <div>
@@ -148,7 +151,7 @@ function TestCaseEditor({
                 rows={2}
                 className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1.5
                   text-xs font-mono text-[#e0e0e0] resize-none focus:outline-none focus:border-[#00e87a40]"
-                placeholder="e.g. [0, 1]"
+                placeholder="JSON value e.g. [0,1] or true or 42"
               />
             </div>
           </div>
@@ -1286,19 +1289,13 @@ export default function AdminPage({ user }: AdminPageProps) {
   }
 
   async function deleteProblem(id: string) {
-    const confirmed = await new Promise<boolean>((resolve) => {
-      setModal({
-        type: "confirm-delete",
-        id,
-        github: "",
-        confirmMsg: "Delete this problem? This cannot be undone.",
-        onConfirmDelete: () => resolve(true),
-      });
-      // store reject so cancel works
-      modalResolve.current = () => resolve(false);
+    const result = await openModal({
+      type: "confirm-delete",
+      id,
+      github: "",
+      confirmMsg: "Delete this problem? This cannot be undone.",
     });
-    setModal({ type: null, id: "", github: "" });
-    if (!confirmed) return;
+    if (result === null) return; // cancelled
     const { error } = await db.from("problems").delete().eq("id", id);
     if (error) {
       showToast("Delete failed: " + error.message);

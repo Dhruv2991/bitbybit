@@ -1,44 +1,16 @@
 // ════════════════════════════════════════════════════════════
 // src/lib/browserExecutor.ts
-// Client-side code execution — zero API, zero auth
-//
-// Python     → Pyodide (CPython 3.11 WASM, runs in browser)
-// JavaScript → Isolated Web Worker (5s timeout)
-// C++/Java/Go/Rust → /api/execute (Wandbox, no auth)
-//
-// JSON HARNESS
-// ─────────────
-// test_cases[i].input    — JSON object keyed by param name
-//                          e.g. { "nums": [2,7,11,15], "target": 9 }
-// test_cases[i].expected — JSON value the function must return
-//                          e.g. [0, 1]
-//
-// The harness deserialises input, calls the user's function with
-// the correct args, serialises the return value, compares to expected.
-// Users only write the function body — no stdin/stdout needed.
+// LeetCode-style execution:
+//   - Test case input  = JSON array of arguments e.g. [[2,7,11,15], 9]
+//   - Test case output = JSON value              e.g. [0,1]
+//   - User writes only the function body
+//   - We wrap it with a harness that calls the function + prints JSON result
 // ════════════════════════════════════════════════════════════
 
-import { parsePythonDef } from '@/types/database';
 import type { RunResult, TestResult } from './executor';
 export type { RunResult, TestResult };
 
-// ── Deep-equal for JSON values ────────────────────────────────
-function jsonEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(normalise(a)) === JSON.stringify(normalise(b));
-}
-function normalise(v: unknown): unknown {
-  if (Array.isArray(v)) return [...v].map(normalise).sort(
-    (x, y) => (JSON.stringify(x) < JSON.stringify(y) ? -1 : 1)
-  );
-  if (v !== null && typeof v === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const k of Object.keys(v as object).sort()) out[k] = normalise((v as any)[k]);
-    return out;
-  }
-  return v;
-}
-
-// ── Pyodide loader (singleton) ────────────────────────────────
+// ── Pyodide loader (singleton) ───────────────────────────────
 let pyodideInstance: any = null;
 let pyodideLoading: Promise<any> | null = null;
 
@@ -62,160 +34,201 @@ async function getPyodide(): Promise<any> {
   return pyodideLoading;
 }
 
-// ── Python via Pyodide ────────────────────────────────────────
-// Wraps the user's function in a harness that:
-//   1. json.loads the input object
-//   2. Calls fn(**kwargs) so param order doesn't matter
-//   3. json.dumps the return value to stdout
-async function runPython(
-  userCode:  string,
-  fnName:    string,
-  inputJson: string,
-): Promise<{ stdout: string; stderr: string }> {
-  const pyodide = await getPyodide();
+// ── Extract function name from user code ─────────────────────
+function extractFuncName(code: string, lang: string): string {
+  if (lang === 'python') {
+    const m = code.match(/def\s+(\w+)\s*\(/);
+    return m?.[1] || 'solution';
+  }
+  if (lang === 'javascript') {
+    const m = code.match(/function\s+(\w+)\s*\(/);
+    return m?.[1] || 'solution';
+  }
+  if (lang === 'cpp') {
+    // match: returnType funcName(
+    const m = code.match(/\w[\w<>*&\s]+\s+(\w+)\s*\(/g);
+    if (m) {
+      const last = m[m.length - 1].trim().match(/(\w+)\s*\($/);
+      return last?.[1] || 'solution';
+    }
+    return 'solution';
+  }
+  if (lang === 'java') {
+    const m = code.match(/public\s+\w+\s+(\w+)\s*\(/);
+    return m?.[1] || 'solution';
+  }
+  return 'solution';
+}
 
+// ── Build harness around user's function ─────────────────────
+// inputJson: JSON array of arguments e.g. [[2,7,11,15], 9]
+function buildHarness(userCode: string, lang: string, inputJson: string): string {
+  const fn = extractFuncName(userCode, lang);
+  const argsJson = JSON.stringify(inputJson); // double-encoded for safe embedding
+
+  switch (lang) {
+    case 'python':
+      return [
+        'import json',
+        '',
+        userCode,
+        '',
+        `__args__ = json.loads(${argsJson})`,
+        `__result__ = ${fn}(*(__args__ if isinstance(__args__, list) else [__args__]))`,
+        'print(json.dumps(__result__, separators=(",", ":")))',
+      ].join('\n');
+
+    case 'javascript':
+      return [
+        userCode,
+        '',
+        `const __args__ = JSON.parse(${argsJson});`,
+        `const __result__ = ${fn}(...(Array.isArray(__args__) ? __args__ : [__args__]));`,
+        'console.log(JSON.stringify(__result__));',
+      ].join('\n');
+
+    case 'cpp':
+      return [
+        '#include <bits/stdc++.h>',
+        '#include <nlohmann/json.hpp>',
+        'using namespace std;',
+        'using json = nlohmann::json;',
+        '',
+        userCode,
+        '',
+        'int main() {',
+        `    json __args__ = json::parse(${argsJson});`,
+        `    auto __result__ = ${fn}(__args__[0], __args__[1]);`,
+        '    cout << json(__result__).dump() << endl;',
+        '    return 0;',
+        '}',
+      ].join('\n');
+
+    case 'java':
+      return [
+        'import com.google.gson.*;',
+        'import java.util.*;',
+        '',
+        userCode.replace('class Solution', 'class Main'),
+        '',
+        '// Harness (appended by BitByBit)',
+        '// Note: full JSON harness requires Gson — Wandbox supports it',
+        `// args: ${inputJson}`,
+      ].join('\n');
+
+    default:
+      return userCode;
+  }
+}
+
+// ── Compare JSON outputs (order-insensitive for objects) ──────
+function jsonEqual(a: string, b: string): boolean {
+  try {
+    const normalize = (v: any): any => {
+      if (Array.isArray(v)) return v.map(normalize);
+      if (v !== null && typeof v === 'object')
+        return Object.fromEntries(Object.entries(v).sort().map(([k,val]) => [k, normalize(val)]));
+      return v;
+    };
+    return JSON.stringify(normalize(JSON.parse(a))) === JSON.stringify(normalize(JSON.parse(b)));
+  } catch {
+    // Fall back to string comparison if not valid JSON
+    return a.trim() === b.trim();
+  }
+}
+
+// ── Run Python via Pyodide ───────────────────────────────────
+async function runPython(code: string): Promise<{ stdout: string; stderr: string }> {
+  const pyodide = await getPyodide();
   let stdout = '';
   let stderr = '';
   pyodide.setStdout({ batched: (s: string) => { stdout += s + '\n'; } });
   pyodide.setStderr({ batched: (s: string) => { stderr += s + '\n'; } });
-
-  // Reset any leftover state from previous test cases
-  pyodide.runPython('import sys; sys.modules.pop("__user__", None)');
-
-  const harness = `
-import json as _json
-
-${userCode}
-
-_input  = _json.loads(${JSON.stringify(inputJson)})
-_result = ${fnName}(**_input)
-print(_json.dumps(_result, separators=(',', ':')))
-`.trim();
-
   try {
-    await pyodide.runPythonAsync(harness);
+    await pyodide.runPythonAsync(code);
   } catch (e: any) {
-    // Clean up the Pyodide internal traceback noise —
-    // only keep lines that reference user code (no _pyodide/_base paths)
-    const raw: string = e.message || String(e);
-    const cleaned = raw
-      .split('\n')
-      .filter((l: string) => !l.includes('_pyodide') && !l.includes('_base.py') && l.trim())
-      .join('\n');
-    stderr += cleaned || raw;
+    stderr += e.message || String(e);
   }
-
   return { stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
 }
 
-// ── JavaScript via Web Worker ─────────────────────────────────
-// Wraps the user's function in an isolated Worker that:
-//   1. JSON.parses the input object
-//   2. Calls fn(...args) with params in declaration order
-//   3. JSON.stringifies the return value and postMessages it
-function runJavaScript(
-  userCode:  string,
-  fnName:    string,
-  params:    string[],
-  inputJson: string,
-  timeout    = 5000,
-): Promise<{ stdout: string; stderr: string }> {
+// ── Run JavaScript in an isolated Web Worker ─────────────────
+function runJavaScript(code: string, timeout = 5000): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     const workerCode = `
+      const __logs__ = [];
+      self.console = {
+        log:   (...a) => __logs__.push(a.map(String).join(' ')),
+        error: (...a) => __logs__.push('[err] ' + a.map(String).join(' ')),
+        warn:  (...a) => __logs__.push('[warn] ' + a.map(String).join(' ')),
+      };
+      // stub require('fs') in case user code still uses it
+      self.require = (mod) => mod === 'fs' ? { readFileSync: () => '' } : {};
       try {
-        ${userCode}
-
-        const __input__  = JSON.parse(${JSON.stringify(inputJson)});
-        const __args__   = ${JSON.stringify(params)}.map(k => __input__[k]);
-        const __result__ = ${fnName}(...__args__);
-
-        self.postMessage({ ok: true, stdout: JSON.stringify(__result__), stderr: '' });
-      } catch (e) {
-        self.postMessage({ ok: false, stdout: '', stderr: e.message });
+        eval(${JSON.stringify(code)});
+        self.postMessage({ ok: true, stdout: __logs__.join('\\n'), stderr: '' });
+      } catch(e) {
+        self.postMessage({ ok: false, stdout: __logs__.join('\\n'), stderr: e.message });
       }
     `;
-
     const blob   = new Blob([workerCode], { type: 'application/javascript' });
     const url    = URL.createObjectURL(blob);
     const worker = new Worker(url);
-
-    const timer = setTimeout(() => {
-      worker.terminate();
-      URL.revokeObjectURL(url);
+    const timer  = setTimeout(() => {
+      worker.terminate(); URL.revokeObjectURL(url);
       resolve({ stdout: '', stderr: 'Time limit exceeded (5s)' });
     }, timeout);
-
     worker.onmessage = (e) => {
-      clearTimeout(timer);
-      worker.terminate();
-      URL.revokeObjectURL(url);
+      clearTimeout(timer); worker.terminate(); URL.revokeObjectURL(url);
       resolve({ stdout: e.data.stdout || '', stderr: e.data.stderr || '' });
     };
-
     worker.onerror = (e) => {
-      clearTimeout(timer);
-      worker.terminate();
-      URL.revokeObjectURL(url);
+      clearTimeout(timer); worker.terminate(); URL.revokeObjectURL(url);
       resolve({ stdout: '', stderr: e.message || 'Worker error' });
     };
   });
 }
 
-// ── Strategy ─────────────────────────────────────────────────
+// ── Main entrypoint ──────────────────────────────────────────
 export type ExecutionStrategy = 'browser' | 'server';
 
 export function getStrategy(language: string): ExecutionStrategy {
   return language === 'python' || language === 'javascript' ? 'browser' : 'server';
 }
 
-// ── runInBrowser ──────────────────────────────────────────────
 export async function runInBrowser(
-  sourceCode: string,
-  language:   string,
-  fnName:     string,
-  params:     string[],
-  testCases:  { input: string; expected: string }[],
-  onProgress?: (done: number, total: number) => void,
+  userCode:  string,
+  language:  string,
+  testCases: { input: string; expected: string }[],
+  onProgress?: (done: number, total: number) => void
 ): Promise<RunResult> {
   if (!testCases.length) return { passed: 0, total: 0, results: [] };
 
   const results: TestResult[] = [];
 
-  // Sequential — Pyodide is single-threaded and shares global state
   for (let i = 0; i < testCases.length; i++) {
     const tc = testCases[i];
     try {
+      const harness = buildHarness(userCode, language, tc.input);
       const t0  = Date.now();
       const out = language === 'python'
-        ? await runPython(sourceCode, fnName, tc.input)
-        : await runJavaScript(sourceCode, fnName, params, tc.input);
+        ? await runPython(harness)
+        : await runJavaScript(harness);
       const ms = Date.now() - t0;
 
-      let actual: unknown;
-      try   { actual = JSON.parse(out.stdout); }
-      catch { actual = out.stdout; }
-
-      let expected: unknown;
-      try   { expected = JSON.parse(tc.expected); }
-      catch { expected = tc.expected; }
-
-      const ok = !out.stderr && jsonEqual(actual, expected);
+      const actual   = (out.stdout || '').trim();
+      const expected = String(tc.expected).trim();
+      const ok       = jsonEqual(actual, expected);
 
       results.push({
-        input:    tc.input,
-        expected: tc.expected,
-        actual:   out.stdout || '',
-        ok,
-        error:    out.stderr || undefined,
-        time:     `${ms}ms`,
+        input: tc.input, expected, actual, ok,
+        error: out.stderr || undefined,
+        time:  `${ms}ms`,
       });
     } catch (e: any) {
       results.push({
-        input:    tc.input,
-        expected: tc.expected,
-        actual:   '',
-        ok:       false,
-        error:    e.message || 'Execution error',
+        input: tc.input, expected: String(tc.expected).trim(),
+        actual: '', ok: false, error: e.message || 'Execution error',
       });
     }
     onProgress?.(i + 1, testCases.length);
@@ -224,24 +237,15 @@ export async function runInBrowser(
   return { passed: results.filter(r => r.ok).length, total: results.length, results };
 }
 
-// ── runOnServer ───────────────────────────────────────────────
 export async function runOnServer(
-  sourceCode: string,
-  language:   string,
-  fnName:     string,
-  params:     string[],
-  testCases:  { input: string; expected: string }[],
+  userCode:  string,
+  language:  string,
+  testCases: { input: string; expected: string }[]
 ): Promise<RunResult> {
   const res = await fetch('/api/execute', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      code:       sourceCode,
-      language,
-      fn_name:    fnName,
-      params,
-      test_cases: testCases,
-    }),
+    body: JSON.stringify({ code: userCode, language, test_cases: testCases, use_harness: true }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Execution failed');
