@@ -359,20 +359,17 @@ export const STARTER_CODE: Record<
   // ───────────────────────────────────
   java: (p) => {
 
-    const { name, params } = parsePythonDef(
-      p?.starter_code || ''
-    );
+  const { name, params } = parsePythonDef(
+    p?.starter_code || ''
+  );
 
-    const paramList = params
-      .map(p => `JsonElement ${p}`)
-      .join(', ');
+  const paramList = params
+    .map(p => `String ${p}`)
+    .join(', ');
 
-    return `JsonElement ${name}(${paramList}) {
+  return `public boolean ${name}(${paramList}) {
 
-    // Example:
-    // int x = target.getAsInt();
-
-    return new JsonArray();
+    return false;
 }`;
 },
 

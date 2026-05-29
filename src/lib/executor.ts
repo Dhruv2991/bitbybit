@@ -22,7 +22,7 @@ const WANDBOX_COMPILER: Record<string, string> = {
   
     cpp: 'gcc-13.2.0',
 
-  java: 'openjdk-jdk-17',
+  java: 'openjdk-jdk-22+36',
 
   rust: 'rust-head',
 
@@ -32,9 +32,11 @@ const WANDBOX_COMPILER: Record<string, string> = {
 function extractFuncName(code: string, lang: string): string {
 
   if (lang === 'java') {
-    const m = code.match(/public\s+\w[\w<>\[\]]*\s+(\w+)\s*\(/);
-    return m?.[1] || 'solution';
-  }
+  const m = code.match(
+    /(?:public\s+)?(?:static\s+)?[\w<>\[\]]+\s+(\w+)\s*\(/
+  );
+  return m?.[1] || 'solution';
+}
 
   if (lang === 'cpp') {
     const lines = code
@@ -142,37 +144,31 @@ function buildFullProgram(
     // ───────────────────────────────────
     case 'java': {
 
-    const argCount = (() => {
-        try {
-            return JSON.parse(argsJson).length;
-        } catch {
-            return 1;
-        }
-    })();
+    let args: any[] = [];
 
-    const argRefs = Array
-        .from(
-            { length: argCount },
-            (_, i) =>
-                `__arr__.get(${i})`
-        )
+    try {
+        args = JSON.parse(argsJson);
+    } catch {
+        args = [];
+    }
+
+    const javaArgs = args
+        .map(v => JSON.stringify(v))
         .join(', ');
 
     return [
         'import java.util.*;',
-        'import com.google.gson.*;',
         '',
-        'public class Main {',
+        'class Main {',
         '',
         userCode,
         '',
-        'public static void main(String[] args) throws Exception {',
+        'public static void main(String[] args) {',
         '',
-        `    JsonArray __arr__ = JsonParser.parseString("${escapedArgs}").getAsJsonArray();`,
+        '    Main sol = new Main();',
         '',
-        `    JsonElement result = ${fn}(${argRefs});`,
+        `    System.out.println(sol.${fn}(${javaArgs}));`,
         '',
-        '    System.out.println(result.toString());',
         '}',
         '}',
     ].join('\n');
@@ -348,6 +344,18 @@ async function executeWithWandbox(
 
   if (!compiler) {
     throw new Error(`Unsupported language: ${language}`);
+  }
+
+  // TEMP DEBUG
+  if (language === 'java') {
+    const listRes = await fetch('https://wandbox.org/api/list.json');
+    const compilers = await listRes.json();
+
+    console.log(
+      compilers.filter((c: any) =>
+        c.language?.toLowerCase().includes('java')
+      )
+    );
   }
 
   const res = await fetch(
