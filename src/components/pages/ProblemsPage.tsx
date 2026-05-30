@@ -52,8 +52,17 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
     ? problems
     : problems.filter(p => p.difficulty === filter || (p.tags || []).includes(filter));
 
+  function handleSolved(problemId: string) {
+    setSolved(prev => {
+      if (prev.includes(problemId)) return prev;
+      const next = [...prev, problemId];
+      try { localStorage.setItem('bb_solved', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+
   if (selected) {
-    return <Workspace problem={selected} user={user} onClose={() => setSelected(null)} />;
+    return <Workspace problem={selected} user={user} onClose={() => setSelected(null)} onSolved={handleSolved} />;
   }
 
   return (

@@ -1214,7 +1214,7 @@ export default function AdminPage({ user }: AdminPageProps) {
       .update({ status: "reviewed", points_awarded: finalPts })
       .eq("id", sub.id);
 
-    await awardPoints(sub.github, finalPts, true /* isContest */);
+    await awardPoints(sub.github, finalPts, true /* isContest */, sub.contest_id ?? undefined);
 
     setArenaSubs((prev) =>
       prev.map((a) =>
@@ -1223,7 +1223,9 @@ export default function AdminPage({ user }: AdminPageProps) {
           : a,
       ),
     );
-    showToast(`✓ Arena approved — ${finalPts} pts to @${sub.github}`);
+    const contest = contests.find((c) => c.id === sub.contest_id);
+    const discount = contest?.leaderboard_discount ?? 0;
+    showToast(`✓ Arena approved — ${finalPts} pts to @${sub.github}${discount > 0 ? ` (${discount}% leaderboard discount applied)` : ""}`);
   }
 
   async function rejectArenaSubmission(id: string, github: string) {
@@ -1244,12 +1246,31 @@ export default function AdminPage({ user }: AdminPageProps) {
   }
 
   // ── Shared: award points to member leaderboard ───────────
-  // isContest=true  → arena/contest submission (still counts as a problem solved)
+  // isContest=true  → arena/contest submission (leaderboard_discount may apply)
   async function awardPoints(
     github: string,
     points: number,
     isContest = false,
+    contestId?: string,
   ) {
+    // Apply leaderboard_discount when awarding arena/contest points.
+    // The discount is a % off for members who are already on the leaderboard
+    // (i.e. have any existing points) — meant to keep contests competitive.
+    let effectivePoints = points;
+    if (isContest && contestId) {
+      const contest = contests.find((c) => c.id === contestId);
+      const discount = contest?.leaderboard_discount ?? 0;
+      if (discount > 0) {
+        const { data: memberCheck } = await db
+          .from("members")
+          .select("total_points")
+          .eq("github", github)
+          .maybeSingle<{ total_points: number }>();
+        if (memberCheck && memberCheck.total_points > 0) {
+          effectivePoints = Math.floor(points * (1 - discount / 100));
+        }
+      }
+    }
     const now = new Date();
     const { data: ex } = await db
       .from("members")
@@ -1273,7 +1294,7 @@ export default function AdminPage({ user }: AdminPageProps) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (db.from("members") as any)
         .update({
-          total_points: (ex.total_points || 0) + points,
+          total_points: (ex.total_points || 0) + effectivePoints,
           problems_solved: (ex.problems_solved || 0) + 1, // both problem & arena count
           streak: newStreak,
           last_solved_at: now.toISOString(),
@@ -1290,7 +1311,7 @@ export default function AdminPage({ user }: AdminPageProps) {
         {
           github,
           name: nameFromSub,
-          total_points: points,
+          total_points: effectivePoints,
           problems_solved: 1,
           streak: 1,
           last_solved_at: now.toISOString(),
@@ -1708,123 +1729,201 @@ export default function AdminPage({ user }: AdminPageProps) {
             )}
 
             {/* ── ARENA SUBMISSIONS ────────────────────────── */}
-            {section === "arena" && (
-              <div>
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="font-display font-bold text-xl">
-                    Arena Submissions
-                  </h2>
-                  <div className="flex gap-3 text-xs font-mono">
-                    <span className="text-[#f0b429]">
-                      {pendingArenaSubs.length} pending
-                    </span>
-                    <span className="text-[#444]">·</span>
-                    <span className="text-[#00e87a]">
-                      {arenaSubs.filter((a) => a.status === "reviewed").length}{" "}
-                      reviewed
-                    </span>
+            {section === "arena" && (() => {
+              // Group: contest_id → github → submissions[]
+              const contestGroups = arenaSubs.reduce<
+                Record<string, { contestName: string; users: Record<string, ArenaSubmission[]> }>
+              >((acc, a) => {
+                const cid = a.contest_id || "__no_contest__";
+                if (!acc[cid]) acc[cid] = { contestName: a.contest_name || "Unknown Contest", users: {} };
+                if (!acc[cid].users[a.github]) acc[cid].users[a.github] = [];
+                acc[cid].users[a.github].push(a);
+                return acc;
+              }, {});
+
+              return (
+                <div>
+                  <div className="flex items-center justify-between mb-5">
+                    <h2 className="font-display font-bold text-xl">
+                      Arena Submissions
+                    </h2>
+                    <div className="flex gap-3 text-xs font-mono">
+                      <span className="text-[#f0b429]">
+                        {pendingArenaSubs.length} pending
+                      </span>
+                      <span className="text-[#444]">·</span>
+                      <span className="text-[#00e87a]">
+                        {arenaSubs.filter((a) => a.status === "reviewed").length}{" "}
+                        reviewed
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="mb-4 p-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono text-[#666]">
-                  ℹ Points formula: base × (1 − strikes×0.1) × time_factor (0.5–1.0).
-                  Faster solves earn a higher time_factor. You can override before approving.
-                  Disqualified entries cannot be approved and are shown separately.
-                </div>
+                  <div className="mb-4 p-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono text-[#666]">
+                    ℹ Points formula: base × (1 − strikes×0.1) × time_factor (0.5–1.0).
+                    Faster solves earn a higher time_factor. You can override before approving.
+                  </div>
 
-                <div className="space-y-3">
                   {arenaSubs.length === 0 && (
                     <div className="text-center py-16 text-[#444] font-mono">
                       No arena submissions yet.
                     </div>
                   )}
-                  {arenaSubs.map((a) => {
-                    const contest = contests.find((c) => c.id === a.contest_id);
-                    // Use problem_id from the submission itself (most accurate),
-                    // then fall back to the contest's problem_id field.
-                    const probId = a.problem_id || contest?.problem_id || null;
-                    const prob   = probId ? probs.find((p) => p.id === probId) : null;
-                    const basePts = prob?.points || 200;
-                    return (
-                      <div
-                        key={a.id}
-                        className={`card p-4 transition-all
-                        ${a.status === "submitted" ? "border-[#f0b42930]" : a.status === "disqualified" ? "border-[#ff4d4d20]" : ""}`}
-                      >
-                        <div className="flex items-start justify-between gap-3 flex-wrap">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono font-bold text-[#e0e0e0]">
-                                {a.contest_name}
-                              </span>
-                              {a.strikes > 0 && (
-                                <span className="text-[10px] font-mono bg-[#ff4d4d15] text-[#ff4d4d] px-1.5 py-0.5 rounded">
-                                  ⚠ {a.strikes} strikes
+
+                  <div className="space-y-6">
+                    {Object.entries(contestGroups).map(([cid, { contestName, users }]) => {
+                      const contest = contests.find((c) => c.id === cid);
+                      const userCount = Object.keys(users).length;
+                      const subCount  = Object.values(users).flat().length;
+                      const pendingCount = Object.values(users).flat().filter(a => a.status === "submitted").length;
+
+                      return (
+                        <div key={cid} className="card border-[#2a2a2a] overflow-hidden">
+                          {/* Contest header */}
+                          <div className="px-5 py-3 bg-[#0d0d0d] border-b border-[#1f1f1f] flex items-center justify-between gap-3 flex-wrap">
+                            <div>
+                              <span className="font-display font-bold text-[#e0e0e0]">{contestName}</span>
+                              {contest && (
+                                <span className={`ml-2 text-[10px] font-mono px-2 py-0.5 rounded font-bold
+                                  ${contest.status === "live" ? "bg-[#00e87a15] text-[#00e87a]"
+                                    : contest.status === "upcoming" ? "bg-[#f0b42915] text-[#f0b429]"
+                                    : "bg-[#33333318] text-[#666]"}`}>
+                                  {contest.status}
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-[#666] font-mono mt-0.5">
-                              @{a.github} · {a.lang} ·{" "}
-                              {new Date(a.created_at).toLocaleString()}
-                            </div>
-                            {(prob || a.problem_title) && (
-                              <div className="text-xs text-[#a78bfa] font-mono mt-0.5">
-                                Problem: {prob?.title || a.problem_title} ({basePts} pts base)
-                              </div>
-                            )}
-                            {a.points_awarded > 0 &&
-                              a.status === "reviewed" && (
-                                <div className="text-xs text-[#00e87a] font-mono mt-0.5">
-                                  Awarded: {a.points_awarded} pts
-                                </div>
+                            <div className="flex gap-3 text-[10px] font-mono text-[#444]">
+                              <span>{userCount} participant{userCount !== 1 ? "s" : ""}</span>
+                              <span>·</span>
+                              <span>{subCount} submission{subCount !== 1 ? "s" : ""}</span>
+                              {pendingCount > 0 && (
+                                <>
+                                  <span>·</span>
+                                  <span className="text-[#f0b429]">{pendingCount} pending</span>
+                                </>
                               )}
-                            {/* ── Code viewer ── */}
-                            {a.code && (
-                              <CodeViewer code={a.code} lang={a.lang} />
-                            )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span
-                              className={`text-xs font-mono px-2 py-0.5 rounded font-bold
-                              ${
-                                a.status === "reviewed"
-                                  ? "bg-[#00e87a15] text-[#00e87a]"
-                                  : a.status === "disqualified"
-                                    ? "bg-[#ff4d4d15] text-[#ff4d4d]"
-                                    : "bg-[#f0b42915] text-[#f0b429]"
-                              }`}
-                            >
-                              {a.status}
-                            </span>
-                            {/* Disqualified rows are final — no approve/reject */}
-                            {a.status === "submitted" && (
-                              <>
-                                <button
-                                  onClick={() =>
-                                    approveArenaSubmission(a, basePts)
-                                  }
-                                  className="px-3 py-1.5 bg-[#00e87a] text-black text-xs font-mono font-bold rounded-lg hover:bg-[#00ff88] transition-all"
-                                >
-                                  ✓ Approve
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    rejectArenaSubmission(a.id, a.github)
-                                  }
-                                  className="px-3 py-1.5 bg-[#ff4d4d20] text-[#ff4d4d] text-xs font-mono rounded-lg hover:bg-[#ff4d4d30] transition-all"
-                                >
-                                  ✗ Reject
-                                </button>
-                              </>
-                            )}
+
+                          {/* Per-user groups */}
+                          <div className="divide-y divide-[#161616]">
+                            {Object.entries(users).map(([github, userSubs]) => {
+                              const pendingUserSubs = userSubs.filter(a => a.status === "submitted");
+                              const totalAwarded    = userSubs.filter(a => a.status === "reviewed")
+                                .reduce((sum, a) => sum + (a.points_awarded || 0), 0);
+
+                              return (
+                                <div key={github} className="px-5 py-4">
+                                  {/* User header row */}
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <img
+                                      src={`https://github.com/${github}.png?size=28`}
+                                      alt={github}
+                                      className="w-7 h-7 rounded-full ring-1 ring-[#2a2a2a] shrink-0"
+                                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                    />
+                                    <span className="font-mono font-bold text-[#e0e0e0] text-sm">@{github}</span>
+                                    <span className="text-[10px] text-[#444] font-mono">
+                                      {userSubs.length} problem{userSubs.length !== 1 ? "s" : ""}
+                                    </span>
+                                    {totalAwarded > 0 && (
+                                      <span className="ml-auto text-xs font-mono text-[#00e87a] font-bold">
+                                        {totalAwarded} pts awarded
+                                      </span>
+                                    )}
+                                    {pendingUserSubs.length > 0 && totalAwarded === 0 && (
+                                      <span className="ml-auto text-[10px] font-mono text-[#f0b429]">
+                                        {pendingUserSubs.length} pending
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Individual submission rows */}
+                                  <div className="space-y-2 pl-10">
+                                    {userSubs.map((a) => {
+                                      const probId  = a.problem_id || contest?.problem_id || null;
+                                      const prob    = probId ? probs.find((p) => p.id === probId) : null;
+                                      const basePts = prob?.points || 200;
+
+                                      return (
+                                        <div
+                                          key={a.id}
+                                          className={`bg-[#0d0d0d] border rounded-xl p-3 transition-all
+                                            ${a.status === "submitted" ? "border-[#f0b42930]"
+                                              : a.status === "disqualified" ? "border-[#ff4d4d20]"
+                                              : "border-[#1a1a1a]"}`}
+                                        >
+                                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                                            <div className="min-w-0 flex-1">
+                                              <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-sm font-mono text-[#a78bfa] font-medium">
+                                                  {prob?.title || a.problem_title || "Unknown Problem"}
+                                                </span>
+                                                <span className="text-[10px] text-[#444] font-mono">
+                                                  {basePts} pts base
+                                                </span>
+                                                {a.strikes > 0 && (
+                                                  <span className="text-[10px] font-mono bg-[#ff4d4d15] text-[#ff4d4d] px-1.5 py-0.5 rounded">
+                                                    ⚠ {a.strikes} strikes
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div className="text-[10px] text-[#555] font-mono mt-0.5">
+                                                {a.lang} · {new Date(a.created_at).toLocaleString()}
+                                                {a.strike_penalty_factor && a.strike_penalty_factor !== 1 && (
+                                                  <span className="ml-2 text-[#a78bfa]">
+                                                    time×{a.strike_penalty_factor.toFixed(2)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {a.points_awarded > 0 && a.status === "reviewed" && (
+                                                <div className="text-xs text-[#00e87a] font-mono mt-0.5 font-bold">
+                                                  ✓ Awarded: {a.points_awarded} pts
+                                                </div>
+                                              )}
+                                              {a.code && <CodeViewer code={a.code} lang={a.lang} />}
+                                            </div>
+
+                                            <div className="flex items-center gap-2 shrink-0">
+                                              <span className={`text-xs font-mono px-2 py-0.5 rounded font-bold
+                                                ${a.status === "reviewed" ? "bg-[#00e87a15] text-[#00e87a]"
+                                                  : a.status === "disqualified" ? "bg-[#ff4d4d15] text-[#ff4d4d]"
+                                                  : "bg-[#f0b42915] text-[#f0b429]"}`}>
+                                                {a.status}
+                                              </span>
+                                              {a.status === "submitted" && (
+                                                <>
+                                                  <button
+                                                    onClick={() => approveArenaSubmission(a, basePts)}
+                                                    className="px-3 py-1.5 bg-[#00e87a] text-black text-xs font-mono font-bold rounded-lg hover:bg-[#00ff88] transition-all"
+                                                  >
+                                                    ✓ Approve
+                                                  </button>
+                                                  <button
+                                                    onClick={() => rejectArenaSubmission(a.id, a.github)}
+                                                    className="px-3 py-1.5 bg-[#ff4d4d20] text-[#ff4d4d] text-xs font-mono rounded-lg hover:bg-[#ff4d4d30] transition-all"
+                                                  >
+                                                    ✗ Reject
+                                                  </button>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* ── PROBLEMS ─────────────────────────────────── */}
             {section === "problems" && (

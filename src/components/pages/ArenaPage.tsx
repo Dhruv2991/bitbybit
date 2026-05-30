@@ -113,6 +113,13 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
       showToast('You have already entered this contest.', 'warn');
       return;
     }
+
+    // Gate: must have a confirmed registration
+    const reg = userRegs.find(r => r.contest_id === contest.id);
+    if (!reg || reg.status !== 'confirmed') {
+      showToast('Your registration is not confirmed yet. Wait for admin approval.', 'warn');
+      return;
+    }
     try { await document.documentElement.requestFullscreen?.(); } catch {}
 
     const ids = getContestProblemIds(contest);
@@ -177,6 +184,13 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     setActiveProblem(arenaProblems[ids[idx]] || null);
   }
 
+  // Tracks the latest code+lang the user has typed (debounced from Workspace)
+  const currentCodeRef = useRef<{ code: string; lang: string }>({ code: '', lang: 'python' });
+
+  function handleArenaCodeChange(code: string, lang: string) {
+    currentCodeRef.current = { code, lang };
+  }
+
   function endContest(status: 'submitted' | 'disqualified') {
     if (timerRef.current)   clearInterval(timerRef.current);
     if (visHandler.current) document.removeEventListener('visibilitychange', visHandler.current);
@@ -190,6 +204,27 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
         const next = new Map(prev);
         if (next.get(contest.id) !== 'disqualified') next.set(contest.id, status);
         return next;
+      });
+    }
+
+    // If the user hits "Submit & Exit" while still on an unsolved problem,
+    // snapshot whatever code they've typed so admin can review it.
+    if (status === 'submitted' && contest && problem && u &&
+        !submittedProblemIds.current.has(problem.id)) {
+      submittedProblemIds.current.add(problem.id);
+      const elapsed    = contest.duration_mins * 60 - timeLeftRef.current;
+      const timeFactor = Math.max(0.5, 1 - (elapsed / (contest.duration_mins * 60)) * 0.5);
+      const { code, lang } = currentCodeRef.current;
+      ;(db.from('arena_submissions') as any).insert([{
+        contest_id: contest.id, contest_name: contest.name,
+        problem_id: problem.id, problem_title: problem.title,
+        github: u.github, name: u.name,
+        lang: lang || 'unknown',
+        code: code || '-- No code submitted --',
+        strikes: strikesRef.current, status: 'submitted',
+        strike_penalty_factor: timeFactor, points_awarded: 0,
+      }]).then(({ error }: { error: any }) => {
+        if (error) console.error('Exit snapshot failed:', error.message);
       });
     }
 
@@ -210,6 +245,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     setActiveProblem(null);
     setSolved(new Set());
     submittedProblemIds.current = new Set();
+    currentCodeRef.current = { code: '', lang: 'python' };
     onArenaLockChange(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     showToast(
@@ -241,13 +277,39 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   }
 
   async function handleProblemClose() {
-    if (!activeContest) return;
-    if (activeProblem) setSolved(prev => new Set(prev).add(activeProblem.id));
-    const ids = getContestProblemIds(activeContest);
-    const nextIdx = problemIndex + 1;
+    const contest = activeContestRef.current;
+    const problem = activeProblemRef.current;
+    const u       = userRef.current;
+    if (!contest) return;
+
+    // Snapshot current code for the problem being closed, if not yet submitted
+    if (problem && u && !submittedProblemIds.current.has(problem.id)) {
+      submittedProblemIds.current.add(problem.id);
+      const elapsed    = contest.duration_mins * 60 - timeLeftRef.current;
+      const timeFactor = Math.max(0.5, 1 - (elapsed / (contest.duration_mins * 60)) * 0.5);
+      const { code, lang } = currentCodeRef.current;
+      ;(db.from('arena_submissions') as any).insert([{
+        contest_id: contest.id, contest_name: contest.name,
+        problem_id: problem.id, problem_title: problem.title,
+        github: u.github, name: u.name,
+        lang: lang || 'unknown',
+        code: code || '-- No code submitted --',
+        strikes: strikesRef.current, status: 'submitted',
+        strike_penalty_factor: timeFactor, points_awarded: 0,
+      }]).then(({ error }: { error: any }) => {
+        if (error) console.error('Problem-close snapshot failed:', error.message);
+      });
+    }
+
+    if (problem) setSolved(prev => new Set(prev).add(problem.id));
+    const ids = getContestProblemIds(contest);
+    // Derive current index from the ref so we're not stale if the user
+    // clicked a problem tab before the auto-advance setTimeout fired.
+    const currentIdx = problem ? ids.indexOf(problem.id) : problemIndex;
+    const nextIdx = currentIdx + 1;
     if (nextIdx < ids.length) {
-      switchProblem(activeContest, nextIdx);
-      showToast(`Problem ${problemIndex + 1} done! Moving to Problem ${nextIdx + 1}…`, 'ok');
+      switchProblem(contest, nextIdx);
+      showToast(`Problem ${currentIdx + 1} done! Moving to Problem ${nextIdx + 1}…`, 'ok');
     } else {
       showToast('All problems attempted! You can submit & exit now.', 'info');
     }
@@ -326,7 +388,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
 
         <div className="p-4 md:p-6">
           {activeProblem ? (
-            <Workspace problem={activeProblem} user={user} onClose={handleProblemClose} onArenaSubmit={handleArenaSubmit} />
+            <Workspace key={activeProblem.id} problem={activeProblem} user={user} onClose={handleProblemClose} onArenaSubmit={handleArenaSubmit} onArenaCodeChange={handleArenaCodeChange} />
           ) : (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
               <div className="text-5xl mb-5">⏳</div>
@@ -410,7 +472,15 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { val: `${ct.duration_mins}m`, label: 'Duration' },
-                    { val: 'Hidden',               label: 'Problems' },
+                    {
+                      val: ct.status === 'live'
+                        ? 'Hidden'
+                        : (() => {
+                            const ids = getContestProblemIds(ct);
+                            return ids.length > 0 ? String(ids.length) : '—';
+                          })(),
+                      label: 'Problems'
+                    },
                     { val: ct.status === 'live' ? 'Active' : ct.status === 'ended' ? 'Done' : 'Open', label: 'Phase' },
                   ].map(item => (
                     <div key={item.label} className="bg-[#0d0d0d] rounded-xl p-2.5 text-center border border-[#1a1a1a]">

@@ -20,13 +20,15 @@ interface WorkspaceProps {
   problem: Problem;
   user:    User | null;
   onClose: () => void;
-  onArenaSubmit?: (code: string, lang: string) => void;
+  onArenaSubmit?:     (code: string, lang: string) => void;
+  onArenaCodeChange?: (code: string, lang: string) => void;
+  onSolved?:          (problemId: string) => void;
 }
 
 type ToastType = 'ok' | 'err' | 'info' | 'warn';
 interface Toast { msg: string; type: ToastType; id: number; }
 
-export default function Workspace({ problem, user, onClose, onArenaSubmit }: WorkspaceProps) {
+export default function Workspace({ problem, user, onClose, onArenaSubmit, onArenaCodeChange, onSolved }: WorkspaceProps) {
   const db = getSupabaseClient();
 
   const [lang,          setLang]          = useState<SupportedLang>('python');
@@ -42,6 +44,17 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit }: Wor
   const [progress,      setProgress]      = useState<{ done: number; total: number } | null>(null);
   const [toasts,        setToasts]        = useState<Toast[]>([]);
   const toastCounter = useRef(0);
+
+  const arenaCodeChangeTimer = useRef<NodeJS.Timeout | null>(null);
+
+  function handleCodeChange(newCode: string) {
+    setCode(newCode);
+    if (!onArenaCodeChange) return;
+    if (arenaCodeChangeTimer.current) clearTimeout(arenaCodeChangeTimer.current);
+    arenaCodeChangeTimer.current = setTimeout(() => {
+      onArenaCodeChange(newCode, lang);
+    }, 500);
+  }
 
   function showToast(msg: string, type: ToastType = 'info') {
     const id = ++toastCounter.current;
@@ -76,6 +89,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit }: Wor
     setRunError(null);
     setRunStatus('');
     setProgress(null);
+    onArenaCodeChange?.(STARTER_CODE[l](problem), l);
   }, [problem]);
 
   async function runTests() {
@@ -118,7 +132,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit }: Wor
 
   async function submitSolution() {
     if (!user) { showToast('Sign in to submit!', 'err'); return; }
-    if (!approach.trim()) { showToast('Please add an approach description or GitHub PR link.', 'warn'); return; }
+    if (!onArenaSubmit && !approach.trim()) { showToast('Please add an approach description or GitHub PR link.', 'warn'); return; }
     if (submitBlocked) return;
 
     setSubmitting(true);
@@ -130,13 +144,17 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit }: Wor
 
       if (onArenaSubmit) {
         onArenaSubmit(code, lang);
-        setStatusMsg('⏳ Pending review.');
         setSubmitBlocked(true);
         setApproach('');
+        onSolved?.(problem.id);
         showToast(
           `✅ Submitted "${problem.title}" — ${total > 0 ? `${passed}/${total} tests passed` : 'pending review'}`,
           'ok'
         );
+        // Auto-advance to next problem after a short pause so the toast is visible.
+        // onClose in arena mode calls handleProblemClose which moves to the next problem
+        // (or shows "all done" if this was the last one).
+        setTimeout(() => onClose(), 1200);
         return;
       }
 
@@ -176,6 +194,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit }: Wor
       setStatusMsg('⏳ Pending review.');
       setSubmitBlocked(true);
       setApproach('');
+      onSolved?.(problem.id);
       showToast(
         `✅ Submitted "${problem.title}" — ${total > 0 ? `${passed}/${total} tests passed, up to ${pointsAwarded} pts` : 'pending review'}`,
         'ok'
@@ -294,7 +313,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit }: Wor
           <LangTabs current={lang} onChange={handleLangChange} />
         </div>
 
-        <CodeEditor value={code} language={lang} onChange={setCode} height="380px" />
+        <CodeEditor value={code} language={lang} onChange={handleCodeChange} height="380px" />
 
         {/* Run button */}
         <button
@@ -325,23 +344,27 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit }: Wor
           loading={running}
         />
 
-        {/* Approach field */}
-        <div className="card p-4">
-          <label className="block text-[10px] text-[#444] font-mono mb-2 uppercase tracking-widest">
-            Your approach or GitHub PR link *
-          </label>
-          <textarea
-            value={approach}
-            onChange={e => setApproach(e.target.value)}
-            placeholder="Describe your approach or paste a GitHub PR link…"
-            rows={3}
-            className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl px-3.5 py-2.5
-              text-[#e0e0e0] text-sm font-mono placeholder-[#2a2a2a] resize-none
-              focus:outline-none focus:border-[#00e87a30] transition-colors"
-          />
-        </div>
+        {/* Approach field — only shown outside the arena */}
+        {!onArenaSubmit && (
+          <div className="card p-4">
+            <label className="block text-[10px] text-[#444] font-mono mb-2 uppercase tracking-widest">
+              Your approach or GitHub PR link *
+            </label>
+            <textarea
+              value={approach}
+              onChange={e => setApproach(e.target.value)}
+              placeholder="Describe your approach or paste a GitHub PR link…"
+              rows={3}
+              className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl px-3.5 py-2.5
+                text-[#e0e0e0] text-sm font-mono placeholder-[#2a2a2a] resize-none
+                focus:outline-none focus:border-[#00e87a30] transition-colors"
+            />
+          </div>
+        )}
 
-        <div className="text-xs text-[#444] font-mono px-1">{statusMsg}</div>
+        {!onArenaSubmit && (
+          <div className="text-xs text-[#444] font-mono px-1">{statusMsg}</div>
+        )}
 
         <button
           onClick={submitSolution}
@@ -355,6 +378,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit }: Wor
           {!user         ? 'Sign in to submit'  :
            submitBlocked ? 'Already submitted'  :
            submitting    ? 'Submitting…'        :
+           onArenaSubmit ? 'Submit & Next Problem →' :
                            'Submit Solution →'}
         </button>
       </div>

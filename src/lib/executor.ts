@@ -408,7 +408,9 @@ function buildFullProgram(
         "        Main sol = new Main();",
         `        Object __result__ = sol.${fn}(${javaArgs});`,
         "",
-        "        if (__result__ instanceof int[]) {",
+        "        if (__result__ instanceof int[][]) {",
+        '            System.out.println(Arrays.deepToString((int[][]) __result__).replace(" ", ""));',
+        "        } else if (__result__ instanceof int[]) {",
         '            System.out.println(Arrays.toString((int[]) __result__).replace(" ", ""));',
         "        } else if (__result__ instanceof String[]) {",
         '            System.out.println(Arrays.toString((String[]) __result__).replace(" ", ""));',
@@ -472,13 +474,20 @@ function buildFullProgram(
 
       const callArgs = args.map((_, i) => `__a${i}__`).join(", ");
 
+      // Detect the return type from args / function signature to choose the right
+      // println format:  {:?} for Vec/complex, {} for scalars (String, int, bool).
+      // This prevents String returns printing as "hello" instead of hello.
+      const retType = rustType(args[0] ?? 0); // heuristic fallback
+      const isVec = retType.startsWith("Vec");
+      const printFmt = isVec ? '"{:?}"' : '"{}"';
+
       return [
         userCode,
         "",
         "fn main() {",
         decls,
         `    let __result__ = ${fn}(${callArgs});`,
-        '    println!("{:?}", __result__);',
+        `    println!(${printFmt}, __result__);`,
         "}",
       ].join("\n");
     }
