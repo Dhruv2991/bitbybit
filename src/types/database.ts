@@ -126,6 +126,9 @@ export interface ArenaSubmission {
   contest_id: string | null;
   contest_name: string;
 
+  problem_id: string | null;
+  problem_title: string;
+
   github: string;
   name: string;
 

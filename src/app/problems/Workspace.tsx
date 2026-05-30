@@ -24,6 +24,9 @@ interface WorkspaceProps {
   problem: Problem;
   user:    User | null;
   onClose: () => void;
+  /** Arena-only: called after a successful submission with the code+lang so the
+   *  arena parent can create the arena_submission row with real data. */
+  onArenaSubmit?: (code: string, lang: string) => void;
 }
 
 type ToastType = 'ok' | 'err' | 'info' | 'warn';
@@ -34,7 +37,7 @@ interface Toast {
   id:   number;
 }
 
-export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
+export default function Workspace({ problem, user, onClose, onArenaSubmit }: WorkspaceProps) {
   const db = getSupabaseClient();
 
   const [lang,          setLang]          = useState<SupportedLang>('python');
@@ -144,6 +147,23 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
     setStatusMsg('Uploading submission...');
 
     try {
+      const passed = testResult?.passed ?? 0;
+      const total  = testResult?.total  ?? 0;
+
+      // ── Arena context: skip submissions table entirely ──────────────────
+      if (onArenaSubmit) {
+        onArenaSubmit(code, lang);
+        setStatusMsg('⏳ Pending review — duplicates blocked.');
+        setSubmitBlocked(true);
+        setApproach('');
+        showToast(
+          `✅ Submitted "${problem.title}" — ${total > 0 ? `${passed}/${total} tests passed` : 'pending admin review'}`,
+          'ok'
+        );
+        return;
+      }
+
+      // ── Regular problem submission ──────────────────────────────────────
       const { data: existing } = await db
         .from('submissions')
         .select('id')
@@ -159,8 +179,6 @@ export default function Workspace({ problem, user, onClose }: WorkspaceProps) {
         return;
       }
 
-      const passed        = testResult?.passed ?? 0;
-      const total         = testResult?.total  ?? 0;
       const pointsAwarded = total > 0
         ? Math.floor((problem.points || 100) * (passed / total))
         : (problem.points || 100);

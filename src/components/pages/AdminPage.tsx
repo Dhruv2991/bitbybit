@@ -793,14 +793,11 @@ function ActionModal({
       setValue(String(modal.suggestedPoints ?? 100));
     if (modal.type === "approve-arena") {
       const sub = modal.arenaSubRef!;
-      const strikePenalty = 1 - (sub.strikes || 0) * 0.1;
+      const strikeFactor = Math.max(0, 1 - (sub.strikes || 0) * 0.1);
+      const timeFactor   = sub.strike_penalty_factor || 1;
       const suggested = Math.max(
         10,
-        Math.floor(
-          (modal.basePoints ?? 100) *
-            Math.max(0, strikePenalty) *
-            (sub.strike_penalty_factor || 1),
-        ),
+        Math.floor((modal.basePoints ?? 100) * strikeFactor * timeFactor),
       );
       setValue(String(suggested));
     }
@@ -1730,10 +1727,9 @@ export default function AdminPage({ user }: AdminPageProps) {
                 </div>
 
                 <div className="mb-4 p-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono text-[#666]">
-                  ℹ Points are calculated as: base × (1 − strikes×0.1) ×
-                  time_factor. You can override the suggested points before
-                  approving. Approved arena submissions are added to the
-                  leaderboard.
+                  ℹ Points formula: base × (1 − strikes×0.1) × time_factor (0.5–1.0).
+                  Faster solves earn a higher time_factor. You can override before approving.
+                  Disqualified entries cannot be approved and are shown separately.
                 </div>
 
                 <div className="space-y-3">
@@ -1744,15 +1740,16 @@ export default function AdminPage({ user }: AdminPageProps) {
                   )}
                   {arenaSubs.map((a) => {
                     const contest = contests.find((c) => c.id === a.contest_id);
-                    const prob = contest?.problem_id
-                      ? probs.find((p) => p.id === contest.problem_id)
-                      : null;
+                    // Use problem_id from the submission itself (most accurate),
+                    // then fall back to the contest's problem_id field.
+                    const probId = a.problem_id || contest?.problem_id || null;
+                    const prob   = probId ? probs.find((p) => p.id === probId) : null;
                     const basePts = prob?.points || 200;
                     return (
                       <div
                         key={a.id}
                         className={`card p-4 transition-all
-                        ${a.status === "submitted" ? "border-[#f0b42930]" : ""}`}
+                        ${a.status === "submitted" ? "border-[#f0b42930]" : a.status === "disqualified" ? "border-[#ff4d4d20]" : ""}`}
                       >
                         <div className="flex items-start justify-between gap-3 flex-wrap">
                           <div className="min-w-0 flex-1">
@@ -1770,9 +1767,9 @@ export default function AdminPage({ user }: AdminPageProps) {
                               @{a.github} · {a.lang} ·{" "}
                               {new Date(a.created_at).toLocaleString()}
                             </div>
-                            {prob && (
+                            {(prob || a.problem_title) && (
                               <div className="text-xs text-[#a78bfa] font-mono mt-0.5">
-                                Problem: {prob.title} ({basePts} pts base)
+                                Problem: {prob?.title || a.problem_title} ({basePts} pts base)
                               </div>
                             )}
                             {a.points_awarded > 0 &&
@@ -1799,6 +1796,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                             >
                               {a.status}
                             </span>
+                            {/* Disqualified rows are final — no approve/reject */}
                             {a.status === "submitted" && (
                               <>
                                 <button

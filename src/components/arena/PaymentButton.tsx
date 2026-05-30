@@ -128,6 +128,7 @@ export default function PaymentButton({ contest, user, onSuccess, onError }: Pay
   const [step,    setStep]    = useState<Step>('qr');
   const [txnId,   setTxnId]   = useState('');
   const [loading, setLoading] = useState(false);
+  const [copied,  setCopied]  = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -143,6 +144,7 @@ export default function PaymentButton({ contest, user, onSuccess, onError }: Pay
     const tid = txnId.trim();
     if (!tid) { onError('Please enter your transaction ID'); return; }
     if (tid.length < 6) { onError('Transaction ID seems too short'); return; }
+    if (loading) return; // guard double-tap
 
     setLoading(true);
     try {
@@ -195,10 +197,15 @@ export default function PaymentButton({ contest, user, onSuccess, onError }: Pay
         <div className="w-full bg-[#1a1a1a] rounded-lg px-3 py-2 flex items-center justify-between gap-2">
           <span className="text-xs font-mono text-[#888] truncate">{upiId}</span>
           <button
-            onClick={() => navigator.clipboard?.writeText(upiId)}
+            onClick={() => {
+              navigator.clipboard?.writeText(upiId).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              });
+            }}
             className="text-[10px] font-mono text-[#00e87a] hover:text-[#00ff88] shrink-0 transition-colors"
           >
-            Copy
+            {copied ? '✓ Copied' : 'Copy'}
           </button>
         </div>
 

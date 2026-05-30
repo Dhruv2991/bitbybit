@@ -1,20 +1,16 @@
 'use client';
 // ════════════════════════════════════════════════════════════
 // src/components/pages/ArenaPage.tsx
-// - alert() fully removed — toast-only
-// - Fullscreen NOT exited on problem submit (only on "Submit & Exit")
-// - Problem solved tracking per contest session
 // ════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import dynamic                                       from 'next/dynamic';
-import { getSupabaseClient }                         from '@/lib/supabase';
-import PaymentButton                                 from '@/components/arena/PaymentButton';
+import { useState, useEffect, useRef } from 'react';
+import dynamic                          from 'next/dynamic';
+import { getSupabaseClient }            from '@/lib/supabase';
+import PaymentButton                    from '@/components/arena/PaymentButton';
 import type { Contest, ContestRegistration, Problem, User } from '@/types/database';
 
 const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false });
 
-// db outside component — stable reference, never triggers re-renders
 const db = getSupabaseClient();
 
 interface ArenaPageProps {
@@ -22,10 +18,15 @@ interface ArenaPageProps {
   onArenaLockChange: (locked: boolean) => void;
 }
 
+// Tracks how a user ended a particular contest (for the card badge)
+type ContestOutcome = 'submitted' | 'disqualified';
+
 export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   const [contests,      setContests]      = useState<Contest[]>([]);
   const [userRegs,      setUserRegs]      = useState<ContestRegistration[]>([]);
   const [arenaProblems, setArenaProblems] = useState<Record<string, Problem>>({});
+  // Map of contest_id → outcome so the card badge is accurate after page reload
+  const [contestOutcomes, setContestOutcomes] = useState<Map<string, ContestOutcome>>(new Map());
   const [loading,       setLoading]       = useState(true);
   const [toast,         setToast]         = useState<{ msg: string; type: 'ok' | 'err' | 'info' | 'warn' } | null>(null);
   const [activeContest, setActiveContest] = useState<Contest | null>(null);
@@ -34,25 +35,70 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   const [strikes,       setStrikes]       = useState(0);
   const [timeLeft,      setTimeLeft]      = useState(0);
   const [solved,        setSolved]        = useState<Set<string>>(new Set());
+  // Tracks which problem IDs have already had an arena_submission row created
+  // this session — prevents duplicate rows if the user re-submits a problem.
+  const submittedProblemIds = useRef<Set<string>>(new Set());
   const timerRef   = useRef<NodeJS.Timeout | null>(null);
   const visHandler = useRef<(() => void) | null>(null);
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
+  // Refs that stay current inside setInterval / event-handler closures
+  const activeContestRef = useRef<Contest | null>(null);
+  const activeProblemRef = useRef<Problem | null>(null);
+  const strikesRef       = useRef<number>(0);
+  const timeLeftRef      = useRef<number>(0);
+  const userRef          = useRef<User | null>(null);
+
+  // Keep refs in sync with state
+  useEffect(() => { activeContestRef.current = activeContest; }, [activeContest]);
+  useEffect(() => { activeProblemRef.current = activeProblem; }, [activeProblem]);
+  useEffect(() => { strikesRef.current       = strikes;       }, [strikes]);
+  useEffect(() => { timeLeftRef.current      = timeLeft;      }, [timeLeft]);
+  useEffect(() => { userRef.current          = user;          }, [user]);
 
   useEffect(() => { loadContests(); }, [user]);
+
+  // ── Realtime: refresh contest list when any contest changes status ──
+  useEffect(() => {
+    const channel = db
+      .channel('arena-contests-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contests' }, () => {
+        loadContests();
+      })
+      .subscribe();
+    return () => { db.removeChannel(channel); };
+  }, [user]);
 
   async function loadContests() {
     setLoading(true);
     try {
-      const [{ data: c }, { data: r }] = await Promise.all([
+      const [{ data: c }, { data: r }, { data: arenaSubs }] = await Promise.all([
         db.from('contests').select('*').order('created_at', { ascending: false }),
         user
           ? db.from('contest_registrations').select('*').eq('github', user.github)
+          : Promise.resolve({ data: [] }),
+        // Fetch status too so we can distinguish submitted vs disqualified on the card
+        user
+          ? db.from('arena_submissions')
+              .select('contest_id, status')
+              .eq('github', user.github)
           : Promise.resolve({ data: [] }),
       ]);
       const contestList = (c || []) as Contest[];
       setContests(contestList);
       setUserRegs((r as ContestRegistration[]) || []);
 
+      // Build outcome map — last row per contest wins
+      const outcomes = new Map<string, ContestOutcome>();
+      for (const row of (arenaSubs || []) as { contest_id: string; status: string }[]) {
+        if (!row.contest_id) continue;
+        // 'disqualified' takes priority; once set, don't overwrite with 'submitted'
+        if (outcomes.get(row.contest_id) !== 'disqualified') {
+          outcomes.set(row.contest_id, row.status === 'disqualified' ? 'disqualified' : 'submitted');
+        }
+      }
+      setContestOutcomes(outcomes);
+
+      // Pre-fetch problems for live contests
       const allIds = new Set<string>();
       contestList.filter(ct => ct.status === 'live').forEach(ct => {
         if (ct.problem_id) allIds.add(ct.problem_id);
@@ -82,11 +128,16 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
 
   async function startContest(contest: Contest) {
     if (!user) { showToast('Sign in required', 'err'); return; }
+    if (contestOutcomes.has(contest.id)) {
+      showToast('You have already entered this contest.', 'warn');
+      return;
+    }
     try { await document.documentElement.requestFullscreen?.(); } catch {}
 
     const ids = getContestProblemIds(contest);
     const firstProblem = ids.length ? arenaProblems[ids[0]] || null : null;
 
+    submittedProblemIds.current = new Set(); // reset per-session tracking
     setActiveContest(contest);
     setActiveProblem(firstProblem);
     setProblemIndex(0);
@@ -109,12 +160,49 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
 
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
-        if (t <= 1) { endContest('submitted'); return 0; }
+        if (t <= 1) {
+          // Time is up — record the current problem as a fallback submission
+          // if it hasn't been submitted yet, then end the contest.
+          recordTimerExpirySub();
+          endContest('submitted');
+          return 0;
+        }
         if (t === 300) showToast('⏰ 5 minutes remaining!', 'warn');
         if (t === 60)  showToast('⏰ 1 minute remaining!', 'err');
         return t - 1;
       });
     }, 1000);
+  }
+
+  // Called when the timer hits zero. If the active problem hasn't been
+  // submitted yet (no arena_submission row exists for it this session),
+  // record a fallback row with whatever the user has typed so the admin
+  // can still see their work. Uses refs so it's safe inside setInterval.
+  function recordTimerExpirySub() {
+    const contest = activeContestRef.current;
+    const problem = activeProblemRef.current;
+    const u       = userRef.current;
+    if (!contest || !problem || !u) return;
+    if (submittedProblemIds.current.has(problem.id)) return; // already recorded
+    submittedProblemIds.current.add(problem.id);
+    const elapsed    = contest.duration_mins * 60 - timeLeftRef.current;
+    const timeFactor = Math.max(0.5, 1 - (elapsed / (contest.duration_mins * 60)) * 0.5);
+    ;(db.from('arena_submissions') as any).insert([{
+      contest_id:            contest.id,
+      contest_name:          contest.name,
+      problem_id:            problem.id,
+      problem_title:         problem.title,
+      github:                u.github,
+      name:                  u.name,
+      lang:                  'unknown',
+      code:                  '-- Time expired before submission --',
+      strikes:               strikesRef.current,
+      status:                'submitted',
+      strike_penalty_factor: timeFactor,
+      points_awarded:        0,
+    }]).then(({ error }: { error: any }) => {
+      if (error) console.error('Timer expiry sub failed:', error.message);
+    });
   }
 
   function switchProblem(contest: Contest, idx: number) {
@@ -127,43 +215,88 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   function endContest(status: 'submitted' | 'disqualified') {
     if (timerRef.current)   clearInterval(timerRef.current);
     if (visHandler.current) document.removeEventListener('visibilitychange', visHandler.current);
+
+    const contest = activeContestRef.current;
+    const problem = activeProblemRef.current;
+    const u       = userRef.current;
+
+    // Lock re-entry immediately in memory
+    if (contest) {
+      setContestOutcomes(prev => {
+        const next = new Map(prev);
+        // Only upgrade to 'disqualified'; never downgrade
+        if (next.get(contest.id) !== 'disqualified') next.set(contest.id, status);
+        return next;
+      });
+    }
+
+    // For disqualification: write a DB row so the lock survives page refresh.
+    if (status === 'disqualified' && contest && u) {
+      ;(db.from('arena_submissions') as any).insert([{
+        contest_id:            contest.id,
+        contest_name:          contest.name,
+        problem_id:            problem?.id   || null,
+        problem_title:         problem?.title || '',
+        github:                u.github,
+        name:                  u.name,
+        lang:                  'unknown',
+        code:                  '',
+        strikes:               strikesRef.current,
+        status:                'disqualified',
+        strike_penalty_factor: 0,
+        points_awarded:        0,
+      }]).then(({ error }: { error: any }) => {
+        if (error) console.error('Failed to record disqualification:', error.message);
+      });
+    }
+
     setActiveContest(null);
     setActiveProblem(null);
     setSolved(new Set());
+    submittedProblemIds.current = new Set();
     onArenaLockChange(false);
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
     showToast(
-      status === 'disqualified' ? '❌ Disqualified — too many tab-switch violations.' : '✅ Contest ended. Good work!',
-      status === 'disqualified' ? 'err' : 'ok'
+      status === 'disqualified'
+        ? '❌ Disqualified — too many tab-switch violations.'
+        : '✅ Contest ended. Good work!',
+      status === 'disqualified' ? 'err' : 'ok',
     );
   }
 
-  // Called from Workspace onClose — in arena context just switch problem or show toast
-  // Does NOT exit fullscreen so the proctor session stays intact
+  // Called from Workspace when the user successfully submits in arena.
+  // Guards against duplicate rows for the same problem.
+  async function handleArenaSubmit(code: string, lang: string) {
+    const contest = activeContestRef.current;
+    const problem = activeProblemRef.current;
+    const u       = userRef.current;
+    if (!contest || !problem || !u) return;
+    // Deduplicate: if this problem was already recorded this session, skip
+    if (submittedProblemIds.current.has(problem.id)) return;
+    submittedProblemIds.current.add(problem.id);
+    try {
+      const elapsed    = contest.duration_mins * 60 - timeLeftRef.current;
+      const timeFactor = Math.max(0.5, 1 - (elapsed / (contest.duration_mins * 60)) * 0.5);
+      await (db.from('arena_submissions') as any).insert([{
+        contest_id:            contest.id,
+        contest_name:          contest.name,
+        problem_id:            problem.id,
+        problem_title:         problem.title,
+        github:                u.github,
+        name:                  u.name,
+        lang,
+        code,
+        strikes:               strikesRef.current,
+        status:                'submitted',
+        strike_penalty_factor: timeFactor,
+        points_awarded:        0,
+      }]);
+    } catch { /* non-fatal */ }
+  }
+
+  // Called from Workspace onClose — moves to next problem without exiting fullscreen.
   async function handleProblemClose() {
     if (!activeContest) return;
-
-    // Record an arena_submission for this problem so admin can review it
-    if (activeProblem && user) {
-      try {
-        const elapsed = activeContest.duration_mins * 60 - timeLeft;
-        const timeFactor = Math.max(0.5, 1 - elapsed / (activeContest.duration_mins * 60) * 0.5);
-        await (db.from('arena_submissions') as any).insert([{
-          contest_id:            activeContest.id,
-          contest_name:          activeContest.name,
-          github:                user.github,
-          name:                  user.name,
-          lang:                  'unknown',       // Workspace doesn't expose lang here; admin sees code in submissions table
-          code:                  '',              // code is in the regular submission row
-          strikes,
-          status:                'submitted',
-          strike_penalty_factor: timeFactor,
-          points_awarded:        0,
-        }]);
-      } catch { /* non-fatal — submission already recorded in submissions table */ }
-    }
-
-    // Mark the current problem as attempted and move to next if possible
     if (activeProblem) setSolved(prev => new Set(prev).add(activeProblem.id));
     const ids = getContestProblemIds(activeContest);
     const nextIdx = problemIndex + 1;
@@ -183,7 +316,6 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     const ids = getContestProblemIds(activeContest);
     return (
       <div className="min-h-screen bg-[#0a0a0a]">
-        {/* Persistent toast inside arena */}
         {toast && (
           <div className={`fixed top-16 right-4 left-4 md:left-auto md:right-6 md:w-auto z-[200]
             px-4 py-3 rounded-lg font-mono text-sm shadow-xl pointer-events-none
@@ -214,12 +346,12 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
               <button onClick={() => endContest('submitted')}
                 className="px-2 md:px-3 py-1.5 bg-[#1a1a1a] border border-[#2a2a2a] text-[#666]
                   hover:text-[#ff4d4d] hover:border-[#ff4d4d40] text-xs md:text-sm font-mono rounded-lg transition-all">
-                Submit & Exit
+                Submit &amp; Exit
               </button>
             </div>
           </div>
 
-          {/* Problem tabs (multi-problem) */}
+          {/* Problem tabs */}
           {ids.length > 1 && (
             <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
               {ids.map((id, i) => (
@@ -243,8 +375,8 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
             <Workspace
               problem={activeProblem}
               user={user}
-              // In arena: closing a problem goes to next, doesn't exit fullscreen
               onClose={handleProblemClose}
+              onArenaSubmit={handleArenaSubmit}
             />
           ) : (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
@@ -292,11 +424,11 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {contests.map(ct => {
-            const reg = userRegs.find(r => r.contest_id === ct.id);
-            const problemCount = getContestProblemIds(ct).length;
+            const reg     = userRegs.find(r => r.contest_id === ct.id);
+            const outcome = contestOutcomes.get(ct.id);
             return (
               <div key={ct.id} className={`card p-4 md:p-5 flex flex-col gap-3 md:gap-4
-                ${ct.status === 'live' ? 'border-[#00e87a40] shadow-[0_0_20px_rgba(0,232,122,0.08)]' :
+                ${ct.status === 'live'  ? 'border-[#00e87a40] shadow-[0_0_20px_rgba(0,232,122,0.08)]' :
                   ct.status === 'ended' ? 'opacity-60' : ''}`}>
 
                 <div className="flex items-center justify-between">
@@ -316,8 +448,9 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
 
                 <div className="grid grid-cols-3 gap-2 text-center">
                   {[
-                    { val: `${ct.duration_mins}m`,  label: 'Duration' },
-                    { val: problemCount > 0 ? `${problemCount} set` : 'Hidden', label: 'Problems' },
+                    { val: `${ct.duration_mins}m`, label: 'Duration' },
+                    // Problem count hidden until user is inside the contest
+                    { val: 'Hidden',               label: 'Problems' },
                     { val: ct.status === 'live' ? 'Active' : ct.status === 'ended' ? 'Done' : 'Open', label: 'Phase' },
                   ].map(item => (
                     <div key={item.label} className="bg-[#0a0a0a] rounded-lg p-2">
@@ -329,7 +462,17 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
 
                 <div className="mt-auto">
                   {ct.status === 'ended' ? (
-                    <div className="text-center text-xs text-[#444] font-mono py-2">Contest ended</div>
+                    // Show the user their personal outcome if they participated
+                    outcome ? (
+                      <div className={`text-center text-xs font-mono py-2 px-2 rounded
+                        ${outcome === 'disqualified'
+                          ? 'bg-[#ff4d4d15] text-[#ff4d4d]'
+                          : 'bg-[#00e87a15] text-[#00e87a]'}`}>
+                        {outcome === 'disqualified' ? '❌ Disqualified' : '✅ Submitted — awaiting results'}
+                      </div>
+                    ) : (
+                      <div className="text-center text-xs text-[#444] font-mono py-2">Contest ended</div>
+                    )
                   ) : reg ? (
                     <>
                       <div className={`text-xs font-mono mb-3 px-2 py-1.5 rounded text-center
@@ -341,10 +484,20 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                                                       '✗ Rejected — Re-apply'}
                       </div>
                       {reg.status === 'confirmed' && ct.status === 'live' && (
-                        <button onClick={() => startContest(ct)}
-                          className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-lg hover:bg-[#00ff88] transition-all active:scale-[0.98]">
-                          Enter Live Arena →
-                        </button>
+                        outcome === 'disqualified' ? (
+                          <div className="w-full py-2.5 bg-[#ff4d4d10] text-[#ff4d4d] font-mono text-sm rounded-lg text-center border border-[#ff4d4d20]">
+                            ❌ Disqualified — entry revoked
+                          </div>
+                        ) : outcome === 'submitted' ? (
+                          <div className="w-full py-2.5 bg-[#1a1a1a] text-[#444] font-mono text-sm rounded-lg text-center border border-[#2a2a2a]">
+                            ✓ Submitted — contest locked
+                          </div>
+                        ) : (
+                          <button onClick={() => startContest(ct)}
+                            className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-lg hover:bg-[#00ff88] transition-all active:scale-[0.98]">
+                            Enter Live Arena →
+                          </button>
+                        )
                       )}
                     </>
                   ) : ct.status === 'live' ? (
