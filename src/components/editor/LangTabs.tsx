@@ -1,17 +1,14 @@
 'use client';
-// ════════════════════════════════════════════════════════════
-// src/components/editor/LangTabs.tsx
-// ════════════════════════════════════════════════════════════
 
 import type { SupportedLang } from '@/types/database';
 
-const LANGS: { id: SupportedLang; label: string; icon: string }[] = [
-  { id: 'python',     label: 'Python',     icon: '🐍' },
-  { id: 'javascript', label: 'JavaScript', icon: '⚡' },
-  { id: 'cpp',        label: 'C++',        icon: '⚙️' },
-  { id: 'java',       label: 'Java',       icon: '☕' },
-  { id: 'rust',       label: 'Rust',       icon: '🦀' },
-  { id: 'go',         label: 'Go',         icon: '🐹' },
+const LANGS: { id: SupportedLang; label: string; icon: string; color: string }[] = [
+  { id: 'python',     label: 'Python',     icon: '🐍', color: '#3572A5' },
+  { id: 'javascript', label: 'JavaScript', icon: '⚡', color: '#f7df1e' },
+  { id: 'cpp',        label: 'C++',        icon: '⚙️', color: '#f34b7d' },
+  { id: 'java',       label: 'Java',       icon: '☕', color: '#b07219' },
+  { id: 'rust',       label: 'Rust',       icon: '🦀', color: '#dea584' },
+  { id: 'go',         label: 'Go',         icon: '🐹', color: '#00ADD8' },
 ];
 
 interface LangTabsProps {
@@ -21,23 +18,26 @@ interface LangTabsProps {
 
 export default function LangTabs({ current, onChange }: LangTabsProps) {
   return (
-    <div className="flex gap-1 flex-wrap bg-[#111] border border-[#1f1f1f] rounded-lg p-1 w-fit">
-      {LANGS.map(({ id, label, icon }) => (
-        <button
-          key={id}
-          onClick={() => onChange(id)}
-          className={`
-            flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-mono font-medium
-            transition-all duration-200
-            ${current === id
-              ? 'bg-[#00e87a] text-black'
-              : 'text-[#666] hover:text-[#e0e0e0] hover:bg-[#1a1a1a]'}
-          `}
-        >
-          <span className="text-xs">{icon}</span>
-          {label}
-        </button>
-      ))}
+    <div className="grid grid-cols-3 gap-1.5 w-full sm:w-auto sm:flex sm:flex-wrap sm:gap-1.5">
+      {LANGS.map(({ id, label, icon }) => {
+        const isActive = current === id;
+        return (
+          <button
+            key={id}
+            onClick={() => onChange(id)}
+            className={`
+              flex items-center justify-center sm:justify-start gap-1.5 px-3 py-2 rounded-xl
+              text-xs font-mono font-medium transition-all duration-150 border
+              ${isActive
+                ? 'bg-[#00e87a15] text-[#00e87a] border-[#00e87a30] font-bold'
+                : 'bg-[#0d0d0d] text-[#555] border-[#1a1a1a] hover:text-[#e0e0e0] hover:border-[#2a2a2a] hover:bg-[#161616]'}
+            `}
+          >
+            <span className="text-sm leading-none">{icon}</span>
+            <span>{label}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

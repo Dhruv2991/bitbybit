@@ -1,7 +1,4 @@
 "use client";
-// ════════════════════════════════════════════════════════════
-// src/app/page.tsx
-// ════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient, resolveAdminStatus } from "@/lib/supabase";
@@ -25,10 +22,6 @@ const NAV_ITEMS: { id: PageId; label: string; icon: string }[] = [
 type ToastType = "ok" | "err" | "warn" | "info";
 interface Toast { id: number; msg: string; type: ToastType; }
 
-// ─── Read session synchronously from localStorage ───────────
-// Supabase stores the session under the storageKey we set ("bitbybit-auth").
-// Reading it synchronously means user state is correct on the FIRST render —
-// no flash of "logged out" state and no loading gate needed.
 function readStoredUser(): User | null {
   if (typeof window === "undefined") return null;
   try {
@@ -42,7 +35,7 @@ function readStoredUser(): User | null {
     return {
       name:     su.user_metadata?.full_name || github,
       github,
-      is_admin: cachedAdmin === '1', // from cache — confirmed async in background
+      is_admin: cachedAdmin === '1',
     };
   } catch { return null; }
 }
@@ -53,10 +46,8 @@ export default function App() {
     try { return (sessionStorage.getItem(PAGE_KEY) as PageId) || "home"; } catch { return "home"; }
   });
 
-  // Start null on both server + client (avoids hydration mismatch).
-  // useEffect reads localStorage immediately after mount — no visible flash.
-  const [user,         setUser]         = useState<User | null>(null);
-  const [authChecked,  setAuthChecked]  = useState(false);
+  const [user,           setUser]           = useState<User | null>(null);
+  const [authChecked,    setAuthChecked]    = useState(false);
   const [arenaLocked,    setArenaLocked]    = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toasts,         setToasts]         = useState<Toast[]>([]);
@@ -77,8 +68,6 @@ export default function App() {
   useEffect(() => {
     const db = getSupabaseClient();
     let alive = true;
-
-    // Read stored session instantly — fills in user before any network call
     const stored = readStoredUser();
     if (stored) setUser(stored);
     setAuthChecked(true);
@@ -86,15 +75,9 @@ export default function App() {
     async function buildUser(su: any): Promise<User> {
       const github  = su.user_metadata?.user_name as string;
       const isAdmin = await resolveAdminStatus(github);
-      return {
-        name:     su.user_metadata?.full_name || github,
-        github,
-        is_admin: isAdmin,
-      };
+      return { name: su.user_metadata?.full_name || github, github, is_admin: isAdmin };
     }
 
-    // Confirm session + resolve is_admin in the background.
-    // Pages are already rendered by now — this just fills in is_admin quietly.
     db.auth.getSession().then(async ({ data: { session } }) => {
       if (!alive) return;
       if (session?.user) {
@@ -105,14 +88,12 @@ export default function App() {
         setUser(u);
         resolving.current = false;
       } else {
-        // No valid session — clear any stale localStorage user
         setUser(null);
       }
     }).catch(() => { if (alive) setUser(null); });
 
     const { data: { subscription } } = db.auth.onAuthStateChange(async (event, session) => {
       if (!alive) return;
-
       if (event === "SIGNED_IN" && session?.user) {
         if (resolving.current) return;
         resolving.current = true;
@@ -120,27 +101,18 @@ export default function App() {
         if (!alive) return;
         setUser(u);
         resolving.current = false;
-
       } else if (event === "SIGNED_OUT") {
         setUser(null);
         setPage("home");
-
-      } else if (event === "TOKEN_REFRESHED") {
-        // Token silently refreshed (tab regained focus) — no rebuild needed,
-        // user is already in state. Just update the Supabase client's token
-        // which it handles internally. Nothing to do here.
       }
     });
 
-    return () => {
-      alive = false;
-      subscription.unsubscribe();
-    };
+    return () => { alive = false; subscription.unsubscribe(); };
   }, []);
 
   function navigate(id: PageId) {
     if (arenaLocked && id !== "arena") {
-      showToast("Proctor active — you cannot leave the arena.", "warn");
+      showToast("Contest in progress — you cannot leave the arena.", "warn");
       return;
     }
     if (id === "admin" && !user?.is_admin) {
@@ -153,66 +125,17 @@ export default function App() {
 
   async function signIn() {
     const db = getSupabaseClient();
-    const origin = window.location.origin;
     await db.auth.signInWithOAuth({
       provider: "github",
-      options: { redirectTo: origin },
+      options: { redirectTo: window.location.origin },
     });
   }
 
   async function signOut() {
     const github = user?.github;
     await getSupabaseClient().auth.signOut();
-    // Clear cached admin status so next login re-checks
     if (github) try { localStorage.removeItem(`bb_admin_${github}`); } catch {}
   }
-
-  const authButton = !authChecked ? <div className="w-24 h-8 rounded-lg bg-[#111] animate-pulse" /> : user ? (
-    <div className="flex items-center gap-2">
-      <img
-        src={`https://github.com/${user.github}.png?size=28`}
-        alt={user.name}
-        className="w-7 h-7 rounded-full object-cover hidden sm:block"
-        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-      />
-      <button onClick={signOut}
-        className="px-4 py-1.5 rounded-lg font-mono text-sm border border-[#2a2a2a]
-          text-[#666] hover:text-[#ff4d4d] hover:border-[#ff4d4d40] transition-all">
-        Sign Out
-      </button>
-    </div>
-  ) : (
-    <button onClick={signIn}
-      className="px-4 py-1.5 rounded-lg font-mono text-sm bg-[#00e87a]
-        text-black font-bold hover:bg-[#00ff88] transition-all">
-      Sign In with GitHub
-    </button>
-  );
-
-  const mobileAuthButton = !authChecked ? null : user ? (
-    <div className="flex items-center justify-between px-4 py-2">
-      <div className="flex items-center gap-2">
-        <img
-          src={`https://github.com/${user.github}.png?size=28`}
-          alt={user.name}
-          className="w-7 h-7 rounded-full object-cover"
-          onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-        />
-        <span className="text-sm font-mono text-[#e0e0e0] truncate max-w-[160px]">{user.name}</span>
-      </div>
-      <button onClick={signOut}
-        className="text-xs font-mono text-[#666] hover:text-[#ff4d4d] transition-colors px-2 py-1">
-        Sign Out
-      </button>
-    </div>
-  ) : (
-    <div className="px-4 py-2">
-      <button onClick={signIn}
-        className="w-full py-2 rounded-lg font-mono text-sm bg-[#00e87a] text-black font-bold hover:bg-[#00ff88] transition-all">
-        Sign In with GitHub
-      </button>
-    </div>
-  );
 
   const toastColors: Record<ToastType, string> = {
     ok:   "bg-[#00e87a] text-black",
@@ -224,92 +147,132 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
 
-      {/* ── Global toasts ─────────────────────────────── */}
+      {/* Global toasts */}
       <div className="fixed top-20 right-4 md:right-6 z-[200] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         {toasts.map(t => (
           <div key={t.id}
-            className={`${toastColors[t.type]} px-4 py-3 rounded-lg font-mono text-sm shadow-xl pointer-events-auto`}>
+            className={`${toastColors[t.type]} px-4 py-3 rounded-xl font-mono text-sm shadow-xl pointer-events-auto animate-fade-up`}>
             {t.msg}
           </div>
         ))}
       </div>
 
-      {/* ── Navbar ──────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur border-b border-[#1a1a1a]">
+      {/* Navbar */}
+      <header className="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#1a1a1a]">
         <div className="max-w-6xl mx-auto px-4 md:px-6 flex items-center justify-between h-14">
+
           {/* Logo */}
-          <button className="flex items-center gap-2 shrink-0" onClick={() => navigate("home")}>
-            <img src="/logo.png" alt="BitByBit" className="w-7 h-7 object-contain" />
-            <span className="font-display font-bold text-lg select-none">
+          <button className="flex items-center gap-2.5 shrink-0 group" onClick={() => navigate("home")}>
+            <img src="/logo.png" alt="BitByBit" className="w-8 h-8 object-contain" />
+            <span className="font-display font-bold text-lg select-none tracking-tight">
               BitBy<span className="text-[#00e87a]">Bit</span>
             </span>
           </button>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-0.5">
             {NAV_ITEMS.map(item => (
               <button key={item.id} onClick={() => navigate(item.id)}
-                className={`px-3 py-1.5 rounded-lg font-mono text-sm transition-all
+                className={`px-3.5 py-1.5 rounded-xl font-mono text-sm transition-all duration-150
                   ${page === item.id
                     ? "bg-[#00e87a15] text-[#00e87a] font-bold"
-                    : "text-[#666] hover:text-[#e0e0e0] hover:bg-[#111]"}`}>
+                    : "text-[#555] hover:text-[#e0e0e0] hover:bg-[#ffffff08]"}`}>
                 {item.label}
               </button>
             ))}
             {user?.is_admin && (
               <button onClick={() => navigate("admin")}
-                className={`px-3 py-1.5 rounded-lg font-mono text-sm transition-all
+                className={`px-3.5 py-1.5 rounded-xl font-mono text-sm transition-all duration-150
                   ${page === "admin"
                     ? "bg-[#a78bfa15] text-[#a78bfa] font-bold"
-                    : "text-[#555] hover:text-[#a78bfa]"}`}>
+                    : "text-[#555] hover:text-[#a78bfa] hover:bg-[#a78bfa08]"}`}>
                 Admin
               </button>
             )}
           </nav>
 
+          {/* Auth — desktop */}
           <div className="hidden md:flex items-center gap-3">
-            {user && <span className="text-xs font-mono text-[#666]">{user.name}</span>}
-            {authButton}
+            {!authChecked ? (
+              <div className="w-24 h-8 rounded-xl bg-[#111] animate-pulse" />
+            ) : user ? (
+              <div className="flex items-center gap-2.5">
+                <img
+                  src={`https://github.com/${user.github}.png?size=32`}
+                  alt={user.name}
+                  className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a2a]"
+                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+                <span className="text-xs font-mono text-[#555]">{user.name}</span>
+                <button onClick={signOut}
+                  className="px-3 py-1.5 rounded-xl font-mono text-xs border border-[#222]
+                    text-[#555] hover:text-[#ff4d4d] hover:border-[#ff4d4d30] transition-all">
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <button onClick={signIn}
+                className="px-4 py-1.5 rounded-xl font-mono text-sm bg-[#00e87a]
+                  text-black font-bold hover:bg-[#00ff88] transition-all shadow-[0_0_16px_rgba(0,232,122,0.2)]">
+                Sign in with GitHub
+              </button>
+            )}
           </div>
 
           {/* Mobile hamburger */}
           <button type="button" aria-label="Toggle menu"
             onClick={() => setMobileMenuOpen(o => !o)}
-            className="md:hidden p-2 text-[#666] hover:text-[#e0e0e0] transition-colors">
-            <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all ${mobileMenuOpen ? "rotate-45 translate-y-2" : ""}`} />
-            <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all ${mobileMenuOpen ? "opacity-0" : ""}`} />
-            <div className={`w-5 h-0.5 bg-current transition-all ${mobileMenuOpen ? "-rotate-45 -translate-y-2" : ""}`} />
+            className="md:hidden p-2 text-[#555] hover:text-[#e0e0e0] transition-colors">
+            <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all duration-200 ${mobileMenuOpen ? "rotate-45 translate-y-2" : ""}`} />
+            <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all duration-200 ${mobileMenuOpen ? "opacity-0" : ""}`} />
+            <div className={`w-5 h-0.5 bg-current transition-all duration-200 ${mobileMenuOpen ? "-rotate-45 -translate-y-2" : ""}`} />
           </button>
         </div>
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[#1a1a1a] bg-[#0a0a0a] pb-3">
+          <div className="md:hidden border-t border-[#1a1a1a] bg-[#0a0a0a]/98 backdrop-blur pb-3">
             {NAV_ITEMS.map(item => (
               <button key={item.id} onClick={() => navigate(item.id)}
-                className={`w-full text-left px-4 py-3 font-mono text-sm transition-all flex items-center gap-2
-                  ${page === item.id ? "text-[#00e87a] bg-[#00e87a08]" : "text-[#666] hover:text-[#e0e0e0]"}`}>
-                <span className="w-5">{item.icon}</span>
+                className={`w-full text-left px-5 py-3 font-mono text-sm transition-all flex items-center gap-3
+                  ${page === item.id ? "text-[#00e87a] bg-[#00e87a06]" : "text-[#555] hover:text-[#e0e0e0]"}`}>
+                <span className="w-5 text-base">{item.icon}</span>
                 {item.label}
               </button>
             ))}
             {user?.is_admin && (
               <button onClick={() => navigate("admin")}
-                className={`w-full text-left px-4 py-3 font-mono text-sm transition-all flex items-center gap-2
+                className={`w-full text-left px-5 py-3 font-mono text-sm flex items-center gap-3
                   ${page === "admin" ? "text-[#a78bfa]" : "text-[#555] hover:text-[#a78bfa]"}`}>
-                <span className="w-5">⚙</span>
-                Admin
+                <span className="w-5">⚙</span> Admin
               </button>
             )}
-            <div className="mt-2 border-t border-[#1a1a1a] pt-2">
-              {mobileAuthButton}
+            <div className="mt-2 border-t border-[#1a1a1a] pt-2 px-4">
+              {!authChecked ? null : user ? (
+                <div className="flex items-center justify-between py-2">
+                  <div className="flex items-center gap-2">
+                    <img src={`https://github.com/${user.github}.png?size=28`} alt={user.name}
+                      className="w-7 h-7 rounded-full object-cover"
+                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    <span className="text-sm font-mono text-[#e0e0e0] truncate max-w-[160px]">{user.name}</span>
+                  </div>
+                  <button onClick={signOut} className="text-xs font-mono text-[#555] hover:text-[#ff4d4d] transition-colors">
+                    Sign out
+                  </button>
+                </div>
+              ) : (
+                <button onClick={signIn}
+                  className="w-full py-2.5 rounded-xl font-mono text-sm bg-[#00e87a] text-black font-bold">
+                  Sign in with GitHub
+                </button>
+              )}
             </div>
           </div>
         )}
       </header>
 
-      {/* ── Page content ─────────────────────────────────── */}
-      <main className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
+      {/* Page content */}
+      <main className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-10">
         {page === "home"        && <HomePage        user={user} onNavigate={navigate} />}
         {page === "problems"    && <ProblemsPage    user={user} />}
         {page === "leaderboard" && <LeaderboardPage />}
@@ -317,13 +280,13 @@ export default function App() {
         {page === "admin"       && user?.is_admin   && <AdminPage user={user} />}
       </main>
 
-      {/* ── Bottom mobile nav ─────────────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0a0a0a]/95 backdrop-blur
-        border-t border-[#1a1a1a] flex z-40 safe-area-inset-bottom">
+      {/* Bottom mobile nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0a0a0a]/98 backdrop-blur-md
+        border-t border-[#1a1a1a] flex z-40">
         {NAV_ITEMS.map(item => (
           <button key={item.id} onClick={() => navigate(item.id)}
-            className={`flex-1 flex flex-col items-center py-3 gap-0.5 font-mono text-[10px] transition-all
-              ${page === item.id ? "text-[#00e87a]" : "text-[#444]"}`}>
+            className={`flex-1 flex flex-col items-center py-3 gap-1 font-mono text-[10px] transition-all
+              ${page === item.id ? "text-[#00e87a]" : "text-[#444] hover:text-[#888]"}`}>
             <span className="text-base leading-none">{item.icon}</span>
             <span>{item.label}</span>
           </button>

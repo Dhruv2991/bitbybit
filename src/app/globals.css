@@ -8,24 +8,22 @@
     --surface:  #111111;
     --card:     #161616;
     --border:   #1f1f1f;
+    --border2:  #2a2a2a;
     --acc:      #00e87a;
+    --acc-dim:  #00e87a18;
     --purple:   #a78bfa;
+    --purple-dim: #a78bfa15;
     --danger:   #ff4d4d;
     --warn:     #f0b429;
     --muted:    #666666;
     --muted2:   #444444;
     --text:     #e0e0e0;
+    --text2:    #999999;
   }
 
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html {
-    scroll-behavior: smooth;
-  }
+  html { scroll-behavior: smooth; }
 
   body {
     font-family: var(--font-mono), 'JetBrains Mono', monospace;
@@ -39,44 +37,71 @@
     font-family: var(--font-display), 'Syne', sans-serif;
   }
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: #2a2a2a;
-    border-radius: 3px;
-  }
+  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 99px; }
   ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
 
-  /* Monaco editor overrides */
   .monaco-editor .margin { background: #0f0f0f !important; }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-[#00e87a] text-black font-mono font-bold px-5 py-2.5 rounded-lg
-           hover:bg-[#00ff88] active:scale-[0.98] transition-all duration-150;
+    @apply bg-[#00e87a] text-black font-mono font-bold px-5 py-2.5 rounded-xl
+           hover:bg-[#00ff88] active:scale-[0.97] transition-all duration-150
+           shadow-[0_0_20px_rgba(0,232,122,0.15)];
   }
 
   .btn-ghost {
-    @apply border border-[#2a2a2a] text-[#e0e0e0] font-mono px-5 py-2.5 rounded-lg
-           hover:border-[#00e87a40] hover:text-[#00e87a] transition-all duration-150;
+    @apply border border-[#2a2a2a] text-[#e0e0e0] font-mono px-5 py-2.5 rounded-xl
+           hover:border-[#00e87a50] hover:text-[#00e87a] transition-all duration-150;
   }
 
-  .diff-easy   { @apply text-[#00e87a] bg-[#00e87a15] px-2 py-0.5 rounded text-xs font-bold; }
-  .diff-medium { @apply text-[#f0b429] bg-[#f0b42915] px-2 py-0.5 rounded text-xs font-bold; }
-  .diff-hard   { @apply text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-0.5 rounded text-xs font-bold; }
+  .diff-easy   { @apply text-[#00e87a] bg-[#00e87a12] px-2.5 py-0.5 rounded-lg text-xs font-bold; }
+  .diff-medium { @apply text-[#f0b429] bg-[#f0b42912] px-2.5 py-0.5 rounded-lg text-xs font-bold; }
+  .diff-hard   { @apply text-[#ff4d4d] bg-[#ff4d4d12] px-2.5 py-0.5 rounded-lg text-xs font-bold; }
 
   .card {
-    @apply bg-[#111] border border-[#1f1f1f] rounded-xl;
+    @apply bg-[#111] border border-[#1f1f1f] rounded-2xl;
+  }
+
+  .card-hover {
+    @apply bg-[#111] border border-[#1f1f1f] rounded-2xl hover:border-[#2a2a2a] hover:bg-[#161616] transition-all duration-200;
   }
 
   .spinner {
     @apply w-5 h-5 border-2 border-[#00e87a] border-t-transparent rounded-full animate-spin;
   }
+
+  .input-base {
+    @apply bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3 py-2
+      text-[#e0e0e0] text-sm font-mono placeholder-[#333]
+      focus:outline-none focus:border-[#00e87a40] transition-colors;
+  }
+
+  .badge-live    { @apply bg-[#00e87a18] text-[#00e87a] text-xs font-mono font-bold px-2.5 py-1 rounded-lg; }
+  .badge-upcoming { @apply bg-[#f0b42918] text-[#f0b429] text-xs font-mono font-bold px-2.5 py-1 rounded-lg; }
+  .badge-ended   { @apply bg-[#33333318] text-[#666] text-xs font-mono font-bold px-2.5 py-1 rounded-lg; }
+
+  /* Glow pulse for live indicator */
+  .live-dot {
+    @apply w-2 h-2 rounded-full bg-[#00e87a];
+    animation: livePulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,232,122,0.4); }
+  50% { box-shadow: 0 0 0 5px rgba(0,232,122,0); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up {
+  animation: fadeUp 0.35s ease both;
 }
 
 @keyframes slide {
