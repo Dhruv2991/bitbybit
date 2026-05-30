@@ -29,13 +29,13 @@ export default function LeaderboardPage() {
           db
             .from('submissions')
             .select('github, name, points_awarded')
-            .eq('status', 'approved')
+            .eq('status', 'approved')           // regular submissions stay 'approved'
             .gte('created_at', cutoff.toISOString())
             .returns<{ github: string; name: string; points_awarded: number }[]>(),
           db
             .from('arena_submissions')
             .select('github, name, points_awarded')
-            .eq('status', 'approved')
+            .eq('status', 'reviewed')           // FIX: arena submissions use 'reviewed', NOT 'approved'
             .gte('created_at', cutoff.toISOString())
             .returns<{ github: string; name: string; points_awarded: number }[]>(),
         ]);
