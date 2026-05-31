@@ -3,16 +3,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Member } from '@/types/database';
 
-type Tab = 'overall' | 'weekly' | 'monthly';
+type Tab = 'overall' | 'weekly' | 'monthly' | 'challenge';
 const db = getSupabaseClient();
 
 interface EnrichedMember extends Member { rank_change?: number; }
+interface ChallengeRow { github: string; name: string; total: number; solved: number; challengeTitle: string; }
 
 export default function LeaderboardPage() {
-  const [members, setMembers] = useState<EnrichedMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tab,     setTab]     = useState<Tab>('overall');
-  const [search,  setSearch]  = useState('');
+  const [members,        setMembers]        = useState<EnrichedMember[]>([]);
+  const [challengeRows,  setChallengeRows]  = useState<ChallengeRow[]>([]);
+  const [challengeTitle, setChallengeTitle] = useState('');
+  const [loading,        setLoading]        = useState(true);
+  const [tab,            setTab]            = useState<Tab>('overall');
+  const [search,         setSearch]         = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -20,45 +23,68 @@ export default function LeaderboardPage() {
       if (tab === 'overall') {
         const { data } = await db.from('members').select('*').order('total_points', { ascending: false }).limit(100);
         setMembers((data || []) as EnrichedMember[]);
+
+      } else if (tab === 'challenge') {
+        // Load the most recent active/ended weekly challenge leaderboard
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: challenges } = await (db.from('weekly_challenges') as any)
+          .select('id, title, status')
+          .in('status', ['active', 'ended'])
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!challenges?.length) { setChallengeRows([]); setChallengeTitle(''); setLoading(false); return; }
+
+        const ch = challenges[0];
+        setChallengeTitle(ch.title);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: subs } = await (db.from('weekly_submissions') as any)
+          .select('github, name, points_awarded, problem_id')
+          .eq('weekly_challenge_id', ch.id);
+
+        const map = new Map<string, { name: string; total: number; problems: Set<string> }>();
+        for (const s of (subs || [])) {
+          if (!map.has(s.github)) map.set(s.github, { name: s.name, total: 0, problems: new Set() });
+          const e = map.get(s.github)!;
+          e.total += s.points_awarded || 0;
+          e.problems.add(s.problem_id);
+        }
+        const rows = [...map.entries()]
+          .map(([github, v]) => ({ github, name: v.name, total: v.total, solved: v.problems.size, challengeTitle: ch.title }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 100);
+        setChallengeRows(rows);
+
       } else {
         const cutoff = new Date();
         if (tab === 'weekly')  cutoff.setDate(cutoff.getDate() - 7);
         if (tab === 'monthly') cutoff.setMonth(cutoff.getMonth() - 1);
 
         const [{ data: subs }, { data: arenaSubs }] = await Promise.all([
-          db
-            .from('submissions')
-            .select('github, name, points_awarded, problem_id')
-            .eq('status', 'approved')           // regular submissions stay 'approved'
-            .gte('created_at', cutoff.toISOString())
-            .returns<{ github: string; name: string; points_awarded: number }[]>(),
-          db
-            .from('arena_submissions')
-            .select('github, name, points_awarded, problem_id')
-            .eq('status', 'reviewed')           // FIX: arena submissions use 'reviewed', NOT 'approved'
-            .gte('created_at', cutoff.toISOString())
-            .returns<{ github: string; name: string; points_awarded: number }[]>(),
+          db.from('submissions').select('github, name, points_awarded, problem_id')
+            .eq('status', 'approved').gte('created_at', cutoff.toISOString())
+            .returns<{ github: string; name: string; points_awarded: number; problem_id: string }[]>(),
+          db.from('arena_submissions').select('github, name, points_awarded, problem_id')
+            .eq('status', 'reviewed').gte('created_at', cutoff.toISOString())
+            .returns<{ github: string; name: string; points_awarded: number; problem_id: string }[]>(),
         ]);
 
-        // FIX: track distinct problems per user to avoid inflation from multiple submissions
         const map: Record<string, { github: string; name: string; total: number; problems: Set<string> }> = {};
         for (const s of [...(subs || []), ...(arenaSubs || [])]) {
           if (!map[s.github]) map[s.github] = { github: s.github, name: s.name, total: 0, problems: new Set() };
           map[s.github].total += s.points_awarded || 0;
-          // Count each unique problem_id once; fall back to a unique key if no problem_id
           const pid = (s as any).problem_id || `pts_${map[s.github].total}`;
           map[s.github].problems.add(pid);
         }
 
         const ranked = Object.values(map)
-          .sort((a, b) => b.total - a.total)
-          .slice(0, 100)
+          .sort((a, b) => b.total - a.total).slice(0, 100)
           .map(m => ({
             id: m.github, github: m.github, name: m.name,
             total_points: m.total, problems_solved: m.problems.size,
             streak: 0, last_solved_at: null, created_at: '',
           } as EnrichedMember));
-
         setMembers(ranked);
       }
     } catch {}
@@ -69,28 +95,81 @@ export default function LeaderboardPage() {
 
   useEffect(() => {
     if (tab !== 'overall') return;
-    const channel = db
-      .channel('leaderboard-realtime')
+    const channel = db.channel('leaderboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, load)
       .subscribe();
     return () => { db.removeChannel(channel); };
   }, [tab, load]);
 
-  const filtered = search.trim()
-    ? members.filter(m =>
-        m.name?.toLowerCase().includes(search.toLowerCase()) ||
-        m.github?.toLowerCase().includes(search.toLowerCase()))
+  const filteredMembers = search.trim()
+    ? members.filter(m => m.name?.toLowerCase().includes(search.toLowerCase()) || m.github?.toLowerCase().includes(search.toLowerCase()))
     : members;
 
+  const filteredChallenge = search.trim()
+    ? challengeRows.filter(r => r.name?.toLowerCase().includes(search.toLowerCase()) || r.github?.toLowerCase().includes(search.toLowerCase()))
+    : challengeRows;
+
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'overall', label: 'All Time'   },
-    { id: 'weekly',  label: 'This Week'  },
-    { id: 'monthly', label: 'This Month' },
+    { id: 'overall',   label: 'All Time'        },
+    { id: 'weekly',    label: 'This Week'       },
+    { id: 'monthly',   label: 'This Month'      },
+    { id: 'challenge', label: '🏅 Weekly Challenge' },
   ];
 
   const rankColors = ['text-[#00e87a]', 'text-[#a78bfa]', 'text-[#f0b429]'];
   const rankBg     = ['bg-[#00e87a08] border-[#00e87a25]', 'bg-[#a78bfa08] border-[#a78bfa20]', 'bg-[#f0b42908] border-[#f0b42920]'];
   const medals     = ['🥇', '🥈', '🥉'];
+
+  // ── Shared row renderer ──────────────────────────────────────
+  function Row({ github, name, points, solved, i, isChallenge }: {
+    github: string; name: string; points: number; solved: number; i: number; isChallenge?: boolean;
+  }) {
+    const isTop3 = i < 3 && !search;
+    return (
+      <div className={`flex items-center gap-3 md:gap-4 px-4 py-3.5 rounded-2xl border transition-all duration-150 hover:brightness-110
+        ${isTop3 ? rankBg[i] : 'bg-[#111] border-[#1f1f1f]'}`}>
+
+        <div className="w-9 text-center shrink-0">
+          {isTop3
+            ? <span className="text-xl">{medals[i]}</span>
+            : <span className="font-mono text-xs font-bold text-[#333]">#{i + 1}</span>}
+        </div>
+
+        <img src={`https://github.com/${github}.png?size=40`} alt={name || github}
+          onError={e => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style'); }}
+          className={`w-9 h-9 rounded-full object-cover shrink-0
+            ${i === 0 ? 'ring-2 ring-[#00e87a]' : i === 1 ? 'ring-2 ring-[#a78bfa]' : i === 2 ? 'ring-2 ring-[#f0b429]' : 'ring-1 ring-[#222]'}`} />
+        <div style={{ display: 'none' }}
+          className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0
+            ${isTop3 ? `bg-[#1a1a1a] ${rankColors[i]}` : 'bg-[#1a1a1a] text-[#555]'}`}>
+          {(name || github || '?')[0].toUpperCase()}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="font-mono font-bold text-[#e0e0e0] text-sm truncate">{name || github}</div>
+          <div className="text-[10px] text-[#444] font-mono mt-0.5">
+            <a href={`https://github.com/${github}`} target="_blank" rel="noopener noreferrer"
+              className="hover:text-[#00e87a] transition-colors" onClick={e => e.stopPropagation()}>
+              @{github}
+            </a>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="hidden sm:flex flex-col items-center">
+            <span className="font-mono font-bold text-[#e0e0e0] text-sm">{solved}</span>
+            <span className="text-[9px] text-[#333] font-mono">{isChallenge ? 'solved' : 'solved'}</span>
+          </div>
+          <div className="flex flex-col items-center">
+            <span className={`font-mono font-bold text-sm ${isTop3 ? rankColors[i] : isChallenge ? 'text-[#f0b429]' : 'text-[#e0e0e0]'}`}>
+              {points.toLocaleString()}
+            </span>
+            <span className="text-[9px] text-[#333] font-mono">pts</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-up">
@@ -102,28 +181,39 @@ export default function LeaderboardPage() {
         </div>
 
         {/* Tab switcher */}
-        <div className="flex gap-1 bg-[#0d0d0d] border border-[#1f1f1f] rounded-xl p-1 w-fit">
+        <div className="flex flex-wrap gap-1 bg-[#0d0d0d] border border-[#1f1f1f] rounded-xl p-1 w-fit">
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-150
-                ${tab === t.id ? 'bg-[#00e87a] text-black font-bold' : 'text-[#555] hover:text-[#e0e0e0]'}`}>
+              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-150
+                ${tab === t.id
+                  ? t.id === 'challenge'
+                    ? 'bg-[#f0b429] text-black font-bold'
+                    : 'bg-[#00e87a] text-black font-bold'
+                  : 'text-[#555] hover:text-[#e0e0e0]'}`}>
               {t.label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Weekly Challenge banner */}
+      {tab === 'challenge' && challengeTitle && (
+        <div className="mb-5 px-4 py-3 bg-[#f0b42910] border border-[#f0b42930] rounded-xl flex items-center gap-2">
+          <span className="text-lg">🏅</span>
+          <div>
+            <p className="text-xs font-mono font-bold text-[#f0b429]">{challengeTitle}</p>
+            <p className="text-[10px] font-mono text-[#555]">Points include time bonus — earlier submissions earn more.</p>
+          </div>
+        </div>
+      )}
+
       {/* Search */}
       <div className="mb-5">
         <div className="relative w-full sm:w-72">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#333] text-sm">🔍</span>
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name or username…"
-            className="w-full input-base pl-8"
-          />
+            className="w-full input-base pl-8" />
         </div>
       </div>
 
@@ -132,90 +222,47 @@ export default function LeaderboardPage() {
           <div className="spinner" />
           <span className="text-[#444] text-xs font-mono">Loading rankings…</span>
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="text-4xl opacity-30">🏆</div>
-          <div className="text-[#444] font-mono text-sm">
-            {search ? 'No members match your search.' : 'No members yet — be the first to solve a problem!'}
+      ) : tab === 'challenge' ? (
+        filteredChallenge.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <div className="text-4xl opacity-30">🏅</div>
+            <div className="text-[#444] font-mono text-sm">
+              {search ? 'No members match your search.' : 'No submissions yet for the current weekly challenge.'}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="hidden sm:grid grid-cols-[3rem_1fr_5rem_5rem] gap-4 px-4 py-2
+              text-[10px] text-[#333] font-mono uppercase tracking-widest border-b border-[#161616] mb-1">
+              <div>Rank</div><div>Member</div><div className="text-center">Solved</div><div className="text-right">Points</div>
+            </div>
+            {filteredChallenge.map((r, i) => (
+              <Row key={r.github} github={r.github} name={r.name} points={r.total} solved={r.solved} i={i} isChallenge />
+            ))}
+          </div>
+        )
       ) : (
-        <div className="space-y-2">
-          {/* Column headers — desktop only */}
-          <div className="hidden sm:grid grid-cols-[3rem_1fr_5rem_5rem] gap-4 px-4 py-2
-            text-[10px] text-[#333] font-mono uppercase tracking-widest border-b border-[#161616] mb-1">
-            <div>Rank</div>
-            <div>Member</div>
-            <div className="text-center">Solved</div>
-            <div className="text-right">Points</div>
+        filteredMembers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-3">
+            <div className="text-4xl opacity-30">🏆</div>
+            <div className="text-[#444] font-mono text-sm">
+              {search ? 'No members match your search.' : 'No members yet — be the first to solve a problem!'}
+            </div>
           </div>
-
-          {filtered.map((m, i) => {
-            const isTop3 = i < 3 && !search;
-            return (
-              <div key={m.id}
-                className={`flex items-center gap-3 md:gap-4 px-4 py-3.5 rounded-2xl border transition-all duration-150
-                  hover:brightness-110
-                  ${isTop3 ? rankBg[i] : 'bg-[#111] border-[#1f1f1f]'}`}>
-
-                {/* Rank */}
-                <div className="w-9 text-center shrink-0">
-                  {isTop3
-                    ? <span className="text-xl">{medals[i]}</span>
-                    : <span className={`font-mono text-xs font-bold text-[#333]`}>#{i + 1}</span>}
-                </div>
-
-                {/* Avatar */}
-                <img
-                  src={`https://github.com/${m.github}.png?size=40`}
-                  alt={m.name || m.github}
-                  onError={e => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                    (e.target as HTMLImageElement).nextElementSibling?.removeAttribute('style');
-                  }}
-                  className={`w-9 h-9 rounded-full object-cover shrink-0
-                    ${i === 0 ? 'ring-2 ring-[#00e87a]' : i === 1 ? 'ring-2 ring-[#a78bfa]' : i === 2 ? 'ring-2 ring-[#f0b429]' : 'ring-1 ring-[#222]'}`}
-                />
-                <div style={{ display: 'none' }}
-                  className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0
-                    ${isTop3 ? `bg-[#1a1a1a] ${rankColors[i]}` : 'bg-[#1a1a1a] text-[#555]'}`}>
-                  {(m.name || m.github || '?')[0].toUpperCase()}
-                </div>
-
-                {/* Name */}
-                <div className="flex-1 min-w-0">
-                  <div className="font-mono font-bold text-[#e0e0e0] text-sm truncate">
-                    {m.name || m.github}
-                  </div>
-                  <div className="text-[10px] text-[#444] font-mono flex items-center gap-1.5 mt-0.5">
-                    <a href={`https://github.com/${m.github}`} target="_blank" rel="noopener noreferrer"
-                      className="hover:text-[#00e87a] transition-colors" onClick={e => e.stopPropagation()}>
-                      @{m.github}
-                    </a>
-                    {m.streak > 0 && <span className="text-[#f0b429]">🔥 {m.streak}d</span>}
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div className="flex items-center gap-4 shrink-0">
-                  <div className="hidden sm:flex flex-col items-center">
-                    <span className="font-mono font-bold text-[#e0e0e0] text-sm">{m.problems_solved}</span>
-                    <span className="text-[9px] text-[#333] font-mono">solved</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className={`font-mono font-bold text-sm ${isTop3 ? rankColors[i] : 'text-[#e0e0e0]'}`}>
-                      {m.total_points.toLocaleString()}
-                    </span>
-                    <span className="text-[9px] text-[#333] font-mono">pts</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="hidden sm:grid grid-cols-[3rem_1fr_5rem_5rem] gap-4 px-4 py-2
+              text-[10px] text-[#333] font-mono uppercase tracking-widest border-b border-[#161616] mb-1">
+              <div>Rank</div><div>Member</div><div className="text-center">Solved</div><div className="text-right">Points</div>
+            </div>
+            {filteredMembers.map((m, i) => (
+              <Row key={m.id} github={m.github} name={m.name || m.github} points={m.total_points} solved={m.problems_solved} i={i} />
+            ))}
+          </div>
+        )
       )}
 
-      {tab !== 'overall' && !loading && filtered.length > 0 && (
+      {tab !== 'overall' && tab !== 'challenge' && !loading && filteredMembers.length > 0 && (
         <p className="text-[10px] text-[#333] font-mono text-center mt-6">
           Showing approved submissions from the past {tab === 'weekly' ? '7' : '30'} days.
         </p>

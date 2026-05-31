@@ -14,6 +14,8 @@ import type {
   ContestRegistration,
   ArenaSubmission,
   Difficulty,
+  WeeklyChallenge,
+  WeeklyAccess,
 } from "@/types/database";
 
 type Section =
@@ -22,7 +24,8 @@ type Section =
   | "arena"
   | "problems"
   | "members"
-  | "contests";
+  | "contests"
+  | "weekly";
 
 const blankProblem = (): Omit<Problem, "id" | "created_at" | "updated_at"> => ({
   title: "",
@@ -1381,6 +1384,7 @@ export default function AdminPage({ user }: AdminPageProps) {
       label: "🏟 Contests",
       badge: regs.filter((r) => r.status === "pending").length,
     },
+    { id: "weekly", label: "🏅 Weekly" },
   ];
 
   if (!user.is_admin)
@@ -2177,6 +2181,336 @@ export default function AdminPage({ user }: AdminPageProps) {
             )}
           </>
         )}
+
+        {/* ════════ WEEKLY CHALLENGE SECTION ════════ */}
+        {section === "weekly" && <WeeklyAdminSection user={user} />}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// Weekly Challenge Admin Section
+// ════════════════════════════════════════════════════════════
+
+function blankWeekly(): Omit<WeeklyChallenge, 'id' | 'created_at'> {
+  const now   = new Date();
+  const start = new Date(now);
+  const end   = new Date(now);
+  end.setDate(end.getDate() + 7);
+  return {
+    title:       '',
+    description: '',
+    problem_ids: [],
+    entry_fee:   49,
+    upi_id:      '',
+    starts_at:   start.toISOString().slice(0, 16),
+    ends_at:     end.toISOString().slice(0, 16),
+    status:      'upcoming',
+  };
+}
+
+function WeeklyAdminSection({ user }: { user: User }) {
+  const db = getSupabaseClient();
+
+  const [challenges,  setChallenges]  = useState<WeeklyChallenge[]>([]);
+  const [accesses,    setAccesses]    = useState<WeeklyAccess[]>([]);
+  const [problems,    setProblems]    = useState<Problem[]>([]);
+  const [form,        setForm]        = useState<Omit<WeeklyChallenge, 'id' | 'created_at'> | null>(null);
+  const [editId,      setEditId]      = useState<string | null>(null);
+  const [saving,      setSaving]      = useState(false);
+  const [toast,       setToast]       = useState('');
+  const [expandedId,  setExpandedId]  = useState<string | null>(null);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [{ data: ch }, { data: acc }, { data: probs }] = await Promise.all([
+      (db.from('weekly_challenges') as any).select('*').order('created_at', { ascending: false }),
+      (db.from('weekly_access') as any).select('*').order('created_at', { ascending: false }),
+      db.from('problems').select('id, title, difficulty, points').order('title'),
+    ]);
+    setChallenges((ch || []) as WeeklyChallenge[]);
+    setAccesses((acc || []) as WeeklyAccess[]);
+    setProblems((probs || []) as Problem[]);
+  }
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3500);
+  }
+
+  function startCreate() {
+    setEditId(null);
+    setForm(blankWeekly());
+  }
+
+  function startEdit(ch: WeeklyChallenge) {
+    setEditId(ch.id);
+    setForm({
+      title:       ch.title,
+      description: ch.description,
+      problem_ids: ch.problem_ids || [],
+      entry_fee:   ch.entry_fee,
+      upi_id:      ch.upi_id,
+      starts_at:   ch.starts_at?.slice(0, 16) || '',
+      ends_at:     ch.ends_at?.slice(0, 16) || '',
+      status:      ch.status,
+    });
+  }
+
+  async function saveForm() {
+    if (!form) return;
+    if (!form.title.trim()) { showToast('Title required'); return; }
+    if (form.problem_ids.length !== 3) { showToast('Select exactly 3 problems'); return; }
+    if (!form.upi_id.trim()) { showToast('UPI ID required'); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        ...form,
+        starts_at: new Date(form.starts_at).toISOString(),
+        ends_at:   new Date(form.ends_at).toISOString(),
+      };
+      if (editId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (db.from('weekly_challenges') as any)
+          .update(payload).eq('id', editId);
+        if (error) throw error;
+        showToast('Updated ✓');
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (db.from('weekly_challenges') as any).insert(payload);
+        if (error) throw error;
+        showToast('Created ✓');
+      }
+      setForm(null); setEditId(null);
+      load();
+    } catch (e: any) {
+      showToast('Error: ' + (e.message || 'Unknown'));
+    } finally { setSaving(false); }
+  }
+
+  async function deleteChallenge(id: string) {
+    if (!confirm('Delete this weekly challenge?')) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (db.from('weekly_challenges') as any).delete().eq('id', id);
+    load();
+  }
+
+  async function updateAccessStatus(id: string, status: 'confirmed' | 'rejected') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (db.from('weekly_access') as any).update({ status }).eq('id', id);
+    load();
+  }
+
+  function toggleProblem(id: string) {
+    if (!form) return;
+    const ids = form.problem_ids;
+    if (ids.includes(id)) {
+      setForm({ ...form, problem_ids: ids.filter(x => x !== id) });
+    } else if (ids.length < 3) {
+      setForm({ ...form, problem_ids: [...ids, id] });
+    }
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-up">
+      {toast && (
+        <div className="fixed top-20 right-4 z-[200] px-4 py-2 bg-[#00e87a] text-black font-mono text-sm rounded-xl shadow-xl">
+          {toast}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-mono font-bold text-[#e0e0e0] text-base">Weekly Challenge</h2>
+          <p className="text-[10px] text-[#444] font-mono mt-0.5">Create paid weekly problem sets with time-bonus scoring.</p>
+        </div>
+        {!form && (
+          <button onClick={startCreate}
+            className="px-4 py-2 bg-[#00e87a20] text-[#00e87a] font-mono text-sm rounded-xl hover:bg-[#00e87a30] transition-all">
+            + New Challenge
+          </button>
+        )}
+      </div>
+
+      {/* Form */}
+      {form && (
+        <div className="bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl p-5 space-y-4">
+          <h3 className="font-mono font-bold text-[#e0e0e0] text-sm">{editId ? 'Edit' : 'New'} Weekly Challenge</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-[#444] font-mono uppercase">Title *</label>
+              <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
+                placeholder="e.g. Week 1 — Arrays"
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]" />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#444] font-mono uppercase">Entry Fee (₹) *</label>
+              <input type="number" value={form.entry_fee} onChange={e => setForm({ ...form, entry_fee: +e.target.value })}
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-[10px] text-[#444] font-mono uppercase">Description</label>
+              <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
+                placeholder="Brief description shown to users"
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]" />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#444] font-mono uppercase">UPI ID *</label>
+              <input value={form.upi_id} onChange={e => setForm({ ...form, upi_id: e.target.value })}
+                placeholder="yourname@upi"
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]" />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#444] font-mono uppercase">Status</label>
+              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as any })}
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none">
+                <option value="upcoming">Upcoming</option>
+                <option value="active">Active</option>
+                <option value="ended">Ended</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-[#444] font-mono uppercase">Starts At</label>
+              <input type="datetime-local" value={form.starts_at} onChange={e => setForm({ ...form, starts_at: e.target.value })}
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none" />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#444] font-mono uppercase">Ends At</label>
+              <input type="datetime-local" value={form.ends_at} onChange={e => setForm({ ...form, ends_at: e.target.value })}
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none" />
+            </div>
+          </div>
+
+          {/* Problem picker — exactly 3 */}
+          <div>
+            <label className="text-[10px] text-[#444] font-mono uppercase">
+              Problems (select exactly 3) — {form.problem_ids.length}/3 selected
+            </label>
+            <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-1">
+              {problems.map(p => {
+                const selected = form.problem_ids.includes(p.id);
+                return (
+                  <button key={p.id} onClick={() => toggleProblem(p.id)}
+                    className={`text-left px-3 py-2 rounded-xl border text-xs font-mono transition-all
+                      ${selected
+                        ? 'border-[#00e87a40] bg-[#00e87a10] text-[#00e87a]'
+                        : form.problem_ids.length >= 3
+                        ? 'border-[#1a1a1a] text-[#333] cursor-not-allowed opacity-40'
+                        : 'border-[#1f1f1f] text-[#888] hover:border-[#2a2a2a] hover:text-[#e0e0e0]'}`}>
+                    {selected ? '✓ ' : '  '}{p.title}
+                    <span className={`ml-2 text-[10px] ${p.difficulty === 'Easy' ? 'text-[#00e87a]' : p.difficulty === 'Medium' ? 'text-[#f0b429]' : 'text-[#ff4d4d]'}`}>
+                      {p.difficulty}
+                    </span>
+                    <span className="ml-1 text-[#a78bfa]">{p.points}pt</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => { setForm(null); setEditId(null); }}
+              className="flex-1 py-2 bg-[#1a1a1a] text-[#666] font-mono text-sm rounded-xl hover:text-[#e0e0e0]">
+              Cancel
+            </button>
+            <button onClick={saveForm} disabled={saving}
+              className="flex-1 py-2 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] disabled:opacity-50">
+              {saving ? 'Saving…' : editId ? 'Save Changes' : 'Create Challenge'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Challenges list */}
+      {challenges.length === 0 && !form && (
+        <div className="text-center py-12 text-[#444] font-mono text-sm">No weekly challenges yet.</div>
+      )}
+
+      <div className="space-y-4">
+        {challenges.map(ch => {
+          const chAccesses = accesses.filter(a => a.weekly_challenge_id === ch.id);
+          const pending    = chAccesses.filter(a => a.status === 'pending');
+          const confirmed  = chAccesses.filter(a => a.status === 'confirmed');
+          const isOpen     = expandedId === ch.id;
+
+          return (
+            <div key={ch.id} className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono font-bold text-[#e0e0e0] text-sm">{ch.title}</span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${ch.status === 'active' ? 'bg-[#00e87a15] text-[#00e87a]' : ch.status === 'upcoming' ? 'bg-[#f0b42915] text-[#f0b429]' : 'bg-[#ff4d4d15] text-[#ff4d4d]'}`}>
+                      {ch.status.toUpperCase()}
+                    </span>
+                    {pending.length > 0 && (
+                      <span className="text-[10px] font-mono bg-[#ff4d4d20] text-[#ff4d4d] px-2 py-0.5 rounded-lg">
+                        {pending.length} pending payment{pending.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-[#444] font-mono mt-1">
+                    ₹{ch.entry_fee} · {new Date(ch.starts_at).toLocaleDateString()} – {new Date(ch.ends_at).toLocaleDateString()} · {confirmed.length} confirmed
+                  </p>
+                </div>
+                <div className="flex gap-2 items-center">
+                  <button onClick={() => setExpandedId(isOpen ? null : ch.id)}
+                    className="text-xs font-mono text-[#555] hover:text-[#e0e0e0] px-3 py-1.5 bg-[#1a1a1a] rounded-lg">
+                    {isOpen ? 'Collapse' : 'Manage'}
+                  </button>
+                  <button onClick={() => startEdit(ch)}
+                    className="text-xs font-mono text-[#a78bfa] hover:text-[#c4b5fd] px-3 py-1.5 bg-[#a78bfa15] rounded-lg">
+                    Edit
+                  </button>
+                  <button onClick={() => deleteChallenge(ch.id)}
+                    className="text-xs font-mono text-[#ff4d4d] px-3 py-1.5 bg-[#ff4d4d15] rounded-lg hover:bg-[#ff4d4d25]">
+                    Del
+                  </button>
+                </div>
+              </div>
+
+              {isOpen && (
+                <div className="border-t border-[#1a1a1a] px-5 py-4">
+                  <p className="text-[10px] text-[#444] font-mono uppercase tracking-widest mb-3">
+                    Payments ({chAccesses.length})
+                  </p>
+                  {chAccesses.length === 0 ? (
+                    <p className="text-xs text-[#333] font-mono">No payment submissions yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {chAccesses.map(a => (
+                        <div key={a.id} className="flex items-center gap-3 flex-wrap px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl">
+                          <img src={`https://github.com/${a.github}.png?size=24`} className="w-6 h-6 rounded-full" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          <span className="text-xs font-mono text-[#e0e0e0] flex-1 min-w-0 truncate">{a.name} <span className="text-[#444]">@{a.github}</span></span>
+                          <span className="text-[10px] font-mono text-[#555]">Txn: {a.txn_id || '—'}</span>
+                          <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${a.status === 'confirmed' ? 'bg-[#00e87a15] text-[#00e87a]' : a.status === 'pending' ? 'bg-[#f0b42915] text-[#f0b429]' : 'bg-[#ff4d4d15] text-[#ff4d4d]'}`}>
+                            {a.status}
+                          </span>
+                          {a.status === 'pending' && (
+                            <div className="flex gap-1.5">
+                              <button onClick={() => updateAccessStatus(a.id, 'confirmed')}
+                                className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]">
+                                Confirm
+                              </button>
+                              <button onClick={() => updateAccessStatus(a.id, 'rejected')}
+                                className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-1 rounded-lg hover:bg-[#ff4d4d25]">
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

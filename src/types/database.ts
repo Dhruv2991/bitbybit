@@ -463,3 +463,58 @@ export const STARTER_CODE: Record<
 }`;
 },
 };
+// ════════════════════════════════════════════════════════════
+// Weekly Challenge (temporary paid-access feature)
+// ════════════════════════════════════════════════════════════
+
+export type WeeklyChallengeStatus = 'upcoming' | 'active' | 'ended';
+export type WeeklyAccessStatus    = 'pending'  | 'confirmed' | 'rejected';
+
+export interface WeeklyChallenge {
+  id:          string;
+  title:       string;
+  description: string;
+
+  // 3 problem IDs included in this week's challenge
+  problem_ids: string[];
+
+  // Payment details
+  entry_fee: number;
+  upi_id:    string;
+
+  // Week window
+  starts_at: string;
+  ends_at:   string;
+
+  status: WeeklyChallengeStatus;
+
+  created_at: string;
+}
+
+export interface WeeklyAccess {
+  id:                    string;
+  weekly_challenge_id:   string;
+  weekly_challenge_title: string;
+  github:                string;
+  name:                  string;
+  txn_id:                string | null;
+  status:                WeeklyAccessStatus;
+  created_at:            string;
+}
+
+export interface WeeklySubmission {
+  id:                  string;
+  weekly_challenge_id: string;
+  problem_id:          string;
+  problem_title:       string;
+  github:              string;
+  name:                string;
+  lang:                string;
+  code:                string;
+  tests_passed:        number;
+  tests_total:         number;
+  // Base points × time bonus factor
+  points_awarded:      number;
+  submitted_at:        string;
+  created_at:          string;
+}

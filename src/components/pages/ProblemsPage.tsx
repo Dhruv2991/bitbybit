@@ -8,22 +8,27 @@ const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false
 
 const DIFFICULTIES = ['all', 'Easy', 'Medium', 'Hard'] as const;
 
-interface ProblemsPageProps { user: User | null }
+interface ProblemsPageProps {
+  user:       User | null;
+  onNavigate: (page: 'weekly') => void;
+}
 
-export default function ProblemsPage({ user }: ProblemsPageProps) {
-  const [problems, setProblems] = useState<Problem[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [filter,   setFilter]   = useState<string>('all');
-  const [selected, setSelected] = useState<Problem | null>(null);
-  const [solved,   setSolved]   = useState<string[]>([]);
+export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
+  const [problems,       setProblems]       = useState<Problem[]>([]);
+  const [loading,        setLoading]        = useState(true);
+  const [filter,         setFilter]         = useState<string>('all');
+  const [selected,       setSelected]       = useState<Problem | null>(null);
+  const [solved,         setSolved]         = useState<string[]>([]);
+  const [weeklyIds,      setWeeklyIds]      = useState<Set<string>>(new Set());
+  const [lockedToast,    setLockedToast]    = useState(false);
+  // Paid access: set of problem IDs the user has confirmed weekly access for
+  const [unlockedIds,    setUnlockedIds]    = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // Load localStorage solved list as a quick initial state
     try { setSolved(JSON.parse(localStorage.getItem('bb_solved') || '[]')); } catch {}
 
     const db = getSupabaseClient();
 
-    // FIX: also load approved submissions from DB so solved state survives across devices/browsers
     if (user?.github) {
       db.from('submissions')
         .select('problem_id')
@@ -42,6 +47,7 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
     async function load() {
       setLoading(true);
       try {
+        // Load problems (excluding contest problems)
         const { data, error } = await db
           .from('problems')
           .select('*')
@@ -49,6 +55,41 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
         if (error) throw error;
         const publicProbs = (data || []).filter((p: any) => !p.is_contest_problem);
         setProblems(publicProbs as Problem[]);
+
+        // Load active weekly challenge problem IDs
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: challenges } = await (db.from('weekly_challenges') as any)
+          .select('id, problem_ids')
+          .in('status', ['active', 'upcoming'])
+          .order('created_at', { ascending: false });
+
+        const allWeeklyIds = new Set<string>();
+        (challenges || []).forEach((ch: any) => {
+          (ch.problem_ids || []).forEach((id: string) => allWeeklyIds.add(id));
+        });
+        setWeeklyIds(allWeeklyIds);
+
+        // If user is logged in, check which weekly challenges they have confirmed access to
+        if (user?.github && challenges?.length) {
+          const challengeIds = (challenges || []).map((ch: any) => ch.id);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: access } = await (db.from('weekly_access') as any)
+            .select('weekly_challenge_id')
+            .eq('github', user.github)
+            .eq('status', 'confirmed')
+            .in('weekly_challenge_id', challengeIds);
+
+          if (access?.length) {
+            const confirmedChallengeIds = new Set((access as any[]).map(a => a.weekly_challenge_id));
+            const unlocked = new Set<string>();
+            (challenges || []).forEach((ch: any) => {
+              if (confirmedChallengeIds.has(ch.id)) {
+                (ch.problem_ids || []).forEach((id: string) => unlocked.add(id));
+              }
+            });
+            setUnlockedIds(unlocked);
+          }
+        }
       } catch {
         setProblems([]);
       } finally {
@@ -78,12 +119,42 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
     });
   }
 
+  function handleRowClick(p: Problem) {
+    const isWeekly   = weeklyIds.has(p.id);
+    const isUnlocked = unlockedIds.has(p.id);
+    if (isWeekly && !isUnlocked) {
+      setLockedToast(true);
+      setTimeout(() => setLockedToast(false), 3500);
+      return;
+    }
+    setSelected(p);
+  }
+
   if (selected) {
     return <Workspace problem={selected} user={user} onClose={() => setSelected(null)} onSolved={handleSolved} />;
   }
 
   return (
     <div className="animate-fade-up">
+
+      {/* Locked toast */}
+      {lockedToast && (
+        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-[#1a1a1a] border border-[#f0b42940] rounded-xl font-mono text-sm shadow-xl max-w-xs animate-fade-up">
+          <span className="text-lg">🔒</span>
+          <div>
+            <p className="text-[#f0b429] font-bold text-xs">Weekly Challenge Problem</p>
+            <p className="text-[#555] text-[10px] mt-0.5">
+              Pay to unlock in the{' '}
+              <button onClick={() => { setLockedToast(false); onNavigate('weekly'); }}
+                className="text-[#00e87a] underline underline-offset-2 hover:text-[#00ff88]">
+                Weekly tab
+              </button>
+              .
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header row */}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -93,7 +164,6 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
           </p>
         </div>
 
-        {/* Difficulty filter */}
         <div className="flex gap-1.5 flex-wrap">
           {DIFFICULTIES.map(d => (
             <button key={d} onClick={() => setFilter(d)}
@@ -127,14 +197,22 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
           {/* Mobile card list */}
           <div className="md:hidden space-y-2">
             {filtered.map((p, i) => {
-              const isSolved = solved.includes(p.id);
+              const isSolved   = solved.includes(p.id);
+              const isWeekly   = weeklyIds.has(p.id);
+              const isUnlocked = unlockedIds.has(p.id);
+              const isLocked   = isWeekly && !isUnlocked;
+
               return (
-                <div key={p.id} onClick={() => setSelected(p)}
-                  className="card-hover px-4 py-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.99]">
+                <div key={p.id} onClick={() => handleRowClick(p)}
+                  className={`card-hover px-4 py-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.99]
+                    ${isLocked ? 'opacity-70' : ''}`}>
                   <div className="text-[#333] text-xs font-mono w-6 shrink-0 text-center">{i + 1}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[#e0e0e0] font-mono text-sm truncate mb-1">{p.title}</div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[#e0e0e0] font-mono text-sm truncate">{p.title}</span>
+                      {isLocked && <span className="text-xs shrink-0">🔒</span>}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
                       <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-lg
                         ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
                           p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
@@ -142,10 +220,11 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
                         {p.difficulty}
                       </span>
                       <span className="text-[#a78bfa] text-[10px] font-mono">{p.points} pts</span>
+                      {isLocked && <span className="text-[10px] font-mono text-[#f0b429]">Weekly</span>}
                     </div>
                   </div>
-                  <span className={`text-sm shrink-0 ${isSolved ? 'text-[#00e87a]' : 'text-[#333]'}`}>
-                    {isSolved ? '✓' : '›'}
+                  <span className={`text-sm shrink-0 ${isSolved ? 'text-[#00e87a]' : isLocked ? 'text-[#f0b42960]' : 'text-[#333]'}`}>
+                    {isSolved ? '✓' : isLocked ? '🔒' : '›'}
                   </span>
                 </div>
               );
@@ -154,7 +233,6 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
 
           {/* Desktop table */}
           <div className="hidden md:block card overflow-hidden">
-            {/* Table header */}
             <div className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-3
               border-b border-[#1a1a1a] text-[10px] text-[#444] font-mono uppercase tracking-widest">
               <div>#</div>
@@ -166,17 +244,35 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
             </div>
 
             {filtered.map((p, i) => {
-              const isSolved = solved.includes(p.id);
+              const isSolved   = solved.includes(p.id);
+              const isWeekly   = weeklyIds.has(p.id);
+              const isUnlocked = unlockedIds.has(p.id);
+              const isLocked   = isWeekly && !isUnlocked;
+
               return (
-                <div key={p.id} onClick={() => setSelected(p)}
-                  className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-4
-                    border-b border-[#161616] last:border-0 hover:bg-[#161616] cursor-pointer
-                    transition-all duration-150 group items-center">
+                <div key={p.id} onClick={() => handleRowClick(p)}
+                  className={`grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-4
+                    border-b border-[#161616] last:border-0 cursor-pointer
+                    transition-all duration-150 group items-center
+                    ${isLocked
+                      ? 'hover:bg-[#f0b42906] opacity-80'
+                      : 'hover:bg-[#161616]'}`}>
+
                   <div className="text-[#333] text-xs font-mono">{i + 1}</div>
 
                   <div>
-                    <div className="text-[#ddd] font-mono text-sm group-hover:text-[#00e87a] transition-colors mb-1">
-                      {p.title}
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`font-mono text-sm transition-colors
+                        ${isLocked
+                          ? 'text-[#888] group-hover:text-[#f0b429]'
+                          : 'text-[#ddd] group-hover:text-[#00e87a]'}`}>
+                        {p.title}
+                      </span>
+                      {isLocked && (
+                        <span className="text-[10px] font-mono text-[#f0b429] bg-[#f0b42915] px-1.5 py-0.5 rounded-lg border border-[#f0b42930]">
+                          🔒 Weekly
+                        </span>
+                      )}
                     </div>
                     <div className="flex gap-1.5 flex-wrap">
                       {(p.tags || []).map(t => (
@@ -198,11 +294,17 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
                   <div className="text-[#444] text-sm font-mono">{p.submission_count || 0}</div>
 
                   <div>
-                    {isSolved
-                      ? <span className="inline-flex items-center gap-1 text-[#00e87a] text-xs font-mono font-bold">
-                          <span>✓</span> Solved
-                        </span>
-                      : <span className="text-[#333] text-xs font-mono group-hover:text-[#555] transition-colors">Solve →</span>}
+                    {isSolved ? (
+                      <span className="inline-flex items-center gap-1 text-[#00e87a] text-xs font-mono font-bold">
+                        <span>✓</span> Solved
+                      </span>
+                    ) : isLocked ? (
+                      <span className="text-[#f0b429] text-xs font-mono group-hover:text-[#f0b429] transition-colors">
+                        Pay to unlock →
+                      </span>
+                    ) : (
+                      <span className="text-[#333] text-xs font-mono group-hover:text-[#555] transition-colors">Solve →</span>
+                    )}
                   </div>
                 </div>
               );

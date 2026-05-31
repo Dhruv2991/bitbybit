@@ -3,13 +3,14 @@
 import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient, resolveAdminStatus } from "@/lib/supabase";
 import type { User } from "@/types/database";
-import HomePage        from "@/components/pages/HomePage";
-import ProblemsPage    from "@/components/pages/ProblemsPage";
-import LeaderboardPage from "@/components/pages/LeaderboardPage";
-import ArenaPage       from "@/components/pages/ArenaPage";
-import AdminPage       from "@/components/pages/AdminPage";
+import HomePage             from "@/components/pages/HomePage";
+import ProblemsPage         from "@/components/pages/ProblemsPage";
+import LeaderboardPage      from "@/components/pages/LeaderboardPage";
+import ArenaPage            from "@/components/pages/ArenaPage";
+import AdminPage            from "@/components/pages/AdminPage";
+import WeeklyChallengePage  from "@/components/pages/WeeklyChallengePage";
 
-type PageId = "home" | "problems" | "leaderboard" | "arena" | "admin";
+type PageId = "home" | "problems" | "leaderboard" | "arena" | "weekly" | "admin";
 const PAGE_KEY = "bb_page";
 
 const NAV_ITEMS: { id: PageId; label: string; icon: string }[] = [
@@ -17,6 +18,7 @@ const NAV_ITEMS: { id: PageId; label: string; icon: string }[] = [
   { id: "problems",    label: "Problems",    icon: "{ }" },
   { id: "leaderboard", label: "Leaderboard", icon: "⚡"  },
   { id: "arena",       label: "Arena",       icon: "🏆"  },
+  { id: "weekly",      label: "Weekly",      icon: "🏅"  },
 ];
 
 type ToastType = "ok" | "err" | "warn" | "info";
@@ -274,9 +276,10 @@ export default function App() {
       {/* Page content */}
       <main className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-10">
         {page === "home"        && <HomePage        user={user} onNavigate={navigate} />}
-        {page === "problems"    && <ProblemsPage    user={user} />}
+        {page === "problems"    && <ProblemsPage    user={user} onNavigate={navigate} />}
         {page === "leaderboard" && <LeaderboardPage />}
         {page === "arena"       && <ArenaPage       user={user} onArenaLockChange={setArenaLocked} />}
+        {page === "weekly"      && <WeeklyChallengePage user={user} />}
         {page === "admin"       && user?.is_admin   && <AdminPage user={user} />}
       </main>
 
