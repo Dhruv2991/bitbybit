@@ -33,8 +33,10 @@ const WANDBOX_COMPILER: Record<string, string> = {
 
 function extractFuncName(code: string, lang: string): string {
   if (lang === "java") {
+    // FIX: match only proper method declarations (public/private/static + explicit return type)
+    // to avoid matching class declarations or variable assignments.
     const m = code.match(
-      /(?:public\s+)?(?:static\s+)?[\w<>\[\]]+\s+(\w+)\s*\(/,
+      /(?:public|private|protected|static|\s)+[\w<>\[\]]+\s+(\w+)\s*\(/,
     );
     return m?.[1] || "solution";
   }
@@ -62,65 +64,42 @@ function extractFuncName(code: string, lang: string): string {
 }
 
 // ── Convert a parsed JS value into a native language literal ─
-// This is the key to the LeetCode-style approach:
-// instead of shipping JSON to the compiled program and parsing it
-// at runtime, we embed the actual native literal in the source code
-// at harness-build time — exactly what Java does with JSON.stringify.
 
 function toNativeLiteral(value: any, lang: string): string {
-  // null / undefined
   if (value === null || value === undefined) {
     switch (lang) {
-      case "cpp":
-        return "nullptr";
-      case "rust":
-        return "None";
-      case "go":
-        return "nil";
-      case "java":
-        return "null";
-      default:
-        return "null";
+      case "cpp":  return "nullptr";
+      case "rust": return "None";
+      case "go":   return "nil";
+      case "java": return "null";
+      default:     return "null";
     }
   }
 
-  // boolean
   if (typeof value === "boolean") {
-    if (lang === "cpp" || lang === "go" || lang === "rust")
-      return value ? "true" : "false";
-    return value ? "true" : "false"; // java too
+    return value ? "true" : "false";
   }
 
-  // number
   if (typeof value === "number") {
-    // Preserve integer vs float distinction
     return Number.isInteger(value) ? String(value) : String(value);
   }
 
-  // string
   if (typeof value === "string") {
     const escaped = value
       .replace(/\\/g, "\\\\")
       .replace(/"/g, '\\"')
       .replace(/\n/g, "\\n");
-    if (lang === "cpp") return `std::string("${escaped}")`;
+    if (lang === "cpp")  return `std::string("${escaped}")`;
     if (lang === "rust") return `String::from("${escaped}")`;
-    return `"${escaped}"`; // go, java
+    return `"${escaped}"`;
   }
 
-  // array
   if (Array.isArray(value)) {
     const items = value.map((v) => toNativeLiteral(v, lang));
 
     if (lang === "cpp") {
       if (value.length === 0) return "{}";
-      const inner = items.join(", ");
-      // Detect element type from first element
-      const first = value[0];
-      if (Array.isArray(first)) {
-        return `{${inner}}`; // nested — outer type declared in variable
-      }
-      return `{${inner}}`;
+      return `{${items.join(", ")}}`;
     }
 
     if (lang === "go") {
@@ -133,7 +112,6 @@ function toNativeLiteral(value: any, lang: string): string {
       if (typeof first === "string") return `[]string{${items.join(", ")}}`;
       if (typeof first === "boolean") return `[]bool{${items.join(", ")}}`;
       if (Array.isArray(first)) {
-        // 2-D int slice
         const inner = value.map(
           (row) =>
             `[]int{${(row as any[]).map((v: any) => toNativeLiteral(v, lang)).join(", ")}}`,
@@ -145,31 +123,18 @@ function toNativeLiteral(value: any, lang: string): string {
 
     if (lang === "rust") {
       if (value.length === 0) return "vec![]";
-      const first = value[0];
-      if (typeof first === "number" && Number.isInteger(first)) {
-        return `vec![${items.join(", ")}]`;
-      }
-      if (typeof first === "string") return `vec![${items.join(", ")}]`;
-      if (typeof first === "boolean") return `vec![${items.join(", ")}]`;
-      if (Array.isArray(first)) {
-        return `vec![${items.join(", ")}]`;
-      }
       return `vec![${items.join(", ")}]`;
     }
 
     if (lang === "java") {
-      // Java already handled separately — kept for completeness
       return `new int[]{${items.join(", ")}}`;
     }
   }
 
-  // Fallback: JSON stringify (should not normally be reached)
   return JSON.stringify(value);
 }
 
 // ── Infer C++ type string from a JS value ───────────────────
-// Used to declare typed variables in main() so the user's
-// function receives proper C++ types, not json objects.
 
 function cppType(value: any): string {
   if (value === null || value === undefined) return "void*";
@@ -181,7 +146,6 @@ function cppType(value: any): string {
     if (value.length === 0) return "std::vector<int>";
     const first = value[0];
     if (Array.isArray(first)) {
-      // Detect inner type
       const inner =
         first.length > 0 && typeof first[0] === "string"
           ? "std::string"
@@ -233,13 +197,8 @@ function rustType(value: any): string {
 }
 
 // ── Serialize result back to JSON for comparison ─────────────
-// Each language prints its result using stdlib only.
-// We wrap the function call in a small serializer so the output
-// matches the expected JSON string stored in the test case.
 
 function cppSerializer(resultExpr: string, returnType: string): string {
-  // For common return types, emit a compact inline serializer.
-  // The user's return type is detected from their function signature.
   if (returnType.includes("vector<vector")) {
     return [
       `    auto __r__ = ${resultExpr};`,
@@ -284,7 +243,6 @@ function cppSerializer(resultExpr: string, returnType: string): string {
   if (returnType === "bool") {
     return `    cout << ((${resultExpr}) ? "true" : "false") << endl;`;
   }
-  // int, long, double, etc.
   return `    cout << (${resultExpr}) << endl;`;
 }
 
@@ -295,8 +253,7 @@ function detectCppReturnType(code: string): string {
     .split("\n")
     .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("#"));
   for (const line of lines) {
-    // Match: returnType funcName(
-    const m = line.match(/^([\w:<>*&\s]+?)\s+\w+\s*\(/);
+    const m = line.match(/^([\w:<>\*&\s]+?)\s+\w+\s*\(/);
     if (m) {
       const rt = m[1].trim();
       if (!["if", "for", "while", "switch", "return"].includes(rt)) {
@@ -324,15 +281,8 @@ function buildFullProgram(
   if (!Array.isArray(args)) args = [args];
 
   switch (lang) {
-    // ─────────────────────────────────────────────────────────
-    // C++  — No nlohmann/json in user code.
-    //        Harness declares typed variables from inferred types
-    //        and passes them directly. Output via custom serializer.
-    // ─────────────────────────────────────────────────────────
     case "cpp": {
       const returnType = detectCppReturnType(userCode);
-
-      // Build typed variable declarations for each arg
       const decls = args
         .map((arg, i) => {
           const type = cppType(arg);
@@ -340,10 +290,8 @@ function buildFullProgram(
           return `    ${type} __a${i}__ = ${literal};`;
         })
         .join("\n");
-
       const callArgs = args.map((_, i) => `__a${i}__`).join(", ");
       const printBlock = cppSerializer(`${fn}(${callArgs})`, returnType);
-
       return [
         "#include <bits/stdc++.h>",
         "using namespace std;",
@@ -358,44 +306,50 @@ function buildFullProgram(
       ].join("\n");
     }
 
-    // ─────────────────────────────────────────────────────────
-    // Java — Already LeetCode-style. No changes to logic;
-    //         just cleaned up from the old dead-code branch.
-    // ─────────────────────────────────────────────────────────
     case "java": {
+      // FIX: use proper Java type mapping for array args, not always int[]
       const javaArgs = args
         .map((v) => {
-          if (typeof v === "string") {
-            return JSON.stringify(v);
-          }
-
-          if (typeof v === "number") {
-            return String(v);
-          }
-
-          if (typeof v === "boolean") {
-            return v ? "true" : "false";
-          }
-
+          if (typeof v === "string") return JSON.stringify(v);
+          if (typeof v === "number") return String(v);
+          if (typeof v === "boolean") return v ? "true" : "false";
           if (Array.isArray(v)) {
-            if (!v.length) {
-              return "new int[]{}";
-            }
-
-            if (typeof v[0] === "number") {
-              return `new int[]{${v.join(",")}}`;
-            }
-
-            if (typeof v[0] === "string") {
-              return `new String[]{${v
-                .map((x) => JSON.stringify(x))
-                .join(",")}}`;
+            if (!v.length) return "new int[]{}";
+            if (typeof v[0] === "number") return `new int[]{${v.join(",")}}`;
+            if (typeof v[0] === "string")
+              return `new String[]{${v.map((x) => JSON.stringify(x)).join(",")}}`;
+            // 2D int array
+            if (Array.isArray(v[0])) {
+              const rows = v
+                .map((row: any[]) => `new int[]{${row.join(",")}}`)
+                .join(", ");
+              return `new int[][]{${rows}}`;
             }
           }
-
           return JSON.stringify(v);
         })
         .join(", ");
+
+      // FIX: detect Java return type from signature to print correctly
+      // Previously used Object __result__ which prints arrays as [I@... (object reference).
+      // Now we detect the declared return type and cast appropriately.
+      const javaReturnTypeMatch = userCode.match(
+        /(?:public|private|protected|static|\s)+\s*([\w<>\[\]]+)\s+\w+\s*\(/,
+      );
+      const javaReturnType = javaReturnTypeMatch?.[1] || "Object";
+
+      let printStmt: string;
+      if (javaReturnType === "int[]" || javaReturnType === "Integer[]") {
+        printStmt = `        System.out.println(Arrays.toString((int[]) __result__).replace(" ", ""));`;
+      } else if (javaReturnType === "int[][]") {
+        printStmt = `        System.out.println(Arrays.deepToString((int[][]) __result__).replace(" ", ""));`;
+      } else if (javaReturnType === "String[]") {
+        printStmt = `        System.out.println(Arrays.toString((String[]) __result__).replace(" ", ""));`;
+      } else if (javaReturnType === "boolean" || javaReturnType === "Boolean") {
+        printStmt = `        System.out.println(__result__);`;
+      } else {
+        printStmt = `        System.out.println(__result__);`;
+      }
 
       return [
         "import java.util.*;",
@@ -422,11 +376,6 @@ function buildFullProgram(
       ].join("\n");
     }
 
-    // ─────────────────────────────────────────────────────────
-    // Go  — No encoding/json for user params.
-    //        Harness injects typed Go literals; result serialized
-    //        with encoding/json (stdlib, no extra deps).
-    // ─────────────────────────────────────────────────────────
     case "go": {
       const decls = args
         .map((arg, i) => {
@@ -435,9 +384,7 @@ function buildFullProgram(
           return `    var __a${i}__ ${type} = ${literal}`;
         })
         .join("\n");
-
       const callArgs = args.map((_, i) => `__a${i}__`).join(", ");
-
       return [
         "package main",
         "",
@@ -457,12 +404,6 @@ function buildFullProgram(
       ].join("\n");
     }
 
-    // ─────────────────────────────────────────────────────────
-    // Rust — No serde_json::Value in user params.
-    //         Harness injects typed Rust literals; result serialized
-    //         with serde_json (already in Wandbox's Rust env).
-    //         User writes fn solution(nums: Vec<i32>, target: i32) -> Vec<i32>
-    // ─────────────────────────────────────────────────────────
     case "rust": {
       const decls = args
         .map((arg, i) => {
@@ -471,15 +412,16 @@ function buildFullProgram(
           return `    let __a${i}__: ${type} = ${literal};`;
         })
         .join("\n");
-
       const callArgs = args.map((_, i) => `__a${i}__`).join(", ");
 
-      // Detect the return type from args / function signature to choose the right
-      // println format:  {:?} for Vec/complex, {} for scalars (String, int, bool).
-      // This prevents String returns printing as "hello" instead of hello.
-      const retType = rustType(args[0] ?? 0); // heuristic fallback
-      const isVec = retType.startsWith("Vec");
-      const printFmt = isVec ? '"{:?}"' : '"{}"';
+      // FIX: detect Rust return type from the function signature, not from the first arg.
+      // The old code used rustType(args[0]) which is wrong — it infers from the INPUT
+      // type, not the return type. We look at the fn signature "-> ReturnType" instead.
+      const rustReturnMatch = userCode.match(/fn\s+\w+[^)]*\)\s*->\s*([\w<>]+)/);
+      const rustReturnHint = rustReturnMatch?.[1] || "";
+      const isVec = rustReturnHint.startsWith("Vec") || rustReturnHint === "String";
+      // Use {:?} for Vec/complex types; {} for scalars (bool, i32, String via Display)
+      const printFmt = isVec && !rustReturnHint.startsWith("String") ? '"{:?}"' : '"{}"';
 
       return [
         userCode,
@@ -511,9 +453,12 @@ function jsonEqual(a: string, b: string): boolean {
         );
       return v;
     };
+    // FIX: Java outputs "[0, 1]" with spaces; strip spaces before comparing
+    const cleanA = a.replace(/\s+/g, "");
+    const cleanB = b.replace(/\s+/g, "");
     return (
-      JSON.stringify(normalize(JSON.parse(a))) ===
-      JSON.stringify(normalize(JSON.parse(b)))
+      JSON.stringify(normalize(JSON.parse(cleanA))) ===
+      JSON.stringify(normalize(JSON.parse(cleanB)))
     );
   } catch {
     return a.trim() === b.trim();
@@ -572,15 +517,16 @@ export async function runAgainstTestCases(
       const out = await executeWithWandbox(fullCode, language);
       const ms = Date.now() - t0;
 
+      // FIX: strip all whitespace before comparison (Java outputs "[0, 1]" with spaces)
       const actual = (out.stdout || "").trim().replace(/\s+/g, "");
-      const expected = String(tc.expected).trim();
+      const expected = String(tc.expected).trim().replace(/\s+/g, "");
       const ok = jsonEqual(actual, expected);
       const error = out.stderr || undefined;
 
       results.push({
         input: tc.input,
-        expected,
-        actual,
+        expected: String(tc.expected).trim(),
+        actual: (out.stdout || "").trim(),
         ok,
         error,
         time: `${ms}ms`,

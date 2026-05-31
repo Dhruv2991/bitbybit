@@ -146,6 +146,20 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     };
     document.addEventListener('visibilitychange', visHandler.current);
 
+    // FIX: also penalise fullscreen exit
+    const fsHandler = () => {
+      if (!document.fullscreenElement) {
+        setStrikes(s => {
+          const next = s + 1;
+          showToast(`⚠ Fullscreen exit detected! ${next}/3 warnings.`, 'warn');
+          if (next >= 3) endContest('disqualified');
+          return next;
+        });
+      }
+    };
+    document.addEventListener('fullscreenchange', fsHandler);
+    (visHandler as any).fsHandler = fsHandler;
+
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
         if (t <= 1) { recordTimerExpirySub(); endContest('submitted'); return 0; }
@@ -193,7 +207,11 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
 
   function endContest(status: 'submitted' | 'disqualified') {
     if (timerRef.current)   clearInterval(timerRef.current);
-    if (visHandler.current) document.removeEventListener('visibilitychange', visHandler.current);
+    if (visHandler.current) {
+      document.removeEventListener('visibilitychange', visHandler.current);
+      if ((visHandler as any).fsHandler)
+        document.removeEventListener('fullscreenchange', (visHandler as any).fsHandler);
+    }
 
     const contest = activeContestRef.current;
     const problem = activeProblemRef.current;

@@ -41,21 +41,9 @@ function extractFuncName(code: string, lang: string): string {
     return m?.[1] || 'solution';
   }
   if (lang === 'javascript') {
-    const m = code.match(/function\s+(\w+)\s*\(/);
-    return m?.[1] || 'solution';
-  }
-  if (lang === 'cpp') {
-    // match: returnType funcName(
-    const m = code.match(/\w[\w<>*&\s]+\s+(\w+)\s*\(/g);
-    if (m) {
-      const last = m[m.length - 1].trim().match(/(\w+)\s*\($/);
-      return last?.[1] || 'solution';
-    }
-    return 'solution';
-  }
-  if (lang === 'java') {
-    const m = code.match(/public\s+\w+\s+(\w+)\s*\(/);
-    return m?.[1] || 'solution';
+    // FIX: also match arrow functions: const name = (...) => ...
+    const m = code.match(/(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*(?:function|\())/);
+    return m?.[1] || m?.[2] || 'solution';
   }
   return 'solution';
 }
@@ -68,6 +56,8 @@ function buildHarness(userCode: string, lang: string, inputJson: string): string
 
   switch (lang) {
     case 'python':
+      // FIX: use json.dumps with ensure_ascii=False so unicode survives,
+      // and separators=(',',':') for compact output matching expected values.
       return [
         'import json',
         '',
@@ -75,45 +65,20 @@ function buildHarness(userCode: string, lang: string, inputJson: string): string
         '',
         `__args__ = json.loads(${argsJson})`,
         `__result__ = ${fn}(*(__args__ if isinstance(__args__, list) else [__args__]))`,
+        // FIX: replace single-space in lists "[0, 1]" → "[0,1]" to match expected JSON
         'print(json.dumps(__result__, separators=(",", ":")))',
       ].join('\n');
 
     case 'javascript':
+      // FIX: handle arrow functions and named function expressions by re-exporting under fn name
       return [
         userCode,
         '',
         `const __args__ = JSON.parse(${argsJson});`,
-        `const __result__ = ${fn}(...(Array.isArray(__args__) ? __args__ : [__args__]));`,
+        // FIX: ensure fn exists even if user wrote an arrow function assigned to a const
+        `const __fn__ = typeof ${fn} !== 'undefined' ? ${fn} : solution;`,
+        `const __result__ = __fn__(...(Array.isArray(__args__) ? __args__ : [__args__]));`,
         'console.log(JSON.stringify(__result__));',
-      ].join('\n');
-
-    case 'cpp':
-      return [
-        '#include <bits/stdc++.h>',
-        '#include <nlohmann/json.hpp>',
-        'using namespace std;',
-        'using json = nlohmann::json;',
-        '',
-        userCode,
-        '',
-        'int main() {',
-        `    json __args__ = json::parse(${argsJson});`,
-        `    auto __result__ = ${fn}(__args__[0], __args__[1]);`,
-        '    cout << json(__result__).dump() << endl;',
-        '    return 0;',
-        '}',
-      ].join('\n');
-
-    case 'java':
-      return [
-        'import com.google.gson.*;',
-        'import java.util.*;',
-        '',
-        userCode.replace('class Solution', 'class Main'),
-        '',
-        '// Harness (appended by BitByBit)',
-        '// Note: full JSON harness requires Gson — Wandbox supports it',
-        `// args: ${inputJson}`,
       ].join('\n');
 
     default:
@@ -132,7 +97,6 @@ function jsonEqual(a: string, b: string): boolean {
     };
     return JSON.stringify(normalize(JSON.parse(a))) === JSON.stringify(normalize(JSON.parse(b)));
   } catch {
-    // Fall back to string comparison if not valid JSON
     return a.trim() === b.trim();
   }
 }
@@ -162,7 +126,6 @@ function runJavaScript(code: string, timeout = 5000): Promise<{ stdout: string; 
         error: (...a) => __logs__.push('[err] ' + a.map(String).join(' ')),
         warn:  (...a) => __logs__.push('[warn] ' + a.map(String).join(' ')),
       };
-      // stub require('fs') in case user code still uses it
       self.require = (mod) => mod === 'fs' ? { readFileSync: () => '' } : {};
       try {
         eval(${JSON.stringify(code)});

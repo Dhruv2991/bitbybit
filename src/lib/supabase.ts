@@ -7,10 +7,6 @@ import type { Database } from '@/types/database';
 const SUPABASE_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-// Pin the singleton on globalThis so it survives Next.js module
-// re-evaluations (fast-refresh, chunk splits).  A plain module-level
-// variable resets on every re-evaluation, creating a brand-new client
-// that hasn't loaded its token yet → spurious logged-out state.
 const G = globalThis as typeof globalThis & {
   __bbClient?: ReturnType<typeof createClient<Database>>;
 };
@@ -36,17 +32,24 @@ export function createServerSupabaseClient() {
 
 export async function resolveAdminStatus(github: string): Promise<boolean> {
   if (!github) return false;
-  // Check cache first — avoids a DB round trip on every page load
   const cacheKey = `bb_admin_${github}`;
+  const tsKey    = `bb_admin_ts_${github}`;
   try {
     const cached = localStorage.getItem(cacheKey);
-    if (cached !== null) return cached === '1';
+    const ts     = parseInt(localStorage.getItem(tsKey) || '0', 10);
+    const age    = Date.now() - ts;
+    // FIX: re-check DB every hour — previously cached forever, so removing
+    // an admin from the DB had no effect until they manually signed out.
+    if (cached !== null && age < 60 * 60 * 1000) return cached === '1';
   } catch {}
   try {
     const { data, error } = await getSupabaseClient()
       .from('admins').select('github').eq('github', github).maybeSingle();
     const result = !error && !!data;
-    try { localStorage.setItem(cacheKey, result ? '1' : '0'); } catch {}
+    try {
+      localStorage.setItem(cacheKey, result ? '1' : '0');
+      localStorage.setItem(tsKey, String(Date.now()));
+    } catch {}
     return result;
   } catch { return false; }
 }

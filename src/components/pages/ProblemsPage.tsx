@@ -18,9 +18,26 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
   const [solved,   setSolved]   = useState<string[]>([]);
 
   useEffect(() => {
+    // Load localStorage solved list as a quick initial state
     try { setSolved(JSON.parse(localStorage.getItem('bb_solved') || '[]')); } catch {}
 
     const db = getSupabaseClient();
+
+    // FIX: also load approved submissions from DB so solved state survives across devices/browsers
+    if (user?.github) {
+      db.from('submissions')
+        .select('problem_id')
+        .eq('github', user.github)
+        .eq('status', 'approved')
+        .then(({ data }) => {
+          if (!data?.length) return;
+          setSolved(prev => {
+            const merged = [...new Set([...prev, ...data.map((s: any) => s.problem_id)])];
+            try { localStorage.setItem('bb_solved', JSON.stringify(merged)); } catch {}
+            return merged;
+          });
+        });
+    }
 
     async function load() {
       setLoading(true);
@@ -46,7 +63,7 @@ export default function ProblemsPage({ user }: ProblemsPageProps) {
       .subscribe();
 
     return () => { db.removeChannel(channel); };
-  }, []);
+  }, [user]);
 
   const filtered = filter === 'all'
     ? problems

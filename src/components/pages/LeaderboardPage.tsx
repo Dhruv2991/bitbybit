@@ -28,23 +28,26 @@ export default function LeaderboardPage() {
         const [{ data: subs }, { data: arenaSubs }] = await Promise.all([
           db
             .from('submissions')
-            .select('github, name, points_awarded')
+            .select('github, name, points_awarded, problem_id')
             .eq('status', 'approved')           // regular submissions stay 'approved'
             .gte('created_at', cutoff.toISOString())
             .returns<{ github: string; name: string; points_awarded: number }[]>(),
           db
             .from('arena_submissions')
-            .select('github, name, points_awarded')
+            .select('github, name, points_awarded, problem_id')
             .eq('status', 'reviewed')           // FIX: arena submissions use 'reviewed', NOT 'approved'
             .gte('created_at', cutoff.toISOString())
             .returns<{ github: string; name: string; points_awarded: number }[]>(),
         ]);
 
-        const map: Record<string, { github: string; name: string; total: number; count: number }> = {};
+        // FIX: track distinct problems per user to avoid inflation from multiple submissions
+        const map: Record<string, { github: string; name: string; total: number; problems: Set<string> }> = {};
         for (const s of [...(subs || []), ...(arenaSubs || [])]) {
-          if (!map[s.github]) map[s.github] = { github: s.github, name: s.name, total: 0, count: 0 };
+          if (!map[s.github]) map[s.github] = { github: s.github, name: s.name, total: 0, problems: new Set() };
           map[s.github].total += s.points_awarded || 0;
-          map[s.github].count += 1;
+          // Count each unique problem_id once; fall back to a unique key if no problem_id
+          const pid = (s as any).problem_id || `pts_${map[s.github].total}`;
+          map[s.github].problems.add(pid);
         }
 
         const ranked = Object.values(map)
@@ -52,7 +55,7 @@ export default function LeaderboardPage() {
           .slice(0, 100)
           .map(m => ({
             id: m.github, github: m.github, name: m.name,
-            total_points: m.total, problems_solved: m.count,
+            total_points: m.total, problems_solved: m.problems.size,
             streak: 0, last_solved_at: null, created_at: '',
           } as EnrichedMember));
 
