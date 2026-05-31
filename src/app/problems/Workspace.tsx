@@ -22,13 +22,14 @@ interface WorkspaceProps {
   onClose: () => void;
   onArenaSubmit?:     (code: string, lang: string) => void;
   onArenaCodeChange?: (code: string, lang: string) => void;
-  onSolved?:          (problemId: string) => void;
+  onSolved?:          (problemId: string, details?: { code: string; lang: string; passed: number; total: number; pointsAwarded: number }) => void;
+  isWeekly?:          boolean;
 }
 
 type ToastType = 'ok' | 'err' | 'info' | 'warn';
 interface Toast { msg: string; type: ToastType; id: number; }
 
-export default function Workspace({ problem, user, onClose, onArenaSubmit, onArenaCodeChange, onSolved }: WorkspaceProps) {
+export default function Workspace({ problem, user, onClose, onArenaSubmit, onArenaCodeChange, onSolved, isWeekly }: WorkspaceProps) {
   const db = getSupabaseClient();
 
   const [lang,          setLang]          = useState<SupportedLang>('python');
@@ -64,6 +65,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
   useEffect(() => {
     if (!user) return;
+    if (isWeekly) return; // weekly submissions are tracked separately
     (async () => {
       const { data } = await db
         .from('submissions')
@@ -80,7 +82,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           : '⏳ Submission pending review — duplicates blocked.');
       }
     })();
-  }, [user, problem.id]);
+  }, [user, problem.id, isWeekly]);
 
   const handleLangChange = useCallback((l: SupportedLang) => {
     setLang(l);
@@ -132,7 +134,8 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
   async function submitSolution() {
     if (!user) { showToast('Sign in to submit!', 'err'); return; }
-    if (!onArenaSubmit && !approach.trim()) { showToast('Please add an approach description or GitHub PR link.', 'warn'); return; }
+    if (!onArenaSubmit && !isWeekly && !approach.trim()) { showToast('Please add an approach description or GitHub PR link.', 'warn'); return; }
+    if (isWeekly && !testResult) { showToast('Please run the tests before submitting.', 'warn'); return; }
     if (submitBlocked) return;
 
     setSubmitting(true);
@@ -141,23 +144,36 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     try {
       const passed = testResult?.passed ?? 0;
       const total  = testResult?.total  ?? 0;
+      const pointsAwarded = total > 0
+        ? Math.floor((problem.points || 100) * (passed / total))
+        : (problem.points || 100);
 
+      // ── Arena mode ──────────────────────────────────────────
       if (onArenaSubmit) {
         onArenaSubmit(code, lang);
         setSubmitBlocked(true);
         setApproach('');
-        onSolved?.(problem.id);
+        onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded });
         showToast(
           `✅ Submitted "${problem.title}" — ${total > 0 ? `${passed}/${total} tests passed` : 'pending review'}`,
           'ok'
         );
-        // Auto-advance to next problem after a short pause so the toast is visible.
-        // onClose in arena mode calls handleProblemClose which moves to the next problem
-        // (or shows "all done" if this was the last one).
         setTimeout(() => onClose(), 1200);
         return;
       }
 
+      // ── Weekly mode — skip submissions table entirely ────────
+      if (isWeekly) {
+        onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded });
+        setStatusMsg(`✅ Submitted — ${passed}/${total} tests, ${pointsAwarded} base pts`);
+        showToast(
+          `✅ "${problem.title}" — ${passed}/${total} tests passed, ${pointsAwarded} base pts (×time bonus)`,
+          'ok'
+        );
+        return;
+      }
+
+      // ── Normal problems mode ─────────────────────────────────
       const { data: existing } = await db
         .from('submissions')
         .select('id')
@@ -172,10 +188,6 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         showToast('You already have a pending or approved submission.', 'warn');
         return;
       }
-
-      const pointsAwarded = total > 0
-        ? Math.floor((problem.points || 100) * (passed / total))
-        : (problem.points || 100);
 
       const { error } = await (db.from('submissions') as any).insert([{
         problem_id:     problem.id,
@@ -194,7 +206,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
       setStatusMsg('⏳ Pending review.');
       setSubmitBlocked(true);
       setApproach('');
-      onSolved?.(problem.id);
+      onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded });
       showToast(
         `✅ Submitted "${problem.title}" — ${total > 0 ? `${passed}/${total} tests passed, up to ${pointsAwarded} pts` : 'pending review'}`,
         'ok'
@@ -344,8 +356,8 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           loading={running}
         />
 
-        {/* Approach field — only shown outside the arena */}
-        {!onArenaSubmit && (
+        {/* Approach field — only shown outside arena and weekly modes */}
+        {!onArenaSubmit && !isWeekly && (
           <div className="card p-4">
             <label className="block text-[10px] text-[#444] font-mono mb-2 uppercase tracking-widest">
               Your approach or GitHub PR link *
@@ -368,18 +380,21 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
         <button
           onClick={submitSolution}
-          disabled={submitting || submitBlocked || !user}
+          disabled={submitting || submitBlocked || !user || (!!isWeekly && !testResult)}
           className={`w-full py-3 rounded-xl font-mono font-bold text-sm transition-all
             ${submitBlocked || !user
               ? 'bg-[#1a1a1a] text-[#333] cursor-not-allowed border border-[#1f1f1f]'
-              : submitting
-                ? 'bg-[#00e87a30] text-[#00e87a60] cursor-not-allowed'
-                : 'btn-primary'}`}>
-          {!user         ? 'Sign in to submit'  :
-           submitBlocked ? 'Already submitted'  :
-           submitting    ? 'Submitting…'        :
-           onArenaSubmit ? 'Submit & Next Problem →' :
-                           'Submit Solution →'}
+              : isWeekly && !testResult
+                ? 'bg-[#1a1a1a] text-[#444] cursor-not-allowed border border-[#1f1f1f]'
+                : submitting
+                  ? 'bg-[#00e87a30] text-[#00e87a60] cursor-not-allowed'
+                  : 'btn-primary'}`}>
+          {!user                      ? 'Sign in to submit'        :
+           submitBlocked              ? 'Already submitted'        :
+           isWeekly && !testResult    ? '▶ Run tests first'        :
+           submitting                 ? 'Submitting…'              :
+           onArenaSubmit              ? 'Submit & Next Problem →'  :
+                                        'Submit Solution →'}
         </button>
       </div>
     </div>

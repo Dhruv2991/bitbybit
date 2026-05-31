@@ -56,11 +56,11 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         const publicProbs = (data || []).filter((p: any) => !p.is_contest_problem);
         setProblems(publicProbs as Problem[]);
 
-        // Load active weekly challenge problem IDs
+        // Load weekly challenge problem IDs that are currently active or upcoming
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: challenges } = await (db.from('weekly_challenges') as any)
           .select('id, problem_ids')
-          .in('status', ['active', 'upcoming'])
+          .neq('status', 'ended')
           .order('created_at', { ascending: false });
 
         const allWeeklyIds = new Set<string>();

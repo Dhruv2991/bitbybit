@@ -2193,9 +2193,14 @@ export default function AdminPage({ user }: AdminPageProps) {
 // Weekly Challenge Admin Section
 // ════════════════════════════════════════════════════════════
 
+// Convert a Date to the value format datetime-local expects: "YYYY-MM-DDTHH:mm" in LOCAL time
+function toLocalDatetimeInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function blankWeekly(): Omit<WeeklyChallenge, 'id' | 'created_at'> {
   const now   = new Date();
-  const start = new Date(now);
   const end   = new Date(now);
   end.setDate(end.getDate() + 7);
   return {
@@ -2204,8 +2209,8 @@ function blankWeekly(): Omit<WeeklyChallenge, 'id' | 'created_at'> {
     problem_ids: [],
     entry_fee:   49,
     upi_id:      '',
-    starts_at:   start.toISOString().slice(0, 16),
-    ends_at:     end.toISOString().slice(0, 16),
+    starts_at:   toLocalDatetimeInput(now),
+    ends_at:     toLocalDatetimeInput(end),
     status:      'upcoming',
   };
 }
@@ -2213,27 +2218,32 @@ function blankWeekly(): Omit<WeeklyChallenge, 'id' | 'created_at'> {
 function WeeklyAdminSection({ user }: { user: User }) {
   const db = getSupabaseClient();
 
-  const [challenges,  setChallenges]  = useState<WeeklyChallenge[]>([]);
-  const [accesses,    setAccesses]    = useState<WeeklyAccess[]>([]);
-  const [problems,    setProblems]    = useState<Problem[]>([]);
-  const [form,        setForm]        = useState<Omit<WeeklyChallenge, 'id' | 'created_at'> | null>(null);
-  const [editId,      setEditId]      = useState<string | null>(null);
-  const [saving,      setSaving]      = useState(false);
-  const [toast,       setToast]       = useState('');
-  const [expandedId,  setExpandedId]  = useState<string | null>(null);
+  const [challenges,   setChallenges]   = useState<WeeklyChallenge[]>([]);
+  const [accesses,     setAccesses]     = useState<WeeklyAccess[]>([]);
+  const [problems,     setProblems]     = useState<Problem[]>([]);
+  const [submissions,  setSubmissions]  = useState<any[]>([]);
+  const [form,         setForm]         = useState<Omit<WeeklyChallenge, 'id' | 'created_at'> | null>(null);
+  const [editId,       setEditId]       = useState<string | null>(null);
+  const [saving,       setSaving]       = useState(false);
+  const [toast,        setToast]        = useState('');
+  const [expandedId,   setExpandedId]   = useState<string | null>(null);
+  const [manageTab,    setManageTab]    = useState<Record<string, 'payments' | 'submissions'>>({});
+  const [editingPts,   setEditingPts]   = useState<Record<string, string>>({});
 
   useEffect(() => { load(); }, []);
 
   async function load() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [{ data: ch }, { data: acc }, { data: probs }] = await Promise.all([
+    const [{ data: ch }, { data: acc }, { data: probs }, { data: subs }] = await Promise.all([
       (db.from('weekly_challenges') as any).select('*').order('created_at', { ascending: false }),
       (db.from('weekly_access') as any).select('*').order('created_at', { ascending: false }),
       db.from('problems').select('id, title, difficulty, points').order('title'),
+      (db.from('weekly_submissions') as any).select('*').order('submitted_at', { ascending: false }),
     ]);
     setChallenges((ch || []) as WeeklyChallenge[]);
     setAccesses((acc || []) as WeeklyAccess[]);
     setProblems((probs || []) as Problem[]);
+    setSubmissions(subs || []);
   }
 
   function showToast(msg: string) {
@@ -2254,8 +2264,8 @@ function WeeklyAdminSection({ user }: { user: User }) {
       problem_ids: ch.problem_ids || [],
       entry_fee:   ch.entry_fee,
       upi_id:      ch.upi_id,
-      starts_at:   ch.starts_at?.slice(0, 16) || '',
-      ends_at:     ch.ends_at?.slice(0, 16) || '',
+      starts_at:   toLocalDatetimeInput(new Date(ch.starts_at)),
+      ends_at:     toLocalDatetimeInput(new Date(ch.ends_at)),
       status:      ch.status,
     });
   }
@@ -2301,6 +2311,18 @@ function WeeklyAdminSection({ user }: { user: User }) {
   async function updateAccessStatus(id: string, status: 'confirmed' | 'rejected') {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db.from('weekly_access') as any).update({ status }).eq('id', id);
+    load();
+  }
+
+  async function updatePoints(subId: string, newPts: string) {
+    const pts = parseInt(newPts, 10);
+    if (isNaN(pts) || pts < 0) { showToast('Enter a valid number'); return; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (db.from('weekly_submissions') as any)
+      .update({ points_awarded: pts }).eq('id', subId);
+    if (error) { showToast('Update failed'); return; }
+    setEditingPts(prev => { const n = { ...prev }; delete n[subId]; return n; });
+    showToast('Points updated ✓');
     load();
   }
 
@@ -2475,37 +2497,128 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
               {isOpen && (
                 <div className="border-t border-[#1a1a1a] px-5 py-4">
-                  <p className="text-[10px] text-[#444] font-mono uppercase tracking-widest mb-3">
-                    Payments ({chAccesses.length})
-                  </p>
-                  {chAccesses.length === 0 ? (
-                    <p className="text-xs text-[#333] font-mono">No payment submissions yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {chAccesses.map(a => (
-                        <div key={a.id} className="flex items-center gap-3 flex-wrap px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl">
-                          <img src={`https://github.com/${a.github}.png?size=24`} className="w-6 h-6 rounded-full" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                          <span className="text-xs font-mono text-[#e0e0e0] flex-1 min-w-0 truncate">{a.name} <span className="text-[#444]">@{a.github}</span></span>
-                          <span className="text-[10px] font-mono text-[#555]">Txn: {a.txn_id || '—'}</span>
-                          <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${a.status === 'confirmed' ? 'bg-[#00e87a15] text-[#00e87a]' : a.status === 'pending' ? 'bg-[#f0b42915] text-[#f0b429]' : 'bg-[#ff4d4d15] text-[#ff4d4d]'}`}>
-                            {a.status}
-                          </span>
-                          {a.status === 'pending' && (
-                            <div className="flex gap-1.5">
-                              <button onClick={() => updateAccessStatus(a.id, 'confirmed')}
-                                className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]">
-                                Confirm
-                              </button>
-                              <button onClick={() => updateAccessStatus(a.id, 'rejected')}
-                                className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-1 rounded-lg hover:bg-[#ff4d4d25]">
-                                Reject
-                              </button>
+
+                  {/* Sub-tabs */}
+                  <div className="flex gap-1 mb-4">
+                    {(['payments', 'submissions'] as const).map(t => (
+                      <button key={t} onClick={() => setManageTab(prev => ({ ...prev, [ch.id]: t }))}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all capitalize
+                          ${(manageTab[ch.id] || 'payments') === t
+                            ? 'bg-[#00e87a] text-black font-bold'
+                            : 'bg-[#1a1a1a] text-[#555] hover:text-[#e0e0e0]'}`}>
+                        {t === 'payments'
+                          ? `Payments (${chAccesses.length})`
+                          : `Submissions (${submissions.filter(s => s.weekly_challenge_id === ch.id).length})`}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Payments tab */}
+                  {(manageTab[ch.id] || 'payments') === 'payments' && (
+                    <>
+                      {chAccesses.length === 0 ? (
+                        <p className="text-xs text-[#333] font-mono">No payment submissions yet.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {chAccesses.map(a => (
+                            <div key={a.id} className="flex items-center gap-3 flex-wrap px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl">
+                              <img src={`https://github.com/${a.github}.png?size=24`} className="w-6 h-6 rounded-full" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                              <span className="text-xs font-mono text-[#e0e0e0] flex-1 min-w-0 truncate">{a.name} <span className="text-[#444]">@{a.github}</span></span>
+                              <span className="text-[10px] font-mono text-[#555]">Txn: {a.txn_id || '—'}</span>
+                              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${a.status === 'confirmed' ? 'bg-[#00e87a15] text-[#00e87a]' : a.status === 'pending' ? 'bg-[#f0b42915] text-[#f0b429]' : 'bg-[#ff4d4d15] text-[#ff4d4d]'}`}>
+                                {a.status}
+                              </span>
+                              {a.status === 'pending' && (
+                                <div className="flex gap-1.5">
+                                  <button onClick={() => updateAccessStatus(a.id, 'confirmed')}
+                                    className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]">
+                                    Confirm
+                                  </button>
+                                  <button onClick={() => updateAccessStatus(a.id, 'rejected')}
+                                    className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-1 rounded-lg hover:bg-[#ff4d4d25]">
+                                    Reject
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      )}
+                    </>
                   )}
+
+                  {/* Submissions tab */}
+                  {manageTab[ch.id] === 'submissions' && (() => {
+                    const chSubs = submissions.filter(s => s.weekly_challenge_id === ch.id);
+                    return chSubs.length === 0 ? (
+                      <p className="text-xs text-[#333] font-mono">No submissions yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {/* Header */}
+                        <div className="hidden sm:grid grid-cols-[1fr_6rem_4rem_4rem_5rem_6rem] gap-3 px-3 py-1
+                          text-[10px] text-[#333] font-mono uppercase tracking-widest border-b border-[#1a1a1a]">
+                          <div>User / Problem</div>
+                          <div>Lang</div>
+                          <div>Tests</div>
+                          <div>When</div>
+                          <div className="text-center">Points</div>
+                          <div className="text-center">Override</div>
+                        </div>
+                        {chSubs.map((s: any) => {
+                          const isEditing = editingPts[s.id] !== undefined;
+                          const daysSince = Math.floor((Date.now() - new Date(s.submitted_at).getTime()) / 86400000);
+                          return (
+                            <div key={s.id} className="grid grid-cols-1 sm:grid-cols-[1fr_6rem_4rem_4rem_5rem_6rem] gap-3 items-center px-3 py-2.5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <img src={`https://github.com/${s.github}.png?size=16`} className="w-4 h-4 rounded-full shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                  <span className="text-xs font-mono text-[#e0e0e0] truncate">{s.name}</span>
+                                  <span className="text-[10px] font-mono text-[#444] truncate">@{s.github}</span>
+                                </div>
+                                <div className="text-[10px] font-mono text-[#555] mt-0.5 truncate">{s.problem_title}</div>
+                              </div>
+                              <div className="text-[10px] font-mono text-[#555]">{s.lang}</div>
+                              <div className="text-[10px] font-mono text-[#888]">{s.tests_passed}/{s.tests_total}</div>
+                              <div className="text-[10px] font-mono text-[#444]">Day {daysSince + 1}</div>
+                              <div className="text-center">
+                                {isEditing ? (
+                                  <input
+                                    type="number" min="0"
+                                    value={editingPts[s.id]}
+                                    onChange={e => setEditingPts(prev => ({ ...prev, [s.id]: e.target.value }))}
+                                    onKeyDown={e => { if (e.key === 'Enter') updatePoints(s.id, editingPts[s.id]); if (e.key === 'Escape') setEditingPts(prev => { const n = { ...prev }; delete n[s.id]; return n; }); }}
+                                    className="w-16 bg-[#111] border border-[#00e87a40] rounded-lg px-2 py-1 text-xs font-mono text-[#00e87a] text-center focus:outline-none"
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <span className="text-sm font-mono font-bold text-[#a78bfa]">{s.points_awarded}</span>
+                                )}
+                              </div>
+                              <div className="flex justify-center gap-1">
+                                {isEditing ? (
+                                  <>
+                                    <button onClick={() => updatePoints(s.id, editingPts[s.id])}
+                                      className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]">
+                                      Save
+                                    </button>
+                                    <button onClick={() => setEditingPts(prev => { const n = { ...prev }; delete n[s.id]; return n; })}
+                                      className="text-[10px] font-mono text-[#555] bg-[#1a1a1a] px-2 py-1 rounded-lg hover:text-[#e0e0e0]">
+                                      ✕
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button onClick={() => setEditingPts(prev => ({ ...prev, [s.id]: String(s.points_awarded) }))}
+                                    className="text-[10px] font-mono text-[#a78bfa] bg-[#a78bfa15] px-2 py-1 rounded-lg hover:bg-[#a78bfa25]">
+                                    Edit pts
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
