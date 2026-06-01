@@ -34,8 +34,8 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
   const features = [
     {
       icon: '⚡',
-      title: 'Daily Challenges',
-      desc: 'Fresh problems posted every day. Solve them in your browser, then submit your GitHub link — everything tracked in one place.',
+      title: 'Weekly Challenges',
+      desc: '3 problems posted every week for FREE!. Solve them in your browser, then submit your GitHub link — everything tracked in one place.',
     },
     {
       icon: '🏆',
