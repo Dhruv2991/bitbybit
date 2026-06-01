@@ -543,7 +543,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                     <button
                       onClick={() => setPayTarget(ch)}
                       className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] transition-all shadow-[0_0_16px_rgba(0,232,122,0.15)] active:scale-[0.99]">
-                      {isUpcoming ? `Unlock early for ₹${ch.entry_fee} →` : `Unlock for ₹${ch.entry_fee} →`}
+                      {isUpcoming ? `Unlock for ₹${ch.entry_fee} →` : `Unlock for ₹${ch.entry_fee} →`}
                     </button>
                   ) : null}
 
