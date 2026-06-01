@@ -53,7 +53,9 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           .select('*')
           .order('created_at', { ascending: false });
         if (error) throw error;
-        const publicProbs = (data || []).filter((p: any) => !p.is_contest_problem);
+        const publicProbs = (data || []).filter((p: any) =>
+          p.visibility === 'public' || p.visibility === 'weekly' || (!p.visibility && !p.is_contest_problem)
+        );
         setProblems(publicProbs as Problem[]);
 
         // Load weekly challenge problem IDs that are currently active or upcoming
@@ -120,7 +122,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   }
 
   function handleRowClick(p: Problem) {
-    const isWeekly   = weeklyIds.has(p.id);
+    const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
     const isUnlocked = unlockedIds.has(p.id);
     if (isWeekly && !isUnlocked) {
       setLockedToast(true);
@@ -198,7 +200,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           <div className="md:hidden space-y-2">
             {filtered.map((p, i) => {
               const isSolved   = solved.includes(p.id);
-              const isWeekly   = weeklyIds.has(p.id);
+              const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
               const isUnlocked = unlockedIds.has(p.id);
               const isLocked   = isWeekly && !isUnlocked;
 
@@ -245,7 +247,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
 
             {filtered.map((p, i) => {
               const isSolved   = solved.includes(p.id);
-              const isWeekly   = weeklyIds.has(p.id);
+              const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
               const isUnlocked = unlockedIds.has(p.id);
               const isLocked   = isWeekly && !isUnlocked;
 

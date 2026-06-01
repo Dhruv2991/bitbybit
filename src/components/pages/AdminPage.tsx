@@ -271,6 +271,35 @@ function ProblemForm({
         <TagInput tags={form.tags} onChange={(t) => set("tags", t)} />
       </div>
       <div>
+        <label className="block text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">
+          Visibility
+        </label>
+        <div className="flex gap-2">
+          {([
+            { value: 'public',  label: '🌐 Public',  desc: 'Everyone on Problems page'     },
+            { value: 'arena',   label: '🏟 Arena',   desc: 'Only inside active Arena'      },
+            { value: 'weekly',  label: '🏅 Weekly',  desc: 'Locked — pay to unlock'        },
+          ] as { value: 'public'|'arena'|'weekly'; label: string; desc: string }[]).map(opt => (
+            <button key={opt.value} type="button"
+              onClick={() => set("visibility" as any, opt.value)}
+              title={opt.desc}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-mono font-bold transition-all text-center
+                ${(form as any).visibility === opt.value || (!( form as any).visibility && opt.value === 'public')
+                  ? opt.value === 'public'  ? 'bg-[#00e87a] text-black'
+                  : opt.value === 'arena'   ? 'bg-[#a78bfa] text-black'
+                  : 'bg-[#f0b429] text-black'
+                  : 'bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]'}`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-[#444] font-mono mt-1.5">
+          {(form as any).visibility === 'arena'  && 'Hidden from Problems page. Only appears inside an active Arena contest.'}
+          {(form as any).visibility === 'weekly' && 'Shown on Problems page with a 🔒 lock. Unlocked after paying in the Weekly tab.'}
+          {(!(form as any).visibility || (form as any).visibility === 'public') && 'Visible and solvable by everyone on the Problems page.'}
+        </p>
+      </div>
+      <div>
         <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
           Description * (HTML)
         </label>
@@ -434,7 +463,7 @@ function ContestForm({
     problemData: Omit<Problem, "id" | "created_at" | "updated_at">,
   ) {
     setCreatingProblem(true);
-    const payload = { ...problemData, is_contest_problem: true };
+    const payload = { ...problemData, visibility: 'arena', is_contest_problem: true };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (db.from("problems") as any)
       .insert([payload])

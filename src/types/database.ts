@@ -38,6 +38,7 @@ export interface Problem {
   submission_count: number;
 
   is_contest_problem?: boolean;
+  visibility?: 'public' | 'arena' | 'weekly';
 
   created_at: string;
   updated_at: string;
