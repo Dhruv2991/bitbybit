@@ -231,7 +231,7 @@ function WeeklyLeaderboard({ challengeId }: { challengeId: string }) {
       {rows.map((r, i) => (
         <div key={r.github} className="flex items-center gap-3 px-3 py-2 bg-[#0f0f0f] border border-[#1a1a1a] rounded-xl">
           <span className={`w-5 text-center font-mono text-xs font-bold ${i === 0 ? 'text-[#ffd700]' : i === 1 ? 'text-[#c0c0c0]' : i === 2 ? 'text-[#cd7f32]' : 'text-[#333]'}`}>{i + 1}</span>
-          <img src={`https://github.com/${r.github}.png?size=24`} className="w-6 h-6 rounded-full" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <img src={`https://github.com/${r.github}.png?size=24`} className="w-6 h-6 rounded-full" alt={r.name} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           <span className="flex-1 text-xs font-mono text-[#e0e0e0] truncate">{r.name}</span>
           <span className="text-[10px] font-mono text-[#444]">{r.solved} solved</span>
           <span className="text-sm font-mono font-bold text-[#a78bfa]">{r.total} pts</span>
