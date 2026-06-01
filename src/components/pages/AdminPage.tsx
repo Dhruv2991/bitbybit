@@ -275,28 +275,58 @@ function ProblemForm({
           Visibility
         </label>
         <div className="flex gap-2">
-          {([
-            { value: 'public',  label: '🌐 Public',  desc: 'Everyone on Problems page'     },
-            { value: 'arena',   label: '🏟 Arena',   desc: 'Only inside active Arena'      },
-            { value: 'weekly',  label: '🏅 Weekly',  desc: 'Locked — pay to unlock'        },
-          ] as { value: 'public'|'arena'|'weekly'; label: string; desc: string }[]).map(opt => (
-            <button key={opt.value} type="button"
+          {(
+            [
+              {
+                value: "public",
+                label: "🌐 Public",
+                desc: "Everyone on Problems page",
+              },
+              {
+                value: "arena",
+                label: "🏟 Arena",
+                desc: "Only inside active Arena",
+              },
+              {
+                value: "weekly",
+                label: "🏅 Weekly",
+                desc: "Locked — pay to unlock",
+              },
+            ] as {
+              value: "public" | "arena" | "weekly";
+              label: string;
+              desc: string;
+            }[]
+          ).map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
               onClick={() => set("visibility" as any, opt.value)}
               title={opt.desc}
               className={`flex-1 px-3 py-2 rounded-lg text-xs font-mono font-bold transition-all text-center
-                ${(form as any).visibility === opt.value || (!( form as any).visibility && opt.value === 'public')
-                  ? opt.value === 'public'  ? 'bg-[#00e87a] text-black'
-                  : opt.value === 'arena'   ? 'bg-[#a78bfa] text-black'
-                  : 'bg-[#f0b429] text-black'
-                  : 'bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]'}`}>
+                ${
+                  (form as any).visibility === opt.value ||
+                  (!(form as any).visibility && opt.value === "public")
+                    ? opt.value === "public"
+                      ? "bg-[#00e87a] text-black"
+                      : opt.value === "arena"
+                        ? "bg-[#a78bfa] text-black"
+                        : "bg-[#f0b429] text-black"
+                    : "bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]"
+                }`}
+            >
               {opt.label}
             </button>
           ))}
         </div>
         <p className="text-[10px] text-[#444] font-mono mt-1.5">
-          {(form as any).visibility === 'arena'  && 'Hidden from Problems page. Only appears inside an active Arena contest.'}
-          {(form as any).visibility === 'weekly' && 'Shown on Problems page with a 🔒 lock. Unlocked after paying in the Weekly tab.'}
-          {(!(form as any).visibility || (form as any).visibility === 'public') && 'Visible and solvable by everyone on the Problems page.'}
+          {(form as any).visibility === "arena" &&
+            "Hidden from Problems page. Only appears inside an active Arena contest."}
+          {(form as any).visibility === "weekly" &&
+            "Shown on Problems page with a 🔒 lock. Unlocked after paying in the Weekly tab."}
+          {(!(form as any).visibility ||
+            (form as any).visibility === "public") &&
+            "Visible and solvable by everyone on the Problems page."}
         </p>
       </div>
       <div>
@@ -463,7 +493,11 @@ function ContestForm({
     problemData: Omit<Problem, "id" | "created_at" | "updated_at">,
   ) {
     setCreatingProblem(true);
-    const payload = { ...problemData, visibility: 'arena', is_contest_problem: true };
+    const payload = {
+      ...problemData,
+      visibility: "arena",
+      is_contest_problem: true,
+    };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (db.from("problems") as any)
       .insert([payload])
@@ -717,6 +751,7 @@ interface ModalState {
     | "reject-sub"
     | "approve-arena"
     | "reject-arena"
+    | "approve-weekly"
     | "reject-reg"
     | "confirm-delete"
     | null;
@@ -901,6 +936,7 @@ export default function AdminPage({ user }: AdminPageProps) {
   const [section, setSection] = useState<Section>("overview");
   const [subs, setSubs] = useState<Submission[]>([]);
   const [arenaSubs, setArenaSubs] = useState<ArenaSubmission[]>([]);
+  const [weeklySubs, setWeeklySubs] = useState<any[]>([]);
   const [probs, setProbs] = useState<Problem[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [contests, setContests] = useState<Contest[]>([]);
@@ -947,6 +983,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     const [
       { data: s },
       { data: a },
+      { data: w },
       { data: p },
       { data: m },
       { data: c },
@@ -962,6 +999,11 @@ export default function AdminPage({ user }: AdminPageProps) {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(200),
+      db
+        .from("weekly_submissions")
+        .select("*")
+        .order("submitted_at", { ascending: false })
+        .limit(200),
       db.from("problems").select("*").order("created_at", { ascending: false }),
       db
         .from("members")
@@ -975,6 +1017,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     ]);
     setSubs(s || []);
     setArenaSubs((a as ArenaSubmission[]) || []);
+    setWeeklySubs(w || []);
     setProbs(p || []);
     setMembers(m || []);
     setContests(c || []);
@@ -1187,7 +1230,78 @@ export default function AdminPage({ user }: AdminPageProps) {
     );
     showToast(`✗ Arena rejected for @${github}: ${finalReason}`);
   }
+  async function approveWeeklySubmission(sub: any) {
+    const { data: freshWeekly } = await db
+      .from("weekly_submissions")
+      .select("status")
+      .eq("id", sub.id)
+      .maybeSingle<{ status: string }>();
 
+    if (freshWeekly?.status === "approved") {
+      showToast("Already approved.");
+      return;
+    }
+
+    const finalStr = await openModal({
+      type: "approve-weekly",
+      id: sub.id,
+      github: sub.github,
+      suggestedPoints: sub.points_awarded,
+    });
+
+    if (finalStr === null) return;
+
+    const finalPts = Math.max(0, parseInt(finalStr as string, 10) || 0);
+
+    await (db.from("weekly_submissions") as any)
+      .update({
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        points_awarded: finalPts,
+      })
+      .eq("id", sub.id);
+
+    await awardPoints(sub.github, finalPts, false, undefined, true);
+
+    setWeeklySubs((prev) =>
+      prev.map((w) =>
+        w.id === sub.id
+          ? {
+              ...w,
+              status: "approved",
+              points_awarded: finalPts,
+            }
+          : w,
+      ),
+    );
+
+    showToast(`✓ Weekly approved — ${finalPts} pts to @${sub.github}`);
+  }
+
+  async function rejectWeeklySubmission(sub: any) {
+    const reason = prompt("Reason for rejection?") || "Rejected";
+
+    await (db.from("weekly_submissions") as any)
+      .update({
+        status: "rejected",
+        review_notes: reason,
+      })
+      .eq("id", sub.id);
+
+    setWeeklySubs((prev) =>
+      prev.map((w) =>
+        w.id === sub.id
+          ? {
+              ...w,
+              status: "rejected",
+              review_notes: reason,
+            }
+          : w,
+      ),
+    );
+
+    showToast(`✗ Weekly submission rejected`);
+  }
   // ── FIX: countAsSolved param — arena passes false so problems_solved & streak stay clean ──
   async function awardPoints(
     github: string,
@@ -2224,52 +2338,69 @@ export default function AdminPage({ user }: AdminPageProps) {
 
 // Convert a Date to the value format datetime-local expects: "YYYY-MM-DDTHH:mm" in LOCAL time
 function toLocalDatetimeInput(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function blankWeekly(): Omit<WeeklyChallenge, 'id' | 'created_at'> {
-  const now   = new Date();
-  const end   = new Date(now);
+function blankWeekly(): Omit<WeeklyChallenge, "id" | "created_at"> {
+  const now = new Date();
+  const end = new Date(now);
   end.setDate(end.getDate() + 7);
   return {
-    title:       '',
-    description: '',
+    title: "",
+    description: "",
     problem_ids: [],
-    entry_fee:   49,
-    upi_id:      '',
+    entry_fee: 49,
+    upi_id: "",
     whatsapp_link: null,
-    starts_at:   toLocalDatetimeInput(now),
-    ends_at:     toLocalDatetimeInput(end),
-    status:      'upcoming',
+    starts_at: toLocalDatetimeInput(now),
+    ends_at: toLocalDatetimeInput(end),
+    status: "upcoming",
   };
 }
 
 function WeeklyAdminSection({ user }: { user: User }) {
   const db = getSupabaseClient();
 
-  const [challenges,   setChallenges]   = useState<WeeklyChallenge[]>([]);
-  const [accesses,     setAccesses]     = useState<WeeklyAccess[]>([]);
-  const [problems,     setProblems]     = useState<Problem[]>([]);
-  const [submissions,  setSubmissions]  = useState<any[]>([]);
-  const [form,         setForm]         = useState<Omit<WeeklyChallenge, 'id' | 'created_at'> | null>(null);
-  const [editId,       setEditId]       = useState<string | null>(null);
-  const [saving,       setSaving]       = useState(false);
-  const [toast,        setToast]        = useState('');
-  const [expandedId,   setExpandedId]   = useState<string | null>(null);
-  const [manageTab,    setManageTab]    = useState<Record<string, 'payments' | 'submissions'>>({});
-  const [editingPts,   setEditingPts]   = useState<Record<string, string>>({});
+  const [challenges, setChallenges] = useState<WeeklyChallenge[]>([]);
+  const [accesses, setAccesses] = useState<WeeklyAccess[]>([]);
+  const [problems, setProblems] = useState<Problem[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [form, setForm] = useState<Omit<
+    WeeklyChallenge,
+    "id" | "created_at"
+  > | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [manageTab, setManageTab] = useState<
+    Record<string, "payments" | "submissions">
+  >({});
+  const [editingPts, setEditingPts] = useState<Record<string, string>>({});
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function load() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [{ data: ch }, { data: acc }, { data: probs }, { data: subs }] = await Promise.all([
-      (db.from('weekly_challenges') as any).select('*').order('created_at', { ascending: false }),
-      (db.from('weekly_access') as any).select('*').order('created_at', { ascending: false }),
-      db.from('problems').select('id, title, difficulty, points').order('title'),
-      (db.from('weekly_submissions') as any).select('*').order('submitted_at', { ascending: false }),
-    ]);
+    const [{ data: ch }, { data: acc }, { data: probs }, { data: subs }] =
+      await Promise.all([
+        (db.from("weekly_challenges") as any)
+          .select("*")
+          .order("created_at", { ascending: false }),
+        (db.from("weekly_access") as any)
+          .select("*")
+          .order("created_at", { ascending: false }),
+        db
+          .from("problems")
+          .select("id, title, difficulty, points")
+          .order("title"),
+        (db.from("weekly_submissions") as any)
+          .select("*")
+          .order("submitted_at", { ascending: false }),
+      ]);
     setChallenges((ch || []) as WeeklyChallenge[]);
     setAccesses((acc || []) as WeeklyAccess[]);
     setProblems((probs || []) as Problem[]);
@@ -2278,7 +2409,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
   function showToast(msg: string) {
     setToast(msg);
-    setTimeout(() => setToast(''), 3500);
+    setTimeout(() => setToast(""), 3500);
   }
 
   function startCreate() {
@@ -2289,71 +2420,181 @@ function WeeklyAdminSection({ user }: { user: User }) {
   function startEdit(ch: WeeklyChallenge) {
     setEditId(ch.id);
     setForm({
-      title:       ch.title,
+      title: ch.title,
       description: ch.description,
       problem_ids: ch.problem_ids || [],
-      entry_fee:   ch.entry_fee,
-      upi_id:      ch.upi_id,
+      entry_fee: ch.entry_fee,
+      upi_id: ch.upi_id,
       whatsapp_link: ch.whatsapp_link || null,
-      starts_at:   toLocalDatetimeInput(new Date(ch.starts_at)),
-      ends_at:     toLocalDatetimeInput(new Date(ch.ends_at)),
-      status:      ch.status,
+      starts_at: toLocalDatetimeInput(new Date(ch.starts_at)),
+      ends_at: toLocalDatetimeInput(new Date(ch.ends_at)),
+      status: ch.status,
     });
   }
 
   async function saveForm() {
     if (!form) return;
-    if (!form.title.trim()) { showToast('Title required'); return; }
-    if (form.problem_ids.length === 0) { showToast('Select at least 1 problem'); return; }
-    if (!form.upi_id.trim()) { showToast('UPI ID required'); return; }
+    if (!form.title.trim()) {
+      showToast("Title required");
+      return;
+    }
+    if (form.problem_ids.length === 0) {
+      showToast("Select at least 1 problem");
+      return;
+    }
+    if (!form.upi_id.trim()) {
+      showToast("UPI ID required");
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
         ...form,
         starts_at: new Date(form.starts_at).toISOString(),
-        ends_at:   new Date(form.ends_at).toISOString(),
+        ends_at: new Date(form.ends_at).toISOString(),
       };
       if (editId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (db.from('weekly_challenges') as any)
-          .update(payload).eq('id', editId);
+        const { error } = await (db.from("weekly_challenges") as any)
+          .update(payload)
+          .eq("id", editId);
         if (error) throw error;
-        showToast('Updated ✓');
+        showToast("Updated ✓");
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (db.from('weekly_challenges') as any).insert(payload);
+        const { error } = await (db.from("weekly_challenges") as any).insert(
+          payload,
+        );
         if (error) throw error;
-        showToast('Created ✓');
+        showToast("Created ✓");
       }
-      setForm(null); setEditId(null);
+      setForm(null);
+      setEditId(null);
       load();
     } catch (e: any) {
-      showToast('Error: ' + (e.message || 'Unknown'));
-    } finally { setSaving(false); }
+      showToast("Error: " + (e.message || "Unknown"));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function deleteChallenge(id: string) {
-    if (!confirm('Delete this weekly challenge?')) return;
+    if (!confirm("Delete this weekly challenge?")) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db.from('weekly_challenges') as any).delete().eq('id', id);
+    await (db.from("weekly_challenges") as any).delete().eq("id", id);
     load();
   }
 
-  async function updateAccessStatus(id: string, status: 'confirmed' | 'rejected') {
+  async function updateAccessStatus(
+    id: string,
+    status: "confirmed" | "rejected",
+  ) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db.from('weekly_access') as any).update({ status }).eq('id', id);
+    await (db.from("weekly_access") as any).update({ status }).eq("id", id);
     load();
   }
 
   async function updatePoints(subId: string, newPts: string) {
     const pts = parseInt(newPts, 10);
-    if (isNaN(pts) || pts < 0) { showToast('Enter a valid number'); return; }
+    if (isNaN(pts) || pts < 0) {
+      showToast("Enter a valid number");
+      return;
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (db.from('weekly_submissions') as any)
-      .update({ points_awarded: pts }).eq('id', subId);
-    if (error) { showToast('Update failed'); return; }
-    setEditingPts(prev => { const n = { ...prev }; delete n[subId]; return n; });
-    showToast('Points updated ✓');
+    const { error } = await (db.from("weekly_submissions") as any)
+      .update({ points_awarded: pts })
+      .eq("id", subId);
+    if (error) {
+      showToast("Update failed");
+      return;
+    }
+    setEditingPts((prev) => {
+      const n = { ...prev };
+      delete n[subId];
+      return n;
+    });
+    showToast("Points updated ✓");
+    load();
+  }
+
+  async function approveWeeklySubmission(sub: any) {
+    if (sub.status === "approved") {
+      showToast("Already approved");
+      return;
+    }
+
+    const finalStr = prompt(
+      `Approve weekly submission for ${sub.github}`,
+      String(sub.points_awarded),
+    );
+
+    if (finalStr === null) return;
+
+    const finalPts = Math.max(0, parseInt(finalStr, 10) || 0);
+
+    const { error } = await (db.from("weekly_submissions") as any)
+      .update({
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        points_awarded: finalPts,
+      })
+      .eq("id", sub.id);
+
+    if (error) {
+      showToast("Approval failed");
+      return;
+    }
+
+    // ===== UPDATE MEMBERS TABLE =====
+
+    const { data: member } = await (db
+      .from("members") as any)
+      .select("*")
+      .eq("github", sub.github)
+      .maybeSingle();
+
+    if (member) {
+      await (db
+        .from("members")as any)
+        .update({
+          total_points: (member.total_points || 0) + finalPts,
+          problems_solved: (member.problems_solved || 0) + 1,
+          last_solved_at: new Date().toISOString(),
+        })
+        .eq("github", sub.github);
+    } else {
+      await (db.from("members") as any).insert({
+        github: sub.github,
+        name: sub.name,
+        total_points: finalPts,
+        problems_solved: 1,
+        streak: 1,
+        last_solved_at: new Date().toISOString(),
+      });
+    }
+
+    showToast(`Approved ${sub.github} (${finalPts} pts)`);
+
+    load();
+  }
+
+  async function rejectWeeklySubmission(sub: any) {
+    const reason = prompt("Reason for rejection?") || "Rejected";
+
+    const { error } = await (db.from("weekly_submissions") as any)
+      .update({
+        status: "rejected",
+        review_notes: reason,
+      })
+      .eq("id", sub.id);
+
+    if (error) {
+      showToast("Reject failed");
+      return;
+    }
+
+    showToast(`Rejected ${sub.github}`);
+
     load();
   }
 
@@ -2361,7 +2602,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
     if (!form) return;
     const ids = form.problem_ids;
     if (ids.includes(id)) {
-      setForm({ ...form, problem_ids: ids.filter(x => x !== id) });
+      setForm({ ...form, problem_ids: ids.filter((x) => x !== id) });
     } else {
       setForm({ ...form, problem_ids: [...ids, id] });
     }
@@ -2378,12 +2619,18 @@ function WeeklyAdminSection({ user }: { user: User }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-mono font-bold text-[#e0e0e0] text-base">Weekly Challenge</h2>
-          <p className="text-[10px] text-[#444] font-mono mt-0.5">Create paid weekly problem sets with time-bonus scoring.</p>
+          <h2 className="font-mono font-bold text-[#e0e0e0] text-base">
+            Weekly Challenge
+          </h2>
+          <p className="text-[10px] text-[#444] font-mono mt-0.5">
+            Create paid weekly problem sets with time-bonus scoring.
+          </p>
         </div>
         {!form && (
-          <button onClick={startCreate}
-            className="px-4 py-2 bg-[#00e87a20] text-[#00e87a] font-mono text-sm rounded-xl hover:bg-[#00e87a30] transition-all">
+          <button
+            onClick={startCreate}
+            className="px-4 py-2 bg-[#00e87a20] text-[#00e87a] font-mono text-sm rounded-xl hover:bg-[#00e87a30] transition-all"
+          >
             + New Challenge
           </button>
         )}
@@ -2392,57 +2639,114 @@ function WeeklyAdminSection({ user }: { user: User }) {
       {/* Form */}
       {form && (
         <div className="bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl p-5 space-y-4">
-          <h3 className="font-mono font-bold text-[#e0e0e0] text-sm">{editId ? 'Edit' : 'New'} Weekly Challenge</h3>
+          <h3 className="font-mono font-bold text-[#e0e0e0] text-sm">
+            {editId ? "Edit" : "New"} Weekly Challenge
+          </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">Title *</label>
-              <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
+              <label className="text-[10px] text-[#444] font-mono uppercase">
+                Title *
+              </label>
+              <input
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
                 placeholder="e.g. Week 1 — Arrays"
-                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]" />
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
+              />
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">Entry Fee (₹) *</label>
-              <input type="number" value={form.entry_fee} onChange={e => setForm({ ...form, entry_fee: +e.target.value })}
-                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]" />
+              <label className="text-[10px] text-[#444] font-mono uppercase">
+                Entry Fee (₹) *
+              </label>
+              <input
+                type="number"
+                value={form.entry_fee}
+                onChange={(e) =>
+                  setForm({ ...form, entry_fee: +e.target.value })
+                }
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+              />
             </div>
             <div className="md:col-span-2">
-              <label className="text-[10px] text-[#444] font-mono uppercase">Description</label>
-              <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
+              <label className="text-[10px] text-[#444] font-mono uppercase">
+                Description
+              </label>
+              <input
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
                 placeholder="Brief description shown to users"
-                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]" />
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
+              />
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">UPI ID *</label>
-              <input value={form.upi_id} onChange={e => setForm({ ...form, upi_id: e.target.value })}
+              <label className="text-[10px] text-[#444] font-mono uppercase">
+                UPI ID *
+              </label>
+              <input
+                value={form.upi_id}
+                onChange={(e) => setForm({ ...form, upi_id: e.target.value })}
                 placeholder="yourname@upi"
-                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]" />
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
+              />
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">WhatsApp Group Link</label>
-              <input value={(form as any).whatsapp_link || ''} onChange={e => setForm({ ...form, whatsapp_link: e.target.value } as any)}
+              <label className="text-[10px] text-[#444] font-mono uppercase">
+                WhatsApp Group Link
+              </label>
+              <input
+                value={(form as any).whatsapp_link || ""}
+                onChange={(e) =>
+                  setForm({ ...form, whatsapp_link: e.target.value } as any)
+                }
                 placeholder="https://chat.whatsapp.com/..."
-                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]" />
-              <p className="text-[10px] text-[#444] font-mono mt-1">Shown to users only after payment is confirmed.</p>
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
+              />
+              <p className="text-[10px] text-[#444] font-mono mt-1">
+                Shown to users only after payment is confirmed.
+              </p>
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">Status</label>
-              <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as any })}
-                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none">
+              <label className="text-[10px] text-[#444] font-mono uppercase">
+                Status
+              </label>
+              <select
+                value={form.status}
+                onChange={(e) =>
+                  setForm({ ...form, status: e.target.value as any })
+                }
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none"
+              >
                 <option value="upcoming">Upcoming</option>
                 <option value="active">Active</option>
                 <option value="ended">Ended</option>
               </select>
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">Starts At</label>
-              <input type="datetime-local" value={form.starts_at} onChange={e => setForm({ ...form, starts_at: e.target.value })}
-                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none" />
+              <label className="text-[10px] text-[#444] font-mono uppercase">
+                Starts At
+              </label>
+              <input
+                type="datetime-local"
+                value={form.starts_at}
+                onChange={(e) =>
+                  setForm({ ...form, starts_at: e.target.value })
+                }
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none"
+              />
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">Ends At</label>
-              <input type="datetime-local" value={form.ends_at} onChange={e => setForm({ ...form, ends_at: e.target.value })}
-                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none" />
+              <label className="text-[10px] text-[#444] font-mono uppercase">
+                Ends At
+              </label>
+              <input
+                type="datetime-local"
+                value={form.ends_at}
+                onChange={(e) => setForm({ ...form, ends_at: e.target.value })}
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none"
+              />
             </div>
           </div>
 
@@ -2452,16 +2756,24 @@ function WeeklyAdminSection({ user }: { user: User }) {
               Problems — {form.problem_ids.length} selected
             </label>
             <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-1">
-              {problems.map(p => {
+              {problems.map((p) => {
                 const selected = form.problem_ids.includes(p.id);
                 return (
-                  <button key={p.id} onClick={() => toggleProblem(p.id)}
+                  <button
+                    key={p.id}
+                    onClick={() => toggleProblem(p.id)}
                     className={`text-left px-3 py-2 rounded-xl border text-xs font-mono transition-all
-                      ${selected
-                        ? 'border-[#00e87a40] bg-[#00e87a10] text-[#00e87a]'
-                        : 'border-[#1f1f1f] text-[#888] hover:border-[#2a2a2a] hover:text-[#e0e0e0]'}`}>
-                    {selected ? '✓ ' : '  '}{p.title}
-                    <span className={`ml-2 text-[10px] ${p.difficulty === 'Easy' ? 'text-[#00e87a]' : p.difficulty === 'Medium' ? 'text-[#f0b429]' : 'text-[#ff4d4d]'}`}>
+                      ${
+                        selected
+                          ? "border-[#00e87a40] bg-[#00e87a10] text-[#00e87a]"
+                          : "border-[#1f1f1f] text-[#888] hover:border-[#2a2a2a] hover:text-[#e0e0e0]"
+                      }`}
+                  >
+                    {selected ? "✓ " : "  "}
+                    {p.title}
+                    <span
+                      className={`ml-2 text-[10px] ${p.difficulty === "Easy" ? "text-[#00e87a]" : p.difficulty === "Medium" ? "text-[#f0b429]" : "text-[#ff4d4d]"}`}
+                    >
                       {p.difficulty}
                     </span>
                     <span className="ml-1 text-[#a78bfa]">{p.points}pt</span>
@@ -2472,13 +2784,25 @@ function WeeklyAdminSection({ user }: { user: User }) {
           </div>
 
           <div className="flex gap-2 pt-1">
-            <button onClick={() => { setForm(null); setEditId(null); }}
-              className="flex-1 py-2 bg-[#1a1a1a] text-[#666] font-mono text-sm rounded-xl hover:text-[#e0e0e0]">
+            <button
+              onClick={() => {
+                setForm(null);
+                setEditId(null);
+              }}
+              className="flex-1 py-2 bg-[#1a1a1a] text-[#666] font-mono text-sm rounded-xl hover:text-[#e0e0e0]"
+            >
               Cancel
             </button>
-            <button onClick={saveForm} disabled={saving}
-              className="flex-1 py-2 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] disabled:opacity-50">
-              {saving ? 'Saving…' : editId ? 'Save Changes' : 'Create Challenge'}
+            <button
+              onClick={saveForm}
+              disabled={saving}
+              className="flex-1 py-2 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] disabled:opacity-50"
+            >
+              {saving
+                ? "Saving…"
+                : editId
+                  ? "Save Changes"
+                  : "Create Challenge"}
             </button>
           </div>
         </div>
@@ -2486,46 +2810,67 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
       {/* Challenges list */}
       {challenges.length === 0 && !form && (
-        <div className="text-center py-12 text-[#444] font-mono text-sm">No weekly challenges yet.</div>
+        <div className="text-center py-12 text-[#444] font-mono text-sm">
+          No weekly challenges yet.
+        </div>
       )}
 
       <div className="space-y-4">
-        {challenges.map(ch => {
-          const chAccesses = accesses.filter(a => a.weekly_challenge_id === ch.id);
-          const pending    = chAccesses.filter(a => a.status === 'pending');
-          const confirmed  = chAccesses.filter(a => a.status === 'confirmed');
-          const isOpen     = expandedId === ch.id;
+        {challenges.map((ch) => {
+          const chAccesses = accesses.filter(
+            (a) => a.weekly_challenge_id === ch.id,
+          );
+          const pending = chAccesses.filter((a) => a.status === "pending");
+          const confirmed = chAccesses.filter((a) => a.status === "confirmed");
+          const isOpen = expandedId === ch.id;
 
           return (
-            <div key={ch.id} className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-2xl overflow-hidden">
+            <div
+              key={ch.id}
+              className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-2xl overflow-hidden"
+            >
               <div className="px-5 py-4 flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono font-bold text-[#e0e0e0] text-sm">{ch.title}</span>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${ch.status === 'active' ? 'bg-[#00e87a15] text-[#00e87a]' : ch.status === 'upcoming' ? 'bg-[#f0b42915] text-[#f0b429]' : 'bg-[#ff4d4d15] text-[#ff4d4d]'}`}>
+                    <span className="font-mono font-bold text-[#e0e0e0] text-sm">
+                      {ch.title}
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${ch.status === "active" ? "bg-[#00e87a15] text-[#00e87a]" : ch.status === "upcoming" ? "bg-[#f0b42915] text-[#f0b429]" : "bg-[#ff4d4d15] text-[#ff4d4d]"}`}
+                    >
                       {ch.status.toUpperCase()}
                     </span>
                     {pending.length > 0 && (
                       <span className="text-[10px] font-mono bg-[#ff4d4d20] text-[#ff4d4d] px-2 py-0.5 rounded-lg">
-                        {pending.length} pending payment{pending.length > 1 ? 's' : ''}
+                        {pending.length} pending payment
+                        {pending.length > 1 ? "s" : ""}
                       </span>
                     )}
                   </div>
                   <p className="text-[10px] text-[#444] font-mono mt-1">
-                    ₹{ch.entry_fee} · {new Date(ch.starts_at).toLocaleDateString()} – {new Date(ch.ends_at).toLocaleDateString()} · {confirmed.length} confirmed
+                    ₹{ch.entry_fee} ·{" "}
+                    {new Date(ch.starts_at).toLocaleDateString()} –{" "}
+                    {new Date(ch.ends_at).toLocaleDateString()} ·{" "}
+                    {confirmed.length} confirmed
                   </p>
                 </div>
                 <div className="flex gap-2 items-center">
-                  <button onClick={() => setExpandedId(isOpen ? null : ch.id)}
-                    className="text-xs font-mono text-[#555] hover:text-[#e0e0e0] px-3 py-1.5 bg-[#1a1a1a] rounded-lg">
-                    {isOpen ? 'Collapse' : 'Manage'}
+                  <button
+                    onClick={() => setExpandedId(isOpen ? null : ch.id)}
+                    className="text-xs font-mono text-[#555] hover:text-[#e0e0e0] px-3 py-1.5 bg-[#1a1a1a] rounded-lg"
+                  >
+                    {isOpen ? "Collapse" : "Manage"}
                   </button>
-                  <button onClick={() => startEdit(ch)}
-                    className="text-xs font-mono text-[#a78bfa] hover:text-[#c4b5fd] px-3 py-1.5 bg-[#a78bfa15] rounded-lg">
+                  <button
+                    onClick={() => startEdit(ch)}
+                    className="text-xs font-mono text-[#a78bfa] hover:text-[#c4b5fd] px-3 py-1.5 bg-[#a78bfa15] rounded-lg"
+                  >
                     Edit
                   </button>
-                  <button onClick={() => deleteChallenge(ch.id)}
-                    className="text-xs font-mono text-[#ff4d4d] px-3 py-1.5 bg-[#ff4d4d15] rounded-lg hover:bg-[#ff4d4d25]">
+                  <button
+                    onClick={() => deleteChallenge(ch.id)}
+                    className="text-xs font-mono text-[#ff4d4d] px-3 py-1.5 bg-[#ff4d4d15] rounded-lg hover:bg-[#ff4d4d25]"
+                  >
                     Del
                   </button>
                 </div>
@@ -2533,45 +2878,78 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
               {isOpen && (
                 <div className="border-t border-[#1a1a1a] px-5 py-4">
-
                   {/* Sub-tabs */}
                   <div className="flex gap-1 mb-4">
-                    {(['payments', 'submissions'] as const).map(t => (
-                      <button key={t} onClick={() => setManageTab(prev => ({ ...prev, [ch.id]: t }))}
+                    {(["payments", "submissions"] as const).map((t) => (
+                      <button
+                        key={t}
+                        onClick={() =>
+                          setManageTab((prev) => ({ ...prev, [ch.id]: t }))
+                        }
                         className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all capitalize
-                          ${(manageTab[ch.id] || 'payments') === t
-                            ? 'bg-[#00e87a] text-black font-bold'
-                            : 'bg-[#1a1a1a] text-[#555] hover:text-[#e0e0e0]'}`}>
-                        {t === 'payments'
+                          ${
+                            (manageTab[ch.id] || "payments") === t
+                              ? "bg-[#00e87a] text-black font-bold"
+                              : "bg-[#1a1a1a] text-[#555] hover:text-[#e0e0e0]"
+                          }`}
+                      >
+                        {t === "payments"
                           ? `Payments (${chAccesses.length})`
-                          : `Submissions (${submissions.filter(s => s.weekly_challenge_id === ch.id).length})`}
+                          : `Submissions (${submissions.filter((s) => s.weekly_challenge_id === ch.id).length})`}
                       </button>
                     ))}
                   </div>
 
                   {/* Payments tab */}
-                  {(manageTab[ch.id] || 'payments') === 'payments' && (
+                  {(manageTab[ch.id] || "payments") === "payments" && (
                     <>
                       {chAccesses.length === 0 ? (
-                        <p className="text-xs text-[#333] font-mono">No payment submissions yet.</p>
+                        <p className="text-xs text-[#333] font-mono">
+                          No payment submissions yet.
+                        </p>
                       ) : (
                         <div className="space-y-2">
-                          {chAccesses.map(a => (
-                            <div key={a.id} className="flex items-center gap-3 flex-wrap px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl">
-                              <img src={`https://github.com/${a.github}.png?size=24`} className="w-6 h-6 rounded-full" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                              <span className="text-xs font-mono text-[#e0e0e0] flex-1 min-w-0 truncate">{a.name} <span className="text-[#444]">@{a.github}</span></span>
-                              <span className="text-[10px] font-mono text-[#555]">Txn: {a.txn_id || '—'}</span>
-                              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${a.status === 'confirmed' ? 'bg-[#00e87a15] text-[#00e87a]' : a.status === 'pending' ? 'bg-[#f0b42915] text-[#f0b429]' : 'bg-[#ff4d4d15] text-[#ff4d4d]'}`}>
+                          {chAccesses.map((a) => (
+                            <div
+                              key={a.id}
+                              className="flex items-center gap-3 flex-wrap px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl"
+                            >
+                              <img
+                                src={`https://github.com/${a.github}.png?size=24`}
+                                className="w-6 h-6 rounded-full"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display =
+                                    "none";
+                                }}
+                              />
+                              <span className="text-xs font-mono text-[#e0e0e0] flex-1 min-w-0 truncate">
+                                {a.name}{" "}
+                                <span className="text-[#444]">@{a.github}</span>
+                              </span>
+                              <span className="text-[10px] font-mono text-[#555]">
+                                Txn: {a.txn_id || "—"}
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${a.status === "confirmed" ? "bg-[#00e87a15] text-[#00e87a]" : a.status === "pending" ? "bg-[#f0b42915] text-[#f0b429]" : "bg-[#ff4d4d15] text-[#ff4d4d]"}`}
+                              >
                                 {a.status}
                               </span>
-                              {a.status === 'pending' && (
+                              {a.status === "pending" && (
                                 <div className="flex gap-1.5">
-                                  <button onClick={() => updateAccessStatus(a.id, 'confirmed')}
-                                    className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]">
+                                  <button
+                                    onClick={() =>
+                                      updateAccessStatus(a.id, "confirmed")
+                                    }
+                                    className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
+                                  >
                                     Confirm
                                   </button>
-                                  <button onClick={() => updateAccessStatus(a.id, 'rejected')}
-                                    className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-1 rounded-lg hover:bg-[#ff4d4d25]">
+                                  <button
+                                    onClick={() =>
+                                      updateAccessStatus(a.id, "rejected")
+                                    }
+                                    className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-1 rounded-lg hover:bg-[#ff4d4d25]"
+                                  >
                                     Reject
                                   </button>
                                 </div>
@@ -2584,77 +2962,172 @@ function WeeklyAdminSection({ user }: { user: User }) {
                   )}
 
                   {/* Submissions tab */}
-                  {manageTab[ch.id] === 'submissions' && (() => {
-                    const chSubs = submissions.filter(s => s.weekly_challenge_id === ch.id);
-                    return chSubs.length === 0 ? (
-                      <p className="text-xs text-[#333] font-mono">No submissions yet.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {/* Header */}
-                        <div className="hidden sm:grid grid-cols-[1fr_6rem_4rem_4rem_5rem_6rem] gap-3 px-3 py-1
-                          text-[10px] text-[#333] font-mono uppercase tracking-widest border-b border-[#1a1a1a]">
-                          <div>User / Problem</div>
-                          <div>Lang</div>
-                          <div>Tests</div>
-                          <div>When</div>
-                          <div className="text-center">Points</div>
-                          <div className="text-center">Override</div>
-                        </div>
-                        {chSubs.map((s: any) => {
-                          const isEditing = editingPts[s.id] !== undefined;
-                          const daysSince = Math.floor((Date.now() - new Date(s.submitted_at).getTime()) / 86400000);
-                          return (
-                            <div key={s.id} className="grid grid-cols-1 sm:grid-cols-[1fr_6rem_4rem_4rem_5rem_6rem] gap-3 items-center px-3 py-2.5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <img src={`https://github.com/${s.github}.png?size=16`} className="w-4 h-4 rounded-full shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                                  <span className="text-xs font-mono text-[#e0e0e0] truncate">{s.name}</span>
-                                  <span className="text-[10px] font-mono text-[#444] truncate">@{s.github}</span>
+                  {manageTab[ch.id] === "submissions" &&
+                    (() => {
+                      const chSubs = submissions.filter(
+                        (s) => s.weekly_challenge_id === ch.id,
+                      );
+                      return chSubs.length === 0 ? (
+                        <p className="text-xs text-[#333] font-mono">
+                          No submissions yet.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {/* Header */}
+                          <div
+                            className="hidden sm:grid grid-cols-[1fr_6rem_4rem_4rem_5rem_6rem] gap-3 px-3 py-1
+                          text-[10px] text-[#333] font-mono uppercase tracking-widest border-b border-[#1a1a1a]"
+                          >
+                            <div>User / Problem</div>
+                            <div>Lang</div>
+                            <div>Tests</div>
+                            <div>When</div>
+                            <div className="text-center">Points</div>
+                            <div className="text-center">Override</div>
+                          </div>
+                          {chSubs.map((s: any) => {
+                            const isEditing = editingPts[s.id] !== undefined;
+                            const daysSince = Math.floor(
+                              (Date.now() -
+                                new Date(s.submitted_at).getTime()) /
+                                86400000,
+                            );
+                            return (
+                              <div
+                                key={s.id}
+                                className="grid grid-cols-1 sm:grid-cols-[1fr_6rem_4rem_4rem_5rem_6rem] gap-3 items-center px-3 py-2.5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl"
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <img
+                                      src={`https://github.com/${s.github}.png?size=16`}
+                                      className="w-4 h-4 rounded-full shrink-0"
+                                      onError={(e) => {
+                                        (
+                                          e.target as HTMLImageElement
+                                        ).style.display = "none";
+                                      }}
+                                    />
+                                    <span className="text-xs font-mono text-[#e0e0e0] truncate">
+                                      {s.name}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-[#444] truncate">
+                                      @{s.github}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] font-mono text-[#555] mt-0.5 truncate">
+                                    {s.problem_title}
+                                  </div>
                                 </div>
-                                <div className="text-[10px] font-mono text-[#555] mt-0.5 truncate">{s.problem_title}</div>
+                                <div className="text-[10px] font-mono text-[#555]">
+                                  {s.lang}
+                                </div>
+                                <div className="text-[10px] font-mono text-[#888]">
+                                  {s.tests_passed}/{s.tests_total}
+                                </div>
+                                <div className="text-[10px] font-mono text-[#444]">
+                                  Day {daysSince + 1}
+                                </div>
+                                <div className="text-center">
+                                  {isEditing ? (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={editingPts[s.id]}
+                                      onChange={(e) =>
+                                        setEditingPts((prev) => ({
+                                          ...prev,
+                                          [s.id]: e.target.value,
+                                        }))
+                                      }
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter")
+                                          updatePoints(s.id, editingPts[s.id]);
+                                        if (e.key === "Escape")
+                                          setEditingPts((prev) => {
+                                            const n = { ...prev };
+                                            delete n[s.id];
+                                            return n;
+                                          });
+                                      }}
+                                      className="w-16 bg-[#111] border border-[#00e87a40] rounded-lg px-2 py-1 text-xs font-mono text-[#00e87a] text-center focus:outline-none"
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <span className="text-sm font-mono font-bold text-[#a78bfa]">
+                                      {s.points_awarded}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex justify-center gap-1 flex-wrap">
+                                  {isEditing ? (
+                                    <>
+                                      <button
+                                        onClick={() =>
+                                          updatePoints(s.id, editingPts[s.id])
+                                        }
+                                        className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
+                                      >
+                                        Save
+                                      </button>
+
+                                      <button
+                                        onClick={() =>
+                                          setEditingPts((prev) => {
+                                            const n = { ...prev };
+                                            delete n[s.id];
+                                            return n;
+                                          })
+                                        }
+                                        className="text-[10px] font-mono text-[#555] bg-[#1a1a1a] px-2 py-1 rounded-lg hover:text-[#e0e0e0]"
+                                      >
+                                        ✕
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      {s.status === "pending" && (
+                                        <>
+                                          <button
+                                            onClick={() =>
+                                              approveWeeklySubmission(s)
+                                            }
+                                            className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
+                                          >
+                                            Approve
+                                          </button>
+
+                                          <button
+                                            onClick={() =>
+                                              rejectWeeklySubmission(s)
+                                            }
+                                            className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-1 rounded-lg hover:bg-[#ff4d4d25]"
+                                          >
+                                            Reject
+                                          </button>
+                                        </>
+                                      )}
+
+                                      <button
+                                        onClick={() =>
+                                          setEditingPts((prev) => ({
+                                            ...prev,
+                                            [s.id]: String(s.points_awarded),
+                                          }))
+                                        }
+                                        className="text-[10px] font-mono text-[#a78bfa] bg-[#a78bfa15] px-2 py-1 rounded-lg hover:bg-[#a78bfa25]"
+                                      >
+                                        Edit pts
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-[10px] font-mono text-[#555]">{s.lang}</div>
-                              <div className="text-[10px] font-mono text-[#888]">{s.tests_passed}/{s.tests_total}</div>
-                              <div className="text-[10px] font-mono text-[#444]">Day {daysSince + 1}</div>
-                              <div className="text-center">
-                                {isEditing ? (
-                                  <input
-                                    type="number" min="0"
-                                    value={editingPts[s.id]}
-                                    onChange={e => setEditingPts(prev => ({ ...prev, [s.id]: e.target.value }))}
-                                    onKeyDown={e => { if (e.key === 'Enter') updatePoints(s.id, editingPts[s.id]); if (e.key === 'Escape') setEditingPts(prev => { const n = { ...prev }; delete n[s.id]; return n; }); }}
-                                    className="w-16 bg-[#111] border border-[#00e87a40] rounded-lg px-2 py-1 text-xs font-mono text-[#00e87a] text-center focus:outline-none"
-                                    autoFocus
-                                  />
-                                ) : (
-                                  <span className="text-sm font-mono font-bold text-[#a78bfa]">{s.points_awarded}</span>
-                                )}
-                              </div>
-                              <div className="flex justify-center gap-1">
-                                {isEditing ? (
-                                  <>
-                                    <button onClick={() => updatePoints(s.id, editingPts[s.id])}
-                                      className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]">
-                                      Save
-                                    </button>
-                                    <button onClick={() => setEditingPts(prev => { const n = { ...prev }; delete n[s.id]; return n; })}
-                                      className="text-[10px] font-mono text-[#555] bg-[#1a1a1a] px-2 py-1 rounded-lg hover:text-[#e0e0e0]">
-                                      ✕
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button onClick={() => setEditingPts(prev => ({ ...prev, [s.id]: String(s.points_awarded) }))}
-                                    className="text-[10px] font-mono text-[#a78bfa] bg-[#a78bfa15] px-2 py-1 rounded-lg hover:bg-[#a78bfa25]">
-                                    Edit pts
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                 </div>
               )}
             </div>
