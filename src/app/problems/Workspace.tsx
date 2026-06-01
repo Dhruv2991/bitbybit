@@ -165,6 +165,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
       // ── Weekly mode — skip submissions table entirely ────────
       if (isWeekly) {
         onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded });
+        setSubmitBlocked(true);
         setStatusMsg(`✅ Submitted — ${passed}/${total} tests, ${pointsAwarded} base pts`);
         showToast(
           `✅ "${problem.title}" — ${passed}/${total} tests passed, ${pointsAwarded} base pts (×time bonus)`,
