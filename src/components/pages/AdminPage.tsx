@@ -2273,7 +2273,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
   async function saveForm() {
     if (!form) return;
     if (!form.title.trim()) { showToast('Title required'); return; }
-    if (form.problem_ids.length !== 3) { showToast('Select exactly 3 problems'); return; }
+    if (form.problem_ids.length === 0) { showToast('Select at least 1 problem'); return; }
     if (!form.upi_id.trim()) { showToast('UPI ID required'); return; }
     setSaving(true);
     try {
@@ -2331,7 +2331,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
     const ids = form.problem_ids;
     if (ids.includes(id)) {
       setForm({ ...form, problem_ids: ids.filter(x => x !== id) });
-    } else if (ids.length < 3) {
+    } else {
       setForm({ ...form, problem_ids: [...ids, id] });
     }
   }
@@ -2408,10 +2408,10 @@ function WeeklyAdminSection({ user }: { user: User }) {
             </div>
           </div>
 
-          {/* Problem picker — exactly 3 */}
+          {/* Problem picker */}
           <div>
             <label className="text-[10px] text-[#444] font-mono uppercase">
-              Problems (select exactly 3) — {form.problem_ids.length}/3 selected
+              Problems — {form.problem_ids.length} selected
             </label>
             <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-1">
               {problems.map(p => {
@@ -2421,8 +2421,6 @@ function WeeklyAdminSection({ user }: { user: User }) {
                     className={`text-left px-3 py-2 rounded-xl border text-xs font-mono transition-all
                       ${selected
                         ? 'border-[#00e87a40] bg-[#00e87a10] text-[#00e87a]'
-                        : form.problem_ids.length >= 3
-                        ? 'border-[#1a1a1a] text-[#333] cursor-not-allowed opacity-40'
                         : 'border-[#1f1f1f] text-[#888] hover:border-[#2a2a2a] hover:text-[#e0e0e0]'}`}>
                     {selected ? '✓ ' : '  '}{p.title}
                     <span className={`ml-2 text-[10px] ${p.difficulty === 'Easy' ? 'text-[#00e87a]' : p.difficulty === 'Medium' ? 'text-[#f0b429]' : 'text-[#ff4d4d]'}`}>

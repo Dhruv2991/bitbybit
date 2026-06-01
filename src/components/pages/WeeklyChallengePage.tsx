@@ -448,7 +448,7 @@ export default function WeeklyChallengePage({ user }: Props) {
 
                 {/* Problems list */}
                 <div className="px-5 py-4">
-                  <p className="text-[10px] text-[#444] font-mono uppercase tracking-widest mb-3">Problems (3)</p>
+                  <p className="text-[10px] text-[#444] font-mono uppercase tracking-widest mb-3">Problems ({chProblems.length})</p>
                   <div className="space-y-2">
                     {chProblems.length === 0 && (
                       <p className="text-xs text-[#333] font-mono">Problems not yet loaded.</p>
@@ -529,7 +529,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                     <button
                       onClick={() => setPayTarget(ch)}
                       className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] transition-all shadow-[0_0_16px_rgba(0,232,122,0.15)] active:scale-[0.99]">
-                      {isUpcoming ? `Unlock early for ₹${ch.entry_fee} →` : `Unlock for ₹${ch.entry_fee} →`}
+                      {isUpcoming ? `Unlock for ₹${ch.entry_fee} →` : `Unlock for ₹${ch.entry_fee} →`}
                     </button>
                   ) : null}
 
