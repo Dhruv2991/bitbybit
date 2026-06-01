@@ -373,7 +373,7 @@ export default function WeeklyChallengePage({ user }: Props) {
           Weekly Challenge <span className="text-[#f0b429]">🏅</span>
         </h1>
         <p className="text-[#444] text-xs font-mono">
-          3 new problems every week. Pay once, solve all week. Earn more points by solving earlier!
+          5 new problems every week. Pay once, solve all problems. Earn more points by solving earlier!
         </p>
       </div>
 
