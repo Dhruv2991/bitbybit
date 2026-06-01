@@ -22,9 +22,9 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   const [weeklyIds,      setWeeklyIds]      = useState<Set<string>>(new Set());
   const [lockedToast,       setLockedToast]       = useState(false);
   const [notStartedToast,   setNotStartedToast]   = useState<string>('');
-  // Paid access: set of problem IDs the user has confirmed weekly access for
   const [unlockedIds,       setUnlockedIds]       = useState<Set<string>>(new Set());
   const [paidNotStartedIds, setPaidNotStartedIds] = useState<Set<string>>(new Set());
+  const [paidEndedIds,      setPaidEndedIds]      = useState<Set<string>>(new Set());
 
   useEffect(() => {
     try { setSolved(JSON.parse(localStorage.getItem('bb_solved') || '[]')); } catch {}
@@ -63,7 +63,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         // Load weekly challenge problem IDs that are currently active or upcoming
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: challenges } = await (db.from('weekly_challenges') as any)
-          .select('id, problem_ids, starts_at')
+          .select('id, problem_ids, starts_at, ends_at')
           .neq('status', 'ended')
           .order('created_at', { ascending: false });
 
@@ -86,21 +86,25 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           if (access?.length) {
             const confirmedChallengeIds = new Set((access as any[]).map(a => a.weekly_challenge_id));
             const now = Date.now();
-            const unlocked      = new Set<string>();
+            const unlocked       = new Set<string>();
             const paidNotStarted = new Set<string>();
+            const paidEnded      = new Set<string>();
             (challenges || []).forEach((ch: any) => {
-              // Only unlock if confirmed AND start time has passed
               const started = new Date(ch.starts_at).getTime() <= now;
+              const ended   = new Date(ch.ends_at).getTime()   <  now;
               if (confirmedChallengeIds.has(ch.id)) {
-                if (started) {
+                if (started && !ended) {
                   (ch.problem_ids || []).forEach((id: string) => unlocked.add(id));
-                } else {
+                } else if (!started) {
                   (ch.problem_ids || []).forEach((id: string) => paidNotStarted.add(id));
+                } else if (ended) {
+                  (ch.problem_ids || []).forEach((id: string) => paidEnded.add(id));
                 }
               }
             });
             setUnlockedIds(unlocked);
             setPaidNotStartedIds(paidNotStarted);
+            setPaidEndedIds(paidEnded);
           }
         }
       } catch {
@@ -136,14 +140,17 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     const isWeekly      = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
     const isUnlocked    = unlockedIds.has(p.id);
     const isPaidWaiting = paidNotStartedIds.has(p.id);
+    const isPaidEnded   = paidEndedIds.has(p.id);
     if (isWeekly && !isUnlocked) {
-      if (isPaidWaiting) {
+      if (isPaidEnded) {
+        setNotStartedToast('This weekly challenge has ended.');
+      } else if (isPaidWaiting) {
         setNotStartedToast('Challenge hasn\'t started yet — come back when it does!');
-        setTimeout(() => setNotStartedToast(''), 3500);
       } else {
         setLockedToast(true);
         setTimeout(() => setLockedToast(false), 3500);
       }
+      if (isPaidEnded || isPaidWaiting) setTimeout(() => setNotStartedToast(''), 3500);
       return;
     }
     setSelected(p);
