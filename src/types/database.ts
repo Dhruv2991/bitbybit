@@ -482,6 +482,7 @@ export interface WeeklyChallenge {
   // Payment details
   entry_fee: number;
   upi_id:    string;
+  whatsapp_link: string | null;
 
   // Week window
   starts_at: string;

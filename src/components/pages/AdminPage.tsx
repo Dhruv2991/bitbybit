@@ -2238,6 +2238,7 @@ function blankWeekly(): Omit<WeeklyChallenge, 'id' | 'created_at'> {
     problem_ids: [],
     entry_fee:   49,
     upi_id:      '',
+    whatsapp_link: null,
     starts_at:   toLocalDatetimeInput(now),
     ends_at:     toLocalDatetimeInput(end),
     status:      'upcoming',
@@ -2293,6 +2294,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
       problem_ids: ch.problem_ids || [],
       entry_fee:   ch.entry_fee,
       upi_id:      ch.upi_id,
+      whatsapp_link: ch.whatsapp_link || null,
       starts_at:   toLocalDatetimeInput(new Date(ch.starts_at)),
       ends_at:     toLocalDatetimeInput(new Date(ch.ends_at)),
       status:      ch.status,
@@ -2415,6 +2417,13 @@ function WeeklyAdminSection({ user }: { user: User }) {
               <input value={form.upi_id} onChange={e => setForm({ ...form, upi_id: e.target.value })}
                 placeholder="yourname@upi"
                 className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]" />
+            </div>
+            <div>
+              <label className="text-[10px] text-[#444] font-mono uppercase">WhatsApp Group Link</label>
+              <input value={(form as any).whatsapp_link || ''} onChange={e => setForm({ ...form, whatsapp_link: e.target.value } as any)}
+                placeholder="https://chat.whatsapp.com/..."
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]" />
+              <p className="text-[10px] text-[#444] font-mono mt-1">Shown to users only after payment is confirmed.</p>
             </div>
             <div>
               <label className="text-[10px] text-[#444] font-mono uppercase">Status</label>

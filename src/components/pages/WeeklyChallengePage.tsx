@@ -190,7 +190,13 @@ function PayModal({
             <div className="text-3xl mb-3">⏳</div>
             <p className="text-sm font-mono text-[#f0b429] font-bold mb-1">Payment Submitted</p>
             <p className="text-xs font-mono text-[#555]">Admin will verify and grant access shortly.</p>
-            <button onClick={onClose} className="mt-4 px-6 py-2 bg-[#1a1a1a] text-[#888] font-mono text-sm rounded-lg hover:text-[#e0e0e0]">Close</button>
+            {challenge.whatsapp_link && (
+              <a href={challenge.whatsapp_link} target="_blank" rel="noopener noreferrer"
+                className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-[#25D366] text-white font-mono font-bold text-sm rounded-lg hover:bg-[#22c55e] transition-all">
+                <span>💬</span> Join WhatsApp Group
+              </a>
+            )}
+            <button onClick={onClose} className="mt-3 px-6 py-2 bg-[#1a1a1a] text-[#888] font-mono text-sm rounded-lg hover:text-[#e0e0e0]">Close</button>
           </div>
         )}
       </div>
@@ -231,7 +237,7 @@ function WeeklyLeaderboard({ challengeId }: { challengeId: string }) {
       {rows.map((r, i) => (
         <div key={r.github} className="flex items-center gap-3 px-3 py-2 bg-[#0f0f0f] border border-[#1a1a1a] rounded-xl">
           <span className={`w-5 text-center font-mono text-xs font-bold ${i === 0 ? 'text-[#ffd700]' : i === 1 ? 'text-[#c0c0c0]' : i === 2 ? 'text-[#cd7f32]' : 'text-[#333]'}`}>{i + 1}</span>
-          <img src={`https://github.com/${r.github}.png?size=24`} className="w-6 h-6 rounded-full" alt={r.name} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <img src={`https://github.com/${r.github}.png?size=24`} className="w-6 h-6 rounded-full" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           <span className="flex-1 text-xs font-mono text-[#e0e0e0] truncate">{r.name}</span>
           <span className="text-[10px] font-mono text-[#444]">{r.solved} solved</span>
           <span className="text-sm font-mono font-bold text-[#a78bfa]">{r.total} pts</span>
@@ -373,7 +379,7 @@ export default function WeeklyChallengePage({ user }: Props) {
           Weekly Challenge <span className="text-[#f0b429]">🏅</span>
         </h1>
         <p className="text-[#444] text-xs font-mono">
-          5 new problems every week. Pay once, solve all problems. Earn more points by solving earlier!
+          3 new problems every week. Pay once, solve all week. Earn more points by solving earlier!
         </p>
       </div>
 
@@ -513,13 +519,21 @@ export default function WeeklyChallengePage({ user }: Props) {
                           : <span className="text-[#00e87a]">✓ Access confirmed — solve all week!</span>
                         }
                       </div>
-                      {!isUpcoming && (
-                        <button
-                          onClick={() => setShowLeader(showLeader === ch.id ? null : ch.id)}
-                          className="text-xs font-mono text-[#a78bfa] hover:text-[#c4b5fd] transition-colors">
-                          {showLeader === ch.id ? 'Hide' : 'View'} leaderboard ↕
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {ch.whatsapp_link && (
+                          <a href={ch.whatsapp_link} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] text-white font-mono text-xs font-bold rounded-lg hover:bg-[#22c55e] transition-all">
+                            💬 WhatsApp Group
+                          </a>
+                        )}
+                        {!isUpcoming && (
+                          <button
+                            onClick={() => setShowLeader(showLeader === ch.id ? null : ch.id)}
+                            className="text-xs font-mono text-[#a78bfa] hover:text-[#c4b5fd] transition-colors">
+                            {showLeader === ch.id ? 'Hide' : 'View'} leaderboard ↕
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ) : access?.status === 'pending' ? (
                     <div className="flex items-center gap-2 text-xs font-mono text-[#f0b429]">
@@ -529,7 +543,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                     <button
                       onClick={() => setPayTarget(ch)}
                       className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] transition-all shadow-[0_0_16px_rgba(0,232,122,0.15)] active:scale-[0.99]">
-                      {isUpcoming ? `Unlock for ₹${ch.entry_fee} →` : `Unlock for ₹${ch.entry_fee} →`}
+                      {isUpcoming ? `Unlock early for ₹${ch.entry_fee} →` : `Unlock for ₹${ch.entry_fee} →`}
                     </button>
                   ) : null}
 
