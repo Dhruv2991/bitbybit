@@ -20,9 +20,11 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   const [selected,       setSelected]       = useState<Problem | null>(null);
   const [solved,         setSolved]         = useState<string[]>([]);
   const [weeklyIds,      setWeeklyIds]      = useState<Set<string>>(new Set());
-  const [lockedToast,    setLockedToast]    = useState(false);
+  const [lockedToast,       setLockedToast]       = useState(false);
+  const [notStartedToast,   setNotStartedToast]   = useState<string>('');
   // Paid access: set of problem IDs the user has confirmed weekly access for
-  const [unlockedIds,    setUnlockedIds]    = useState<Set<string>>(new Set());
+  const [unlockedIds,       setUnlockedIds]       = useState<Set<string>>(new Set());
+  const [paidNotStartedIds, setPaidNotStartedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     try { setSolved(JSON.parse(localStorage.getItem('bb_solved') || '[]')); } catch {}
@@ -61,7 +63,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         // Load weekly challenge problem IDs that are currently active or upcoming
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: challenges } = await (db.from('weekly_challenges') as any)
-          .select('id, problem_ids')
+          .select('id, problem_ids, starts_at')
           .neq('status', 'ended')
           .order('created_at', { ascending: false });
 
@@ -83,13 +85,22 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
 
           if (access?.length) {
             const confirmedChallengeIds = new Set((access as any[]).map(a => a.weekly_challenge_id));
-            const unlocked = new Set<string>();
+            const now = Date.now();
+            const unlocked      = new Set<string>();
+            const paidNotStarted = new Set<string>();
             (challenges || []).forEach((ch: any) => {
+              // Only unlock if confirmed AND start time has passed
+              const started = new Date(ch.starts_at).getTime() <= now;
               if (confirmedChallengeIds.has(ch.id)) {
-                (ch.problem_ids || []).forEach((id: string) => unlocked.add(id));
+                if (started) {
+                  (ch.problem_ids || []).forEach((id: string) => unlocked.add(id));
+                } else {
+                  (ch.problem_ids || []).forEach((id: string) => paidNotStarted.add(id));
+                }
               }
             });
             setUnlockedIds(unlocked);
+            setPaidNotStartedIds(paidNotStarted);
           }
         }
       } catch {
@@ -122,11 +133,17 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   }
 
   function handleRowClick(p: Problem) {
-    const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
-    const isUnlocked = unlockedIds.has(p.id);
+    const isWeekly      = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
+    const isUnlocked    = unlockedIds.has(p.id);
+    const isPaidWaiting = paidNotStartedIds.has(p.id);
     if (isWeekly && !isUnlocked) {
-      setLockedToast(true);
-      setTimeout(() => setLockedToast(false), 3500);
+      if (isPaidWaiting) {
+        setNotStartedToast('Challenge hasn\'t started yet — come back when it does!');
+        setTimeout(() => setNotStartedToast(''), 3500);
+      } else {
+        setLockedToast(true);
+        setTimeout(() => setLockedToast(false), 3500);
+      }
       return;
     }
     setSelected(p);
@@ -139,7 +156,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   return (
     <div className="animate-fade-up">
 
-      {/* Locked toast */}
+      {/* Locked toast — unpaid */}
       {lockedToast && (
         <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-[#1a1a1a] border border-[#f0b42940] rounded-xl font-mono text-sm shadow-xl max-w-xs animate-fade-up">
           <span className="text-lg">🔒</span>
@@ -153,6 +170,17 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               </button>
               .
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* Not-started toast — paid but waiting */}
+      {notStartedToast && (
+        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-[#1a1a1a] border border-[#a78bfa40] rounded-xl font-mono text-sm shadow-xl max-w-xs animate-fade-up">
+          <span className="text-lg">⏳</span>
+          <div>
+            <p className="text-[#a78bfa] font-bold text-xs">Not Started Yet</p>
+            <p className="text-[#555] text-[10px] mt-0.5">{notStartedToast}</p>
           </div>
         </div>
       )}
