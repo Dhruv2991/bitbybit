@@ -209,6 +209,8 @@ function PayModal({
             <div className="flex justify-center mb-3 bg-white p-3 rounded-xl">
               <UpiQr upiUrl={upiUrl} size={180} />
             </div>
+
+            {/* UPI ID copy */}
             <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 flex items-center justify-between gap-2 mb-3">
               <span className="text-xs font-mono text-[#888] truncate">
                 {challenge.upi_id}
@@ -222,15 +224,44 @@ function PayModal({
                 }}
                 className="text-[10px] font-mono text-[#00e87a] shrink-0"
               >
-                {copied ? "✓ Copied" : "Copy"}
+                {copied ? "✓ Copied" : "Copy UPI ID"}
               </button>
             </div>
-            <a
-              href={upiUrl}
-              className="block text-center text-xs font-mono text-[#a78bfa] mb-3"
-            >
-              Open in UPI App ↗
-            </a>
+
+            {/* UPI app shortcuts */}
+            <div className="mb-3">
+              <p className="text-[10px] text-[#444] font-mono mb-2 text-center">
+                Pay via
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  {
+                    name: "GPay",
+                    url: `gpay://upi/pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", am: String(challenge.entry_fee), cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
+                  },
+                  {
+                    name: "PhonePe",
+                    url: `phonepe://pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", am: String(challenge.entry_fee), cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
+                  },
+                  {
+                    name: "Paytm",
+                    url: `paytmmp://pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", am: String(challenge.entry_fee), cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
+                  },
+                ].map((app) => (
+                  <a
+                    key={app.name}
+                    href={app.url}
+                    className="flex items-center justify-center py-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg text-xs font-mono text-[#888] hover:text-[#e0e0e0] hover:border-[#3a3a3a] transition-all"
+                  >
+                    {app.name}
+                  </a>
+                ))}
+              </div>
+              <p className="text-[10px] text-[#333] font-mono mt-2 text-center">
+                or scan the QR above with any UPI app
+              </p>
+            </div>
+
             <button
               onClick={() => setStep("txn")}
               className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-lg hover:bg-[#00ff88] transition-all"
@@ -660,7 +691,6 @@ export default function WeeklyChallengePage({ user }: Props) {
             const now = Date.now();
             const startMs = new Date(ch.starts_at).getTime();
             const endMs = new Date(ch.ends_at).getTime();
-            // Derive live status purely from timestamps — admin doesn't need to flip status manually
             const isUpcoming = now < startMs;
             const isActive =
               now >= startMs && now <= endMs && ch.status !== "ended";
@@ -884,9 +914,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                       onClick={() => setPayTarget(ch)}
                       className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] transition-all shadow-[0_0_16px_rgba(0,232,122,0.15)] active:scale-[0.99]"
                     >
-                      {isUpcoming
-                        ? `Unlock for ₹${ch.entry_fee} →`
-                        : `Unlock for ₹${ch.entry_fee} →`}
+                      Unlock for ₹{ch.entry_fee} →
                     </button>
                   ) : null}
 
