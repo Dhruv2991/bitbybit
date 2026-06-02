@@ -103,6 +103,26 @@ export default function App() {
         if (!alive) return;
         setUser(u);
         resolving.current = false;
+        // Upsert into members so homepage count reflects all GitHub logins
+        if (u?.github) {
+          (db.from("members")as any).upsert({
+            github:          u.github,
+            name:            u.name,
+            total_points:    0,
+            problems_solved: 0,
+            streak:          0,
+          }, { onConflict: "github", ignoreDuplicates: true }).then(() => {});
+        }
+        // Upsert into members so the homepage count reflects all GitHub logins
+        if (u?.github) {
+          (db.from("members")as any).upsert({
+            github:       u.github,
+            name:         u.name,
+            total_points: 0,
+            problems_solved: 0,
+            streak:       0,
+          }, { onConflict: "github", ignoreDuplicates: true }).then(() => {});
+        }
       } else if (event === "SIGNED_OUT") {
         setUser(null);
         setPage("home");
