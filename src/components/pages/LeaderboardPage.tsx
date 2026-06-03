@@ -259,7 +259,7 @@ export default function LeaderboardPage() {
           {isTop3 ? (
             <span className="text-xl">{medals[i]}</span>
           ) : (
-            <span className="font-mono text-xs font-bold text-[#333]">
+            <span className="font-mono text-xs font-bold text-[#ccc]">
               #{i + 1}
             </span>
           )}
@@ -280,7 +280,7 @@ export default function LeaderboardPage() {
         <div
           style={{ display: "none" }}
           className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0
-            ${isTop3 ? `bg-[#1a1a1a] ${rankColors[i]}` : "bg-[#1a1a1a] text-[#555]"}`}
+            ${isTop3 ? `bg-[#1a1a1a] ${rankColors[i]}` : "bg-[#1a1a1a] text-[#aaa]"}`}
         >
           {(name || github || "?")[0].toUpperCase()}
         </div>
@@ -289,7 +289,7 @@ export default function LeaderboardPage() {
           <div className="font-mono font-bold text-[#e0e0e0] text-sm truncate">
             {name || github}
           </div>
-          <div className="text-[10px] text-[#444] font-mono mt-0.5">
+          <div className="text-[10px] text-[#999] font-mono mt-0.5">
             <a
               href={`https://github.com/${github}`}
               target="_blank"
@@ -307,7 +307,7 @@ export default function LeaderboardPage() {
             <span className="font-mono font-bold text-[#e0e0e0] text-sm">
               {solved}
             </span>
-            <span className="text-[9px] text-[#333] font-mono">
+            <span className="text-[9px] text-[#ccc] font-mono">
               {isChallenge ? "solved" : "solved"}
             </span>
           </div>
@@ -317,7 +317,7 @@ export default function LeaderboardPage() {
             >
               {points.toLocaleString()}
             </span>
-            <span className="text-[9px] text-[#333] font-mono">pts</span>
+            <span className="text-[9px] text-[#ccc] font-mono">pts</span>
           </div>
         </div>
       </div>
@@ -332,7 +332,7 @@ export default function LeaderboardPage() {
           <h1 className="font-display font-bold text-xl md:text-2xl mb-1">
             Leaderboard
           </h1>
-          <p className="text-[#444] text-xs font-mono">
+          <p className="text-[#999] text-xs font-mono">
             Rankings update automatically after each approved submission.
           </p>
         </div>
@@ -349,7 +349,7 @@ export default function LeaderboardPage() {
                     ? t.id === "challenge"
                       ? "bg-[#f0b429] text-black font-bold"
                       : "bg-[#00e87a] text-black font-bold"
-                    : "text-[#555] hover:text-[#e0e0e0]"
+                    : "text-[#aaa] hover:text-[#e0e0e0]"
                 }`}
             >
               {t.label}
@@ -366,7 +366,7 @@ export default function LeaderboardPage() {
             <p className="text-xs font-mono font-bold text-[#f0b429]">
               {challengeTitle}
             </p>
-            <p className="text-[10px] font-mono text-[#555]">
+            <p className="text-[10px] font-mono text-[#aaa]">
               Points include time bonus — earlier submissions earn more.
             </p>
           </div>
@@ -376,7 +376,7 @@ export default function LeaderboardPage() {
       {/* Search */}
       <div className="mb-5">
         <div className="relative w-full sm:w-72">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#333] text-sm">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#ccc] text-sm">
             🔍
           </span>
           <input
@@ -392,7 +392,7 @@ export default function LeaderboardPage() {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="spinner" />
-          <span className="text-[#444] text-xs font-mono">
+          <span className="text-[#999] text-xs font-mono">
             Loading rankings…
           </span>
         </div>
@@ -400,7 +400,7 @@ export default function LeaderboardPage() {
         filteredChallenge.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <div className="text-4xl opacity-30">🏅</div>
-            <div className="text-[#444] font-mono text-sm">
+            <div className="text-[#999] font-mono text-sm">
               {search
                 ? "No members match your search."
                 : "No submissions yet for the current weekly challenge."}
@@ -410,7 +410,7 @@ export default function LeaderboardPage() {
           <div className="space-y-2">
             <div
               className="hidden sm:grid grid-cols-[3rem_1fr_5rem_5rem] gap-4 px-4 py-2
-              text-[10px] text-[#333] font-mono uppercase tracking-widest border-b border-[#161616] mb-1"
+              text-[10px] text-[#ccc] font-mono uppercase tracking-widest border-b border-[#161616] mb-1"
             >
               <div>Rank</div>
               <div>Member</div>
@@ -433,7 +433,7 @@ export default function LeaderboardPage() {
       ) : filteredMembers.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="text-4xl opacity-30">🏆</div>
-          <div className="text-[#444] font-mono text-sm">
+          <div className="text-[#999] font-mono text-sm">
             {search
               ? "No members match your search."
               : "No members yet — be the first to solve a problem!"}
@@ -443,7 +443,7 @@ export default function LeaderboardPage() {
         <div className="space-y-2">
           <div
             className="hidden sm:grid grid-cols-[3rem_1fr_5rem_5rem] gap-4 px-4 py-2
-              text-[10px] text-[#333] font-mono uppercase tracking-widest border-b border-[#161616] mb-1"
+              text-[10px] text-[#ccc] font-mono uppercase tracking-widest border-b border-[#161616] mb-1"
           >
             <div>Rank</div>
             <div>Member</div>
@@ -467,7 +467,7 @@ export default function LeaderboardPage() {
         tab !== "challenge" &&
         !loading &&
         filteredMembers.length > 0 && (
-          <p className="text-[10px] text-[#333] font-mono text-center mt-6">
+          <p className="text-[10px] text-[#ccc] font-mono text-center mt-6">
             Showing approved submissions from the past{" "}
             {tab === "weekly" ? "7" : "30"} days.
           </p>

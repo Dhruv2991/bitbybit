@@ -185,7 +185,7 @@ function PayModal({
       <div className="w-full max-w-sm bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl p-5 relative">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-[#444] hover:text-[#e0e0e0] font-mono text-lg"
+          className="absolute top-3 right-3 text-[#999] hover:text-[#e0e0e0] font-mono text-lg"
         >
           ×
         </button>
@@ -195,14 +195,14 @@ function PayModal({
             <h3 className="font-mono font-bold text-[#e0e0e0] mb-1">
               Unlock Weekly Challenge
             </h3>
-            <p className="text-xs text-[#555] font-mono mb-4">
+            <p className="text-xs text-[#aaa] font-mono mb-4">
               {challenge.title}
             </p>
             <div className="text-center mb-3">
               <span className="font-mono font-bold text-2xl text-[#00e87a]">
                 ₹{challenge.entry_fee}
               </span>
-              <span className="text-[#444] font-mono text-xs ml-2">
+              <span className="text-[#999] font-mono text-xs ml-2">
                 one-time, valid all week
               </span>
             </div>
@@ -212,7 +212,7 @@ function PayModal({
 
             {/* UPI ID copy */}
             <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 flex items-center justify-between gap-2 mb-3">
-              <span className="text-xs font-mono text-[#888] truncate">
+              <span className="text-xs font-mono text-[#ccc] truncate">
                 {challenge.upi_id}
               </span>
               <button
@@ -230,7 +230,7 @@ function PayModal({
 
             {/* UPI app shortcuts */}
             <div className="mb-3">
-              <p className="text-[10px] text-[#444] font-mono mb-2 text-center">
+              <p className="text-[10px] text-[#999] font-mono mb-2 text-center">
                 Pay via
               </p>
               <div className="grid grid-cols-3 gap-2">
@@ -251,13 +251,13 @@ function PayModal({
                   <a
                     key={app.name}
                     href={app.url}
-                    className="flex items-center justify-center py-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg text-xs font-mono text-[#888] hover:text-[#e0e0e0] hover:border-[#3a3a3a] transition-all"
+                    className="flex items-center justify-center py-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg text-xs font-mono text-[#ccc] hover:text-[#e0e0e0] hover:border-[#3a3a3a] transition-all"
                   >
                     {app.name}
                   </a>
                 ))}
               </div>
-              <p className="text-[10px] text-[#333] font-mono mt-2 text-center">
+              <p className="text-[10px] text-[#888] font-mono mt-2 text-center">
                 or scan the QR above with any UPI app
               </p>
             </div>
@@ -276,7 +276,7 @@ function PayModal({
             <h3 className="font-mono font-bold text-[#e0e0e0] mb-1">
               Enter Transaction ID
             </h3>
-            <p className="text-[10px] text-[#444] font-mono mb-3">
+            <p className="text-[10px] text-[#999] font-mono mb-3">
               Find it in your UPI app under payment history.
             </p>
             {err && (
@@ -292,7 +292,7 @@ function PayModal({
             <div className="flex gap-2">
               <button
                 onClick={() => setStep("qr")}
-                className="flex-1 py-2 bg-[#1a1a1a] text-[#666] font-mono text-sm rounded-lg hover:text-[#e0e0e0]"
+                className="flex-1 py-2 bg-[#1a1a1a] text-[#bbb] font-mono text-sm rounded-lg hover:text-[#e0e0e0]"
               >
                 ← Back
               </button>
@@ -313,7 +313,7 @@ function PayModal({
             <p className="text-sm font-mono text-[#f0b429] font-bold mb-1">
               Payment Submitted
             </p>
-            <p className="text-xs font-mono text-[#555]">
+            <p className="text-xs font-mono text-[#aaa]">
               Admin will verify and grant access shortly.
             </p>
             {challenge.whatsapp_link && (
@@ -328,7 +328,7 @@ function PayModal({
             )}
             <button
               onClick={onClose}
-              className="mt-3 px-6 py-2 bg-[#1a1a1a] text-[#888] font-mono text-sm rounded-lg hover:text-[#e0e0e0]"
+              className="mt-3 px-6 py-2 bg-[#1a1a1a] text-[#ccc] font-mono text-sm rounded-lg hover:text-[#e0e0e0]"
             >
               Close
             </button>
@@ -438,7 +438,7 @@ function WeeklyLeaderboard({ challengeId }: { challengeId: string }) {
 
   if (rows.length === 0)
     return (
-      <p className="text-xs text-[#444] font-mono text-center py-4">
+      <p className="text-xs text-[#999] font-mono text-center py-4">
         No submissions yet.
       </p>
     );
@@ -451,7 +451,7 @@ function WeeklyLeaderboard({ challengeId }: { challengeId: string }) {
           className="flex items-center gap-3 px-3 py-2 bg-[#0f0f0f] border border-[#1a1a1a] rounded-xl"
         >
           <span
-            className={`w-5 text-center font-mono text-xs font-bold ${i === 0 ? "text-[#ffd700]" : i === 1 ? "text-[#c0c0c0]" : i === 2 ? "text-[#cd7f32]" : "text-[#333]"}`}
+            className={`w-5 text-center font-mono text-xs font-bold ${i === 0 ? "text-[#ffd700]" : i === 1 ? "text-[#c0c0c0]" : i === 2 ? "text-[#cd7f32]" : "text-[#888]"}`}
           >
             {i + 1}
           </span>
@@ -466,7 +466,7 @@ function WeeklyLeaderboard({ challengeId }: { challengeId: string }) {
           <span className="flex-1 text-xs font-mono text-[#e0e0e0] truncate">
             {r.name}
           </span>
-          <span className="text-[10px] font-mono text-[#444]">
+          <span className="text-[10px] font-mono text-[#999]">
             {r.solved} solved
           </span>
           <span className="text-sm font-mono font-bold text-[#a78bfa]">
@@ -632,7 +632,7 @@ export default function WeeklyChallengePage({ user }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-3">
         <div className="spinner" />
-        <span className="text-[#444] text-xs font-mono">
+        <span className="text-[#bbb] text-xs font-mono">
           Loading weekly challenges…
         </span>
       </div>
@@ -646,7 +646,7 @@ export default function WeeklyChallengePage({ user }: Props) {
         <h1 className="font-display font-bold text-xl md:text-2xl mb-1">
           Weekly Challenge <span className="text-[#f0b429]">🏅</span>
         </h1>
-        <p className="text-[#444] text-xs font-mono">
+        <p className="text-[#bbb] text-xs font-mono">
           3 new problems every week. Pay once, solve all week. Earn more points
           by solving earlier!
         </p>
@@ -655,7 +655,7 @@ export default function WeeklyChallengePage({ user }: Props) {
       {/* Scoring info */}
       <div className="mb-6 bg-[#0f0f0f] border border-[#1a1a1a] rounded-xl p-4 flex flex-wrap gap-4">
         <div className="flex-1 min-w-[140px]">
-          <p className="text-[10px] text-[#444] font-mono uppercase tracking-widest mb-1">
+          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
             Scoring Formula
           </p>
           <p className="text-xs text-[#e0e0e0] font-mono">
@@ -663,13 +663,13 @@ export default function WeeklyChallengePage({ user }: Props) {
           </p>
         </div>
         <div className="flex-1 min-w-[140px]">
-          <p className="text-[10px] text-[#444] font-mono uppercase tracking-widest mb-1">
+          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
             Day 1 bonus
           </p>
           <p className="text-sm font-bold text-[#00e87a] font-mono">100%</p>
         </div>
         <div className="flex-1 min-w-[140px]">
-          <p className="text-[10px] text-[#444] font-mono uppercase tracking-widest mb-1">
+          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
             Day 7 bonus
           </p>
           <p className="text-sm font-bold text-[#f0b429] font-mono">20%</p>
@@ -679,7 +679,7 @@ export default function WeeklyChallengePage({ user }: Props) {
       {challenges.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="text-4xl opacity-20">📅</div>
-          <p className="text-[#444] font-mono text-sm">
+          <p className="text-[#999] font-mono text-sm">
             No active weekly challenge right now — check back soon!
           </p>
         </div>
@@ -713,7 +713,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                         {ch.title}
                       </h2>
                       {ch.description && (
-                        <p className="text-xs text-[#555] font-mono mt-0.5">
+                        <p className="text-xs text-[#aaa] font-mono mt-0.5">
                           {ch.description}
                         </p>
                       )}
@@ -731,14 +731,14 @@ export default function WeeklyChallengePage({ user }: Props) {
                         </span>
                       )}
                       {isEnded && (
-                        <span className="text-[10px] font-mono text-[#555] bg-[#1a1a1a] px-2 py-0.5 rounded-lg">
+                        <span className="text-[10px] font-mono text-[#aaa] bg-[#1a1a1a] px-2 py-0.5 rounded-lg">
                           ENDED
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-4 text-[10px] font-mono text-[#444]">
+                  <div className="mt-3 flex flex-wrap gap-4 text-[10px] font-mono text-[#999]">
                     <span>
                       📅 {new Date(ch.starts_at).toLocaleString()} –{" "}
                       {new Date(ch.ends_at).toLocaleString()}
@@ -764,12 +764,12 @@ export default function WeeklyChallengePage({ user }: Props) {
 
                 {/* Problems list */}
                 <div className="px-5 py-4">
-                  <p className="text-[10px] text-[#444] font-mono uppercase tracking-widest mb-3">
+                  <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-3">
                     Problems ({chProblems.length})
                   </p>
                   <div className="space-y-2">
                     {chProblems.length === 0 && (
-                      <p className="text-xs text-[#333] font-mono">
+                      <p className="text-xs text-[#888] font-mono">
                         Problems not yet loaded.
                       </p>
                     )}
@@ -800,7 +800,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                             }`}
                         >
                           <span
-                            className={`text-sm ${solved ? "text-[#00e87a]" : "text-[#333]"}`}
+                            className={`text-sm ${solved ? "text-[#00e87a]" : "text-[#888]"}`}
                           >
                             {solved ? "✓" : "◯"}
                           </span>
@@ -812,7 +812,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                                 ? "text-[#00e87a]"
                                 : confirmed && isActive
                                   ? "text-[#e0e0e0] group-hover:text-[#00e87a]"
-                                  : "text-[#555]"
+                                  : "text-[#aaa]"
                             }`}
                             >
                               {p.title}
@@ -839,7 +839,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                             </span>
                           )}
                           {!confirmed && (
-                            <span className="text-[#444] text-xs">🔒</span>
+                            <span className="text-[#999] text-xs">🔒</span>
                           )}
                           {confirmed && isUpcoming && (
                             <span className="text-[10px] font-mono text-[#f0b429]">
@@ -847,7 +847,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                             </span>
                           )}
                           {confirmed && isEnded && (
-                            <span className="text-[10px] font-mono text-[#444]">
+                            <span className="text-[10px] font-mono text-[#999]">
                               ended
                             </span>
                           )}
@@ -861,7 +861,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                 <div className="px-5 pb-4">
                   {!user ? (
                     <div className="text-center py-3 border border-[#1a1a1a] rounded-xl">
-                      <p className="text-xs font-mono text-[#444]">
+                      <p className="text-xs font-mono text-[#999]">
                         Sign in with GitHub to participate
                       </p>
                     </div>
@@ -874,7 +874,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                             {new Date(ch.starts_at).toLocaleString()}
                           </span>
                         ) : isEnded ? (
-                          <span className="text-[#555]">✓ Challenge ended</span>
+                          <span className="text-[#aaa]">✓ Challenge ended</span>
                         ) : (
                           <span className="text-[#00e87a]">
                             ✓ Access confirmed — solve all week!
@@ -921,7 +921,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                   {/* Leaderboard */}
                   {confirmed && showLeader === ch.id && (
                     <div className="mt-4 border-t border-[#1a1a1a] pt-4">
-                      <p className="text-[10px] text-[#444] font-mono uppercase tracking-widest mb-2">
+                      <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-2">
                         Weekly Leaderboard
                       </p>
                       <WeeklyLeaderboard challengeId={ch.id} />

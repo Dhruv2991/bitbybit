@@ -59,7 +59,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
       {/* Hero */}
       <section className="text-center py-12 md:py-20">
         <div className="inline-flex items-center gap-2 bg-[#111] border border-[#1f1f1f] px-4 py-1.5 rounded-full
-          text-xs font-mono text-[#555] mb-7">
+          text-xs font-mono text-[#aaa] mb-7">
           <span className="live-dot" />
           <span>by <span className="text-[#00e87a]">TeamCodeLocked</span> &nbsp;·&nbsp; Beta v2.0</span>
         </div>
@@ -68,7 +68,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
           Build Sharper.<br />
           Code <em className="text-[#00e87a] not-italic">Bit By Bit.</em>
         </h1>
-        <p className="text-[#555] text-base md:text-lg font-mono max-w-xl mx-auto mb-8 px-4 leading-relaxed">
+        <p className="text-[#aaa] text-base md:text-lg font-mono max-w-xl mx-auto mb-8 px-4 leading-relaxed">
           The private arena for TeamCodeLocked — solve daily problems, run real tests, and compete in proctored contests.
         </p>
 
@@ -94,7 +94,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
               <div className="text-2xl md:text-3xl font-display font-extrabold text-[#00e87a]">
                 {s.val ?? <span className="inline-block w-10 h-7 bg-[#1a1a1a] rounded-lg animate-pulse" />}
               </div>
-              <div className="text-[11px] text-[#444] font-mono mt-1.5 tracking-wider uppercase">{s.label}</div>
+              <div className="text-[11px] text-[#bbb] font-mono mt-1.5 tracking-wider uppercase">{s.label}</div>
             </div>
           ))}
         </div>
@@ -108,7 +108,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
             style={{ animationDelay: `${i * 60}ms` }}>
             <div className="text-2xl mb-4">{f.icon}</div>
             <h3 className="font-display font-bold text-[#e0e0e0] mb-2 text-sm group-hover:text-[#00e87a] transition-colors">{f.title}</h3>
-            <p className="text-[#555] text-xs font-mono leading-relaxed">{f.desc}</p>
+            <p className="text-[#aaa] text-xs font-mono leading-relaxed">{f.desc}</p>
           </div>
         ))}
       </section>

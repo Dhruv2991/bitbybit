@@ -169,7 +169,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           <span className="text-lg">🔒</span>
           <div>
             <p className="text-[#f0b429] font-bold text-xs">Weekly Challenge Problem</p>
-            <p className="text-[#555] text-[10px] mt-0.5">
+            <p className="text-[#aaa] text-[10px] mt-0.5">
               Pay to unlock in the{' '}
               <button onClick={() => { setLockedToast(false); onNavigate('weekly'); }}
                 className="text-[#00e87a] underline underline-offset-2 hover:text-[#00ff88]">
@@ -187,7 +187,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           <span className="text-lg">⏳</span>
           <div>
             <p className="text-[#a78bfa] font-bold text-xs">Not Started Yet</p>
-            <p className="text-[#555] text-[10px] mt-0.5">{notStartedToast}</p>
+            <p className="text-[#aaa] text-[10px] mt-0.5">{notStartedToast}</p>
           </div>
         </div>
       )}
@@ -196,7 +196,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="font-display font-bold text-xl md:text-2xl mb-0.5">Problems</h1>
-          <p className="text-[#444] text-xs font-mono">
+          <p className="text-[#999] text-xs font-mono">
             {problems.length > 0 ? `${problems.length} problems available` : 'Loading…'}
           </p>
         </div>
@@ -210,7 +210,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                   : d === 'Medium' ? 'bg-[#f0b42918] text-[#f0b429] border border-[#f0b42930]'
                   : d === 'Hard'   ? 'bg-[#ff4d4d18] text-[#ff4d4d] border border-[#ff4d4d30]'
                   : 'bg-[#00e87a18] text-[#00e87a] border border-[#00e87a30]'
-                  : 'bg-[#111] border border-[#1f1f1f] text-[#555] hover:text-[#e0e0e0] hover:border-[#2a2a2a]'}`}>
+                  : 'bg-[#111] border border-[#1f1f1f] text-[#aaa] hover:text-[#e0e0e0] hover:border-[#2a2a2a]'}`}>
               {d === 'all' ? 'All' : d}
             </button>
           ))}
@@ -220,12 +220,12 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="spinner" />
-          <span className="text-[#444] text-xs font-mono">Loading problems…</span>
+          <span className="text-[#999] text-xs font-mono">Loading problems…</span>
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="text-4xl opacity-30">{ '{  }' }</div>
-          <div className="text-[#444] font-mono text-sm">
+          <div className="text-[#999] font-mono text-sm">
             {problems.length === 0 ? 'No problems yet — check back soon!' : 'Nothing matches this filter.'}
           </div>
         </div>
@@ -243,7 +243,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                 <div key={p.id} onClick={() => handleRowClick(p)}
                   className={`card-hover px-4 py-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.99]
                     ${isLocked ? 'opacity-70' : ''}`}>
-                  <div className="text-[#333] text-xs font-mono w-6 shrink-0 text-center">{i + 1}</div>
+                  <div className="text-[#ccc] text-xs font-mono w-6 shrink-0 text-center">{i + 1}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[#e0e0e0] font-mono text-sm truncate">{p.title}</span>
@@ -260,7 +260,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                       {isLocked && <span className="text-[10px] font-mono text-[#f0b429]">Weekly</span>}
                     </div>
                   </div>
-                  <span className={`text-sm shrink-0 ${isSolved ? 'text-[#00e87a]' : isLocked ? 'text-[#f0b42960]' : 'text-[#333]'}`}>
+                  <span className={`text-sm shrink-0 ${isSolved ? 'text-[#00e87a]' : isLocked ? 'text-[#f0b42960]' : 'text-[#ccc]'}`}>
                     {isSolved ? '✓' : isLocked ? '🔒' : '›'}
                   </span>
                 </div>
@@ -271,7 +271,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           {/* Desktop table */}
           <div className="hidden md:block card overflow-hidden">
             <div className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-3
-              border-b border-[#1a1a1a] text-[10px] text-[#444] font-mono uppercase tracking-widest">
+              border-b border-[#1a1a1a] text-[10px] text-[#999] font-mono uppercase tracking-widest">
               <div>#</div>
               <div>Title</div>
               <div>Difficulty</div>
@@ -295,13 +295,13 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                       ? 'hover:bg-[#f0b42906] opacity-80'
                       : 'hover:bg-[#161616]'}`}>
 
-                  <div className="text-[#333] text-xs font-mono">{i + 1}</div>
+                  <div className="text-[#ccc] text-xs font-mono">{i + 1}</div>
 
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`font-mono text-sm transition-colors
                         ${isLocked
-                          ? 'text-[#888] group-hover:text-[#f0b429]'
+                          ? 'text-[#ccc] group-hover:text-[#f0b429]'
                           : 'text-[#ddd] group-hover:text-[#00e87a]'}`}>
                         {p.title}
                       </span>
@@ -313,7 +313,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                     </div>
                     <div className="flex gap-1.5 flex-wrap">
                       {(p.tags || []).map(t => (
-                        <span key={t} className="text-[10px] text-[#444] bg-[#0f0f0f] px-1.5 py-0.5 rounded font-mono border border-[#1a1a1a]">{t}</span>
+                        <span key={t} className="text-[10px] text-[#999] bg-[#0f0f0f] px-1.5 py-0.5 rounded font-mono border border-[#1a1a1a]">{t}</span>
                       ))}
                     </div>
                   </div>
@@ -328,7 +328,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                   </div>
 
                   <div className="text-[#a78bfa] text-sm font-mono font-bold">{p.points}</div>
-                  <div className="text-[#444] text-sm font-mono">{p.submission_count || 0}</div>
+                  <div className="text-[#999] text-sm font-mono">{p.submission_count || 0}</div>
 
                   <div>
                     {isSolved ? (
@@ -340,7 +340,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                         Pay to unlock →
                       </span>
                     ) : (
-                      <span className="text-[#333] text-xs font-mono group-hover:text-[#555] transition-colors">Solve →</span>
+                      <span className="text-[#ccc] text-xs font-mono group-hover:text-[#aaa] transition-colors">Solve →</span>
                     )}
                   </div>
                 </div>

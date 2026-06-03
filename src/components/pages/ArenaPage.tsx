@@ -359,7 +359,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <span className="live-dot shrink-0" />
-              <span className="hidden md:block text-xs font-mono text-[#555] uppercase tracking-wider">Live Contest</span>
+              <span className="hidden md:block text-xs font-mono text-[#aaa] uppercase tracking-wider">Live Contest</span>
               <span className="font-mono font-bold text-[#e0e0e0] text-sm truncate">{activeContest.name}</span>
             </div>
 
@@ -372,13 +372,13 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
 
               {/* Strike counter */}
               <div className={`hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-lg
-                ${strikes > 0 ? 'text-[#ff4d4d] bg-[#ff4d4d12] border border-[#ff4d4d20]' : 'text-[#333] bg-[#111] border border-[#1a1a1a]'}`}>
+                ${strikes > 0 ? 'text-[#ff4d4d] bg-[#ff4d4d12] border border-[#ff4d4d20]' : 'text-[#ccc] bg-[#111] border border-[#1a1a1a]'}`}>
                 <span>⚠</span>
                 <span>{strikes}/3 warnings</span>
               </div>
 
               <button onClick={() => endContest('submitted')}
-                className="px-3 py-1.5 bg-[#1a1a1a] border border-[#2a2a2a] text-[#666]
+                className="px-3 py-1.5 bg-[#1a1a1a] border border-[#2a2a2a] text-[#bbb]
                   hover:text-[#ff4d4d] hover:border-[#ff4d4d30] text-xs font-mono rounded-xl transition-all">
                 Submit & Exit
               </button>
@@ -395,7 +395,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                       ? 'bg-[#00e87a] text-black font-bold'
                       : solved.has(id)
                         ? 'bg-[#00e87a15] text-[#00e87a] border border-[#00e87a30]'
-                        : 'bg-[#1a1a1a] border border-[#2a2a2a] text-[#555] hover:text-[#e0e0e0]'}`}>
+                        : 'bg-[#1a1a1a] border border-[#2a2a2a] text-[#aaa] hover:text-[#e0e0e0]'}`}>
                   {solved.has(id) ? '✓ ' : ''}Problem {i + 1}
                   {arenaProblems[id] ? ` — ${arenaProblems[id].title}` : ''}
                 </button>
@@ -411,7 +411,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
               <div className="text-5xl mb-5">⏳</div>
               <div className="font-mono text-[#e0e0e0] text-lg mb-2">Waiting for the problem to be revealed…</div>
-              <div className="text-sm text-[#555] font-mono mb-6">Stay on this page. The problem will appear shortly.</div>
+              <div className="text-sm text-[#aaa] font-mono mb-6">Stay on this page. The problem will appear shortly.</div>
               <button onClick={loadContests} className="btn-ghost text-sm">Refresh</button>
             </div>
           )}
@@ -433,7 +433,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
       {/* Header */}
       <div className="mb-6">
         <h1 className="font-display font-bold text-xl md:text-2xl mb-1.5">Proctored Arena</h1>
-        <p className="text-[#555] text-sm font-mono">
+        <p className="text-[#aaa] text-sm font-mono">
           Pay the entry fee · get confirmed · compete in a supervised contest
         </p>
       </div>
@@ -444,7 +444,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
           <span className="text-lg shrink-0">🛡️</span>
           <div>
             <div className="font-mono font-bold text-[#f0b429] text-sm mb-1">Contest runs in supervised mode</div>
-            <div className="text-xs font-mono text-[#666] leading-relaxed">
+            <div className="text-xs font-mono text-[#bbb] leading-relaxed">
               Once you enter, the contest runs fullscreen. Switching tabs or exiting fullscreen counts as a violation. 
               3 violations = disqualification. You can only enter each contest once.
             </div>
@@ -453,11 +453,11 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[#555] font-mono text-sm py-12">
+        <div className="flex items-center gap-2 text-[#aaa] font-mono text-sm py-12">
           <div className="spinner" /> Loading contests…
         </div>
       ) : contests.length === 0 ? (
-        <div className="text-center py-20 text-[#444] font-mono">
+        <div className="text-center py-20 text-[#999] font-mono">
           <div className="text-4xl mb-4 opacity-30">🏆</div>
           <div className="text-sm">No contests right now. Check back soon!</div>
         </div>
@@ -483,7 +483,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                 {/* Contest info */}
                 <div>
                   <div className="font-display font-bold text-[#e0e0e0] mb-1">{ct.name}</div>
-                  <div className="text-xs text-[#555] font-mono">🎁 {ct.prize_note || 'Standard prize allocation'}</div>
+                  <div className="text-xs text-[#aaa] font-mono">🎁 {ct.prize_note || 'Standard prize allocation'}</div>
                 </div>
 
                 {/* Stats grid */}
@@ -503,7 +503,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                   ].map(item => (
                     <div key={item.label} className="bg-[#0d0d0d] rounded-xl p-2.5 text-center border border-[#1a1a1a]">
                       <div className="text-[#e0e0e0] font-mono font-bold text-xs">{item.val}</div>
-                      <div className="text-[10px] text-[#333] font-mono mt-0.5">{item.label}</div>
+                      <div className="text-[10px] text-[#ccc] font-mono mt-0.5">{item.label}</div>
                     </div>
                   ))}
                 </div>
@@ -519,7 +519,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                         {outcome === 'disqualified' ? '❌ Disqualified' : '✅ Submitted — awaiting results'}
                       </div>
                     ) : (
-                      <div className="text-center text-xs text-[#333] font-mono py-2.5">Contest ended</div>
+                      <div className="text-center text-xs text-[#ccc] font-mono py-2.5">Contest ended</div>
                     )
                   ) : reg ? (
                     <>
@@ -537,7 +537,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                             ❌ Disqualified
                           </div>
                         ) : outcome === 'submitted' ? (
-                          <div className="w-full py-2.5 bg-[#1a1a1a] text-[#444] font-mono text-sm rounded-xl text-center border border-[#222]">
+                          <div className="w-full py-2.5 bg-[#1a1a1a] text-[#999] font-mono text-sm rounded-xl text-center border border-[#222]">
                             ✓ Submitted — contest locked
                           </div>
                         ) : (
@@ -550,11 +550,11 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                       )}
                     </>
                   ) : ct.status === 'live' ? (
-                    <button disabled className="w-full py-2.5 bg-[#1a1a1a] text-[#333] font-mono text-sm rounded-xl cursor-not-allowed border border-[#1f1f1f]">
+                    <button disabled className="w-full py-2.5 bg-[#1a1a1a] text-[#ccc] font-mono text-sm rounded-xl cursor-not-allowed border border-[#1f1f1f]">
                       Registration closed
                     </button>
                   ) : !user ? (
-                    <button disabled className="w-full py-2.5 bg-[#1a1a1a] text-[#333] font-mono text-sm rounded-xl cursor-not-allowed border border-[#1f1f1f]">
+                    <button disabled className="w-full py-2.5 bg-[#1a1a1a] text-[#ccc] font-mono text-sm rounded-xl cursor-not-allowed border border-[#1f1f1f]">
                       Sign in to register
                     </button>
                   ) : (

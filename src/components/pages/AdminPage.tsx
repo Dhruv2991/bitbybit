@@ -72,12 +72,12 @@ function TagInput({
         {tags.map((t) => (
           <span
             key={t}
-            className="flex items-center gap-1 bg-[#1a1a1a] text-[#888] text-xs font-mono px-2 py-0.5 rounded"
+            className="flex items-center gap-1 bg-[#1a1a1a] text-[#ccc] text-xs font-mono px-2 py-0.5 rounded"
           >
             {t}
             <button
               onClick={() => onChange(tags.filter((x) => x !== t))}
-              className="text-[#444] hover:text-[#ff4d4d] ml-0.5"
+              className="text-[#999] hover:text-[#ff4d4d] ml-0.5"
             >
               ×
             </button>
@@ -121,9 +121,9 @@ function TestCaseEditor({
         <div key={i} className="flex gap-2 items-start">
           <div className="flex-1 grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
                 Input{" "}
-                <span className="normal-case text-[#333]">
+                <span className="normal-case text-[#ccc]">
                   (JSON array of args)
                 </span>
               </label>
@@ -136,7 +136,7 @@ function TestCaseEditor({
               />
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
                 Expected
               </label>
               <textarea
@@ -150,7 +150,7 @@ function TestCaseEditor({
           </div>
           <button
             onClick={() => onChange(cases.filter((_, idx) => idx !== i))}
-            className="mt-4 text-[#444] hover:text-[#ff4d4d] text-lg leading-none font-mono"
+            className="mt-4 text-[#999] hover:text-[#ff4d4d] text-lg leading-none font-mono"
           >
             ×
           </button>
@@ -158,7 +158,7 @@ function TestCaseEditor({
       ))}
       <button
         onClick={() => onChange([...cases, { input: "", expected: "" }])}
-        className="w-full py-1.5 border border-dashed border-[#2a2a2a] text-[#444] hover:text-[#00e87a] hover:border-[#00e87a40] text-xs font-mono rounded-lg transition-all"
+        className="w-full py-1.5 border border-dashed border-[#2a2a2a] text-[#999] hover:text-[#00e87a] hover:border-[#00e87a40] text-xs font-mono rounded-lg transition-all"
       >
         + Add Test Case
       </button>
@@ -224,7 +224,7 @@ function ProblemForm({
       )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2">
-          <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+          <label className="block text-xs text-[#bbb] font-mono mb-1 uppercase tracking-wider">
             Title *
           </label>
           <input
@@ -235,7 +235,7 @@ function ProblemForm({
           />
         </div>
         <div>
-          <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+          <label className="block text-xs text-[#bbb] font-mono mb-1 uppercase tracking-wider">
             Points
           </label>
           <input
@@ -248,7 +248,7 @@ function ProblemForm({
         </div>
       </div>
       <div>
-        <label className="block text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">
+        <label className="block text-xs text-[#bbb] font-mono mb-2 uppercase tracking-wider">
           Difficulty
         </label>
         <div className="flex gap-2">
@@ -257,7 +257,7 @@ function ProblemForm({
               key={d}
               onClick={() => set("difficulty", d)}
               className={`px-4 py-1.5 rounded-lg text-xs font-mono font-bold transition-all
-                ${form.difficulty === d ? (d === "Easy" ? "bg-[#00e87a] text-black" : d === "Medium" ? "bg-[#f0b429] text-black" : "bg-[#ff4d4d] text-white") : "bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]"}`}
+                ${form.difficulty === d ? (d === "Easy" ? "bg-[#00e87a] text-black" : d === "Medium" ? "bg-[#f0b429] text-black" : "bg-[#ff4d4d] text-white") : "bg-[#1a1a1a] text-[#bbb] hover:text-[#e0e0e0]"}`}
             >
               {d}
             </button>
@@ -265,13 +265,13 @@ function ProblemForm({
         </div>
       </div>
       <div>
-        <label className="block text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">
+        <label className="block text-xs text-[#bbb] font-mono mb-2 uppercase tracking-wider">
           Tags
         </label>
         <TagInput tags={form.tags} onChange={(t) => set("tags", t)} />
       </div>
       <div>
-        <label className="block text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">
+        <label className="block text-xs text-[#bbb] font-mono mb-2 uppercase tracking-wider">
           Visibility
         </label>
         <div className="flex gap-2">
@@ -312,14 +312,14 @@ function ProblemForm({
                       : opt.value === "arena"
                         ? "bg-[#a78bfa] text-black"
                         : "bg-[#f0b429] text-black"
-                    : "bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]"
+                    : "bg-[#1a1a1a] text-[#bbb] hover:text-[#e0e0e0]"
                 }`}
             >
               {opt.label}
             </button>
           ))}
         </div>
-        <p className="text-[10px] text-[#444] font-mono mt-1.5">
+        <p className="text-[10px] text-[#999] font-mono mt-1.5">
           {(form as any).visibility === "arena" &&
             "Hidden from Problems page. Only appears inside an active Arena contest."}
           {(form as any).visibility === "weekly" &&
@@ -330,7 +330,7 @@ function ProblemForm({
         </p>
       </div>
       <div>
-        <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+        <label className="block text-xs text-[#bbb] font-mono mb-1 uppercase tracking-wider">
           Description * (HTML)
         </label>
         <textarea
@@ -342,7 +342,7 @@ function ProblemForm({
         />
       </div>
       <div>
-        <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+        <label className="block text-xs text-[#bbb] font-mono mb-1 uppercase tracking-wider">
           Example
         </label>
         <textarea
@@ -354,11 +354,11 @@ function ProblemForm({
         />
       </div>
       <div>
-        <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+        <label className="block text-xs text-[#bbb] font-mono mb-1 uppercase tracking-wider">
           Starter Code (Python)
         </label>
         <div>
-          <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+          <label className="block text-xs text-[#bbb] font-mono mb-1 uppercase tracking-wider">
             Parameter Types
           </label>
           <input
@@ -377,7 +377,7 @@ function ProblemForm({
           />
         </div>
         <div>
-          <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+          <label className="block text-xs text-[#bbb] font-mono mb-1 uppercase tracking-wider">
             Return Type
           </label>
           <select
@@ -401,7 +401,7 @@ function ProblemForm({
         />
       </div>
       <div>
-        <label className="block text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">
+        <label className="block text-xs text-[#bbb] font-mono mb-2 uppercase tracking-wider">
           Test Cases
         </label>
         <TestCaseEditor
@@ -553,7 +553,7 @@ function ContestForm({
           { label: "UPI ID", key: "upi_id", ph: "yourname@upi", type: "text" },
         ].map(({ label, key, ph, type }) => (
           <div key={key}>
-            <label className="block text-xs text-[#666] font-mono mb-1 uppercase tracking-wider">
+            <label className="block text-xs text-[#bbb] font-mono mb-1 uppercase tracking-wider">
               {label}
             </label>
             <input
@@ -573,7 +573,7 @@ function ContestForm({
       </div>
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs text-[#666] font-mono uppercase tracking-wider">
+          <label className="text-xs text-[#bbb] font-mono uppercase tracking-wider">
             Contest Problems ({selectedIds.length} selected)
           </label>
           <button
@@ -585,7 +585,7 @@ function ContestForm({
         </div>
         <div className="max-h-48 overflow-y-auto space-y-1 bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg p-2">
           {problems.length === 0 ? (
-            <div className="text-xs text-[#444] font-mono py-2 text-center">
+            <div className="text-xs text-[#999] font-mono py-2 text-center">
               No problems yet — create one below
             </div>
           ) : (
@@ -646,7 +646,7 @@ function ContestForm({
             <div className="text-xs text-[#00e87a] font-mono font-bold mb-1 uppercase tracking-wider">
               ✦ Create Arena Problem (hidden from public Problems page)
             </div>
-            <p className="text-[10px] text-[#444] font-mono mb-4">
+            <p className="text-[10px] text-[#999] font-mono mb-4">
               This problem will be marked arena-only and won't appear in the
               Problems tab.
             </p>
@@ -660,7 +660,7 @@ function ContestForm({
         )}
       </div>
       <div>
-        <label className="block text-xs text-[#666] font-mono mb-2 uppercase tracking-wider">
+        <label className="block text-xs text-[#bbb] font-mono mb-2 uppercase tracking-wider">
           Status
         </label>
         <div className="flex gap-2">
@@ -669,7 +669,7 @@ function ContestForm({
               key={s}
               onClick={() => set("status", s)}
               className={`px-4 py-1.5 rounded-lg text-xs font-mono font-bold transition-all capitalize
-                ${form.status === s ? (s === "live" ? "bg-[#00e87a] text-black" : s === "upcoming" ? "bg-[#f0b429] text-black" : "bg-[#333] text-[#e0e0e0]") : "bg-[#1a1a1a] text-[#666] hover:text-[#e0e0e0]"}`}
+                ${form.status === s ? (s === "live" ? "bg-[#00e87a] text-black" : s === "upcoming" ? "bg-[#f0b429] text-black" : "bg-[#333] text-[#e0e0e0]") : "bg-[#1a1a1a] text-[#bbb] hover:text-[#e0e0e0]"}`}
             >
               {s}
             </button>
@@ -713,13 +713,13 @@ function CodeViewer({ code, lang }: { code: string; lang: string }) {
   return (
     <div className="mt-2 bg-[#080808] border border-[#1a1a1a] rounded-lg overflow-hidden">
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-[#1a1a1a] bg-[#0d0d0d]">
-        <span className="text-[10px] font-mono text-[#444] uppercase tracking-wider">
+        <span className="text-[10px] font-mono text-[#999] uppercase tracking-wider">
           {lang}
         </span>
         <div className="flex items-center gap-3">
           <button
             onClick={copy}
-            className="text-[10px] font-mono text-[#555] hover:text-[#00e87a] transition-colors"
+            className="text-[10px] font-mono text-[#aaa] hover:text-[#00e87a] transition-colors"
           >
             {copied ? "✓ Copied" : "Copy"}
           </button>
@@ -836,7 +836,7 @@ function ActionModal({
           {title}
         </h3>
         {isApprove && (
-          <p className="text-xs text-[#555] font-mono mb-4">
+          <p className="text-xs text-[#aaa] font-mono mb-4">
             Points are auto-calculated from test results. Adjust before
             confirming.
           </p>
@@ -844,32 +844,32 @@ function ActionModal({
         {modal.type === "approve-arena" && modal.arenaSubRef && (
           <div className="mb-3 p-2.5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono space-y-1">
             <div className="flex justify-between">
-              <span className="text-[#444]">Strikes</span>
+              <span className="text-[#999]">Strikes</span>
               <span className="text-[#f0b429]">
                 {modal.arenaSubRef.strikes}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#444]">Time factor</span>
+              <span className="text-[#999]">Time factor</span>
               <span className="text-[#a78bfa]">
                 {(modal.arenaSubRef.strike_penalty_factor || 1).toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#444]">Base pts</span>
+              <span className="text-[#999]">Base pts</span>
               <span className="text-[#e0e0e0]">{modal.basePoints}</span>
             </div>
           </div>
         )}
         {modal.type === "confirm-delete" && (
-          <p className="text-xs text-[#666] font-mono mb-4">
+          <p className="text-xs text-[#bbb] font-mono mb-4">
             {modal.confirmMsg}
           </p>
         )}
         <form onSubmit={handleSubmit} className="space-y-3">
           {isApprove && (
             <div>
-              <label className="block text-[10px] text-[#444] font-mono uppercase mb-1">
+              <label className="block text-[10px] text-[#999] font-mono uppercase mb-1">
                 Points to award
               </label>
               <input
@@ -887,9 +887,9 @@ function ActionModal({
             modal.type === "reject-arena" ||
             modal.type === "reject-reg") && (
             <div>
-              <label className="block text-[10px] text-[#444] font-mono uppercase mb-1">
+              <label className="block text-[10px] text-[#999] font-mono uppercase mb-1">
                 Reason{" "}
-                <span className="normal-case text-[#333]">(optional)</span>
+                <span className="normal-case text-[#ccc]">(optional)</span>
               </label>
               <input
                 autoFocus
@@ -916,7 +916,7 @@ function ActionModal({
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 rounded-lg text-xs font-mono text-[#444] hover:text-[#888] transition-all"
+              className="px-4 py-2 rounded-lg text-xs font-mono text-[#999] hover:text-[#ccc] transition-all"
             >
               Cancel
             </button>
@@ -1549,7 +1549,7 @@ export default function AdminPage({ user }: AdminPageProps) {
       )}
 
       <aside className="w-48 shrink-0">
-        <div className="text-xs text-[#444] font-mono uppercase tracking-wider mb-3">
+        <div className="text-xs text-[#999] font-mono uppercase tracking-wider mb-3">
           Admin
         </div>
         <nav className="space-y-1">
@@ -1561,7 +1561,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                 resetForms();
               }}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm font-mono transition-all flex items-center justify-between
-                ${section === n.id ? "bg-[#00e87a15] text-[#00e87a]" : "text-[#666] hover:text-[#e0e0e0]"}`}
+                ${section === n.id ? "bg-[#00e87a15] text-[#00e87a]" : "text-[#bbb] hover:text-[#e0e0e0]"}`}
             >
               <span>{n.label}</span>
               {n.badge && n.badge > 0 ? (
@@ -1576,7 +1576,7 @@ export default function AdminPage({ user }: AdminPageProps) {
 
       <div className="flex-1 min-w-0">
         {loading ? (
-          <div className="flex items-center gap-2 text-[#666] font-mono pt-4">
+          <div className="flex items-center gap-2 text-[#bbb] font-mono pt-4">
             <div className="spinner" /> Loading...
           </div>
         ) : (
@@ -1606,14 +1606,14 @@ export default function AdminPage({ user }: AdminPageProps) {
                       >
                         {s.val}
                       </div>
-                      <div className="text-xs text-[#444] font-mono mt-1">
+                      <div className="text-xs text-[#999] font-mono mt-1">
                         {s.label}
                       </div>
                     </div>
                   ))}
                 </div>
                 <div className="card p-5">
-                  <div className="text-xs text-[#444] font-mono uppercase tracking-wider mb-3">
+                  <div className="text-xs text-[#999] font-mono uppercase tracking-wider mb-3">
                     Quick Actions
                   </div>
                   <div className="flex flex-wrap gap-3">
@@ -1666,7 +1666,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                       {subs.filter((s) => s.status === "pending").length}{" "}
                       pending
                     </span>
-                    <span className="text-[#444]">·</span>
+                    <span className="text-[#999]">·</span>
                     <span className="text-[#00e87a]">
                       {subs.filter((s) => s.status === "approved").length}{" "}
                       approved
@@ -1675,7 +1675,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                 </div>
                 <div className="space-y-3">
                   {subs.length === 0 && (
-                    <div className="text-center py-16 text-[#444] font-mono">
+                    <div className="text-center py-16 text-[#999] font-mono">
                       No submissions yet.
                     </div>
                   )}
@@ -1689,18 +1689,18 @@ export default function AdminPage({ user }: AdminPageProps) {
                           <div className="font-mono font-bold text-[#e0e0e0]">
                             {s.problem_title}
                           </div>
-                          <div className="text-xs text-[#666] font-mono mt-0.5">
+                          <div className="text-xs text-[#bbb] font-mono mt-0.5">
                             @{s.github} · {s.lang} ·{" "}
                             {new Date(s.created_at).toLocaleString()}
                           </div>
                           {s.approach && (
-                            <div className="text-xs text-[#888] mt-1.5 font-mono bg-[#0a0a0a] rounded px-2 py-1 max-w-lg">
-                              <span className="text-[#444]">Approach: </span>
+                            <div className="text-xs text-[#ccc] mt-1.5 font-mono bg-[#0a0a0a] rounded px-2 py-1 max-w-lg">
+                              <span className="text-[#999]">Approach: </span>
                               {s.approach}
                             </div>
                           )}
                           {s.tests_total > 0 && (
-                            <div className="text-xs text-[#666] mt-1 font-mono">
+                            <div className="text-xs text-[#bbb] mt-1 font-mono">
                               Tests: {s.tests_passed}/{s.tests_total} ·
                               potential {s.points_awarded} pts
                             </div>
@@ -1781,7 +1781,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                         <span className="text-[#f0b429]">
                           {pendingArenaSubs.length} pending
                         </span>
-                        <span className="text-[#444]">·</span>
+                        <span className="text-[#999]">·</span>
                         <span className="text-[#00e87a]">
                           {
                             arenaSubs.filter((a) => a.status === "reviewed")
@@ -1791,13 +1791,13 @@ export default function AdminPage({ user }: AdminPageProps) {
                         </span>
                       </div>
                     </div>
-                    <div className="mb-4 p-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono text-[#666]">
+                    <div className="mb-4 p-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono text-[#bbb]">
                       ℹ Points formula: base × (1 − strikes×0.1) × time_factor
                       (0.5–1.0). Faster solves earn a higher time_factor. You
                       can override before approving.
                     </div>
                     {arenaSubs.length === 0 && (
-                      <div className="text-center py-16 text-[#444] font-mono">
+                      <div className="text-center py-16 text-[#999] font-mono">
                         No arena submissions yet.
                       </div>
                     )}
@@ -1822,13 +1822,13 @@ export default function AdminPage({ user }: AdminPageProps) {
                                   </span>
                                   {contest && (
                                     <span
-                                      className={`ml-2 text-[10px] font-mono px-2 py-0.5 rounded font-bold ${contest.status === "live" ? "bg-[#00e87a15] text-[#00e87a]" : contest.status === "upcoming" ? "bg-[#f0b42915] text-[#f0b429]" : "bg-[#33333318] text-[#666]"}`}
+                                      className={`ml-2 text-[10px] font-mono px-2 py-0.5 rounded font-bold ${contest.status === "live" ? "bg-[#00e87a15] text-[#00e87a]" : contest.status === "upcoming" ? "bg-[#f0b42915] text-[#f0b429]" : "bg-[#33333318] text-[#bbb]"}`}
                                     >
                                       {contest.status}
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex gap-3 text-[10px] font-mono text-[#444]">
+                                <div className="flex gap-3 text-[10px] font-mono text-[#999]">
                                   <span>
                                     {userCount} participant
                                     {userCount !== 1 ? "s" : ""}
@@ -1877,7 +1877,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                                           <span className="font-mono font-bold text-[#e0e0e0] text-sm">
                                             @{github}
                                           </span>
-                                          <span className="text-[10px] text-[#444] font-mono">
+                                          <span className="text-[10px] text-[#999] font-mono">
                                             {userSubs.length} problem
                                             {userSubs.length !== 1 ? "s" : ""}
                                           </span>
@@ -1918,7 +1918,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                                                           a.problem_title ||
                                                           "Unknown Problem"}
                                                       </span>
-                                                      <span className="text-[10px] text-[#444] font-mono">
+                                                      <span className="text-[10px] text-[#999] font-mono">
                                                         {basePts} pts base
                                                       </span>
                                                       {a.strikes > 0 && (
@@ -1927,7 +1927,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                                                         </span>
                                                       )}
                                                     </div>
-                                                    <div className="text-[10px] text-[#555] font-mono mt-0.5">
+                                                    <div className="text-[10px] text-[#aaa] font-mono mt-0.5">
                                                       {a.lang} ·{" "}
                                                       {new Date(
                                                         a.created_at,
@@ -2049,7 +2049,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                 )}
                 <div className="space-y-2">
                   {probs.length === 0 && !showProblemForm && (
-                    <div className="text-center py-16 text-[#444] font-mono">
+                    <div className="text-center py-16 text-[#999] font-mono">
                       No problems yet. Click "+ New Problem" to get started.
                     </div>
                   )}
@@ -2077,13 +2077,13 @@ export default function AdminPage({ user }: AdminPageProps) {
                           <span className="text-[10px] text-[#a78bfa] font-mono">
                             {p.points} pts
                           </span>
-                          <span className="text-[10px] text-[#444] font-mono">
+                          <span className="text-[10px] text-[#999] font-mono">
                             {(p.test_cases || []).length} tests
                           </span>
                           {(p.tags || []).map((t) => (
                             <span
                               key={t}
-                              className="text-[10px] text-[#444] bg-[#0f0f0f] px-1.5 py-0.5 rounded font-mono"
+                              className="text-[10px] text-[#999] bg-[#0f0f0f] px-1.5 py-0.5 rounded font-mono"
                             >
                               {t}
                             </span>
@@ -2097,7 +2097,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                             setShowProblemForm(false);
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }}
-                          className="px-3 py-1.5 bg-[#1a1a1a] text-[#888] hover:text-[#00e87a] text-xs font-mono rounded-lg transition-all border border-[#2a2a2a]"
+                          className="px-3 py-1.5 bg-[#1a1a1a] text-[#ccc] hover:text-[#00e87a] text-xs font-mono rounded-lg transition-all border border-[#2a2a2a]"
                         >
                           ✏ Edit
                         </button>
@@ -2122,7 +2122,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                 </h2>
                 <div className="space-y-2">
                   {members.length === 0 && (
-                    <div className="text-center py-16 text-[#444] font-mono">
+                    <div className="text-center py-16 text-[#999] font-mono">
                       No members yet.
                     </div>
                   )}
@@ -2131,7 +2131,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                       key={m.id}
                       className={`card px-5 py-4 flex items-center gap-4 ${i === 0 ? "border-[#00e87a40]" : i === 1 ? "border-[#a78bfa30]" : i === 2 ? "border-[#f0b42930]" : ""}`}
                     >
-                      <div className="w-8 text-center font-mono font-bold text-sm shrink-0 text-[#444]">
+                      <div className="w-8 text-center font-mono font-bold text-sm shrink-0 text-[#999]">
                         {i === 0 ? "👑" : `#${i + 1}`}
                       </div>
                       <div className="w-8 h-8 bg-[#1a1a1a] rounded-full flex items-center justify-center font-display font-bold text-[#00e87a] text-sm shrink-0">
@@ -2141,7 +2141,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                         <div className="font-mono text-[#e0e0e0] truncate">
                           {m.name}
                         </div>
-                        <div className="text-xs text-[#444] font-mono">
+                        <div className="text-xs text-[#999] font-mono">
                           @{m.github}
                         </div>
                       </div>
@@ -2149,7 +2149,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                         <div className="font-mono font-bold text-[#00e87a]">
                           {m.total_points} XP
                         </div>
-                        <div className="text-xs text-[#444] font-mono">
+                        <div className="text-xs text-[#999] font-mono">
                           {m.problems_solved} solved · {m.streak}🔥
                         </div>
                       </div>
@@ -2215,9 +2215,9 @@ export default function AdminPage({ user }: AdminPageProps) {
                             <div>
                               <div className="font-mono text-[#e0e0e0] text-sm">
                                 {r.name}{" "}
-                                <span className="text-[#444]">@{r.github}</span>
+                                <span className="text-[#999]">@{r.github}</span>
                               </div>
-                              <div className="text-xs text-[#666] font-mono mt-0.5">
+                              <div className="text-xs text-[#bbb] font-mono mt-0.5">
                                 {r.contest_name} · Txn: {r.txn_id || "N/A"}
                               </div>
                             </div>
@@ -2242,7 +2242,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                 )}
                 <div className="space-y-3">
                   {contests.length === 0 && !showContestForm && (
-                    <div className="text-center py-16 text-[#444] font-mono">
+                    <div className="text-center py-16 text-[#999] font-mono">
                       No contests yet.
                     </div>
                   )}
@@ -2256,7 +2256,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                           <div className="font-mono font-bold text-[#e0e0e0]">
                             {c.name}
                           </div>
-                          <div className="text-xs text-[#666] font-mono mt-0.5">
+                          <div className="text-xs text-[#bbb] font-mono mt-0.5">
                             ₹{c.entry_fee} entry · {c.duration_mins}m ·{" "}
                             {c.prize_note || "No prize note"}
                           </div>
@@ -2274,7 +2274,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                               key={s}
                               onClick={() => setContestStatus(c.id, s)}
                               className={`px-2.5 py-1 text-xs font-mono rounded-lg transition-all capitalize
-                                ${c.status === s ? (s === "live" ? "bg-[#00e87a] text-black font-bold" : s === "upcoming" ? "bg-[#f0b429] text-black font-bold" : "bg-[#333] text-[#e0e0e0] font-bold") : "text-[#444] hover:text-[#666] border border-[#2a2a2a]"}`}
+                                ${c.status === s ? (s === "live" ? "bg-[#00e87a] text-black font-bold" : s === "upcoming" ? "bg-[#f0b429] text-black font-bold" : "bg-[#333] text-[#e0e0e0] font-bold") : "text-[#999] hover:text-[#bbb] border border-[#2a2a2a]"}`}
                             >
                               {s}
                             </button>
@@ -2285,7 +2285,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                               setShowContestForm(false);
                               window.scrollTo({ top: 0, behavior: "smooth" });
                             }}
-                            className="px-3 py-1 bg-[#1a1a1a] text-[#888] hover:text-[#a78bfa] text-xs font-mono rounded-lg transition-all border border-[#2a2a2a]"
+                            className="px-3 py-1 bg-[#1a1a1a] text-[#ccc] hover:text-[#a78bfa] text-xs font-mono rounded-lg transition-all border border-[#2a2a2a]"
                           >
                             ✏ Edit
                           </button>
@@ -2299,7 +2299,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                       </div>
                       {regs.filter((r) => r.contest_id === c.id).length > 0 && (
                         <div className="pt-3 border-t border-[#1a1a1a]">
-                          <div className="text-[10px] text-[#444] font-mono mb-1.5 uppercase">
+                          <div className="text-[10px] text-[#999] font-mono mb-1.5 uppercase">
                             Registrations (
                             {regs.filter((r) => r.contest_id === c.id).length})
                           </div>
@@ -2622,7 +2622,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
           <h2 className="font-mono font-bold text-[#e0e0e0] text-base">
             Weekly Challenge
           </h2>
-          <p className="text-[10px] text-[#444] font-mono mt-0.5">
+          <p className="text-[10px] text-[#999] font-mono mt-0.5">
             Create paid weekly problem sets with time-bonus scoring.
           </p>
         </div>
@@ -2645,7 +2645,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
                 Title *
               </label>
               <input
@@ -2656,7 +2656,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
               />
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
                 Entry Fee (₹) *
               </label>
               <input
@@ -2669,7 +2669,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
               />
             </div>
             <div className="md:col-span-2">
-              <label className="text-[10px] text-[#444] font-mono uppercase">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
                 Description
               </label>
               <input
@@ -2682,7 +2682,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
               />
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
                 UPI ID *
               </label>
               <input
@@ -2693,7 +2693,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
               />
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
                 WhatsApp Group Link
               </label>
               <input
@@ -2704,12 +2704,12 @@ function WeeklyAdminSection({ user }: { user: User }) {
                 placeholder="https://chat.whatsapp.com/..."
                 className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
               />
-              <p className="text-[10px] text-[#444] font-mono mt-1">
+              <p className="text-[10px] text-[#999] font-mono mt-1">
                 Shown to users only after payment is confirmed.
               </p>
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
                 Status
               </label>
               <select
@@ -2725,7 +2725,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
               </select>
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
                 Starts At
               </label>
               <input
@@ -2738,7 +2738,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
               />
             </div>
             <div>
-              <label className="text-[10px] text-[#444] font-mono uppercase">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
                 Ends At
               </label>
               <input
@@ -2752,7 +2752,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
           {/* Problem picker */}
           <div>
-            <label className="text-[10px] text-[#444] font-mono uppercase">
+            <label className="text-[10px] text-[#999] font-mono uppercase">
               Problems — {form.problem_ids.length} selected
             </label>
             <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-1.5 max-h-60 overflow-y-auto pr-1">
@@ -2766,7 +2766,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                       ${
                         selected
                           ? "border-[#00e87a40] bg-[#00e87a10] text-[#00e87a]"
-                          : "border-[#1f1f1f] text-[#888] hover:border-[#2a2a2a] hover:text-[#e0e0e0]"
+                          : "border-[#1f1f1f] text-[#ccc] hover:border-[#2a2a2a] hover:text-[#e0e0e0]"
                       }`}
                   >
                     {selected ? "✓ " : "  "}
@@ -2789,7 +2789,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                 setForm(null);
                 setEditId(null);
               }}
-              className="flex-1 py-2 bg-[#1a1a1a] text-[#666] font-mono text-sm rounded-xl hover:text-[#e0e0e0]"
+              className="flex-1 py-2 bg-[#1a1a1a] text-[#bbb] font-mono text-sm rounded-xl hover:text-[#e0e0e0]"
             >
               Cancel
             </button>
@@ -2810,7 +2810,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
       {/* Challenges list */}
       {challenges.length === 0 && !form && (
-        <div className="text-center py-12 text-[#444] font-mono text-sm">
+        <div className="text-center py-12 text-[#999] font-mono text-sm">
           No weekly challenges yet.
         </div>
       )}
@@ -2847,7 +2847,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-[#444] font-mono mt-1">
+                  <p className="text-[10px] text-[#999] font-mono mt-1">
                     ₹{ch.entry_fee} ·{" "}
                     {new Date(ch.starts_at).toLocaleDateString()} –{" "}
                     {new Date(ch.ends_at).toLocaleDateString()} ·{" "}
@@ -2857,7 +2857,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                 <div className="flex gap-2 items-center">
                   <button
                     onClick={() => setExpandedId(isOpen ? null : ch.id)}
-                    className="text-xs font-mono text-[#555] hover:text-[#e0e0e0] px-3 py-1.5 bg-[#1a1a1a] rounded-lg"
+                    className="text-xs font-mono text-[#aaa] hover:text-[#e0e0e0] px-3 py-1.5 bg-[#1a1a1a] rounded-lg"
                   >
                     {isOpen ? "Collapse" : "Manage"}
                   </button>
@@ -2890,7 +2890,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                           ${
                             (manageTab[ch.id] || "payments") === t
                               ? "bg-[#00e87a] text-black font-bold"
-                              : "bg-[#1a1a1a] text-[#555] hover:text-[#e0e0e0]"
+                              : "bg-[#1a1a1a] text-[#aaa] hover:text-[#e0e0e0]"
                           }`}
                       >
                         {t === "payments"
@@ -2904,7 +2904,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                   {(manageTab[ch.id] || "payments") === "payments" && (
                     <>
                       {chAccesses.length === 0 ? (
-                        <p className="text-xs text-[#333] font-mono">
+                        <p className="text-xs text-[#ccc] font-mono">
                           No payment submissions yet.
                         </p>
                       ) : (
@@ -2924,9 +2924,9 @@ function WeeklyAdminSection({ user }: { user: User }) {
                               />
                               <span className="text-xs font-mono text-[#e0e0e0] flex-1 min-w-0 truncate">
                                 {a.name}{" "}
-                                <span className="text-[#444]">@{a.github}</span>
+                                <span className="text-[#999]">@{a.github}</span>
                               </span>
-                              <span className="text-[10px] font-mono text-[#555]">
+                              <span className="text-[10px] font-mono text-[#aaa]">
                                 Txn: {a.txn_id || "—"}
                               </span>
                               <span
@@ -2968,7 +2968,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                         (s) => s.weekly_challenge_id === ch.id,
                       );
                       return chSubs.length === 0 ? (
-                        <p className="text-xs text-[#333] font-mono">
+                        <p className="text-xs text-[#ccc] font-mono">
                           No submissions yet.
                         </p>
                       ) : (
@@ -2976,7 +2976,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                           {/* Header */}
                           <div
                             className="hidden sm:grid grid-cols-[1fr_6rem_4rem_4rem_5rem_6rem] gap-3 px-3 py-1
-                          text-[10px] text-[#333] font-mono uppercase tracking-widest border-b border-[#1a1a1a]"
+                          text-[10px] text-[#ccc] font-mono uppercase tracking-widest border-b border-[#1a1a1a]"
                           >
                             <div>User / Problem</div>
                             <div>Lang</div>
@@ -3011,21 +3011,21 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                     <span className="text-xs font-mono text-[#e0e0e0] truncate">
                                       {s.name}
                                     </span>
-                                    <span className="text-[10px] font-mono text-[#444] truncate">
+                                    <span className="text-[10px] font-mono text-[#999] truncate">
                                       @{s.github}
                                     </span>
                                   </div>
-                                  <div className="text-[10px] font-mono text-[#555] mt-0.5 truncate">
+                                  <div className="text-[10px] font-mono text-[#aaa] mt-0.5 truncate">
                                     {s.problem_title}
                                   </div>
                                 </div>
-                                <div className="text-[10px] font-mono text-[#555]">
+                                <div className="text-[10px] font-mono text-[#aaa]">
                                   {s.lang}
                                 </div>
-                                <div className="text-[10px] font-mono text-[#888]">
+                                <div className="text-[10px] font-mono text-[#ccc]">
                                   {s.tests_passed}/{s.tests_total}
                                 </div>
-                                <div className="text-[10px] font-mono text-[#444]">
+                                <div className="text-[10px] font-mono text-[#999]">
                                   Day {daysSince + 1}
                                 </div>
                                 <div className="text-center">
@@ -3079,7 +3079,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                             return n;
                                           })
                                         }
-                                        className="text-[10px] font-mono text-[#555] bg-[#1a1a1a] px-2 py-1 rounded-lg hover:text-[#e0e0e0]"
+                                        className="text-[10px] font-mono text-[#aaa] bg-[#1a1a1a] px-2 py-1 rounded-lg hover:text-[#e0e0e0]"
                                       >
                                         ✕
                                       </button>
