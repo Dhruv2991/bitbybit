@@ -228,7 +228,7 @@ function PayModal({
               </button>
             </div>
 
-            {/* UPI app shortcuts */}
+            {/* UPI app shortcuts — amount removed to avoid security rejection */}
             <div className="mb-3">
               <p className="text-[10px] text-[#999] font-mono mb-2 text-center">
                 Pay via
@@ -237,15 +237,15 @@ function PayModal({
                 {[
                   {
                     name: "GPay",
-                    url: `gpay://upi/pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", am: String(challenge.entry_fee), cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
+                    url: `gpay://upi/pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
                   },
                   {
                     name: "PhonePe",
-                    url: `phonepe://pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", am: String(challenge.entry_fee), cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
+                    url: `phonepe://pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
                   },
                   {
                     name: "Paytm",
-                    url: `paytmmp://pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", am: String(challenge.entry_fee), cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
+                    url: `paytmmp://pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
                   },
                 ].map((app) => (
                   <a
@@ -258,7 +258,7 @@ function PayModal({
                 ))}
               </div>
               <p className="text-[10px] text-[#888] font-mono mt-2 text-center">
-                or scan the QR above with any UPI app
+                Enter <span className="text-[#00e87a] font-bold">₹{challenge.entry_fee}</span> as the amount · or scan the QR above
               </p>
             </div>
 
