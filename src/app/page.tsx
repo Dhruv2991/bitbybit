@@ -53,8 +53,12 @@ export default function App() {
   const [arenaLocked,    setArenaLocked]    = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [toasts,         setToasts]         = useState<Toast[]>([]);
+  const [liveItems,      setLiveItems]      = useState<{ id: string; label: string; page: PageId; type: 'arena' | 'weekly'; status: 'live' | 'upcoming' }[]>([]);
+  const [notifOpen,      setNotifOpen]      = useState(false);
   const toastCounter = useRef(0);
   const resolving    = useRef(false);
+  const notifRef     = useRef<HTMLDivElement>(null);
+  const notifRefMob  = useRef<HTMLDivElement>(null);
 
   function showToast(msg: string, type: ToastType = "info") {
     const id = ++toastCounter.current;
@@ -105,22 +109,12 @@ export default function App() {
         resolving.current = false;
         // Upsert into members so homepage count reflects all GitHub logins
         if (u?.github) {
-          (db.from("members")as any).upsert({
+          (db.from("members") as any).upsert({
             github:          u.github,
             name:            u.name,
             total_points:    0,
             problems_solved: 0,
             streak:          0,
-          }, { onConflict: "github", ignoreDuplicates: true }).then(() => {});
-        }
-        // Upsert into members so the homepage count reflects all GitHub logins
-        if (u?.github) {
-          (db.from("members")as any).upsert({
-            github:       u.github,
-            name:         u.name,
-            total_points: 0,
-            problems_solved: 0,
-            streak:       0,
           }, { onConflict: "github", ignoreDuplicates: true }).then(() => {});
         }
       } else if (event === "SIGNED_OUT") {
@@ -132,7 +126,53 @@ export default function App() {
     return () => { alive = false; subscription.unsubscribe(); };
   }, []);
 
+  // Poll for live and upcoming contests and weekly challenges every 60s
+  useEffect(() => {
+    async function checkLive() {
+      const db = getSupabaseClient();
+      const items: { id: string; label: string; page: PageId; type: 'arena' | 'weekly'; status: 'live' | 'upcoming' }[] = [];
+
+      // Live arena contests
+      const { data: liveContests } = await db.from('contests').select('id, title, status').eq('status', 'live');
+      (liveContests || []).forEach((c: any) => items.push({ id: c.id, label: c.title, page: 'arena', type: 'arena', status: 'live' }));
+
+      // Upcoming arena contests
+      const { data: upcomingContests } = await db.from('contests').select('id, title, status').eq('status', 'upcoming');
+      (upcomingContests || []).forEach((c: any) => items.push({ id: c.id, label: c.title, page: 'arena', type: 'arena', status: 'upcoming' }));
+
+      // Live + upcoming weekly challenges
+      const { data: weekly } = await (db.from('weekly_challenges') as any)
+        .select('id, title, status, starts_at, ends_at')
+        .in('status', ['active', 'upcoming']);
+      (weekly || []).forEach((w: any) => {
+        const now     = Date.now();
+        const started = new Date(w.starts_at).getTime() <= now;
+        const ended   = new Date(w.ends_at).getTime()   <  now;
+        if (started && !ended) {
+          items.push({ id: w.id, label: w.title, page: 'weekly', type: 'weekly', status: 'live' });
+        } else if (!started) {
+          items.push({ id: w.id, label: w.title, page: 'weekly', type: 'weekly', status: 'upcoming' });
+        }
+      });
+
+      setLiveItems(items);
+    }
+    checkLive();
+    const interval = setInterval(checkLive, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Close notif on escape key
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setNotifOpen(false);
+    }
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, []);
+
   function navigate(id: PageId) {
+    setNotifOpen(false);
     if (arenaLocked && id !== "arena") {
       showToast("Contest in progress — you cannot leave the arena.", "warn");
       return;
@@ -165,6 +205,48 @@ export default function App() {
     warn: "bg-[#f0b429] text-black",
     info: "bg-[#1f1f1f] text-[#e0e0e0] border border-[#2a2a2a]",
   };
+
+  const liveCount     = liveItems.filter(i => i.status === 'live').length;
+  const upcomingCount = liveItems.filter(i => i.status === 'upcoming').length;
+
+  const bellDropdown = notifOpen && (
+    <div className="absolute right-0 top-10 w-72 bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl shadow-2xl overflow-hidden z-[100]">
+      <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
+        <span className="text-xs font-mono font-bold text-[#e0e0e0]">Events</span>
+        <div className="flex items-center gap-1.5">
+          {liveCount > 0 && (
+            <span className="text-[10px] font-mono bg-[#00e87a20] text-[#00e87a] px-2 py-0.5 rounded-lg">{liveCount} live</span>
+          )}
+          {upcomingCount > 0 && (
+            <span className="text-[10px] font-mono bg-[#f0b42920] text-[#f0b429] px-2 py-0.5 rounded-lg">{upcomingCount} upcoming</span>
+          )}
+        </div>
+      </div>
+      {liveItems.length === 0 ? (
+        <div className="px-4 py-6 text-center text-[#444] font-mono text-xs">Nothing live or upcoming right now</div>
+      ) : (
+        <div className="divide-y divide-[#1a1a1a]">
+          {liveItems.map(item => (
+            <button key={item.id + item.status}
+              onClick={() => { setNotifOpen(false); navigate(item.page); }}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#161616] transition-all text-left group">
+              <span className="text-base shrink-0">{item.type === 'arena' ? '🏆' : '🏅'}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-mono font-bold text-[#e0e0e0] truncate">{item.label}</p>
+                <p className="text-[10px] font-mono text-[#555] mt-0.5">
+                  {item.type === 'arena' ? 'Arena Contest' : 'Weekly Challenge'} ·{' '}
+                  {item.status === 'live'
+                    ? <span className="text-[#00e87a]">LIVE</span>
+                    : <span className="text-[#f0b429]">UPCOMING</span>}
+                </p>
+              </div>
+              <span className="text-[10px] font-mono text-[#00e87a] group-hover:translate-x-0.5 transition-transform shrink-0">Go →</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
@@ -215,6 +297,17 @@ export default function App() {
 
           {/* Auth — desktop */}
           <div className="hidden md:flex items-center gap-3">
+            {/* 🔔 Desktop bell */}
+            <div className="relative" ref={notifRef}>
+              <button onClick={() => setNotifOpen(o => !o)}
+                className="relative p-2 text-[#555] hover:text-[#e0e0e0] transition-colors rounded-xl hover:bg-[#ffffff08]">
+                <span className="text-base">🔔</span>
+                {liveItems.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#00e87a] animate-pulse" />
+                )}
+              </button>
+              {bellDropdown}
+            </div>
             {!authChecked ? (
               <div className="w-24 h-8 rounded-xl bg-[#111] animate-pulse" />
             ) : user ? (
@@ -241,14 +334,27 @@ export default function App() {
             )}
           </div>
 
-          {/* Mobile hamburger */}
-          <button type="button" aria-label="Toggle menu"
-            onClick={() => setMobileMenuOpen(o => !o)}
-            className="md:hidden p-2 text-[#555] hover:text-[#e0e0e0] transition-colors">
-            <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all duration-200 ${mobileMenuOpen ? "rotate-45 translate-y-2" : ""}`} />
-            <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all duration-200 ${mobileMenuOpen ? "opacity-0" : ""}`} />
-            <div className={`w-5 h-0.5 bg-current transition-all duration-200 ${mobileMenuOpen ? "-rotate-45 -translate-y-2" : ""}`} />
-          </button>
+          {/* Mobile — bell + hamburger */}
+          <div className="md:hidden flex items-center gap-1">
+            {/* 🔔 Mobile bell */}
+            <div className="relative" ref={notifRefMob}>
+              <button onClick={() => setNotifOpen(o => !o)}
+                className="relative p-2 text-[#555] hover:text-[#e0e0e0] transition-colors">
+                <span className="text-base">🔔</span>
+                {liveItems.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#00e87a] animate-pulse" />
+                )}
+              </button>
+              {bellDropdown}
+            </div>
+            <button type="button" aria-label="Toggle menu"
+              onClick={() => setMobileMenuOpen(o => !o)}
+              className="p-2 text-[#555] hover:text-[#e0e0e0] transition-colors">
+              <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all duration-200 ${mobileMenuOpen ? "rotate-45 translate-y-2" : ""}`} />
+              <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all duration-200 ${mobileMenuOpen ? "opacity-0" : ""}`} />
+              <div className={`w-5 h-0.5 bg-current transition-all duration-200 ${mobileMenuOpen ? "-rotate-45 -translate-y-2" : ""}`} />
+            </button>
+          </div>
         </div>
 
         {/* Mobile menu */}
