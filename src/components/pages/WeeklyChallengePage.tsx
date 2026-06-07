@@ -12,8 +12,10 @@ import type { Problem, User } from "@/types/database";
 import type {
   WeeklyChallenge,
   WeeklyAccess,
-  WeeklySubmission,
+  WeeklySubmission as WeeklySubmissionBase,
 } from "@/types/database";
+
+type WeeklySubmission = WeeklySubmissionBase & { status?: string };
 
 const Workspace = dynamic(() => import("@/app/problems/Workspace"), {
   ssr: false,
@@ -573,6 +575,12 @@ export default function WeeklyChallengePage({ user }: Props) {
     const problem = problems[problemId];
     if (!problem) return;
 
+    // Block resubmission if admin has already approved this problem
+    const existing = mySubmissions.find(
+      (s) => s.weekly_challenge_id === activeChallenge.id && s.problem_id === problemId
+    );
+    if (existing?.status === "approved") return;
+
     // Time bonus applied on top of the test-result-based points
     const bonus = computeBonus(
       activeChallenge.starts_at,
@@ -781,6 +789,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                           s.problem_id === p.id,
                       );
                       const solved = !!mySub;
+                      const isApproved = mySub?.status === "approved";
 
                       return (
                         <div
@@ -789,12 +798,15 @@ export default function WeeklyChallengePage({ user }: Props) {
                             if (!confirmed) return;
                             if (isUpcoming) return;
                             if (isEnded) return;
+                            if (isApproved) return;
                             setActiveChallenge(ch);
                             setActiveProblem(p);
                           }}
                           className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150
                             ${
-                              confirmed && isActive
+                              isApproved
+                                ? "border-[#00e87a20] bg-[#00e87a06] cursor-default"
+                                : confirmed && isActive
                                 ? "border-[#1f1f1f] hover:bg-[#161616] hover:border-[#2a2a2a] cursor-pointer group"
                                 : "border-[#161616] opacity-50 cursor-not-allowed select-none"
                             }`}

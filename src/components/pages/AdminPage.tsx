@@ -2961,166 +2961,196 @@ function WeeklyAdminSection({ user }: { user: User }) {
                     </>
                   )}
 
-                  {/* Submissions tab */}
+                  {/* Submissions tab — grouped by person */}
                   {manageTab[ch.id] === "submissions" &&
                     (() => {
                       const chSubs = submissions.filter(
                         (s) => s.weekly_challenge_id === ch.id,
                       );
-                      return chSubs.length === 0 ? (
-                        <p className="text-xs text-[#ccc] font-mono">
-                          No submissions yet.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {/* Header */}
-                          <div
-                            className="hidden sm:grid grid-cols-[1fr_6rem_4rem_4rem_5rem_6rem] gap-3 px-3 py-1
-                          text-[10px] text-[#ccc] font-mono uppercase tracking-widest border-b border-[#1a1a1a]"
-                          >
-                            <div>User / Problem</div>
-                            <div>Lang</div>
-                            <div>Tests</div>
-                            <div>When</div>
-                            <div className="text-center">Points</div>
-                            <div className="text-center">Override</div>
-                          </div>
-                          {chSubs.map((s: any) => {
-                            const isEditing = editingPts[s.id] !== undefined;
-                            const daysSince = Math.floor(
-                              (Date.now() -
-                                new Date(s.submitted_at).getTime()) /
-                                86400000,
-                            );
+                      if (chSubs.length === 0) {
+                        return (
+                          <p className="text-xs text-[#ccc] font-mono">
+                            No submissions yet.
+                          </p>
+                        );
+                      }
+
+                      // Keep only the latest submission per person per problem (safety dedup)
+                      const latestPerKey = new Map<string, any>();
+                      for (const s of chSubs) {
+                        const key = `${s.github}::${s.problem_id}`;
+                        const existing = latestPerKey.get(key);
+                        if (!existing || new Date(s.submitted_at) > new Date(existing.submitted_at)) {
+                          latestPerKey.set(key, s);
+                        }
+                      }
+                      // Group by github handle, preserving order of first appearance
+                      const byUser = new Map<string, any[]>();
+                      for (const s of Array.from(latestPerKey.values())) {
+                        if (!byUser.has(s.github)) byUser.set(s.github, []);
+                        byUser.get(s.github)!.push(s);
+                      }
+
+                      return (
+                        <div className="space-y-4">
+                          {Array.from(byUser.entries()).map(([github, userSubs]) => {
+                            const totalPts = userSubs.reduce((sum: number, s: any) => sum + (s.points_awarded || 0), 0);
+                            const pendingCount = userSubs.filter((s: any) => s.status === "pending").length;
+                            const firstSub = userSubs[0];
+
                             return (
-                              <div
-                                key={s.id}
-                                className="grid grid-cols-1 sm:grid-cols-[1fr_6rem_4rem_4rem_5rem_6rem] gap-3 items-center px-3 py-2.5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl"
-                              >
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1.5">
+                              <div key={github} className="border border-[#1f1f1f] rounded-2xl overflow-hidden">
+                                {/* Person header */}
+                                <div className="flex items-center justify-between px-4 py-3 bg-[#111] border-b border-[#1a1a1a]">
+                                  <div className="flex items-center gap-2.5">
                                     <img
-                                      src={`https://github.com/${s.github}.png?size=16`}
-                                      className="w-4 h-4 rounded-full shrink-0"
-                                      onError={(e) => {
-                                        (
-                                          e.target as HTMLImageElement
-                                        ).style.display = "none";
-                                      }}
+                                      src={`https://github.com/${github}.png?size=28`}
+                                      className="w-7 h-7 rounded-full shrink-0 ring-1 ring-[#2a2a2a]"
+                                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                                     />
-                                    <span className="text-xs font-mono text-[#e0e0e0] truncate">
-                                      {s.name}
+                                    <div>
+                                      <span className="text-xs font-mono font-bold text-[#e0e0e0]">{firstSub.name}</span>
+                                      <span className="text-[10px] font-mono text-[#555] ml-1.5">@{github}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {pendingCount > 0 && (
+                                      <span className="text-[10px] font-mono bg-[#f0b42920] text-[#f0b429] px-2 py-0.5 rounded-lg">
+                                        {pendingCount} pending
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-mono bg-[#a78bfa20] text-[#a78bfa] px-2 py-0.5 rounded-lg">
+                                      {userSubs.length} problem{userSubs.length !== 1 ? "s" : ""}
                                     </span>
-                                    <span className="text-[10px] font-mono text-[#999] truncate">
-                                      @{s.github}
+                                    <span className="text-xs font-mono font-bold text-[#00e87a]">
+                                      {totalPts} pts
                                     </span>
                                   </div>
-                                  <div className="text-[10px] font-mono text-[#aaa] mt-0.5 truncate">
-                                    {s.problem_title}
+                                </div>
+
+                                {/* This person's submissions — one row per problem */}
+                                <div className="divide-y divide-[#141414]">
+                                  {/* Column header */}
+                                  <div className="hidden sm:grid grid-cols-[1fr_5rem_4rem_4rem_5rem_7rem] gap-3 px-4 py-1.5 text-[10px] text-[#444] font-mono uppercase tracking-widest">
+                                    <div>Problem</div>
+                                    <div>Lang</div>
+                                    <div>Tests</div>
+                                    <div>Day</div>
+                                    <div className="text-center">Points</div>
+                                    <div className="text-center">Actions</div>
                                   </div>
-                                </div>
-                                <div className="text-[10px] font-mono text-[#aaa]">
-                                  {s.lang}
-                                </div>
-                                <div className="text-[10px] font-mono text-[#ccc]">
-                                  {s.tests_passed}/{s.tests_total}
-                                </div>
-                                <div className="text-[10px] font-mono text-[#999]">
-                                  Day {daysSince + 1}
-                                </div>
-                                <div className="text-center">
-                                  {isEditing ? (
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      value={editingPts[s.id]}
-                                      onChange={(e) =>
-                                        setEditingPts((prev) => ({
-                                          ...prev,
-                                          [s.id]: e.target.value,
-                                        }))
-                                      }
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter")
-                                          updatePoints(s.id, editingPts[s.id]);
-                                        if (e.key === "Escape")
-                                          setEditingPts((prev) => {
-                                            const n = { ...prev };
-                                            delete n[s.id];
-                                            return n;
-                                          });
-                                      }}
-                                      className="w-16 bg-[#111] border border-[#00e87a40] rounded-lg px-2 py-1 text-xs font-mono text-[#00e87a] text-center focus:outline-none"
-                                      autoFocus
-                                    />
-                                  ) : (
-                                    <span className="text-sm font-mono font-bold text-[#a78bfa]">
-                                      {s.points_awarded}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex justify-center gap-1 flex-wrap">
-                                  {isEditing ? (
-                                    <>
-                                      <button
-                                        onClick={() =>
-                                          updatePoints(s.id, editingPts[s.id])
-                                        }
-                                        className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
-                                      >
-                                        Save
-                                      </button>
 
-                                      <button
-                                        onClick={() =>
-                                          setEditingPts((prev) => {
-                                            const n = { ...prev };
-                                            delete n[s.id];
-                                            return n;
-                                          })
-                                        }
-                                        className="text-[10px] font-mono text-[#aaa] bg-[#1a1a1a] px-2 py-1 rounded-lg hover:text-[#e0e0e0]"
-                                      >
-                                        ✕
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      {s.status === "pending" && (
-                                        <>
-                                          <button
-                                            onClick={() =>
-                                              approveWeeklySubmission(s)
-                                            }
-                                            className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
-                                          >
-                                            Approve
-                                          </button>
+                                  {userSubs.map((s: any) => {
+                                    const isEditing = editingPts[s.id] !== undefined;
+                                    const daysSince = Math.floor(
+                                      (Date.now() - new Date(s.submitted_at).getTime()) / 86400000,
+                                    );
+                                    const statusColor =
+                                      s.status === "approved"
+                                        ? "text-[#00e87a]"
+                                        : s.status === "rejected"
+                                        ? "text-[#ff4d4d]"
+                                        : "text-[#f0b429]";
 
-                                          <button
-                                            onClick={() =>
-                                              rejectWeeklySubmission(s)
-                                            }
-                                            className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-1 rounded-lg hover:bg-[#ff4d4d25]"
-                                          >
-                                            Reject
-                                          </button>
-                                        </>
-                                      )}
-
-                                      <button
-                                        onClick={() =>
-                                          setEditingPts((prev) => ({
-                                            ...prev,
-                                            [s.id]: String(s.points_awarded),
-                                          }))
-                                        }
-                                        className="text-[10px] font-mono text-[#a78bfa] bg-[#a78bfa15] px-2 py-1 rounded-lg hover:bg-[#a78bfa25]"
+                                    return (
+                                      <div
+                                        key={s.id}
+                                        className="grid grid-cols-1 sm:grid-cols-[1fr_5rem_4rem_4rem_5rem_7rem] gap-3 items-center px-4 py-2.5 hover:bg-[#0d0d0d] transition-colors"
                                       >
-                                        Edit pts
-                                      </button>
-                                    </>
-                                  )}
+                                        {/* Problem title + status badge */}
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="text-xs font-mono text-[#e0e0e0] truncate">
+                                              {s.problem_title}
+                                            </span>
+                                            <span className={`text-[9px] font-mono uppercase ${statusColor} shrink-0`}>
+                                              {s.status}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <div className="text-[10px] font-mono text-[#aaa]">{s.lang}</div>
+
+                                        <div className="text-[10px] font-mono text-[#ccc]">
+                                          {s.tests_passed}/{s.tests_total}
+                                        </div>
+
+                                        <div className="text-[10px] font-mono text-[#999]">
+                                          Day {daysSince + 1}
+                                        </div>
+
+                                        {/* Points — editable */}
+                                        <div className="text-center">
+                                          {isEditing ? (
+                                            <input
+                                              type="number"
+                                              min="0"
+                                              value={editingPts[s.id]}
+                                              onChange={(e) =>
+                                                setEditingPts((prev) => ({ ...prev, [s.id]: e.target.value }))
+                                              }
+                                              onKeyDown={(e) => {
+                                                if (e.key === "Enter") updatePoints(s.id, editingPts[s.id]);
+                                                if (e.key === "Escape")
+                                                  setEditingPts((prev) => { const n = { ...prev }; delete n[s.id]; return n; });
+                                              }}
+                                              className="w-16 bg-[#111] border border-[#00e87a40] rounded-lg px-2 py-1 text-xs font-mono text-[#00e87a] text-center focus:outline-none"
+                                              autoFocus
+                                            />
+                                          ) : (
+                                            <span className="text-sm font-mono font-bold text-[#a78bfa]">
+                                              {s.points_awarded}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {/* Action buttons */}
+                                        <div className="flex justify-center gap-1 flex-wrap">
+                                          {isEditing ? (
+                                            <>
+                                              <button
+                                                onClick={() => updatePoints(s.id, editingPts[s.id])}
+                                                className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
+                                              >
+                                                Save
+                                              </button>
+                                              <button
+                                                onClick={() => setEditingPts((prev) => { const n = { ...prev }; delete n[s.id]; return n; })}
+                                                className="text-[10px] font-mono text-[#aaa] bg-[#1a1a1a] px-2 py-1 rounded-lg hover:text-[#e0e0e0]"
+                                              >
+                                                ✕
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <>
+                                              {s.status === "pending" && (
+                                                <>
+                                                  <button
+                                                    onClick={() => approveWeeklySubmission(s)}
+                                                    className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
+                                                  >
+                                                    ✓
+                                                  </button>
+                                                  <button
+                                                    onClick={() => rejectWeeklySubmission(s)}
+                                                    className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-1 rounded-lg hover:bg-[#ff4d4d25]"
+                                                  >
+                                                    ✗
+                                                  </button>
+                                                </>
+                                              )}
+                                              <button
+                                                onClick={() => setEditingPts((prev) => ({ ...prev, [s.id]: String(s.points_awarded) }))}
+                                                className="text-[10px] font-mono text-[#a78bfa] bg-[#a78bfa15] px-2 py-1 rounded-lg hover:bg-[#a78bfa25]"
+                                              >
+                                                pts
+                                              </button>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             );

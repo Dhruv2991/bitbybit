@@ -157,7 +157,16 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   }
 
   if (selected) {
-    return <Workspace problem={selected} user={user} onClose={() => setSelected(null)} onSolved={handleSolved} />;
+    const isSelectedWeekly = (selected as any).visibility === 'weekly' || weeklyIds.has(selected.id);
+    return (
+      <Workspace
+        problem={selected}
+        user={user}
+        onClose={() => setSelected(null)}
+        onSolved={handleSolved}
+        isWeekly={isSelectedWeekly}
+      />
+    );
   }
 
   return (
