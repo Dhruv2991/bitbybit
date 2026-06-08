@@ -134,21 +134,14 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     setTimeLeft(contest.duration_mins * 60);
     onArenaLockChange(true);
 
-    visHandler.current = () => {
-      if (document.hidden) {
-        setStrikes(s => {
-          const next = s + 1;
-          showToast(`⚠ Tab switch detected! ${next}/3 warnings.`, 'warn');
-          if (next >= 3) endContest('disqualified');
-          return next;
-        });
-      }
-    };
-    document.addEventListener('visibilitychange', visHandler.current);
+    // Use a single flag to prevent double-strike when fullscreen exit
+    // also triggers visibilitychange simultaneously
+    let fsJustChanged = false;
 
-    // FIX: also penalise fullscreen exit
     const fsHandler = () => {
       if (!document.fullscreenElement) {
+        fsJustChanged = true;
+        setTimeout(() => { fsJustChanged = false; }, 200);
         setStrikes(s => {
           const next = s + 1;
           showToast(`⚠ Fullscreen exit detected! ${next}/3 warnings.`, 'warn');
@@ -159,6 +152,18 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     };
     document.addEventListener('fullscreenchange', fsHandler);
     (visHandler as any).fsHandler = fsHandler;
+
+    visHandler.current = () => {
+      if (document.hidden && !fsJustChanged) {
+        setStrikes(s => {
+          const next = s + 1;
+          showToast(`⚠ Tab switch detected! ${next}/3 warnings.`, 'warn');
+          if (next >= 3) endContest('disqualified');
+          return next;
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', visHandler.current);
 
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
