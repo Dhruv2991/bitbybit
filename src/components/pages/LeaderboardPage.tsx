@@ -70,14 +70,16 @@ export default function LeaderboardPage() {
 
         const map = new Map<
           string,
-          { name: string; total: number; problems: Set<string> }
+          { name: string; total: number; problems: Set<string>; firstSolve: string }
         >();
         for (const s of subs || []) {
           if (!map.has(s.github))
-            map.set(s.github, { name: s.name, total: 0, problems: new Set() });
+            map.set(s.github, { name: s.name, total: 0, problems: new Set(), firstSolve: s.submitted_at });
           const e = map.get(s.github)!;
           e.total += s.points_awarded || 0;
           e.problems.add(s.problem_id);
+          if (new Date(s.submitted_at).getTime() < new Date(e.firstSolve).getTime())
+            e.firstSolve = s.submitted_at;
         }
         const rows = [...map.entries()]
           .map(([github, v]) => ({
@@ -87,7 +89,10 @@ export default function LeaderboardPage() {
             solved: v.problems.size,
             challengeTitle: ch.title,
           }))
-          .sort((a, b) => b.total - a.total)
+          .sort((a, b) => {
+            if (b.total !== a.total) return b.total - a.total;
+            return new Date((map.get(a.github)?.firstSolve || 0)).getTime() - new Date((map.get(b.github)?.firstSolve || 0)).getTime();
+          })
           .slice(0, 100);
         setChallengeRows(rows);
       } else {
@@ -188,18 +193,20 @@ export default function LeaderboardPage() {
   }, [load]);
 
   useEffect(() => {
-    if (tab !== "overall") return;
-    const channel = db
-      .channel("leaderboard-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "members" },
-        load,
-      )
-      .subscribe();
-    return () => {
-      db.removeChannel(channel);
-    };
+    if (tab === "overall") {
+      const channel = db
+        .channel("leaderboard-realtime-members")
+        .on("postgres_changes", { event: "*", schema: "public", table: "members" }, load)
+        .subscribe();
+      return () => { db.removeChannel(channel); };
+    }
+    if (tab === "challenge") {
+      const channel = db
+        .channel("leaderboard-realtime-weekly")
+        .on("postgres_changes", { event: "*", schema: "public", table: "weekly_submissions" }, load)
+        .subscribe();
+      return () => { db.removeChannel(channel); };
+    }
   }, [tab, load]);
 
   const filteredMembers = search.trim()
