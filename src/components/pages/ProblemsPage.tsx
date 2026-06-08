@@ -20,6 +20,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   const [selected,       setSelected]       = useState<Problem | null>(null);
   const [solved,         setSolved]         = useState<string[]>([]);
   const [weeklyIds,      setWeeklyIds]      = useState<Set<string>>(new Set());
+  const [weeklyChallengeMap, setWeeklyChallengeMap] = useState<Map<string, any>>(new Map());
   const [lockedToast,       setLockedToast]       = useState(false);
   const [notStartedToast,   setNotStartedToast]   = useState<string>('');
   const [unlockedIds,       setUnlockedIds]       = useState<Set<string>>(new Set());
@@ -68,10 +69,15 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           .order('created_at', { ascending: false });
 
         const allWeeklyIds = new Set<string>();
+        const challengeMap = new Map<string, any>();
         (challenges || []).forEach((ch: any) => {
-          (ch.problem_ids || []).forEach((id: string) => allWeeklyIds.add(id));
+          (ch.problem_ids || []).forEach((id: string) => {
+            allWeeklyIds.add(id);
+            challengeMap.set(id, ch);
+          });
         });
         setWeeklyIds(allWeeklyIds);
+        setWeeklyChallengeMap(challengeMap);
 
         // If user is logged in, check which weekly challenges they have confirmed access to
         if (user?.github && challenges?.length) {
@@ -127,13 +133,54 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     ? problems
     : problems.filter(p => p.difficulty === filter || (p.tags || []).includes(filter));
 
-  function handleSolved(problemId: string) {
+  async function handleSolved(
+    problemId: string,
+    details?: { code: string; lang: string; passed: number; total: number; pointsAwarded: number }
+  ) {
+    // Update local solved state
     setSolved(prev => {
       if (prev.includes(problemId)) return prev;
       const next = [...prev, problemId];
       try { localStorage.setItem('bb_solved', JSON.stringify(next)); } catch {}
       return next;
     });
+
+    // If this is a weekly problem and user is logged in, write to weekly_submissions
+    const challenge = weeklyChallengeMap.get(problemId);
+    if (challenge && user) {
+      try {
+        const db = getSupabaseClient();
+        const problem = problems.find(p => p.id === problemId);
+        const now = Date.now();
+        const start = new Date(challenge.starts_at).getTime();
+        const end = new Date(challenge.ends_at).getTime();
+        const total = end - start;
+        const frac = total > 0 ? Math.min(1, Math.max(0, now - start) / total) : 1;
+        const bonus = 1.0 - frac * 0.8;
+        const basePts = details?.pointsAwarded ?? problem?.points ?? 100;
+        const finalPoints = Math.round(basePts * (1 + bonus));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (db.from('weekly_submissions') as any).upsert(
+          {
+            weekly_challenge_id: challenge.id,
+            problem_id: problemId,
+            problem_title: problem?.title ?? '',
+            github: user.github,
+            name: user.name,
+            lang: details?.lang ?? 'unknown',
+            code: details?.code ?? '',
+            tests_passed: details?.passed ?? 0,
+            tests_total: details?.total ?? 0,
+            points_awarded: finalPoints,
+            time_bonus: bonus,
+            status: 'pending',
+            submitted_at: new Date().toISOString(),
+          },
+          { onConflict: 'weekly_challenge_id,problem_id,github' }
+        );
+      } catch {}
+      return; // Don't write to submissions table for weekly problems
+    }
   }
 
   function handleRowClick(p: Problem) {
@@ -157,7 +204,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   }
 
   if (selected) {
-    const isSelectedWeekly = (selected as any).visibility === 'weekly' || weeklyIds.has(selected.id);
+    const isSelectedWeekly = weeklyIds.has(selected.id) || (selected as any).visibility === 'weekly';
     return (
       <Workspace
         problem={selected}
