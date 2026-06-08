@@ -15,14 +15,16 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
     const db = getSupabaseClient();
     (async () => {
       try {
-        const [{ data: pd }, { data: sd }, { data: md }] = await Promise.all([
+        const [{ data: pd }, { data: sd }, { data: wd }, { data: md }] = await Promise.all([
           db.from('problems').select('id'),
           db.from('submissions').select('id'),
+          db.from('weekly_submissions').select('id'),
           db.from('members').select('id'),
         ]);
+        const totalSubmissions = (sd?.length ?? 0) + (wd?.length ?? 0);
         setStats({
           problems:    String(pd?.length  ?? 0),
-          submissions: String(sd?.length  ?? 0),
+          submissions: String(totalSubmissions),
           members:     String(md?.length  ?? 0),
         });
       } catch {
