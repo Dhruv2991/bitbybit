@@ -15,6 +15,7 @@ interface ChallengeRow {
   total: number;
   solved: number;
   challengeTitle: string;
+  firstSolve: string;
 }
 
 export default function LeaderboardPage() {
@@ -29,12 +30,49 @@ export default function LeaderboardPage() {
     setLoading(true);
     try {
       if (tab === "overall") {
-        const { data } = await db
-          .from("members")
-          .select("*")
-          .order("total_points", { ascending: false })
-          .limit(100);
-        setMembers((data || []) as EnrichedMember[]);
+        // Aggregate from all three tables for true all-time points
+        const [{ data: normalSubs }, { data: arenaSubs }, { data: weeklySubs }, { data: membersData }] = await Promise.all([
+          db.from("submissions").select("github, name, points_awarded, problem_id").eq("status", "approved"),
+          db.from("arena_submissions").select("github, name, points_awarded, problem_id").eq("status", "reviewed"),
+          (db.from("weekly_submissions") as any).select("github, name, points_awarded, problem_id").eq("status", "approved"),
+          db.from("members").select("github, name, streak, last_solved_at, created_at, problems_solved"),
+        ]);
+
+        // Deduplicate: per user per problem, keep only the highest points_awarded
+        // (prevents double-counting if the same problem was approved in multiple tables)
+        const bestPerProblem = new Map<string, { github: string; name: string; points: number }>();
+        for (const s of [...(normalSubs || []), ...(arenaSubs || []), ...(weeklySubs || [])]) {
+          const key = `${s.github}::${s.problem_id}`;
+          const existing = bestPerProblem.get(key);
+          if (!existing || (s.points_awarded || 0) > existing.points)
+            bestPerProblem.set(key, { github: s.github, name: s.name, points: s.points_awarded || 0 });
+        }
+
+        const map: Record<string, { github: string; name: string; total: number; solved: number }> = {};
+        for (const v of bestPerProblem.values()) {
+          if (!map[v.github]) map[v.github] = { github: v.github, name: v.name, total: 0, solved: 0 };
+          map[v.github].total += v.points;
+          map[v.github].solved += 1;
+        }
+
+        const membersMap = new Map((membersData || []).map((m: any) => [m.github, m]));
+        const ranked = Object.values(map)
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 100)
+          .map(m => {
+            const member = membersMap.get(m.github) as any;
+            return {
+              id: m.github,
+              github: m.github,
+              name: m.name,
+              total_points: m.total,
+              problems_solved: m.solved,
+              streak: member?.streak || 0,
+              last_solved_at: member?.last_solved_at || null,
+              created_at: member?.created_at || "",
+            } as EnrichedMember;
+          });
+        setMembers(ranked);
       } else if (tab === "challenge") {
         // Load the most recent active/ended weekly challenge leaderboard
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,10 +126,11 @@ export default function LeaderboardPage() {
             total: v.total,
             solved: v.problems.size,
             challengeTitle: ch.title,
+            firstSolve: v.firstSolve,
           }))
           .sort((a, b) => {
             if (b.total !== a.total) return b.total - a.total;
-            return new Date((map.get(a.github)?.firstSolve || 0)).getTime() - new Date((map.get(b.github)?.firstSolve || 0)).getTime();
+            return new Date(a.firstSolve).getTime() - new Date(b.firstSolve).getTime();
           })
           .slice(0, 100);
         setChallengeRows(rows);
@@ -195,8 +234,10 @@ export default function LeaderboardPage() {
   useEffect(() => {
     if (tab === "overall") {
       const channel = db
-        .channel("leaderboard-realtime-members")
-        .on("postgres_changes", { event: "*", schema: "public", table: "members" }, load)
+        .channel("leaderboard-realtime-overall")
+        .on("postgres_changes", { event: "*", schema: "public", table: "submissions" }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "weekly_submissions" }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "arena_submissions" }, load)
         .subscribe();
       return () => { db.removeChannel(channel); };
     }
