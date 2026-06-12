@@ -2378,6 +2378,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
     Record<string, "payments" | "submissions">
   >({});
   const [editingPts, setEditingPts] = useState<Record<string, string>>({});
+  const [carryFromId, setCarryFromId] = useState<string>("");
 
   useEffect(() => {
     load();
@@ -2415,6 +2416,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
   function startCreate() {
     setEditId(null);
     setForm(blankWeekly());
+    setCarryFromId("");
   }
 
   function startEdit(ch: WeeklyChallenge) {
@@ -2462,11 +2464,37 @@ function WeeklyAdminSection({ user }: { user: User }) {
         showToast("Updated ✓");
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (db.from("weekly_challenges") as any).insert(
+        const { data: inserted, error } = await (db.from("weekly_challenges") as any).insert(
           payload,
-        );
+        ).select().single();
         if (error) throw error;
-        showToast("Created ✓");
+
+        // Carry forward confirmed access from a previous challenge
+        if (carryFromId && inserted) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { data: prevAccess } = await (db.from("weekly_access") as any)
+            .select("github, name")
+            .eq("weekly_challenge_id", carryFromId)
+            .eq("status", "confirmed");
+
+          if (prevAccess?.length) {
+            const newRows = prevAccess.map((a: any) => ({
+              weekly_challenge_id: inserted.id,
+              weekly_challenge_title: payload.title,
+              github: a.github,
+              name: a.name,
+              txn_id: "carried-forward",
+              status: "confirmed",
+            }));
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (db.from("weekly_access") as any).insert(newRows);
+            showToast(`Created ✓ — carried forward access for ${prevAccess.length} user(s)`);
+          } else {
+            showToast("Created ✓ — no confirmed access found to carry forward");
+          }
+        } else {
+          showToast("Created ✓");
+        }
       }
       setForm(null);
       setEditId(null);
@@ -2749,6 +2777,29 @@ function WeeklyAdminSection({ user }: { user: User }) {
               />
             </div>
           </div>
+
+          {!editId && (
+            <div className="border-t border-[#1a1a1a] pt-4">
+              <label className="text-[10px] text-[#999] font-mono uppercase">
+                Carry forward access from previous challenge
+              </label>
+              <select
+                value={carryFromId}
+                onChange={(e) => setCarryFromId(e.target.value)}
+                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+              >
+                <option value="">— None (require fresh payments) —</option>
+                {challenges.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-[#999] font-mono mt-1">
+                All users with confirmed access to the selected challenge will automatically get access to this new challenge — no re-payment required.
+              </p>
+            </div>
+          )}
 
           {/* Problem picker */}
           <div>

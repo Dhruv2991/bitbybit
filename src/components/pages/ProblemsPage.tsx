@@ -185,7 +185,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         const frac = total > 0 ? Math.min(1, Math.max(0, now - start) / total) : 1;
         const bonus = 1.0 - frac * 0.8;
         const basePts = details?.pointsAwarded ?? problem?.points ?? 100;
-        const finalPoints = Math.round(basePts * bonus);
+        const finalPoints = Math.round(basePts * (1 + bonus));
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (db.from('weekly_submissions') as any).upsert(
           {

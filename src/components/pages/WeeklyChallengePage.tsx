@@ -581,7 +581,7 @@ export default function WeeklyChallengePage({ user }: Props) {
       activeChallenge.ends_at,
     );
     const basePts = details?.pointsAwarded ?? problem.points ?? 100;
-    const finalPoints = Math.round(basePts * bonus);
+    const finalPoints = Math.round(basePts * (1 + bonus));
     const passed = details?.passed ?? (problem.test_cases?.length || 0);
     const total = details?.total ?? (problem.test_cases?.length || 0);
 
