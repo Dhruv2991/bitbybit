@@ -421,7 +421,7 @@ function WeeklyLeaderboard({ challengeId }: { challengeId: string }) {
   loadLeaderboard();
 
   const channel = db
-    .channel(`weekly-${challengeId}`)
+    .channel(`weekly-lb-${challengeId}-${Math.random().toString(36).slice(2)}`)
     .on(
       "postgres_changes",
       {
@@ -575,19 +575,13 @@ export default function WeeklyChallengePage({ user }: Props) {
     const problem = problems[problemId];
     if (!problem) return;
 
-    // Block resubmission if admin has already approved this problem
-    const existing = mySubmissions.find(
-      (s) => s.weekly_challenge_id === activeChallenge.id && s.problem_id === problemId
-    );
-    if (existing?.status === "approved") return;
-
     // Time bonus applied on top of the test-result-based points
     const bonus = computeBonus(
       activeChallenge.starts_at,
       activeChallenge.ends_at,
     );
     const basePts = details?.pointsAwarded ?? problem.points ?? 100;
-    const finalPoints = Math.round(basePts * (1 + bonus));
+    const finalPoints = Math.round(basePts * bonus);
     const passed = details?.passed ?? (problem.test_cases?.length || 0);
     const total = details?.total ?? (problem.test_cases?.length || 0);
 
@@ -789,7 +783,6 @@ export default function WeeklyChallengePage({ user }: Props) {
                           s.problem_id === p.id,
                       );
                       const solved = !!mySub;
-                      const isApproved = mySub?.status === "approved";
 
                       return (
                         <div
@@ -798,15 +791,12 @@ export default function WeeklyChallengePage({ user }: Props) {
                             if (!confirmed) return;
                             if (isUpcoming) return;
                             if (isEnded) return;
-                            if (isApproved) return;
                             setActiveChallenge(ch);
                             setActiveProblem(p);
                           }}
                           className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150
                             ${
-                              isApproved
-                                ? "border-[#00e87a20] bg-[#00e87a06] cursor-default"
-                                : confirmed && isActive
+                              confirmed && isActive
                                 ? "border-[#1f1f1f] hover:bg-[#161616] hover:border-[#2a2a2a] cursor-pointer group"
                                 : "border-[#161616] opacity-50 cursor-not-allowed select-none"
                             }`}

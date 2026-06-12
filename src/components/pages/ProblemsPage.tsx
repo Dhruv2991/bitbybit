@@ -26,6 +26,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   const [unlockedIds,       setUnlockedIds]       = useState<Set<string>>(new Set());
   const [paidNotStartedIds, setPaidNotStartedIds] = useState<Set<string>>(new Set());
   const [paidEndedIds,      setPaidEndedIds]      = useState<Set<string>>(new Set());
+  const [attemptCounts,     setAttemptCounts]     = useState<Record<string, number>>({});
 
   useEffect(() => {
     try { setSolved(JSON.parse(localStorage.getItem('bb_solved') || '[]')); } catch {}
@@ -45,7 +46,33 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
             return merged;
           });
         });
+
+      // Also check weekly_submissions for approved weekly problems
+      (db.from('weekly_submissions') as any)
+        .select('problem_id')
+        .eq('github', user.github)
+        .eq('status', 'approved')
+        .then(({ data }: any) => {
+          if (!data?.length) return;
+          setSolved(prev => {
+            const merged = [...new Set([...prev, ...data.map((s: any) => s.problem_id)])];
+            try { localStorage.setItem('bb_solved', JSON.stringify(merged)); } catch {}
+            return merged;
+          });
+        });
     }
+
+    // Load attempt counts for all problems (submissions + weekly_submissions)
+    Promise.all([
+      db.from('submissions').select('problem_id'),
+      (db.from('weekly_submissions') as any).select('problem_id'),
+    ]).then(([{ data: normalSubs }, { data: weeklySubs }]) => {
+      const counts: Record<string, number> = {};
+      for (const s of [...(normalSubs || []), ...(weeklySubs || [])]) {
+        counts[s.problem_id] = (counts[s.problem_id] || 0) + 1;
+      }
+      setAttemptCounts(counts);
+    });
 
     async function load() {
       setLoading(true);
@@ -158,7 +185,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         const frac = total > 0 ? Math.min(1, Math.max(0, now - start) / total) : 1;
         const bonus = 1.0 - frac * 0.8;
         const basePts = details?.pointsAwarded ?? problem?.points ?? 100;
-        const finalPoints = Math.round(basePts * (1 + bonus));
+        const finalPoints = Math.round(basePts * bonus);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (db.from('weekly_submissions') as any).upsert(
           {
@@ -294,7 +321,6 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
               const isUnlocked = unlockedIds.has(p.id);
               const isLocked   = isWeekly && !isUnlocked;
-
               return (
                 <div key={p.id} onClick={() => handleRowClick(p)}
                   className={`card-hover px-4 py-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.99]
@@ -341,7 +367,6 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
               const isUnlocked = unlockedIds.has(p.id);
               const isLocked   = isWeekly && !isUnlocked;
-
               return (
                 <div key={p.id} onClick={() => handleRowClick(p)}
                   className={`grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-4
@@ -384,7 +409,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                   </div>
 
                   <div className="text-[#a78bfa] text-sm font-mono font-bold">{p.points}</div>
-                  <div className="text-[#999] text-sm font-mono">{p.submission_count || 0}</div>
+                  <div className="text-[#999] text-sm font-mono">{attemptCounts[p.id] || 0}</div>
 
                   <div>
                     {isSolved ? (

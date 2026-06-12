@@ -44,6 +44,13 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   const [runStatus,     setRunStatus]     = useState('');
   const [progress,      setProgress]      = useState<{ done: number; total: number } | null>(null);
   const [toasts,        setToasts]        = useState<Toast[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string; resolve: (v: boolean) => void } | null>(null);
+
+  function confirmAction(message: string): Promise<boolean> {
+    return new Promise(resolve => {
+      setConfirmDialog({ message, resolve });
+    });
+  }
   const toastCounter = useRef(0);
 
   const arenaCodeChangeTimer = useRef<NodeJS.Timeout | null>(null);
@@ -65,7 +72,23 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
   useEffect(() => {
     if (!user) return;
-    if (isWeekly) return; // weekly submissions are tracked separately
+    if (isWeekly) {
+      // Check for an existing pending weekly submission for this problem
+      (async () => {
+        const { data } = await (db.from('weekly_submissions') as any)
+          .select('id, status')
+          .eq('problem_id', problem.id)
+          .eq('github', user.github)
+          .limit(1)
+          
+        if (data?.length) {
+          setStatusMsg(data[0].status === 'approved'
+            ? '✓ Already approved.'
+            : '⏳ Submission pending review — resubmitting will replace it.');
+        }
+      })();
+      return;
+    }
     (async () => {
       const { data } = await db
         .from('submissions')
@@ -76,10 +99,9 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         .limit(1)
         .returns<{ id: string; status: string }[]>();
       if (data?.length) {
-        setSubmitBlocked(true);
         setStatusMsg(data[0].status === 'approved'
-          ? '✓ Already approved — no re-submission allowed.'
-          : '⏳ Submission pending review — duplicates blocked.');
+          ? '✓ Already approved — resubmitting will replace it.'
+          : '⏳ Submission pending review — resubmitting will replace it.');
       }
     })();
   }, [user, problem.id, isWeekly]);
@@ -164,6 +186,27 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
       // ── Weekly mode — skip submissions table entirely ────────
       if (isWeekly) {
+        // Check for existing pending submission and confirm resubmission
+        const { data: existingWeekly } = await (db.from('weekly_submissions') as any)
+          .select('id, status')
+          .eq('problem_id', problem.id)
+          .eq('github', user.github)
+          .limit(1)
+         
+
+        if (existingWeekly?.length) {
+          const isApproved = existingWeekly[0].status === 'approved';
+          const confirmMsg = isApproved
+            ? 'This problem is already approved. Do you want to resubmit? This will replace your approved submission and require admin re-approval.'
+            : 'You already have a pending submission for this problem. Do you want to resubmit and replace it?';
+          const proceed = await confirmAction(confirmMsg);
+          if (!proceed) {
+            setStatusMsg('Resubmission cancelled.');
+            setSubmitting(false);
+            return;
+          }
+        }
+
         onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded });
         setSubmitBlocked(true);
         setStatusMsg(`✅ Submitted — ${passed}/${total} tests, ${pointsAwarded} base pts`);
@@ -177,20 +220,27 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
       // ── Normal problems mode ─────────────────────────────────
       const { data: existing } = await db
         .from('submissions')
-        .select('id')
+        .select('id, status')
         .eq('problem_id', problem.id)
         .eq('github', user.github)
         .in('status', ['pending', 'approved'])
-        .limit(1);
+        .limit(1)
+        .returns<{ id: string; status: string }[]>();
 
       if (existing?.length) {
-        setStatusMsg('⏳ Duplicate blocked.');
-        setSubmitBlocked(true);
-        showToast('You already have a pending or approved submission.', 'warn');
-        return;
+        const isApproved = existing[0].status === 'approved';
+        const confirmMsg = isApproved
+          ? 'This problem is already approved. Do you want to resubmit? This will replace your approved submission and require admin re-approval.'
+          : 'You already have a pending submission for this problem. Do you want to resubmit and replace it?';
+        const proceed = await confirmAction(confirmMsg);
+        if (!proceed) {
+          setStatusMsg('Resubmission cancelled.');
+          setSubmitting(false);
+          return;
+        }
       }
 
-      const { error } = await (db.from('submissions') as any).insert([{
+      const { error } = await (db.from('submissions') as any).upsert([{
         problem_id:     problem.id,
         problem_title:  problem.title,
         name:           user.name,
@@ -200,12 +250,11 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         tests_passed:   passed,
         tests_total:    total,
         points_awarded: pointsAwarded,
-      }]);
+      }], { onConflict: 'problem_id,github' });
 
       if (error) throw error;
 
       setStatusMsg('⏳ Pending review.');
-      setSubmitBlocked(true);
       setApproach('');
       onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded });
       showToast(
@@ -244,6 +293,34 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           </div>
         ))}
       </div>
+
+      {/* Confirm dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl p-5 shadow-2xl animate-fade-up">
+            <div className="flex items-start gap-3 mb-4">
+              <span className="text-2xl">⚠️</span>
+              <p className="text-sm font-mono text-[#e0e0e0] leading-relaxed">
+                {confirmDialog.message}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { confirmDialog.resolve(false); setConfirmDialog(null); }}
+                className="flex-1 py-2.5 bg-[#1a1a1a] text-[#ccc] font-mono text-sm font-bold rounded-xl hover:bg-[#222] hover:text-[#e0e0e0] transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { confirmDialog.resolve(true); setConfirmDialog(null); }}
+                className="flex-1 py-2.5 bg-[#00e87a] text-black font-mono text-sm font-bold rounded-xl hover:bg-[#00ff88] transition-all"
+              >
+                Resubmit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Left: Problem description */}
       <div className="card p-5 md:p-6 overflow-y-auto">
