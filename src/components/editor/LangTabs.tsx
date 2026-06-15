@@ -14,12 +14,14 @@ const LANGS: { id: SupportedLang; label: string; icon: string; color: string }[]
 interface LangTabsProps {
   current:  SupportedLang;
   onChange: (lang: SupportedLang) => void;
+  allowedLangs?: SupportedLang[];
 }
 
-export default function LangTabs({ current, onChange }: LangTabsProps) {
+export default function LangTabs({ current, onChange, allowedLangs }: LangTabsProps) {
+  const visibleLangs = allowedLangs ? LANGS.filter(l => allowedLangs.includes(l.id)) : LANGS;
   return (
     <div className="grid grid-cols-3 gap-1.5 w-full sm:w-auto sm:flex sm:flex-wrap sm:gap-1.5">
-      {LANGS.map(({ id, label, icon }) => {
+      {visibleLangs.map(({ id, label, icon }) => {
         const isActive = current === id;
         return (
           <button

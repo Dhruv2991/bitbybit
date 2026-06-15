@@ -62,13 +62,14 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         });
     }
 
-    // Load attempt counts for all problems (submissions + weekly_submissions)
+    // Load attempt counts for all problems (submissions + weekly_submissions + practice_attempts)
     Promise.all([
       db.from('submissions').select('problem_id'),
       (db.from('weekly_submissions') as any).select('problem_id'),
-    ]).then(([{ data: normalSubs }, { data: weeklySubs }]) => {
+      (db.from('practice_attempts') as any).select('problem_id'),
+    ]).then(([{ data: normalSubs }, { data: weeklySubs }, { data: practiceAttempts }]) => {
       const counts: Record<string, number> = {};
-      for (const s of [...(normalSubs || []), ...(weeklySubs || [])]) {
+      for (const s of [...(normalSubs || []), ...(weeklySubs || []), ...(practiceAttempts || [])]) {
         counts[s.problem_id] = (counts[s.problem_id] || 0) + 1;
       }
       setAttemptCounts(counts);
@@ -88,11 +89,11 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         );
         setProblems(publicProbs as Problem[]);
 
-        // Load weekly challenge problem IDs that are currently active or upcoming
+        // Load weekly challenge problem IDs — include ended ones too so
+        // paid users can still get "practice mode" access after end
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: challenges } = await (db.from('weekly_challenges') as any)
-          .select('id, problem_ids, starts_at, ends_at')
-          .neq('status', 'ended')
+          .select('id, problem_ids, starts_at, ends_at, status')
           .order('created_at', { ascending: false });
 
         const allWeeklyIds = new Set<string>();
@@ -124,7 +125,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
             const paidEnded      = new Set<string>();
             (challenges || []).forEach((ch: any) => {
               const started = new Date(ch.starts_at).getTime() <= now;
-              const ended   = new Date(ch.ends_at).getTime()   <  now;
+              const ended   = ch.status === 'ended' || new Date(ch.ends_at).getTime() < now;
               if (confirmedChallengeIds.has(ch.id)) {
                 if (started && !ended) {
                   (ch.problem_ids || []).forEach((id: string) => unlocked.add(id));
@@ -217,14 +218,16 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     const isPaidEnded   = paidEndedIds.has(p.id);
     if (isWeekly && !isUnlocked) {
       if (isPaidEnded) {
-        setNotStartedToast('This weekly challenge has ended.');
+        // Challenge ended for a paid user — allow practice mode (no points)
+        setSelected(p);
+        return;
       } else if (isPaidWaiting) {
         setNotStartedToast('Challenge hasn\'t started yet — come back when it does!');
       } else {
         setLockedToast(true);
         setTimeout(() => setLockedToast(false), 3500);
       }
-      if (isPaidEnded || isPaidWaiting) setTimeout(() => setNotStartedToast(''), 3500);
+      if (isPaidWaiting) setTimeout(() => setNotStartedToast(''), 3500);
       return;
     }
     setSelected(p);
@@ -232,13 +235,15 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
 
   if (selected) {
     const isSelectedWeekly = weeklyIds.has(selected.id) || (selected as any).visibility === 'weekly';
+    const isPracticeMode = isSelectedWeekly && paidEndedIds.has(selected.id);
     return (
       <Workspace
         problem={selected}
         user={user}
         onClose={() => setSelected(null)}
         onSolved={handleSolved}
-        isWeekly={isSelectedWeekly}
+        isWeekly={isSelectedWeekly && !isPracticeMode}
+        practiceMode={isPracticeMode}
       />
     );
   }
@@ -320,7 +325,8 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               const isSolved   = solved.includes(p.id);
               const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
               const isUnlocked = unlockedIds.has(p.id);
-              const isLocked   = isWeekly && !isUnlocked;
+              const isPaidEndedP = paidEndedIds.has(p.id);
+              const isLocked   = isWeekly && !isUnlocked && !isPaidEndedP;
               return (
                 <div key={p.id} onClick={() => handleRowClick(p)}
                   className={`card-hover px-4 py-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.99]
@@ -340,6 +346,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                       </span>
                       <span className="text-[#a78bfa] text-[10px] font-mono">{p.points} pts</span>
                       {isLocked && <span className="text-[10px] font-mono text-[#f0b429]">Weekly</span>}
+                      {isPaidEndedP && !isSolved && <span className="text-[10px] font-mono text-[#a78bfa]">Practice (no pts)</span>}
                     </div>
                   </div>
                   <span className={`text-sm shrink-0 ${isSolved ? 'text-[#00e87a]' : isLocked ? 'text-[#f0b42960]' : 'text-[#ccc]'}`}>
@@ -366,7 +373,8 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               const isSolved   = solved.includes(p.id);
               const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
               const isUnlocked = unlockedIds.has(p.id);
-              const isLocked   = isWeekly && !isUnlocked;
+              const isPaidEndedP = paidEndedIds.has(p.id);
+              const isLocked   = isWeekly && !isUnlocked && !isPaidEndedP;
               return (
                 <div key={p.id} onClick={() => handleRowClick(p)}
                   className={`grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-4
@@ -389,6 +397,11 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                       {isLocked && (
                         <span className="text-[10px] font-mono text-[#f0b429] bg-[#f0b42915] px-1.5 py-0.5 rounded-lg border border-[#f0b42930]">
                           🔒 Weekly
+                        </span>
+                      )}
+                      {isPaidEndedP && !isSolved && (
+                        <span className="text-[10px] font-mono text-[#a78bfa] bg-[#a78bfa15] px-1.5 py-0.5 rounded-lg border border-[#a78bfa30]">
+                          🏁 Practice (no points)
                         </span>
                       )}
                     </div>
@@ -419,6 +432,10 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                     ) : isLocked ? (
                       <span className="text-[#f0b429] text-xs font-mono group-hover:text-[#f0b429] transition-colors">
                         Pay to unlock →
+                      </span>
+                    ) : isPaidEndedP ? (
+                      <span className="text-[#a78bfa] text-xs font-mono group-hover:text-[#c4b5fd] transition-colors">
+                        Practice →
                       </span>
                     ) : (
                       <span className="text-[#ccc] text-xs font-mono group-hover:text-[#aaa] transition-colors">Solve →</span>

@@ -617,6 +617,8 @@ export default function WeeklyChallengePage({ user }: Props) {
 
   // ── Workspace view ──
   if (activeProblem && activeChallenge) {
+    const now = Date.now();
+    const isChallengeEnded = activeChallenge.status === "ended" || now > new Date(activeChallenge.ends_at).getTime();
     return (
       <Workspace
         problem={activeProblem}
@@ -625,7 +627,8 @@ export default function WeeklyChallengePage({ user }: Props) {
           setActiveProblem(null);
         }}
         onSolved={handleSolved}
-        isWeekly={true}
+        isWeekly={!isChallengeEnded}
+        practiceMode={isChallengeEnded}
       />
     );
   }
@@ -790,7 +793,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                           onClick={() => {
                             if (!confirmed) return;
                             if (isUpcoming) return;
-                            if (isEnded) return;
+                            // Ended + confirmed -> practice mode (no points)
                             setActiveChallenge(ch);
                             setActiveProblem(p);
                           }}
@@ -798,6 +801,8 @@ export default function WeeklyChallengePage({ user }: Props) {
                             ${
                               confirmed && isActive
                                 ? "border-[#1f1f1f] hover:bg-[#161616] hover:border-[#2a2a2a] cursor-pointer group"
+                                : confirmed && isEnded
+                                ? "border-[#a78bfa20] hover:bg-[#a78bfa08] hover:border-[#a78bfa30] cursor-pointer group"
                                 : "border-[#161616] opacity-50 cursor-not-allowed select-none"
                             }`}
                         >
@@ -848,7 +853,12 @@ export default function WeeklyChallengePage({ user }: Props) {
                               starts soon
                             </span>
                           )}
-                          {confirmed && isEnded && (
+                          {confirmed && isEnded && !solved && (
+                            <span className="text-[10px] font-mono text-[#a78bfa]">
+                              🏁 practice
+                            </span>
+                          )}
+                          {confirmed && isEnded && solved && (
                             <span className="text-[10px] font-mono text-[#999]">
                               ended
                             </span>

@@ -24,12 +24,13 @@ interface WorkspaceProps {
   onArenaCodeChange?: (code: string, lang: string) => void;
   onSolved?:          (problemId: string, details?: { code: string; lang: string; passed: number; total: number; pointsAwarded: number }) => void;
   isWeekly?:          boolean;
+  practiceMode?:      boolean;
 }
 
 type ToastType = 'ok' | 'err' | 'info' | 'warn';
 interface Toast { msg: string; type: ToastType; id: number; }
 
-export default function Workspace({ problem, user, onClose, onArenaSubmit, onArenaCodeChange, onSolved, isWeekly }: WorkspaceProps) {
+export default function Workspace({ problem, user, onClose, onArenaSubmit, onArenaCodeChange, onSolved, isWeekly, practiceMode }: WorkspaceProps) {
   const db = getSupabaseClient();
 
   const [lang,          setLang]          = useState<SupportedLang>('python');
@@ -72,6 +73,10 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
   useEffect(() => {
     if (!user) return;
+    if (practiceMode) {
+      setStatusMsg('🏁 Practice mode — challenge has ended, no points will be awarded.');
+      return;
+    }
     if (isWeekly) {
       // Check for an existing pending weekly submission for this problem
       (async () => {
@@ -79,8 +84,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           .select('id, status')
           .eq('problem_id', problem.id)
           .eq('github', user.github)
-          .limit(1)
-          
+          .limit(1);
         if (data?.length) {
           setStatusMsg(data[0].status === 'approved'
             ? '✓ Already approved.'
@@ -145,6 +149,17 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
       }
 
       setTestResult(result);
+
+      // Record a practice attempt — once per user per problem, no points
+      if (practiceMode && user) {
+        (db.from('practice_attempts') as any)
+          .upsert(
+            { problem_id: problem.id, github: user.github, name: user.name, lang },
+            { onConflict: 'problem_id,github', ignoreDuplicates: true }
+          )
+          .then(() => {})
+          .catch(() => {});
+      }
     } catch (e: any) {
       setRunError('Execution error: ' + (e.message || 'Unknown'));
     } finally {
@@ -156,6 +171,10 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
   async function submitSolution() {
     if (!user) { showToast('Sign in to submit!', 'err'); return; }
+    if (practiceMode) {
+      showToast('🏁 Practice mode — this challenge has ended, submissions are not recorded.', 'info');
+      return;
+    }
     if (!onArenaSubmit && !isWeekly && !approach.trim()) { showToast('Please add an approach description or GitHub PR link.', 'warn'); return; }
     if (isWeekly && !testResult) { showToast('Please run the tests before submitting.', 'warn'); return; }
     if (submitBlocked) return;
@@ -191,8 +210,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           .select('id, status')
           .eq('problem_id', problem.id)
           .eq('github', user.github)
-          .limit(1)
-         
+          .limit(1);
 
         if (existingWeekly?.length) {
           const isApproved = existingWeekly[0].status === 'approved';
@@ -400,7 +418,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
               {execBadge.label}
             </span>
           </div>
-          <LangTabs current={lang} onChange={handleLangChange} />
+          <LangTabs current={lang} onChange={handleLangChange} allowedLangs={practiceMode ? ['python', 'javascript'] : undefined} />
         </div>
 
         <CodeEditor value={code} language={lang} onChange={handleCodeChange} height="380px" />
@@ -434,8 +452,8 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           loading={running}
         />
 
-        {/* Approach field — only shown outside arena and weekly modes */}
-        {!onArenaSubmit && !isWeekly && (
+        {/* Approach field — only shown outside arena, weekly, and practice modes */}
+        {!onArenaSubmit && !isWeekly && !practiceMode && (
           <div className="card p-4">
             <label className="block text-[10px] text-[#444] font-mono mb-2 uppercase tracking-widest">
               Your approach or GitHub PR link *
@@ -458,19 +476,22 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
         <button
           onClick={submitSolution}
-          disabled={submitting || submitBlocked || !user || (!!isWeekly && !testResult)}
+          disabled={submitting || submitBlocked || !user || (!!isWeekly && !testResult && !practiceMode) || (!!practiceMode && !testResult)}
           className={`w-full py-3 rounded-xl font-mono font-bold text-sm transition-all
             ${submitBlocked || !user
               ? 'bg-[#1a1a1a] text-[#333] cursor-not-allowed border border-[#1f1f1f]'
-              : isWeekly && !testResult
+              : (isWeekly || practiceMode) && !testResult
                 ? 'bg-[#1a1a1a] text-[#444] cursor-not-allowed border border-[#1f1f1f]'
                 : submitting
                   ? 'bg-[#00e87a30] text-[#00e87a60] cursor-not-allowed'
-                  : 'btn-primary'}`}>
+                  : practiceMode
+                    ? 'bg-[#a78bfa15] text-[#a78bfa] border border-[#a78bfa30] hover:bg-[#a78bfa25]'
+                    : 'btn-primary'}`}>
           {!user                      ? 'Sign in to submit'        :
            submitBlocked              ? 'Already submitted'        :
-           isWeekly && !testResult    ? '▶ Run tests first'        :
+           (isWeekly || practiceMode) && !testResult ? '▶ Run tests first' :
            submitting                 ? 'Submitting…'              :
+           practiceMode               ? '🏁 Practice Run (no points)' :
            onArenaSubmit              ? 'Submit & Next Problem →'  :
                                         'Submit Solution →'}
         </button>
