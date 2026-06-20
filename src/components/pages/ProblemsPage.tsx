@@ -13,6 +13,30 @@ interface ProblemsPageProps {
   onNavigate: (page: 'weekly') => void;
 }
 
+function ShareButton() {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        const url = `${window.location.origin}${window.location.pathname}#problems`;
+        navigator.clipboard?.writeText(url).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        });
+      }}
+      className="flex items-center gap-2 px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a]
+        rounded-xl font-mono text-xs text-[#666] hover:text-[#e0e0e0] hover:border-[#252525]
+        transition-all duration-200"
+    >
+      {copied ? (
+        <><span className="text-[#00e87a]">✓</span><span className="text-[#00e87a]">Link copied</span></>
+      ) : (
+        <><span>🔗</span><span>Share</span></>
+      )}
+    </button>
+  );
+}
+
 export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   const [problems,       setProblems]       = useState<Problem[]>([]);
   const [loading,        setLoading]        = useState(true);
@@ -27,6 +51,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   const [paidNotStartedIds, setPaidNotStartedIds] = useState<Set<string>>(new Set());
   const [paidEndedIds,      setPaidEndedIds]      = useState<Set<string>>(new Set());
   const [attemptCounts,     setAttemptCounts]     = useState<Record<string, number>>({});
+  const [search,             setSearch]             = useState('');
 
   useEffect(() => {
     try { setSolved(JSON.parse(localStorage.getItem('bb_solved') || '[]')); } catch {}
@@ -157,9 +182,16 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     return () => { db.removeChannel(channel); };
   }, [user]);
 
-  const filtered = filter === 'all'
+  const afterFilter = filter === 'all'
     ? problems
     : problems.filter(p => p.difficulty === filter || (p.tags || []).includes(filter));
+
+  const filtered = search.trim()
+    ? afterFilter.filter(p =>
+        p.title.toLowerCase().includes(search.toLowerCase()) ||
+        (p.tags || []).some((t: string) => t.toLowerCase().includes(search.toLowerCase()))
+      )
+    : afterFilter;
 
   async function handleSolved(
     problemId: string,
@@ -249,11 +281,11 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   }
 
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up relative">
 
       {/* Locked toast — unpaid */}
       {lockedToast && (
-        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-[#1a1a1a] border border-[#f0b42940] rounded-xl font-mono text-sm shadow-xl max-w-xs animate-fade-up">
+        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-[#0f0f0f] border border-[#f0b42930] rounded-2xl font-mono text-sm shadow-2xl max-w-xs animate-slide-down backdrop-blur-xl" style={{boxShadow:"0 8px 32px rgba(240,180,41,0.08)"}}>
           <span className="text-lg">🔒</span>
           <div>
             <p className="text-[#f0b429] font-bold text-xs">Weekly Challenge Problem</p>
@@ -271,7 +303,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
 
       {/* Not-started toast — paid but waiting */}
       {notStartedToast && (
-        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-[#1a1a1a] border border-[#a78bfa40] rounded-xl font-mono text-sm shadow-xl max-w-xs animate-fade-up">
+        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-[#0f0f0f] border border-[#a78bfa30] rounded-2xl font-mono text-sm shadow-2xl max-w-xs animate-slide-down backdrop-blur-xl" style={{boxShadow:"0 8px 32px rgba(167,139,250,0.08)"}}>
           <span className="text-lg">⏳</span>
           <div>
             <p className="text-[#a78bfa] font-bold text-xs">Not Started Yet</p>
@@ -280,28 +312,66 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         </div>
       )}
 
-      {/* Header row */}
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="font-display font-bold text-xl md:text-2xl mb-0.5">Problems</h1>
-          <p className="text-[#999] text-xs font-mono">
-            {problems.length > 0 ? `${problems.length} problems available` : 'Loading…'}
-          </p>
+      {/* Header */}
+      <div className="mb-6">
+        {/* Title row */}
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div>
+            <h1 className="font-display font-bold text-xl md:text-2xl mb-0.5 text-[#e2e2e2]">Problems</h1>
+            <p className="text-[#666] text-xs font-mono">
+              {filtered.length !== problems.length
+                ? `${filtered.length} of ${problems.length} problems`
+                : `${problems.length} problems`}
+            </p>
+          </div>
+          {/* Share button — contextual, not floating */}
+          <ShareButton />
         </div>
 
-        <div className="flex gap-1.5 flex-wrap">
-          {DIFFICULTIES.map(d => (
-            <button key={d} onClick={() => setFilter(d)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-medium transition-all duration-150
-                ${filter === d
-                  ? d === 'Easy'   ? 'bg-[#00e87a18] text-[#00e87a] border border-[#00e87a30]'
-                  : d === 'Medium' ? 'bg-[#f0b42918] text-[#f0b429] border border-[#f0b42930]'
-                  : d === 'Hard'   ? 'bg-[#ff4d4d18] text-[#ff4d4d] border border-[#ff4d4d30]'
-                  : 'bg-[#00e87a18] text-[#00e87a] border border-[#00e87a30]'
-                  : 'bg-[#111] border border-[#1f1f1f] text-[#aaa] hover:text-[#e0e0e0] hover:border-[#2a2a2a]'}`}>
-              {d === 'all' ? 'All' : d}
-            </button>
-          ))}
+        {/* Search + filters row */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Search */}
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#444] text-xs pointer-events-none">🔍</span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search problems or tags…"
+              className="w-full bg-[#080808] border border-[#1a1a1a] rounded-xl pl-8 pr-10 py-2.5
+                text-sm font-mono text-[#e0e0e0] placeholder-[#333]
+                focus:outline-none focus:border-[#00e87a25] transition-colors"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#555] hover:text-[#e0e0e0] text-xs transition-colors"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Difficulty filters */}
+          <div className="flex gap-1.5 flex-wrap shrink-0">
+            {DIFFICULTIES.map(d => {
+              const count = d === 'all' ? problems.length : problems.filter(p => p.difficulty === d).length;
+              return (
+                <button key={d} onClick={() => setFilter(d)}
+                  className={`px-3.5 py-2.5 rounded-xl text-xs font-mono font-medium transition-all duration-200 flex items-center gap-1.5
+                    ${filter === d
+                      ? d === 'Easy'   ? 'bg-[#00e87a18] text-[#00e87a] border border-[#00e87a30]'
+                      : d === 'Medium' ? 'bg-[#f0b42918] text-[#f0b429] border border-[#f0b42930]'
+                      : d === 'Hard'   ? 'bg-[#ff4d4d18] text-[#ff4d4d] border border-[#ff4d4d30]'
+                      : 'bg-[#00e87a18] text-[#00e87a] border border-[#00e87a30]'
+                      : 'bg-[#080808] border border-[#1a1a1a] text-[#888] hover:text-[#e0e0e0] hover:border-[#222]'}`}>
+                  {d === 'all' ? 'All' : d}
+                  {count > 0 && (
+                    <span className="opacity-50 text-[10px] tabular-nums">{count}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -358,9 +428,9 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           </div>
 
           {/* Desktop table */}
-          <div className="hidden md:block card overflow-hidden">
+          <div className="hidden md:block bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden" style={{boxShadow:"0 0 0 1px rgba(255,255,255,0.02)"}}>
             <div className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-3
-              border-b border-[#1a1a1a] text-[10px] text-[#999] font-mono uppercase tracking-widest">
+              border-b border-[#161616] text-[10px] text-[#666] font-mono uppercase tracking-widest bg-[#0a0a0a]">
               <div>#</div>
               <div>Title</div>
               <div>Difficulty</div>
@@ -381,8 +451,8 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                     border-b border-[#161616] last:border-0 cursor-pointer
                     transition-all duration-150 group items-center
                     ${isLocked
-                      ? 'hover:bg-[#f0b42906] opacity-80'
-                      : 'hover:bg-[#161616]'}`}>
+                      ? 'hover:bg-[#f0b42904] opacity-75'
+                      : 'row-hover hover:bg-[#0f0f0f]'}`}>
 
                   <div className="text-[#ccc] text-xs font-mono">{i + 1}</div>
 

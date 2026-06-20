@@ -354,37 +354,37 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
       <div className="min-h-screen bg-[#0a0a0a]">
         {toast && (
           <div className={`fixed top-16 right-4 left-4 md:left-auto md:right-6 md:w-auto z-[200]
-            px-4 py-3 rounded-xl font-mono text-sm shadow-xl pointer-events-none ${toastStyle(toast.type)}`}>
+            px-4 py-3 rounded-2xl font-mono text-sm shadow-2xl pointer-events-none backdrop-blur-sm animate-slide-down ${toastStyle(toast.type)}`}>
             {toast.msg}
           </div>
         )}
 
         {/* Contest bar */}
-        <div className="bg-[#111] border-b border-[#1f1f1f] px-4 md:px-6 py-3 sticky top-0 z-50">
+        <div className="bg-[#080808]/95 backdrop-blur-xl border-b border-[#161616] px-4 md:px-6 py-3 sticky top-0 z-50" style={{boxShadow:"0 1px 0 rgba(255,255,255,0.03)"}}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <span className="live-dot shrink-0" />
-              <span className="hidden md:block text-xs font-mono text-[#aaa] uppercase tracking-wider">Live Contest</span>
+              <span className="hidden md:block text-xs font-mono text-[#777] uppercase tracking-wider">Live Contest</span>
               <span className="font-mono font-bold text-[#e0e0e0] text-sm truncate">{activeContest.name}</span>
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
               {/* Countdown */}
-              <div className={`font-mono text-xl md:text-2xl font-bold tabular-nums
-                ${timeLeft <= 60 ? 'text-[#ff4d4d] animate-pulse' : 'text-[#00e87a]'}`}>
+              <div className={`font-mono text-xl md:text-2xl font-bold tabular-nums transition-all duration-500
+                ${timeLeft <= 60 ? 'text-[#ff4d4d] animate-pulse' : 'text-[#00e87a] stat-glow'}`}>
                 {fmtTime(timeLeft)}
               </div>
 
               {/* Strike counter */}
-              <div className={`hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-lg
-                ${strikes > 0 ? 'text-[#ff4d4d] bg-[#ff4d4d12] border border-[#ff4d4d20]' : 'text-[#ccc] bg-[#111] border border-[#1a1a1a]'}`}>
+              <div className={`hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-lg transition-all duration-300
+                ${strikes > 0 ? 'text-[#ff4d4d] bg-[#ff4d4d10] border border-[#ff4d4d20]' + (strikes >= 2 ? ' animate-pulse' : '') : 'text-[#666] bg-[#0a0a0a] border border-[#161616]'}`}>
                 <span>⚠</span>
                 <span>{strikes}/3 warnings</span>
               </div>
 
               <button onClick={() => endContest('submitted')}
-                className="px-3 py-1.5 bg-[#1a1a1a] border border-[#2a2a2a] text-[#bbb]
-                  hover:text-[#ff4d4d] hover:border-[#ff4d4d30] text-xs font-mono rounded-xl transition-all">
+                className="px-3 py-1.5 bg-[#0f0f0f] border border-[#1f1f1f] text-[#666]
+                  hover:text-[#ff4d4d] hover:border-[#ff4d4d25] text-xs font-mono rounded-xl transition-all duration-200">
                 Submit & Exit
               </button>
             </div>
@@ -397,10 +397,10 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                 <button key={id} onClick={() => switchProblem(activeContest, i)}
                   className={`px-3 py-1 rounded-lg text-xs font-mono whitespace-nowrap transition-all shrink-0
                     ${problemIndex === i
-                      ? 'bg-[#00e87a] text-black font-bold'
+                      ? 'bg-[#00e87a] text-black font-bold shadow-[0_0_12px_rgba(0,232,122,0.3)]'
                       : solved.has(id)
-                        ? 'bg-[#00e87a15] text-[#00e87a] border border-[#00e87a30]'
-                        : 'bg-[#1a1a1a] border border-[#2a2a2a] text-[#aaa] hover:text-[#e0e0e0]'}`}>
+                        ? 'bg-[#00e87a10] text-[#00e87a] border border-[#00e87a20]'
+                        : 'bg-[#0f0f0f] border border-[#1a1a1a] text-[#666] hover:text-[#e0e0e0] hover:border-[#2a2a2a]'}`}>
                   {solved.has(id) ? '✓ ' : ''}Problem {i + 1}
                   {arenaProblems[id] ? ` — ${arenaProblems[id].title}` : ''}
                 </button>
@@ -414,10 +414,17 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
             <Workspace key={activeProblem.id} problem={activeProblem} user={user} onClose={handleProblemClose} onArenaSubmit={handleArenaSubmit} onArenaCodeChange={handleArenaCodeChange} />
           ) : (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-              <div className="text-5xl mb-5">⏳</div>
-              <div className="font-mono text-[#e0e0e0] text-lg mb-2">Waiting for the problem to be revealed…</div>
-              <div className="text-sm text-[#aaa] font-mono mb-6">Stay on this page. The problem will appear shortly.</div>
-              <button onClick={loadContests} className="btn-ghost text-sm">Refresh</button>
+              <div className="relative mb-8">
+                <div className="w-20 h-20 rounded-full border border-[#00e87a20] flex items-center justify-center animate-float">
+                  <div className="w-14 h-14 rounded-full border border-[#00e87a30] flex items-center justify-center">
+                    <span className="text-3xl">⏳</span>
+                  </div>
+                </div>
+                <div className="absolute inset-0 rounded-full animate-glow-pulse" style={{boxShadow:"0 0 40px rgba(0,232,122,0.08)"}} />
+              </div>
+              <div className="font-display font-bold text-[#e0e0e0] text-xl mb-2">Waiting for the problem…</div>
+              <div className="text-sm text-[#666] font-mono mb-6 max-w-xs leading-relaxed">Stay on this page. The problem will appear shortly. Do not switch tabs.</div>
+              <button onClick={loadContests} className="btn-ghost text-sm">↺ Refresh</button>
             </div>
           )}
         </div>
@@ -430,15 +437,16 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
     <div className="animate-fade-up">
       {toast && (
         <div className={`fixed top-20 right-4 left-4 md:left-auto md:right-6 md:w-auto z-50
-          px-4 py-3 rounded-xl font-mono text-sm shadow-xl pointer-events-none ${toastStyle(toast.type)}`}>
+          px-4 py-3 rounded-2xl font-mono text-sm shadow-2xl pointer-events-none backdrop-blur-sm animate-slide-down ${toastStyle(toast.type)}`}>
           {toast.msg}
         </div>
       )}
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="font-display font-bold text-xl md:text-2xl mb-1.5">Proctored Arena</h1>
-        <p className="text-[#aaa] text-sm font-mono">
+        <h1 className="font-display font-bold text-xl md:text-2xl mb-1 text-[#e2e2e2]">Proctored Arena 🏟️</h1>
+        <p className="text-xs font-mono text-[#555] mb-5">Supervised coding contests. Real prizes. No shortcuts.</p>
+        <p className="text-[#888] text-sm font-mono">
           Pay the entry fee · get confirmed · compete in a supervised contest
         </p>
       </div>
@@ -458,7 +466,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[#aaa] font-mono text-sm py-12">
+        <div className="flex items-center gap-2 text-[#888] font-mono text-sm py-12">
           <div className="spinner" /> Loading contests…
         </div>
       ) : contests.length === 0 ? (
@@ -473,9 +481,12 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
             const outcome = contestOutcomes.get(ct.id);
             return (
               <div key={ct.id}
-                className={`card flex flex-col gap-4 p-5
-                  ${ct.status === 'live'  ? 'border-[#00e87a30] shadow-[0_0_24px_rgba(0,232,122,0.07)]' :
-                    ct.status === 'ended' ? 'opacity-60' : ''}`}>
+                className={`flex flex-col gap-4 p-5 rounded-2xl border transition-all duration-300
+                  ${ct.status === 'live'
+                    ? 'bg-[#0a0a0a] border-[#00e87a25] shadow-[0_0_32px_rgba(0,232,122,0.08)]'
+                    : ct.status === 'ended'
+                    ? 'bg-[#080808] border-[#141414] opacity-50'
+                    : 'bg-[#0a0a0a] border-[#1a1a1a] hover:border-[#222]'}`}>
 
                 {/* Status + price */}
                 <div className="flex items-center justify-between">
@@ -487,8 +498,8 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
 
                 {/* Contest info */}
                 <div>
-                  <div className="font-display font-bold text-[#e0e0e0] mb-1">{ct.name}</div>
-                  <div className="text-xs text-[#aaa] font-mono">🎁 {ct.prize_note || 'Standard prize allocation'}</div>
+                  <div className="font-display font-bold text-[#e2e2e2] text-base mb-1">{ct.name}</div>
+                  <div className="text-xs text-[#888] font-mono">🎁 {ct.prize_note || 'Standard prize allocation'}</div>
                 </div>
 
                 {/* Stats grid */}

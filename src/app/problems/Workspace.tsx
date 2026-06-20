@@ -341,12 +341,19 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
       )}
 
       {/* Left: Problem description */}
-      <div className="card p-5 md:p-6 overflow-y-auto">
+      <div className="bg-[#080808] border-r border-[#141414] p-5 md:p-6 overflow-y-auto">
         <button onClick={onClose}
-          className="mb-5 text-xs text-[#444] hover:text-[#00e87a] font-mono transition-colors flex items-center gap-1.5">
-          ← Back to Problems
+          className="mb-5 text-xs text-[#555] hover:text-[#00e87a] font-mono transition-colors flex items-center gap-1.5 group">
+          <span className="group-hover:-translate-x-0.5 transition-transform duration-150 inline-block">←</span>
+          <span>{isWeekly ? 'Weekly Challenge' : practiceMode ? 'Practice (ended)' : 'Problems'}</span>
         </button>
 
+        {practiceMode && (
+          <div className="mb-4 flex items-center gap-2 bg-[#a78bfa08] border border-[#a78bfa15] rounded-xl px-3 py-2">
+            <span className="text-sm">🏁</span>
+            <span className="text-xs font-mono text-[#a78bfa]">Practice mode — no points awarded. Python & JS only.</span>
+          </div>
+        )}
         <div className="flex items-start gap-3 mb-4 flex-wrap">
           <h2 className="text-xl font-display font-bold text-[#e0e0e0] flex-1">{problem.title}</h2>
           <span className={
@@ -354,7 +361,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
             problem.difficulty === 'Medium' ? 'diff-medium' : 'diff-hard'}>
             {problem.difficulty}
           </span>
-          <span className="px-2.5 py-0.5 bg-[#a78bfa15] text-[#a78bfa] rounded-lg text-xs font-mono font-bold shrink-0 border border-[#a78bfa20]">
+          <span className="px-2.5 py-0.5 bg-[#a78bfa10] text-[#a78bfa] rounded-lg text-xs font-mono font-bold shrink-0 border border-[#a78bfa15]">
             {problem.points} pts
           </span>
         </div>
@@ -362,7 +369,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         {(problem.tags || []).length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-5">
             {problem.tags.map(tag => (
-              <span key={tag} className="px-2 py-0.5 bg-[#1a1a1a] text-[#555] rounded-lg text-xs font-mono border border-[#222]">
+              <span key={tag} className="px-2 py-0.5 bg-[#141414] text-[#777] rounded-lg text-xs font-mono border border-[#1c1c1c]">
                 {tag}
               </span>
             ))}
@@ -380,25 +387,25 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
         {problem.example && (
           <div className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-xl p-4 mb-5">
-            <div className="text-[10px] text-[#444] font-mono mb-2 uppercase tracking-widest">Example</div>
+            <div className="text-[10px] text-[#666] font-mono mb-2 uppercase tracking-widest">Example</div>
             <pre className="text-[#00e87a] text-sm font-mono whitespace-pre-wrap">{problem.example}</pre>
           </div>
         )}
 
         {(problem.test_cases || []).length > 0 && (
           <div>
-            <div className="text-[10px] text-[#444] font-mono mb-3 uppercase tracking-widest">🧪 Sample Test Cases</div>
+            <div className="text-[10px] text-[#666] font-mono mb-3 uppercase tracking-widest">🧪 Sample Test Cases</div>
             <div className="space-y-2">
               {problem.test_cases.slice(0, 3).map((tc, i) => (
-                <div key={i} className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl px-3.5 py-2.5 text-xs font-mono">
-                  <span className="text-[#444]">Input: </span>
+                <div key={i} className="bg-[#060606] border border-[#131313] rounded-xl px-3.5 py-2.5 text-xs font-mono hover:border-[#1a1a1a] transition-colors">
+                  <span className="text-[#777]">Input: </span>
                   <code className="text-[#888]">{tc.input}</code>
-                  <span className="text-[#444] ml-3">→ </span>
+                  <span className="text-[#777] ml-3">→ </span>
                   <code className="text-[#00e87a]">{tc.expected}</code>
                 </div>
               ))}
               {problem.test_cases.length > 3 && (
-                <div className="text-xs text-[#333] font-mono pl-1">
+                <div className="text-xs text-[#666] font-mono pl-1">
                   +{problem.test_cases.length - 3} hidden test cases
                 </div>
               )}
@@ -413,7 +420,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         {/* Language picker header */}
         <div className="card p-4">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-mono text-[#444] uppercase tracking-widest">Choose Language</span>
+            <span className="text-[10px] font-mono text-[#666] uppercase tracking-widest">Choose Language</span>
             <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${execBadge.cls}`}>
               {execBadge.label}
             </span>
@@ -427,9 +434,9 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         <button
           onClick={runTests}
           disabled={running}
-          className="w-full py-2.5 bg-[#0d0d0d] border border-[#1f1f1f] hover:border-[#00e87a30]
-            text-[#00e87a] font-mono text-sm rounded-xl transition-all hover:bg-[#00e87a06]
-            disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+          className="w-full py-2.5 bg-[#060606] border border-[#141414] hover:border-[#00e87a20]
+            text-[#00e87a] font-mono text-sm font-bold rounded-xl transition-all duration-200 hover:bg-[#00e87a05]
+            disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2">
           {running ? (
             <span className="flex items-center gap-2">
               <span className="w-3.5 h-3.5 border-2 border-[#00e87a] border-t-transparent rounded-full animate-spin" />
@@ -455,7 +462,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         {/* Approach field — only shown outside arena, weekly, and practice modes */}
         {!onArenaSubmit && !isWeekly && !practiceMode && (
           <div className="card p-4">
-            <label className="block text-[10px] text-[#444] font-mono mb-2 uppercase tracking-widest">
+            <label className="block text-[10px] text-[#666] font-mono mb-2 uppercase tracking-widest">
               Your approach or GitHub PR link *
             </label>
             <textarea
@@ -463,7 +470,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
               onChange={e => setApproach(e.target.value)}
               placeholder="Describe your approach or paste a GitHub PR link…"
               rows={3}
-              className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl px-3.5 py-2.5
+              className="w-full bg-[#060606] border border-[#141414] rounded-xl px-3.5 py-2.5
                 text-[#e0e0e0] text-sm font-mono placeholder-[#2a2a2a] resize-none
                 focus:outline-none focus:border-[#00e87a30] transition-colors"
             />
@@ -471,7 +478,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         )}
 
         {!onArenaSubmit && (
-          <div className="text-xs text-[#444] font-mono px-1">{statusMsg}</div>
+          <div className="text-xs text-[#777] font-mono px-1 animate-fade-in">{statusMsg}</div>
         )}
 
         <button
@@ -485,7 +492,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
                 : submitting
                   ? 'bg-[#00e87a30] text-[#00e87a60] cursor-not-allowed'
                   : practiceMode
-                    ? 'bg-[#a78bfa15] text-[#a78bfa] border border-[#a78bfa30] hover:bg-[#a78bfa25]'
+                    ? 'bg-[#a78bfa10] text-[#a78bfa] border border-[#a78bfa20] hover:bg-[#a78bfa18]'
                     : 'btn-primary'}`}>
           {!user                      ? 'Sign in to submit'        :
            submitBlocked              ? 'Already submitted'        :

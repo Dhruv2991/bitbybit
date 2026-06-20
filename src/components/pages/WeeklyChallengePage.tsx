@@ -450,10 +450,10 @@ function WeeklyLeaderboard({ challengeId }: { challengeId: string }) {
       {rows.map((r, i) => (
         <div
           key={r.github}
-          className="flex items-center gap-3 px-3 py-2 bg-[#0f0f0f] border border-[#1a1a1a] rounded-xl"
+          className="flex items-center gap-3 px-3 py-2 bg-[#080808] border border-[#141414] rounded-xl transition-all duration-150 hover:border-[#1c1c1c]"
         >
           <span
-            className={`w-5 text-center font-mono text-xs font-bold ${i === 0 ? "text-[#ffd700]" : i === 1 ? "text-[#c0c0c0]" : i === 2 ? "text-[#cd7f32]" : "text-[#888]"}`}
+            className={`w-6 text-center font-mono text-xs font-bold shrink-0 ${i === 0 ? "text-[#ffd700]" : i === 1 ? "text-[#c0c0c0]" : i === 2 ? "text-[#cd7f32]" : "text-[#555] tabular-nums"}`}
           >
             {i + 1}
           </span>
@@ -648,17 +648,16 @@ export default function WeeklyChallengePage({ user }: Props) {
     <div className="animate-fade-up max-w-3xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="font-display font-bold text-xl md:text-2xl mb-1">
+        <h1 className="font-display font-bold text-xl md:text-2xl mb-1 text-[#e2e2e2]">
           Weekly Challenge <span className="text-[#f0b429]">🏅</span>
         </h1>
-        <p className="text-[#bbb] text-xs font-mono">
-          3 new problems every week. Pay once, solve all week. Earn more points
-          by solving earlier!
+        <p className="text-[#777] text-xs font-mono">
+          3 new problems every week · Pay once · Solve earlier for more points
         </p>
       </div>
 
       {/* Scoring info */}
-      <div className="mb-6 bg-[#0f0f0f] border border-[#1a1a1a] rounded-xl p-4 flex flex-wrap gap-4">
+      <div className="mb-6 bg-[#080808] border border-[#161616] rounded-2xl p-4 flex flex-wrap gap-4" style={{background:"linear-gradient(135deg,#0a0a0a 0%,#080808 100%)"}}>
         <div className="flex-1 min-w-[140px]">
           <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
             Scoring Formula
@@ -708,17 +707,17 @@ export default function WeeklyChallengePage({ user }: Props) {
             return (
               <div
                 key={ch.id}
-                className="card border border-[#1a1a1a] rounded-2xl overflow-hidden"
+                className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden transition-all duration-300 hover:border-[#1c1c1c]"
               >
                 {/* Challenge header */}
                 <div className="px-5 py-4 border-b border-[#1a1a1a]">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
-                      <h2 className="font-mono font-bold text-[#e0e0e0] text-base">
+                      <h2 className="font-mono font-bold text-[#e2e2e2] text-base">
                         {ch.title}
                       </h2>
                       {ch.description && (
-                        <p className="text-xs text-[#aaa] font-mono mt-0.5">
+                        <p className="text-xs text-[#777] font-mono mt-0.5">
                           {ch.description}
                         </p>
                       )}
@@ -726,8 +725,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                     <div className="flex items-center gap-2 shrink-0">
                       {isActive && (
                         <span className="flex items-center gap-1 text-[10px] font-mono text-[#00e87a] bg-[#00e87a12] px-2 py-0.5 rounded-lg">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#00e87a] animate-pulse inline-block" />{" "}
-                          LIVE
+                          <span className="live-dot" />{" "}LIVE
                         </span>
                       )}
                       {isUpcoming && (
@@ -769,7 +767,7 @@ export default function WeeklyChallengePage({ user }: Props) {
 
                 {/* Problems list */}
                 <div className="px-5 py-4">
-                  <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-3">
+                  <p className="text-[10px] text-[#666] font-mono uppercase tracking-widest mb-3">
                     Problems ({chProblems.length})
                   </p>
                   <div className="space-y-2">
@@ -800,7 +798,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                           className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150
                             ${
                               confirmed && isActive
-                                ? "border-[#1f1f1f] hover:bg-[#161616] hover:border-[#2a2a2a] cursor-pointer group"
+                                ? "border-[#181818] hover:bg-[#0f0f0f] hover:border-[#00e87a15] cursor-pointer group"
                                 : confirmed && isEnded
                                 ? "border-[#a78bfa20] hover:bg-[#a78bfa08] hover:border-[#a78bfa30] cursor-pointer group"
                                 : "border-[#161616] opacity-50 cursor-not-allowed select-none"
@@ -859,7 +857,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                             </span>
                           )}
                           {confirmed && isEnded && solved && (
-                            <span className="text-[10px] font-mono text-[#999]">
+                            <span className="text-[10px] font-mono text-[#555]">
                               ended
                             </span>
                           )}
@@ -924,7 +922,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                   ) : isActive || isUpcoming ? (
                     <button
                       onClick={() => setPayTarget(ch)}
-                      className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] transition-all shadow-[0_0_16px_rgba(0,232,122,0.15)] active:scale-[0.99]"
+                      className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] active:scale-[0.98] transition-all btn-primary"
                     >
                       Unlock for ₹{ch.entry_fee} →
                     </button>

@@ -69,7 +69,25 @@ export default function App() {
   function setPage(id: PageId) {
     setPageState(id);
     try { sessionStorage.setItem(PAGE_KEY, id); } catch {}
+    // Sync URL hash so the page is shareable/bookmarkable
+    if (typeof window !== "undefined") {
+      window.location.hash = id === "home" ? "" : id;
+    }
   }
+
+  // On mount, read URL hash to navigate to the right page
+  // Only use hash if sessionStorage doesn't have a page stored
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.replace("#", "") as PageId;
+    const validPages: PageId[] = ["home", "problems", "leaderboard", "arena", "weekly", "admin"];
+    const stored = sessionStorage.getItem(PAGE_KEY);
+    // Only navigate to hash if it's valid AND there's no stored session page
+    if (hash && validPages.includes(hash) && !stored) {
+      setPageState(hash);
+      try { sessionStorage.setItem(PAGE_KEY, hash); } catch {}
+    }
+  }, []);
 
   useEffect(() => {
     const db = getSupabaseClient();
@@ -223,7 +241,7 @@ export default function App() {
         </div>
       </div>
       {liveItems.length === 0 ? (
-        <div className="px-4 py-6 text-center text-[#444] font-mono text-xs">Nothing live or upcoming right now</div>
+        <div className="px-4 py-6 text-center text-[#666] font-mono text-xs">Nothing live or upcoming right now</div>
       ) : (
         <div className="divide-y divide-[#1a1a1a]">
           {liveItems.map(item => (
@@ -255,14 +273,14 @@ export default function App() {
       <div className="fixed top-20 right-4 md:right-6 z-[200] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         {toasts.map(t => (
           <div key={t.id}
-            className={`${toastColors[t.type]} px-4 py-3 rounded-xl font-mono text-sm shadow-xl pointer-events-auto animate-fade-up`}>
+            className={`${toastColors[t.type]} px-4 py-3 rounded-xl font-mono text-sm shadow-2xl pointer-events-auto animate-slide-down backdrop-blur-sm`}>
             {t.msg}
           </div>
         ))}
       </div>
 
       {/* Navbar */}
-      <header className="sticky top-0 z-50 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#1a1a1a]">
+      <header className="sticky top-0 z-50 bg-[#080808]/90 backdrop-blur-xl border-b border-[#161616]" style={{boxShadow: "0 1px 0 rgba(255,255,255,0.03)"}}>
         <div className="max-w-6xl mx-auto px-4 md:px-6 flex items-center justify-between h-14">
 
           {/* Logo */}
@@ -277,10 +295,11 @@ export default function App() {
           <nav className="hidden md:flex items-center gap-0.5">
             {NAV_ITEMS.map(item => (
               <button key={item.id} onClick={() => navigate(item.id)}
-                className={`px-3.5 py-1.5 rounded-xl font-mono text-sm transition-all duration-150
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-mono text-sm transition-all duration-150
                   ${page === item.id
-                    ? "bg-[#00e87a15] text-[#00e87a] font-bold"
-                    : "text-[#555] hover:text-[#e0e0e0] hover:bg-[#ffffff08]"}`}>
+                    ? "bg-[#00e87a10] text-[#00e87a] font-bold border border-[#00e87a20]"
+                    : "text-[#666] hover:text-[#e0e0e0] hover:bg-[#ffffff06]"}`}>
+                <span className="text-xs opacity-70">{item.icon}</span>
                 {item.label}
               </button>
             ))}
@@ -289,7 +308,7 @@ export default function App() {
                 className={`px-3.5 py-1.5 rounded-xl font-mono text-sm transition-all duration-150
                   ${page === "admin"
                     ? "bg-[#a78bfa15] text-[#a78bfa] font-bold"
-                    : "text-[#555] hover:text-[#a78bfa] hover:bg-[#a78bfa08]"}`}>
+                    : "text-[#777] hover:text-[#a78bfa] hover:bg-[#a78bfa08]"}`}>
                 Admin
               </button>
             )}
@@ -300,7 +319,7 @@ export default function App() {
             {/* 🔔 Desktop bell */}
             <div className="relative" ref={notifRef}>
               <button onClick={() => setNotifOpen(o => !o)}
-                className="relative p-2 text-[#555] hover:text-[#e0e0e0] transition-colors rounded-xl hover:bg-[#ffffff08]">
+                className="relative p-2 text-[#777] hover:text-[#e0e0e0] transition-colors rounded-xl hover:bg-[#ffffff08]">
                 <span className="text-base">🔔</span>
                 {liveItems.length > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#00e87a] animate-pulse" />
@@ -318,10 +337,10 @@ export default function App() {
                   className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a2a]"
                   onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
-                <span className="text-xs font-mono text-[#555]">{user.name}</span>
+                <span className="text-xs font-mono text-[#888]">{user.name}</span>
                 <button onClick={signOut}
                   className="px-3 py-1.5 rounded-xl font-mono text-xs border border-[#222]
-                    text-[#555] hover:text-[#ff4d4d] hover:border-[#ff4d4d30] transition-all">
+                    text-[#777] hover:text-[#ff4d4d] hover:border-[#ff4d4d30] transition-all">
                   Sign out
                 </button>
               </div>
@@ -362,8 +381,9 @@ export default function App() {
           <div className="md:hidden border-t border-[#1a1a1a] bg-[#0a0a0a]/98 backdrop-blur pb-3">
             {NAV_ITEMS.map(item => (
               <button key={item.id} onClick={() => navigate(item.id)}
-                className={`w-full text-left px-5 py-3 font-mono text-sm transition-all flex items-center gap-3
-                  ${page === item.id ? "text-[#00e87a] bg-[#00e87a06]" : "text-[#555] hover:text-[#e0e0e0]"}`}>
+                className={`w-full text-left px-5 py-3 font-mono text-sm transition-all flex items-center gap-3 relative
+                  ${page === item.id ? "text-[#00e87a] bg-[#00e87a06]" : "text-[#777] hover:text-[#e0e0e0]"}`}>
+                {page === item.id && <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-[#00e87a] rounded-full" />}
                 <span className="w-5 text-base">{item.icon}</span>
                 {item.label}
               </button>
@@ -410,14 +430,17 @@ export default function App() {
       </main>
 
       {/* Bottom mobile nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0a0a0a]/98 backdrop-blur-md
-        border-t border-[#1a1a1a] flex z-40">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#080808]/98 backdrop-blur-xl
+        border-t border-[#161616] flex z-40" style={{boxShadow:"0 -1px 0 rgba(255,255,255,0.02)"}}>
         {NAV_ITEMS.map(item => (
           <button key={item.id} onClick={() => navigate(item.id)}
-            className={`flex-1 flex flex-col items-center py-3 gap-1 font-mono text-[10px] transition-all
-              ${page === item.id ? "text-[#00e87a]" : "text-[#444] hover:text-[#888]"}`}>
+            className={`flex-1 flex flex-col items-center py-3 gap-1 font-mono text-[10px] transition-all relative
+              ${page === item.id ? "text-[#00e87a]" : "text-[#555] hover:text-[#aaa]"}`}>
+            {page === item.id && (
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-[#00e87a] rounded-full" />
+            )}
             <span className="text-base leading-none">{item.icon}</span>
-            <span>{item.label}</span>
+            <span className={page === item.id ? "font-bold" : ""}>{item.label}</span>
           </button>
         ))}
       </nav>

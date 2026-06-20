@@ -18,6 +18,30 @@ interface ChallengeRow {
   firstSolve: string;
 }
 
+function ShareLBButton() {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        const url = `${window.location.origin}${window.location.pathname}#leaderboard`;
+        navigator.clipboard?.writeText(url).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        });
+      }}
+      className="flex items-center gap-2 px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a]
+        rounded-xl font-mono text-xs text-[#666] hover:text-[#e0e0e0] hover:border-[#252525]
+        transition-all duration-200"
+    >
+      {copied ? (
+        <><span className="text-[#00e87a]">✓</span><span className="text-[#00e87a]">Link copied</span></>
+      ) : (
+        <><span>🔗</span><span>Share</span></>
+      )}
+    </button>
+  );
+}
+
 export default function LeaderboardPage() {
   const [members, setMembers] = useState<EnrichedMember[]>([]);
   const [challengeRows, setChallengeRows] = useState<ChallengeRow[]>([]);
@@ -300,7 +324,7 @@ export default function LeaderboardPage() {
     const isTop3 = i < 3 && !search;
     return (
       <div
-        className={`flex items-center gap-3 md:gap-4 px-4 py-3.5 rounded-2xl border transition-all duration-150 hover:brightness-110
+        className={`flex items-center gap-3 md:gap-4 px-4 py-3.5 rounded-2xl border transition-all duration-200 hover:scale-[1.005]
         ${isTop3 ? rankBg[i] : "bg-[#111] border-[#1f1f1f]"}`}
       >
         <div className="w-9 text-center shrink-0">
@@ -377,13 +401,14 @@ export default function LeaderboardPage() {
       {/* Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-display font-bold text-xl md:text-2xl mb-1">
+          <h1 className="font-display font-bold text-xl md:text-2xl mb-1 text-[#e2e2e2]">
             Leaderboard
           </h1>
-          <p className="text-[#999] text-xs font-mono">
+          <p className="text-[#777] text-xs font-mono">
             Rankings update automatically after each approved submission.
           </p>
         </div>
+        <ShareLBButton />
 
         {/* Tab switcher */}
         <div className="flex flex-wrap gap-1 bg-[#0d0d0d] border border-[#1f1f1f] rounded-xl p-1 w-fit">
@@ -395,9 +420,9 @@ export default function LeaderboardPage() {
                 ${
                   tab === t.id
                     ? t.id === "challenge"
-                      ? "bg-[#f0b429] text-black font-bold"
-                      : "bg-[#00e87a] text-black font-bold"
-                    : "text-[#aaa] hover:text-[#e0e0e0]"
+                      ? "bg-[#f0b42912] text-[#f0b429] font-bold border border-[#f0b42920]"
+                      : "bg-[#00e87a10] text-[#00e87a] font-bold border border-[#00e87a20]"
+                    : "text-[#666] hover:text-[#e0e0e0] hover:bg-[#ffffff06] border border-transparent"
                 }`}
             >
               {t.label}
@@ -408,13 +433,13 @@ export default function LeaderboardPage() {
 
       {/* Weekly Challenge banner */}
       {tab === "challenge" && challengeTitle && (
-        <div className="mb-5 px-4 py-3 bg-[#f0b42910] border border-[#f0b42930] rounded-xl flex items-center gap-2">
+        <div className="mb-5 px-4 py-3 bg-[#f0b42908] border border-[#f0b42920] rounded-2xl flex items-center gap-2" style={{boxShadow:"0 0 20px rgba(240,180,41,0.04)"}}>
           <span className="text-lg">🏅</span>
           <div>
             <p className="text-xs font-mono font-bold text-[#f0b429]">
               {challengeTitle}
             </p>
-            <p className="text-[10px] font-mono text-[#aaa]">
+            <p className="text-[10px] font-mono text-[#888]">
               Points include time bonus — earlier submissions earn more.
             </p>
           </div>
@@ -432,7 +457,7 @@ export default function LeaderboardPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or username…"
-            className="w-full input-base pl-8"
+            className="w-full bg-[#080808] border border-[#161616] rounded-xl px-3 py-2.5 pl-8 text-[#e0e0e0] text-sm font-mono placeholder-[#222] focus:outline-none focus:border-[#00e87a20] transition-colors"
           />
         </div>
       </div>
