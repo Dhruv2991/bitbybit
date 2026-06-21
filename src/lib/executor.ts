@@ -513,10 +513,48 @@ const stderr =
   return { stdout, stderr };
 }
 
+// ── Wandbox language compiler map ────────────────────────────
+
+const WANDBOX_COMPILER: Record<string, string> = {
+  cpp:  "gcc-head",
+  java: "openjdk-jdk-22+36",
+  rust: "rust-1.82.0",
+  go:   "go-1.23.2",
+};
+
+// ── Wandbox fallback execution ────────────────────────────────
+
+async function executeWithWandbox(
+  fullCode: string,
+  language: string,
+): Promise<{ stdout: string; stderr: string }> {
+  const compiler = WANDBOX_COMPILER[language];
+  if (!compiler) throw new Error(`Wandbox: unsupported language: ${language}`);
+
+  const res = await fetch("https://wandbox.org/api/compile.json", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ compiler, code: fullCode }),
+    signal: AbortSignal.timeout(30000),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Wandbox error ${res.status}: ${body}`);
+  }
+
+  const data = await res.json();
+  return {
+    stdout: data.program_output ?? "",
+    stderr: (data.compiler_error ?? "") + (data.program_error ?? ""),
+  };
+}
+
 // ── Public API ───────────────────────────────────────────────
 //
 // runAgainstTestCases makes exactly ONE Judge0 call for all
 // test cases combined, instead of one call per test case.
+// Falls back to Wandbox if Judge0 is unreachable.
 
 export async function runAgainstTestCases(
   userCode: string,
@@ -531,22 +569,31 @@ export async function runAgainstTestCases(
   let stderr = "";
 
   try {
+    // Try Judge0 first
     const out = await executeWithJudge0(batchedCode, language);
     stdout = out.stdout;
     stderr = out.stderr;
   } catch (e: any) {
-    const errMsg = e.message || "Execution error";
-    return {
-      passed: 0,
-      total:  testCases.length,
-      results: testCases.map((tc) => ({
-        input:    tc.input,
-        expected: String(tc.expected).trim(),
-        actual:   "",
-        ok:       false,
-        error:    errMsg,
-      })),
-    };
+    console.warn("[executor] Judge0 failed, trying Wandbox fallback:", e.message);
+    try {
+      // Fallback to Wandbox
+      const out = await executeWithWandbox(batchedCode, language);
+      stdout = out.stdout;
+      stderr = out.stderr;
+    } catch (e2: any) {
+      const errMsg = e2.message || "Execution error";
+      return {
+        passed: 0,
+        total:  testCases.length,
+        results: testCases.map((tc) => ({
+          input:    tc.input,
+          expected: String(tc.expected).trim(),
+          actual:   "",
+          ok:       false,
+          error:    errMsg,
+        })),
+      };
+    }
   }
 
   const totalMs = Date.now() - t0;
