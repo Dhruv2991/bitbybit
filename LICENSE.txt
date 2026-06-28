@@ -1,0 +1,6 @@
+Copyright (c) 2026 [Dhruv G Nayak]. All rights reserved.
+
+This repository is public for viewing purposes only (such as portfolio review). 
+No license is granted for the usage, modification, redistribution, or copying 
+of this software. You may not clone or download this code to build your own 
+derivative works.
