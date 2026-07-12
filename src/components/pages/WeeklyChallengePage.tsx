@@ -483,19 +483,28 @@ function WeeklyLeaderboard({ challengeId }: { challengeId: string }) {
 // ── Main page ────────────────────────────────────────────────
 interface Props {
   user: User | null;
+  onNavigate?: (page: string) => void;
 }
 
-export default function WeeklyChallengePage({ user }: Props) {
-  const [challenges, setChallenges] = useState<WeeklyChallenge[]>([]);
-  const [myAccess, setMyAccess] = useState<WeeklyAccess[]>([]);
-  const [problems, setProblems] = useState<Record<string, Problem>>({});
-  const [mySubmissions, setMySubmissions] = useState<WeeklySubmission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [payTarget, setPayTarget] = useState<WeeklyChallenge | null>(null);
-  const [activeChallenge, setActiveChallenge] =
-    useState<WeeklyChallenge | null>(null);
-  const [activeProblem, setActiveProblem] = useState<Problem | null>(null);
-  const [showLeader, setShowLeader] = useState<string | null>(null);
+export default function WeeklyChallengePage({ user, onNavigate }: Props) {
+  const [challenges,     setChallenges]     = useState<WeeklyChallenge[]>([]);
+  const [isSubscribed,   setIsSubscribed]   = useState(false);
+  const [subStatus,      setSubStatus]      = useState<'none' | 'pending' | 'confirmed' | 'rejected'>('none');
+  const [problems,       setProblems]       = useState<Record<string, Problem>>({});
+  const [mySubmissions,  setMySubmissions]  = useState<WeeklySubmission[]>([]);
+  const [loading,        setLoading]        = useState(true);
+  const [activeChallenge, setActiveChallenge] = useState<WeeklyChallenge | null>(null);
+  const [activeProblem,   setActiveProblem]   = useState<Problem | null>(null);
+  const [showLeader,      setShowLeader]      = useState<string | null>(null);
+  const [summaries,       setSummaries]       = useState<Record<string, any>>({});
+  const [loadingSummary,  setLoadingSummary]  = useState<string | null>(null);
+  const [fee,            setFee]            = useState<number | null>(null);
+  const [upiId,          setUpiId]          = useState('');
+  const [txnId,          setTxnId]          = useState('');
+  const [submitting,     setSubmitting]     = useState(false);
+  const [submitted,      setSubmitted]      = useState(false);
+  const [payErr,         setPayErr]         = useState('');
+  const [copied,         setCopied]         = useState(false);
 
   const db = getSupabaseClient();
 
@@ -506,43 +515,44 @@ export default function WeeklyChallengePage({ user }: Props) {
   async function load() {
     setLoading(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: ch } = await (db.from("weekly_challenges") as any)
-        .select("*")
-        .order("created_at", { ascending: false });
+      const [{ data: ch }, { data: configs }] = await Promise.all([
+        (db.from("weekly_challenges") as any).select("*").order("created_at", { ascending: false }),
+        (db.from("app_config") as any).select("*").in("key", ["subscription_fee", "subscription_upi"]),
+      ]);
 
       const list = (ch || []) as WeeklyChallenge[];
-
-      // Show all challenges — ended ones are still visible for results/leaderboard
       setChallenges(list);
+
+      for (const c of configs || []) {
+        if (c.key === "subscription_fee") setFee(Number(c.value));
+        if (c.key === "subscription_upi") setUpiId(c.value);
+      }
 
       // Load all problems referenced
       const ids = new Set<string>();
-      list.forEach((c) =>
-        (c.problem_ids || []).forEach((id: string) => ids.add(id)),
-      );
+      list.forEach((c) => (c.problem_ids || []).forEach((id: string) => ids.add(id)));
       if (ids.size) {
         const { data: probs } = await db
           .from("problems")
           .select("*")
           .in("id", Array.from(ids));
         const map: Record<string, Problem> = {};
-        (probs || []).forEach((p: Problem) => {
-          map[p.id] = p;
-        });
+        (probs || []).forEach((p: Problem) => { map[p.id] = p; });
         setProblems(map);
       }
 
-      // Load user's access records
+      // Check subscription status
       if (user?.github) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: acc } = await (db.from("weekly_access") as any)
-          .select("*")
-          .eq("github", user.github);
-        setMyAccess((acc || []) as WeeklyAccess[]);
+        const { data: sub } = await (db.from("subscribers") as any)
+          .select("status")
+          .eq("github", user.github)
+          .maybeSingle();
+
+        const status = sub?.status ?? "none";
+        setSubStatus(status);
+        setIsSubscribed(status === "confirmed");
 
         // Load user's weekly submissions
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: subs } = await (db.from("weekly_submissions") as any)
           .select("*")
           .eq("github", user.github);
@@ -552,12 +562,67 @@ export default function WeeklyChallengePage({ user }: Props) {
     setLoading(false);
   }
 
-  function accessFor(challengeId: string): WeeklyAccess | undefined {
-    return myAccess.find((a) => a.weekly_challenge_id === challengeId);
+  async function generateSummary(ch: WeeklyChallenge) {
+    if (summaries[ch.id] || loadingSummary === ch.id) return;
+    setLoadingSummary(ch.id);
+    try {
+      // Fetch leaderboard data for this challenge
+      const { data: subs } = await (db.from('weekly_submissions') as any)
+        .select('github, name, points_awarded, status')
+        .eq('weekly_challenge_id', ch.id)
+        .eq('status', 'approved')
+        .order('points_awarded', { ascending: false })
+        .limit(10);
+
+      const topFinishers = (subs || []).slice(0, 3).map((s: any) => ({
+        name:   s.name,
+        github: s.github,
+        points: s.points_awarded,
+      }));
+
+      const chProblems = (ch.problem_ids || [])
+        .map(id => problems[id])
+        .filter(Boolean)
+        .map(p => ({ title: p.title, difficulty: p.difficulty, tags: p.tags || [] }));
+
+      const { generateChallengeSummary } = await import('@/lib/gemini');
+      const summary = await generateChallengeSummary(
+        ch.title,
+        chProblems,
+        topFinishers,
+        (subs || []).length,
+      );
+
+      if (summary) setSummaries(prev => ({ ...prev, [ch.id]: summary }));
+    } catch {}
+    setLoadingSummary(null);
   }
 
-  function hasConfirmedAccess(challengeId: string) {
-    return accessFor(challengeId)?.status === "confirmed";
+  async function submitPayment() {
+    if (!user || !txnId.trim()) return;
+    const tid = txnId.trim();
+    if (tid.length < 6) { setPayErr("Transaction ID seems too short"); return; }
+    setSubmitting(true);
+    setPayErr("");
+    try {
+      const { data: existing } = await (db.from("subscribers") as any)
+        .select("id").eq("github", user.github).maybeSingle();
+      if (existing) {
+        setPayErr("You already have a subscription request pending.");
+        setSubmitting(false);
+        return;
+      }
+      const { error } = await (db.from("subscribers") as any).insert({
+        github: user.github, name: user.name, txn_id: tid, status: "pending",
+      });
+      if (error) throw error;
+      setSubmitted(true);
+      setSubStatus("pending");
+    } catch (e: any) {
+      setPayErr(e.message || "Submission failed. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   // Called by Workspace when a problem is submitted
@@ -652,12 +717,12 @@ export default function WeeklyChallengePage({ user }: Props) {
           Weekly Challenge <span className="text-[#f0b429]">🏅</span>
         </h1>
         <p className="text-[#777] text-xs font-mono">
-          3 new problems every week · Pay once · Solve earlier for more points
+          3 new problems every week · Subscribe once · Solve earlier for more points
         </p>
       </div>
 
       {/* Scoring info */}
-      <div className="mb-6 bg-[#080808] border border-[#161616] rounded-2xl p-4 flex flex-wrap gap-4" style={{background:"linear-gradient(135deg,#0a0a0a 0%,#080808 100%)"}}>
+      <div className="mb-6 bg-[#080808] border border-[#161616] rounded-2xl p-4 flex flex-wrap gap-4">
         <div className="flex-1 min-w-[140px]">
           <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
             Scoring Formula
@@ -680,6 +745,148 @@ export default function WeeklyChallengePage({ user }: Props) {
         </div>
       </div>
 
+      {/* ── Non-subscriber paywall ───────────────────────────────── */}
+      {!isSubscribed && (
+        <div className="mb-6">
+          {subStatus === 'pending' || submitted ? (
+            /* Pending state */
+            <div className="bg-[#0a0a0a] border border-[#f0b42925] rounded-2xl p-6 text-center">
+              <div className="text-4xl mb-3">⏳</div>
+              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Payment under review</h2>
+              <p className="text-[#777] font-mono text-sm">
+                Your transaction has been received. Admin will confirm shortly — weekly problems will unlock automatically.
+              </p>
+            </div>
+          ) : subStatus === 'rejected' ? (
+            /* Rejected — allow retry */
+            <div className="bg-[#0a0a0a] border border-[#ff4d4d25] rounded-2xl p-6 text-center">
+              <div className="text-4xl mb-3">❌</div>
+              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Payment rejected</h2>
+              <p className="text-[#777] font-mono text-sm mb-4">Your previous transaction was rejected. Please make a new payment.</p>
+              <button
+                onClick={async () => {
+                  await (db.from("subscribers") as any).delete().eq("github", user?.github);
+                  setSubStatus("none");
+                }}
+                className="px-5 py-2.5 bg-[#f0b429] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#fbbf24] transition-all"
+              >
+                Try Again →
+              </button>
+            </div>
+          ) : !user ? (
+            /* Not signed in */
+            <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-6 text-center">
+              <div className="text-4xl mb-3">🔒</div>
+              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Sign in to subscribe</h2>
+              <p className="text-[#777] font-mono text-sm">Sign in with GitHub to get lifetime access to all weekly challenges.</p>
+            </div>
+          ) : (
+            /* Main paywall */
+            <div className="bg-[#0a0a0a] border border-[#00e87a20] rounded-2xl overflow-hidden">
+              {/* Hero */}
+              <div className="px-5 py-5 border-b border-[#161616]">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-3xl">⭐</span>
+                  <div>
+                    <h2 className="font-display font-bold text-lg text-[#e0e0e0]">Lifetime Subscription</h2>
+                    <p className="text-[10px] font-mono text-[#555]">One-time payment · Unlock all weekly challenges forever</p>
+                  </div>
+                  <div className="ml-auto text-right">
+                    <div className="text-2xl font-display font-bold text-[#00e87a]">
+                      {fee !== null ? `₹${fee}` : '—'}
+                    </div>
+                    <div className="text-[9px] font-mono text-[#555]">one-time</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3 text-[10px] font-mono">
+                  {['All current & future weekly problems', 'Time bonus scoring', 'Weekly leaderboard'].map(f => (
+                    <span key={f} className="flex items-center gap-1 text-[#bbb]">
+                      <span className="text-[#00e87a]">✓</span>{f}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Payment */}
+              <div className="px-5 py-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {/* QR side */}
+                <div className="flex flex-col items-center gap-3">
+                  <p className="text-[10px] font-mono text-[#666] uppercase tracking-widest">Scan to pay via UPI</p>
+                  {upiId ? (
+                    <div className="bg-white p-2.5 rounded-xl">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=BitByBit&am=${fee}&cu=INR&tn=BitByBit+Subscription`)}`}
+                        alt="UPI QR"
+                        width={160}
+                        height={160}
+                        style={{ width: 160, height: 160 }}
+                        className="rounded-lg"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-[160px] h-[160px] bg-[#111] rounded-xl flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-[#333] border-t-[#555] rounded-full animate-spin" />
+                    </div>
+                  )}
+                  {/* UPI ID */}
+                  <div className="w-full flex items-center gap-2 bg-[#111] border border-[#1a1a1a] rounded-xl px-3 py-2">
+                    <span className="text-xs font-mono text-[#ccc] flex-1 truncate">{upiId || '—'}</span>
+                    <button
+                      onClick={() => { navigator.clipboard?.writeText(upiId); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                      className="text-[10px] font-mono text-[#00e87a] shrink-0"
+                    >
+                      {copied ? '✓' : 'Copy'}
+                    </button>
+                  </div>
+                  {/* App shortcuts */}
+                  <div className="grid grid-cols-3 gap-2 w-full">
+                    {[
+                      { name: 'GPay',    url: `gpay://upi/pay?pa=${upiId}&pn=BitByBit&cu=INR` },
+                      { name: 'PhonePe', url: `phonepe://pay?pa=${upiId}&pn=BitByBit&cu=INR` },
+                      { name: 'Paytm',   url: `paytmmp://pay?pa=${upiId}&pn=BitByBit&cu=INR` },
+                    ].map(app => (
+                      <a key={app.name} href={app.url}
+                        className="flex items-center justify-center py-1.5 bg-[#111] border border-[#1a1a1a] rounded-lg text-[10px] font-mono text-[#ccc] hover:border-[#333] transition-all text-center">
+                        {app.name}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Txn input side */}
+                <div className="flex flex-col justify-center gap-3">
+                  <div>
+                    <label className="block text-[10px] text-[#666] font-mono uppercase tracking-widest mb-2">
+                      Enter Transaction / UTR ID after payment
+                    </label>
+                    <input
+                      value={txnId}
+                      onChange={e => { setTxnId(e.target.value); setPayErr(""); }}
+                      placeholder="e.g. 423987654321"
+                      className="w-full bg-[#060606] border border-[#1a1a1a] rounded-xl px-3.5 py-2.5 text-sm font-mono
+                        text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a30] transition-colors"
+                    />
+                    {payErr && <p className="text-[10px] text-[#ff4d4d] font-mono mt-1.5">{payErr}</p>}
+                  </div>
+                  <button
+                    onClick={submitPayment}
+                    disabled={submitting || !txnId.trim()}
+                    className="w-full py-3 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
+                      hover:bg-[#00ff88] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  >
+                    {submitting ? 'Submitting…' : 'Submit Payment →'}
+                  </button>
+                  <p className="text-[10px] text-[#444] font-mono text-center">
+                    Payments verified manually · Access granted within a few hours
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Challenge list — shown to everyone (subscribers get full access, others see preview) ── */}
       {challenges.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="text-4xl opacity-20">📅</div>
@@ -690,19 +897,14 @@ export default function WeeklyChallengePage({ user }: Props) {
       ) : (
         <div className="space-y-6">
           {challenges.map((ch) => {
-            const access = accessFor(ch.id);
-            const confirmed = hasConfirmedAccess(ch.id);
             const now = Date.now();
             const startMs = new Date(ch.starts_at).getTime();
             const endMs = new Date(ch.ends_at).getTime();
             const isUpcoming = now < startMs;
-            const isActive =
-              now >= startMs && now <= endMs && ch.status !== "ended";
+            const isActive = now >= startMs && now <= endMs && ch.status !== "ended";
             const isEnded = ch.status === "ended" || now > endMs;
             const bonus = computeBonus(ch.starts_at, ch.ends_at);
-            const chProblems = (ch.problem_ids || [])
-              .map((id) => problems[id])
-              .filter(Boolean);
+            const chProblems = (ch.problem_ids || []).map((id) => problems[id]).filter(Boolean);
 
             return (
               <div
@@ -756,7 +958,7 @@ export default function WeeklyChallengePage({ user }: Props) {
                         ⏱ {timeLeft(ch.ends_at)}
                       </span>
                     )}
-                    {isActive && confirmed && (
+                    {isActive && isSubscribed && (
                       <span className="text-[#a78bfa]">
                         ⚡ Current bonus: {fmtBonus(bonus)}
                       </span>
@@ -789,19 +991,17 @@ export default function WeeklyChallengePage({ user }: Props) {
                         <div
                           key={p.id}
                           onClick={() => {
-                            if (!confirmed) return;
+                            if (!isSubscribed) return;
                             if (isUpcoming) return;
-                            // Ended + confirmed -> practice mode (no points)
                             setActiveChallenge(ch);
                             setActiveProblem(p);
                           }}
                           className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150
-                            ${
-                              confirmed && isActive
-                                ? "border-[#181818] hover:bg-[#0f0f0f] hover:border-[#00e87a15] cursor-pointer group"
-                                : confirmed && isEnded
-                                ? "border-[#a78bfa20] hover:bg-[#a78bfa08] hover:border-[#a78bfa30] cursor-pointer group"
-                                : "border-[#161616] opacity-50 cursor-not-allowed select-none"
+                            ${isSubscribed && isActive
+                              ? "border-[#181818] hover:bg-[#0f0f0f] hover:border-[#00e87a15] cursor-pointer group"
+                              : isSubscribed && isEnded
+                              ? "border-[#a78bfa20] hover:bg-[#a78bfa08] hover:border-[#a78bfa30] cursor-pointer group"
+                              : "border-[#161616] opacity-50 cursor-not-allowed select-none"
                             }`}
                         >
                           <span
@@ -812,27 +1012,22 @@ export default function WeeklyChallengePage({ user }: Props) {
                           <div className="flex-1 min-w-0">
                             <span
                               className={`font-mono text-sm transition-colors truncate block
-                            ${
-                              solved
+                            ${solved
                                 ? "text-[#00e87a]"
-                                : confirmed && isActive
+                                : isSubscribed && isActive
                                   ? "text-[#e0e0e0] group-hover:text-[#00e87a]"
                                   : "text-[#aaa]"
-                            }`}
+                              }`}
                             >
                               {p.title}
                             </span>
                           </div>
-                          <span
-                            className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg
-                            ${
-                              p.difficulty === "Easy"
-                                ? "text-[#00e87a] bg-[#00e87a12]"
-                                : p.difficulty === "Medium"
-                                  ? "text-[#f0b429] bg-[#f0b42912]"
-                                  : "text-[#ff4d4d] bg-[#ff4d4d12]"
-                            }`}
-                          >
+                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg
+                            ${p.difficulty === "Easy"
+                              ? "text-[#00e87a] bg-[#00e87a12]"
+                              : p.difficulty === "Medium"
+                                ? "text-[#f0b429] bg-[#f0b42912]"
+                                : "text-[#ff4d4d] bg-[#ff4d4d12]"}`}>
                             {p.difficulty}
                           </span>
                           <span className="text-xs font-mono text-[#a78bfa] font-bold">
@@ -843,20 +1038,20 @@ export default function WeeklyChallengePage({ user }: Props) {
                               +{mySub.points_awarded}
                             </span>
                           )}
-                          {!confirmed && (
+                          {!isSubscribed && (
                             <span className="text-[#999] text-xs">🔒</span>
                           )}
-                          {confirmed && isUpcoming && (
+                          {isSubscribed && isUpcoming && (
                             <span className="text-[10px] font-mono text-[#f0b429]">
                               starts soon
                             </span>
                           )}
-                          {confirmed && isEnded && !solved && (
+                          {isSubscribed && isEnded && !solved && (
                             <span className="text-[10px] font-mono text-[#a78bfa]">
                               🏁 practice
                             </span>
                           )}
-                          {confirmed && isEnded && solved && (
+                          {isSubscribed && isEnded && solved && (
                             <span className="text-[10px] font-mono text-[#555]">
                               ended
                             </span>
@@ -867,69 +1062,61 @@ export default function WeeklyChallengePage({ user }: Props) {
                   </div>
                 </div>
 
-                {/* Access / payment section */}
+                {/* Access section */}
                 <div className="px-5 pb-4">
                   {!user ? (
                     <div className="text-center py-3 border border-[#1a1a1a] rounded-xl">
-                      <p className="text-xs font-mono text-[#999]">
-                        Sign in with GitHub to participate
-                      </p>
+                      <p className="text-xs font-mono text-[#999]">Sign in with GitHub to participate</p>
                     </div>
-                  ) : confirmed ? (
+                  ) : isSubscribed ? (
                     <div className="flex items-center justify-between flex-wrap gap-3">
                       <div className="flex items-center gap-2 text-xs font-mono">
                         {isUpcoming ? (
                           <span className="text-[#f0b429]">
-                            ✓ Payment confirmed — problems unlock on{" "}
-                            {new Date(ch.starts_at).toLocaleString()}
+                            ✓ Subscribed — problems unlock on {new Date(ch.starts_at).toLocaleString()}
                           </span>
                         ) : isEnded ? (
                           <span className="text-[#aaa]">✓ Challenge ended</span>
                         ) : (
-                          <span className="text-[#00e87a]">
-                            ✓ Access confirmed — solve all week!
-                          </span>
+                          <span className="text-[#00e87a]">✓ Subscribed — solve all week!</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         {ch.whatsapp_link && (
-                          <a
-                            href={ch.whatsapp_link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] text-white font-mono text-xs font-bold rounded-lg hover:bg-[#22c55e] transition-all"
-                          >
+                          <a href={ch.whatsapp_link} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] text-white font-mono text-xs font-bold rounded-lg hover:bg-[#22c55e] transition-all">
                             💬 WhatsApp Group
                           </a>
                         )}
                         {!isUpcoming && (
                           <button
-                            onClick={() =>
-                              setShowLeader(showLeader === ch.id ? null : ch.id)
-                            }
-                            className="text-xs font-mono text-[#a78bfa] hover:text-[#c4b5fd] transition-colors"
-                          >
-                            {showLeader === ch.id ? "Hide" : "View"} leaderboard
-                            ↕
+                            onClick={() => setShowLeader(showLeader === ch.id ? null : ch.id)}
+                            className="text-xs font-mono text-[#a78bfa] hover:text-[#c4b5fd] transition-colors">
+                            {showLeader === ch.id ? "Hide" : "View"} leaderboard ↕
                           </button>
                         )}
                       </div>
                     </div>
-                  ) : access?.status === "pending" ? (
+                  ) : subStatus === "pending" ? (
                     <div className="flex items-center gap-2 text-xs font-mono text-[#f0b429]">
-                      ⏳ Payment under review (Txn: {access.txn_id})
+                      ⏳ Subscription payment under review — hang tight!
                     </div>
-                  ) : isActive || isUpcoming ? (
-                    <button
-                      onClick={() => setPayTarget(ch)}
-                      className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] active:scale-[0.98] transition-all btn-primary"
-                    >
-                      Unlock for ₹{ch.entry_fee} →
-                    </button>
-                  ) : null}
+                  ) : (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <p className="text-xs font-mono text-[#777] flex-1">
+                        Subscribe for lifetime access to all weekly challenges
+                      </p>
+                      <button
+                        onClick={() => onNavigate?.('subscribe')}
+                        className="px-4 py-2 bg-[#00e87a] text-black font-mono font-bold text-xs rounded-xl hover:bg-[#00ff88] transition-all shrink-0"
+                      >
+                        Subscribe ⭐
+                      </button>
+                    </div>
+                  )}
 
                   {/* Leaderboard */}
-                  {confirmed && showLeader === ch.id && (
+                  {isSubscribed && showLeader === ch.id && (
                     <div className="mt-4 border-t border-[#1a1a1a] pt-4">
                       <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-2">
                         Weekly Leaderboard
@@ -937,24 +1124,71 @@ export default function WeeklyChallengePage({ user }: Props) {
                       <WeeklyLeaderboard challengeId={ch.id} />
                     </div>
                   )}
+
+                  {/* AI Summary — only for ended challenges */}
+                  {isEnded && (
+                    <div className="mt-3 border-t border-[#141414] pt-3">
+                      {/* Toggle button */}
+                      {!summaries[ch.id] && (
+                        <button
+                          onClick={() => generateSummary(ch)}
+                          disabled={loadingSummary === ch.id}
+                          className="flex items-center gap-2 text-[10px] font-mono px-3 py-1.5
+                            bg-[#a78bfa10] border border-[#a78bfa20] text-[#a78bfa] rounded-lg
+                            hover:bg-[#a78bfa18] disabled:opacity-50 transition-all"
+                        >
+                          {loadingSummary === ch.id ? (
+                            <><span className="w-2.5 h-2.5 border border-[#a78bfa] border-t-transparent rounded-full animate-spin inline-block" /> Generating summary…</>
+                          ) : '✦ Generate AI Summary'}
+                        </button>
+                      )}
+
+                      {/* Summary card */}
+                      {summaries[ch.id] && (
+                        <div className="bg-[#0a0a0a] border border-[#a78bfa20] rounded-xl p-4 space-y-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[#a78bfa] text-xs">✦</span>
+                            <span className="text-[10px] font-mono font-bold text-[#a78bfa] uppercase tracking-widest">
+                              Challenge Summary
+                            </span>
+                          </div>
+
+                          {[
+                            { icon: '🧠', label: 'Concept tested',    text: summaries[ch.id].concept },
+                            { icon: '⚡', label: 'Optimal approach',  text: summaries[ch.id].optimalApproach },
+                            { icon: '⚠️', label: 'Common mistakes',   text: summaries[ch.id].commonMistakes },
+                            { icon: '🏆', label: 'Top finishers',     text: summaries[ch.id].shoutout },
+                            { icon: '💪', label: 'Keep going',        text: summaries[ch.id].closing },
+                          ].map(({ icon, label, text }) => text ? (
+                            <div key={label} className="flex gap-2.5 items-start">
+                              <span className="text-sm shrink-0 mt-0.5">{icon}</span>
+                              <div>
+                                <div className="text-[9px] font-mono text-[#555] uppercase tracking-widest mb-0.5">
+                                  {label}
+                                </div>
+                                <p className="text-[11px] font-mono text-[#bbb] leading-relaxed">
+                                  {text}
+                                </p>
+                              </div>
+                            </div>
+                          ) : null)}
+
+                          <button
+                            onClick={() => generateSummary(ch)}
+                            disabled={loadingSummary === ch.id}
+                            className="text-[9px] font-mono text-[#444] hover:text-[#a78bfa] transition-colors mt-1"
+                          >
+                            ↻ Regenerate
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
-      )}
-
-      {/* Payment modal */}
-      {payTarget && user && (
-        <PayModal
-          challenge={payTarget}
-          user={user}
-          onSuccess={() => {
-            load();
-            setPayTarget(null);
-          }}
-          onClose={() => setPayTarget(null)}
-        />
       )}
     </div>
   );

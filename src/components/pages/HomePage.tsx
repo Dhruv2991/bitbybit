@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { User } from '@/types/database';
+import { getRecommendations, setAiUser } from '@/lib/gemini';
 
 interface HomePageProps {
   user:       User | null;
@@ -113,6 +114,32 @@ function ActivityTicker({ members }: { members: number }) {
 
 export default function HomePage({ user, onNavigate }: HomePageProps) {
   const [stats, setStats] = useState<{ problems: string; submissions: string; members: string } | null>(null);
+  const [announcement, setAnnouncement] = useState<string>('');
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    const db = getSupabaseClient();
+    (async () => {
+      try {
+        const { data } = await (db.from('app_config') as any)
+          .select('*')
+          .in('key', ['announcement_text', 'announcement_active']);
+        const map = new Map((data || []).map((c: any) => [c.key, c.value]));
+        if (map.get('announcement_active') === 'true' && map.get('announcement_text')) {
+          setAnnouncement(String(map.get('announcement_text')));
+        }
+      } catch {}
+    })();
+    try {
+      const stored = sessionStorage.getItem('bb_announcement_dismissed');
+      if (stored) setDismissed(true);
+    } catch {}
+  }, []);
+
+  function dismissAnnouncement() {
+    setDismissed(true);
+    try { sessionStorage.setItem('bb_announcement_dismissed', '1'); } catch {}
+  }
 
   useEffect(() => {
     const db = getSupabaseClient();
@@ -134,6 +161,88 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
       }
     })();
   }, []);
+
+  const [dailyProblem, setDailyProblem] = useState<any>(null);
+  const [dailySolvedToday, setDailySolvedToday] = useState(false);
+
+  useEffect(() => {
+    const db = getSupabaseClient();
+    (async () => {
+      try {
+        const { data } = await db.from('problems').select('*')
+          .eq('visibility', 'public');
+        const pool = ((data || []) as any[]).filter((p: any) => !p.is_contest_problem);
+        if (!pool.length) return;
+
+        // Deterministic pick — same problem for everyone, changes once per day
+        const dayKey = new Date().toISOString().slice(0, 10);
+        let hash = 0;
+        for (let i = 0; i < dayKey.length; i++) hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
+        const problem = pool[hash % pool.length];
+        setDailyProblem(problem);
+
+        if (user?.github) {
+          const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+          const { data: subs } = await db.from('submissions').select('id, created_at')
+            .eq('github', user.github).eq('problem_id', problem.id).eq('status', 'approved');
+          const solvedToday = (subs || []).some((s: any) => new Date(s.created_at) >= startOfDay);
+          setDailySolvedToday(solvedToday);
+        }
+      } catch {}
+    })();
+  }, [user?.github]);
+
+  function openDailyProblem() {
+    if (!dailyProblem) return;
+    try { sessionStorage.setItem('bb_open_problem_id', dailyProblem.id); } catch {}
+    onNavigate('problems');
+  }
+
+  const [recommended, setRecommended] = useState<any[]>([]);
+  const [recLoading, setRecLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user?.github) { setRecommended([]); return; }
+    const db = getSupabaseClient();
+    let alive = true;
+    (async () => {
+      try {
+        const { data: sub } = await (db.from('subscribers') as any)
+          .select('status').eq('github', user.github).maybeSingle();
+        const isSub = sub?.status === 'confirmed';
+        setAiUser(user.github, isSub);
+        if (!isSub) { if (alive) setRecommended([]); return; }
+
+        const [{ data: allProblems }, { data: solvedSubs }] = await Promise.all([
+          db.from('problems').select('id, title, difficulty, points, tags').eq('visibility', 'public'),
+          db.from('submissions').select('problem_title').eq('github', user.github).eq('status', 'approved'),
+        ]);
+        const pool = ((allProblems || []) as any[]).filter(p => !p.is_contest_problem);
+        const solvedTitles = [...new Set((solvedSubs || []).map((s: any) => s.problem_title))];
+        const availableTitles = pool
+          .filter(p => !solvedTitles.includes(p.title))
+          .map(p => p.title);
+        if (!availableTitles.length) { if (alive) setRecommended([]); return; }
+
+        setRecLoading(true);
+        const picks = await getRecommendations(solvedTitles as string[], availableTitles);
+        if (!alive) return;
+        const matched = picks
+          .map(title => pool.find(p => p.title === title))
+          .filter(Boolean);
+        setRecommended(matched);
+      } catch {
+        if (alive) setRecommended([]);
+      }
+      if (alive) setRecLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [user?.github]);
+
+  function openRecommendedProblem(id: string) {
+    try { sessionStorage.setItem('bb_open_problem_id', id); } catch {}
+    onNavigate('problems');
+  }
 
   const features = [
     {
@@ -176,6 +285,78 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
 
   return (
     <div className="animate-fade-up">
+
+      {announcement && !dismissed && (
+        <div className="flex items-center gap-3 px-4 py-3 mb-4 bg-[#00e87a08] border border-[#00e87a20]
+          rounded-2xl text-sm font-mono text-[#00e87a] animate-fade-up">
+          <span className="shrink-0">📣</span>
+          <span className="flex-1">{announcement}</span>
+          <button
+            onClick={dismissAnnouncement}
+            aria-label="Dismiss announcement"
+            className="shrink-0 text-[#00e87a80] hover:text-[#00e87a] transition-colors px-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {dailyProblem && (
+        <button onClick={openDailyProblem}
+          className="w-full flex items-center gap-4 px-5 py-4 mb-4 bg-[#f0b42908] border border-[#f0b42925]
+            rounded-2xl text-left hover:border-[#f0b42945] transition-all duration-200 group">
+          <div className="w-11 h-11 rounded-xl bg-[#f0b42912] flex items-center justify-center text-xl shrink-0">
+            🗓️
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-[#f0b429] font-bold">Daily Problem</span>
+              {dailySolvedToday && (
+                <span className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a12] border border-[#00e87a20] rounded-full px-2 py-0.5">
+                  ✓ Solved today
+                </span>
+              )}
+            </div>
+            <div className="font-display font-bold text-[#e2e2e2] text-sm truncate">{dailyProblem.title}</div>
+          </div>
+          <span className={`text-xs font-mono font-bold shrink-0 px-2 py-1 rounded-lg
+            ${dailyProblem.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
+              dailyProblem.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
+              'text-[#ff4d4d] bg-[#ff4d4d12]'}`}>
+            {dailyProblem.difficulty}
+          </span>
+          <span className="text-[#666] group-hover:text-[#f0b429] transition-colors shrink-0">→</span>
+        </button>
+      )}
+
+      {user && (recLoading || recommended.length > 0) && (
+        <div className="mb-4 px-5 py-4 bg-[#0d0d0d] border border-[#1a1a1a] rounded-2xl">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm">✦</span>
+            <span className="text-xs font-mono font-bold text-[#a78bfa] uppercase tracking-wider">Based on what you've solved</span>
+          </div>
+          {recLoading ? (
+            <div className="flex items-center gap-2 text-[#666] font-mono text-xs py-2">
+              <div className="spinner-sm" /> Finding problems for you…
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {recommended.map((p: any) => (
+                <button key={p.id} onClick={() => openRecommendedProblem(p.id)}
+                  className="text-left p-3 bg-[#080808] border border-[#1a1a1a] rounded-xl hover:border-[#a78bfa30] transition-all">
+                  <div className="text-xs font-mono font-bold text-[#e0e0e0] truncate mb-1">{p.title}</div>
+                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded
+                    ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
+                      p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
+                      'text-[#ff4d4d] bg-[#ff4d4d12]'}`}>
+                    {p.difficulty}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Hero ───────────────────────────────────────────── */}
       <section className="relative text-center pt-12 pb-16 md:pt-20 md:pb-24 overflow-hidden">

@@ -35,6 +35,8 @@ export interface Problem {
 
   test_cases: TestCase[];
 
+  hints?: string[];
+
   submission_count: number;
 
   is_contest_problem?: boolean;
@@ -142,6 +144,9 @@ export interface ArenaSubmission {
 
   strike_penalty_factor: number;
   points_awarded: number;
+
+  tests_passed: number;
+  tests_total:  number;
 
   created_at: string;
 }
@@ -465,7 +470,7 @@ export const STARTER_CODE: Record<
 },
 };
 // ════════════════════════════════════════════════════════════
-// Weekly Challenge (temporary paid-access feature)
+// Weekly Challenge (organizational grouping — no payment gate)
 // ════════════════════════════════════════════════════════════
 
 export type WeeklyChallengeStatus = 'upcoming' | 'active' | 'ended';
@@ -479,7 +484,7 @@ export interface WeeklyChallenge {
   // 3 problem IDs included in this week's challenge
   problem_ids: string[];
 
-  // Payment details
+  // Payment details (kept for legacy — no longer used for access gating)
   entry_fee: number;
   upi_id:    string;
   whatsapp_link: string | null;
@@ -515,8 +520,31 @@ export interface WeeklySubmission {
   code:                string;
   tests_passed:        number;
   tests_total:         number;
-  // Base points × time bonus factor
   points_awarded:      number;
   submitted_at:        string;
   created_at:          string;
+}
+
+// ════════════════════════════════════════════════════════════
+// Subscription (one-time lifetime access)
+// ════════════════════════════════════════════════════════════
+
+export type SubscriberStatus = 'pending' | 'confirmed' | 'rejected';
+
+export interface Subscriber {
+  id:         string;
+  github:     string;
+  name:       string;
+  txn_id:     string;
+  status:     SubscriberStatus;
+  created_at: string;
+}
+
+// ════════════════════════════════════════════════════════════
+// App Config (admin-adjustable key-value settings)
+// ════════════════════════════════════════════════════════════
+
+export interface AppConfig {
+  key:   string;
+  value: string;
 }

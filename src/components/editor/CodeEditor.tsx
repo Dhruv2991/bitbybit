@@ -4,7 +4,7 @@
 // Monaco Editor wrapper
 // ════════════════════════════════════════════════════════════
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { OnMount, BeforeMount } from '@monaco-editor/react';
 import type { SupportedLang } from '@/types/database';
@@ -55,6 +55,17 @@ export default function CodeEditor({
   height = '420px',
 }: CodeEditorProps) {
 
+  const [monacoTheme, setMonacoTheme] = useState<'bitbybit-dark' | 'bitbybit-light'>('bitbybit-dark');
+
+  useEffect(() => {
+    const read = () =>
+      setMonacoTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'bitbybit-light' : 'bitbybit-dark');
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
   const handleBeforeMount: BeforeMount = (monaco) => {
     monaco.editor.defineTheme('bitbybit-dark', {
       base:    'vs-dark',
@@ -84,6 +95,34 @@ export default function CodeEditor({
         'scrollbarSlider.hoverBackground':        '#2a2a2a',
       },
     });
+    monaco.editor.defineTheme('bitbybit-light', {
+      base:    'vs',
+      inherit: true,
+      rules: [
+        { token: 'comment',  foreground: '8a8a94', fontStyle: 'italic' },
+        { token: 'keyword',  foreground: '7c3aed', fontStyle: 'bold' },
+        { token: 'string',   foreground: '15803d' },
+        { token: 'number',   foreground: 'b45309' },
+        { token: 'type',     foreground: '1d4ed8' },
+        { token: 'function', foreground: 'a16207' },
+        { token: 'variable', foreground: '17171b' },
+        { token: 'operator', foreground: 'be185d' },
+      ],
+      colors: {
+        'editor.background':                      '#f7f7f8',
+        'editor.foreground':                      '#17171b',
+        'editorLineNumber.foreground':             '#b8b8c3',
+        'editorLineNumber.activeForeground':       '#7a7a81',
+        'editor.selectionBackground':             '#00e87a33',
+        'editor.lineHighlightBackground':         '#ececef',
+        'editorCursor.foreground':                '#00b368',
+        'editor.selectionHighlightBackground':    '#00e87a22',
+        'editorBracketMatch.background':          '#00e87a30',
+        'editorBracketMatch.border':              '#00b368',
+        'scrollbarSlider.background':             '#dadae0',
+        'scrollbarSlider.hoverBackground':        '#c2c2cc',
+      },
+    });
   };
 
   const handleMount: OnMount = (editor) => {
@@ -101,7 +140,7 @@ export default function CodeEditor({
         height={height}
         language={MONACO_LANG_MAP[language]}
         value={value}
-        theme="bitbybit-dark"
+        theme={monacoTheme}
         beforeMount={handleBeforeMount}
         onMount={handleMount}
         onChange={(v) => onChange(v || '')}

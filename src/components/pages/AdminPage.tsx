@@ -16,6 +16,7 @@ import type {
   Difficulty,
   WeeklyChallenge,
   WeeklyAccess,
+  Subscriber,
 } from "@/types/database";
 
 type Section =
@@ -25,7 +26,10 @@ type Section =
   | "problems"
   | "members"
   | "contests"
-  | "weekly";
+  | "weekly"
+  | "subscribers"
+  | "ai-generate"
+  | "announcements";
 
 const blankProblem = (): Omit<Problem, "id" | "created_at" | "updated_at"> => ({
   title: "",
@@ -38,6 +42,7 @@ const blankProblem = (): Omit<Problem, "id" | "created_at" | "updated_at"> => ({
   param_types: [],
   return_type: "bool",
   test_cases: [],
+  hints: [],
   submission_count: 0,
 });
 
@@ -189,8 +194,11 @@ function ProblemForm({
     param_types: initial.param_types || [],
     return_type: initial.return_type || "bool",
   });
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState("");
+  const [saving,           setSaving]           = useState(false);
+  const [err,              setErr]              = useState("");
+  const [generatingTests,  setGeneratingTests]  = useState(false);
+  const [improvingDesc,    setImprovingDesc]    = useState(false);
+  const [aiTestErr,        setAiTestErr]        = useState("");
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -213,6 +221,50 @@ function ProblemForm({
       setErr(e.message || "Save failed");
       setSaving(false);
     }
+  }
+
+  async function handleGenerateTests() {
+    if (!form.title.trim()) { setAiTestErr("Add a title first."); return; }
+    if (!form.description.trim()) { setAiTestErr("Add a description first."); return; }
+    setGeneratingTests(true);
+    setAiTestErr("");
+    try {
+      const { generateTestCases } = await import("@/lib/gemini");
+      const generated = await generateTestCases(
+        form.title,
+        form.description,
+        form.param_types,
+        form.return_type,
+        form.test_cases,
+      );
+      if (!generated.length) {
+        setAiTestErr("AI couldn't generate test cases. Check your description and try again.");
+      } else {
+        set("test_cases", [...form.test_cases, ...generated]);
+      }
+    } catch {
+      setAiTestErr("Generation failed. Try again.");
+    }
+    setGeneratingTests(false);
+  }
+
+  async function handleImproveDescription() {
+    if (!form.description.trim()) { setErr("Add a rough description first."); return; }
+    setImprovingDesc(true);
+    try {
+      const { improveDescription } = await import("@/lib/gemini");
+      const improved = await improveDescription(
+        form.title,
+        form.description,
+        form.param_types,
+        form.return_type,
+        form.example,
+      );
+      if (improved && !improved.startsWith('⚠️') && !improved.startsWith('AI error')) {
+        set("description", improved);
+      }
+    } catch {}
+    setImprovingDesc(false);
   }
 
   return (
@@ -330,9 +382,22 @@ function ProblemForm({
         </p>
       </div>
       <div>
-        <label className="block text-xs text-[#bbb] font-mono mb-1 uppercase tracking-wider">
-          Description * (HTML)
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs text-[#bbb] font-mono uppercase tracking-wider">
+            Description * (HTML)
+          </label>
+          <button
+            onClick={handleImproveDescription}
+            disabled={improvingDesc || !form.description.trim()}
+            className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-lg
+              bg-[#a78bfa10] border border-[#a78bfa25] text-[#a78bfa]
+              hover:bg-[#a78bfa18] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            {improvingDesc
+              ? <><span className="w-2.5 h-2.5 border border-[#a78bfa] border-t-transparent rounded-full animate-spin inline-block mr-1" />Improving…</>
+              : "✦ AI Improve"}
+          </button>
+        </div>
         <textarea
           value={form.description}
           onChange={(e) => set("description", e.target.value)}
@@ -402,8 +467,54 @@ function ProblemForm({
       </div>
       <div>
         <label className="block text-xs text-[#bbb] font-mono mb-2 uppercase tracking-wider">
-          Test Cases
+          Hints <span className="text-[#555] normal-case">(optional — up to 3, revealed one at a time)</span>
         </label>
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-[#555] w-12 shrink-0">Hint {i + 1}</span>
+              <input
+                value={(form.hints || [])[i] || ""}
+                onChange={(e) => {
+                  const next = [...(form.hints || ["", "", ""])];
+                  while (next.length < 3) next.push("");
+                  next[i] = e.target.value;
+                  set("hints", next.filter((_, idx) => idx <= i || next[idx]));
+                }}
+                placeholder={
+                  i === 0 ? "e.g. Think about what data structure allows O(1) lookups" :
+                  i === 1 ? "e.g. What if you stored the complement of each number?" :
+                             "e.g. A single pass through the array is sufficient"
+                }
+                className="flex-1 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
+              />
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-[#555] font-mono mt-1.5">
+          Users unlock hints one-by-one with a 30s cooldown. Leave blank to disable hints for this problem.
+        </p>
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs text-[#bbb] font-mono uppercase tracking-wider">
+            Test Cases
+          </label>
+          <button
+            onClick={handleGenerateTests}
+            disabled={generatingTests || !form.title.trim()}
+            className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-lg
+              bg-[#00e87a10] border border-[#00e87a25] text-[#00e87a]
+              hover:bg-[#00e87a18] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            {generatingTests
+              ? <><span className="w-2.5 h-2.5 border border-[#00e87a] border-t-transparent rounded-full animate-spin inline-block mr-1" />Generating…</>
+              : "✦ AI Generate"}
+          </button>
+        </div>
+        {aiTestErr && (
+          <p className="text-[10px] text-[#ff4d4d] font-mono mb-2">{aiTestErr}</p>
+        )}
         <TestCaseEditor
           cases={form.test_cases}
           onChange={(tc) => set("test_cases", tc)}
@@ -752,6 +863,7 @@ interface ModalState {
     | "approve-arena"
     | "reject-arena"
     | "approve-weekly"
+    | "reject-weekly"
     | "reject-reg"
     | "confirm-delete"
     | null;
@@ -775,24 +887,26 @@ function ActionModal({
 }) {
   const [value, setValue] = useState("");
   const isApprove =
-    modal.type === "approve-sub" || modal.type === "approve-arena";
+    modal.type === "approve-sub" ||
+    modal.type === "approve-arena" ||
+    modal.type === "approve-weekly";
 
   useEffect(() => {
-    if (modal.type === "approve-sub")
+    if (modal.type === "approve-sub" || modal.type === "approve-weekly")
       setValue(String(modal.suggestedPoints ?? 100));
     if (modal.type === "approve-arena") {
       const sub = modal.arenaSubRef!;
-      const strikeFactor = Math.max(0, 1 - (sub.strikes || 0) * 0.1);
-      const timeFactor = sub.strike_penalty_factor || 1;
-      const suggested = Math.max(
-        10,
-        Math.floor((modal.basePoints ?? 100) * strikeFactor * timeFactor),
-      );
+      // Use the already-calculated points_awarded from submission time
+      // which correctly factors in: testRatio × timeFactor × strikePenalty
+      const suggested = sub.points_awarded > 0
+        ? sub.points_awarded
+        : Math.max(10, Math.floor((modal.basePoints ?? 100) * Math.max(0.7, 1 - (sub.strikes || 0) * 0.1) * (sub.strike_penalty_factor || 1)));
       setValue(String(suggested));
     }
     if (
       modal.type === "reject-sub" ||
       modal.type === "reject-arena" ||
+      modal.type === "reject-weekly" ||
       modal.type === "reject-reg"
     )
       setValue("");
@@ -817,11 +931,15 @@ function ActionModal({
           ? `Approve arena entry — @${modal.github}`
           : modal.type === "reject-arena"
             ? `Disqualify entry — @${modal.github}`
-            : modal.type === "reject-reg"
-              ? `Reject registration — @${modal.github}`
-              : modal.type === "confirm-delete"
-                ? "Confirm Delete"
-                : "";
+            : modal.type === "approve-weekly"
+              ? `Approve weekly submission — @${modal.github}`
+              : modal.type === "reject-weekly"
+                ? `Reject weekly submission — @${modal.github}`
+                : modal.type === "reject-reg"
+                  ? `Reject registration — @${modal.github}`
+                  : modal.type === "confirm-delete"
+                    ? "Confirm Delete"
+                    : "";
 
   return (
     <div
@@ -844,20 +962,34 @@ function ActionModal({
         {modal.type === "approve-arena" && modal.arenaSubRef && (
           <div className="mb-3 p-2.5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono space-y-1">
             <div className="flex justify-between">
-              <span className="text-[#999]">Strikes</span>
-              <span className="text-[#f0b429]">
-                {modal.arenaSubRef.strikes}
+              <span className="text-[#999]">Tests passed</span>
+              <span className={modal.arenaSubRef.tests_total > 0
+                ? modal.arenaSubRef.tests_passed === modal.arenaSubRef.tests_total
+                  ? "text-[#00e87a] font-bold"
+                  : "text-[#f0b429] font-bold"
+                : "text-[#555]"}>
+                {modal.arenaSubRef.tests_total > 0
+                  ? `${modal.arenaSubRef.tests_passed}/${modal.arenaSubRef.tests_total}`
+                  : "not run"}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#999]">Time factor</span>
+              <span className="text-[#999]">Strikes</span>
+              <span className="text-[#f0b429]">{modal.arenaSubRef.strikes}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-[#999]">Time + strike factor</span>
               <span className="text-[#a78bfa]">
-                {(modal.arenaSubRef.strike_penalty_factor || 1).toFixed(2)}
+                {(modal.arenaSubRef.strike_penalty_factor || 1).toFixed(2)}×
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-[#999]">Base pts</span>
               <span className="text-[#e0e0e0]">{modal.basePoints}</span>
+            </div>
+            <div className="flex justify-between border-t border-[#1f1f1f] pt-1 mt-1">
+              <span className="text-[#999]">Calculated pts</span>
+              <span className="text-[#00e87a] font-bold">{modal.arenaSubRef.points_awarded}</span>
             </div>
           </div>
         )}
@@ -885,6 +1017,7 @@ function ActionModal({
           )}
           {(modal.type === "reject-sub" ||
             modal.type === "reject-arena" ||
+            modal.type === "reject-weekly" ||
             modal.type === "reject-reg") && (
             <div>
               <label className="block text-[10px] text-[#999] font-mono uppercase mb-1">
@@ -947,6 +1080,9 @@ export default function AdminPage({ user }: AdminPageProps) {
   const [editingProblem, setEditingProblem] = useState<Problem | null>(null);
   const [showContestForm, setShowContestForm] = useState(false);
   const [editingContest, setEditingContest] = useState<Contest | null>(null);
+  const [plagResults,    setPlagResults]    = useState<Record<string, any>>({});
+  const [plagChecking,   setPlagChecking]   = useState<string | null>(null);
+  const [expandedCode,   setExpandedCode]   = useState<string | null>(null);
 
   const [modal, setModal] = useState<ModalState>({
     type: null,
@@ -1163,6 +1299,31 @@ export default function AdminPage({ user }: AdminPageProps) {
     showToast(`✗ Rejected submission for @${github}`);
   }
 
+  async function checkPlagiarism(sub: Submission) {
+    if (plagChecking === sub.id) return;
+    setPlagChecking(sub.id);
+    try {
+      // Fetch other submissions for the same problem
+      const { data: others } = await (db.from("submissions") as any)
+        .select("github, code")
+        .eq("problem_id", sub.problem_id)
+        .neq("github", sub.github)
+        .in("status", ["pending", "approved"])
+        .limit(10);
+
+      const { detectPlagiarism } = await import("@/lib/gemini");
+      const result = await detectPlagiarism(
+        sub.code || "",
+        sub.lang,
+        (others || []).filter((o: any) => o.code),
+      );
+      setPlagResults(prev => ({ ...prev, [sub.id]: result }));
+    } catch {
+      setPlagResults(prev => ({ ...prev, [sub.id]: { score: 0, verdict: "clean", matches: [], explanation: "Check failed." } }));
+    }
+    setPlagChecking(null);
+  }
+
   // ── FIX: fresh DB check for arena too ──
   async function approveArenaSubmission(
     sub: ArenaSubmission,
@@ -1229,78 +1390,6 @@ export default function AdminPage({ user }: AdminPageProps) {
       ),
     );
     showToast(`✗ Arena rejected for @${github}: ${finalReason}`);
-  }
-  async function approveWeeklySubmission(sub: any) {
-    const { data: freshWeekly } = await db
-      .from("weekly_submissions")
-      .select("status")
-      .eq("id", sub.id)
-      .maybeSingle<{ status: string }>();
-
-    if (freshWeekly?.status === "approved") {
-      showToast("Already approved.");
-      return;
-    }
-
-    const finalStr = await openModal({
-      type: "approve-weekly",
-      id: sub.id,
-      github: sub.github,
-      suggestedPoints: sub.points_awarded,
-    });
-
-    if (finalStr === null) return;
-
-    const finalPts = Math.max(0, parseInt(finalStr as string, 10) || 0);
-
-    await (db.from("weekly_submissions") as any)
-      .update({
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        points_awarded: finalPts,
-      })
-      .eq("id", sub.id);
-
-    await awardPoints(sub.github, finalPts, false, undefined, true);
-
-    setWeeklySubs((prev) =>
-      prev.map((w) =>
-        w.id === sub.id
-          ? {
-              ...w,
-              status: "approved",
-              points_awarded: finalPts,
-            }
-          : w,
-      ),
-    );
-
-    showToast(`✓ Weekly approved — ${finalPts} pts to @${sub.github}`);
-  }
-
-  async function rejectWeeklySubmission(sub: any) {
-    const reason = prompt("Reason for rejection?") || "Rejected";
-
-    await (db.from("weekly_submissions") as any)
-      .update({
-        status: "rejected",
-        review_notes: reason,
-      })
-      .eq("id", sub.id);
-
-    setWeeklySubs((prev) =>
-      prev.map((w) =>
-        w.id === sub.id
-          ? {
-              ...w,
-              status: "rejected",
-              review_notes: reason,
-            }
-          : w,
-      ),
-    );
-
-    showToast(`✗ Weekly submission rejected`);
   }
   // ── FIX: countAsSolved param — arena passes false so problems_solved & streak stay clean ──
   async function awardPoints(
@@ -1527,7 +1616,10 @@ export default function AdminPage({ user }: AdminPageProps) {
       label: "🏟 Contests",
       badge: regs.filter((r) => r.status === "pending").length,
     },
-    { id: "weekly", label: "🏅 Weekly" },
+    { id: "weekly",      label: "🏅 Weekly" },
+    { id: "subscribers", label: "⭐ Subscribers" },
+    { id: "ai-generate", label: "✦ AI Generate" },
+    { id: "announcements", label: "📣 Announcements" },
   ];
 
   if (!user.is_admin)
@@ -1710,7 +1802,64 @@ export default function AdminPage({ user }: AdminPageProps) {
                               Reason: {s.reject_reason}
                             </div>
                           )}
-                          {s.code && <CodeViewer code={s.code} lang={s.lang} />}
+                          {s.code && (
+                            <div>
+                              <CodeViewer code={s.code} lang={s.lang} />
+                              {/* Plagiarism check */}
+                              <div className="mt-2">
+                                {!plagResults[s.id] ? (
+                                  <button
+                                    onClick={() => checkPlagiarism(s)}
+                                    disabled={plagChecking === s.id}
+                                    className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-lg
+                                      bg-[#f0b42910] border border-[#f0b42920] text-[#f0b429]
+                                      hover:bg-[#f0b42918] disabled:opacity-50 transition-all"
+                                  >
+                                    {plagChecking === s.id ? (
+                                      <><span className="w-2.5 h-2.5 border border-[#f0b429] border-t-transparent rounded-full animate-spin inline-block" /> Checking…</>
+                                    ) : '✦ Check Plagiarism'}
+                                  </button>
+                                ) : (
+                                  <div className={`rounded-xl p-3 border text-[10px] font-mono space-y-1.5
+                                    ${plagResults[s.id].verdict === 'likely_plagiarised' ? 'bg-[#ff4d4d08] border-[#ff4d4d25]' :
+                                      plagResults[s.id].verdict === 'suspicious'         ? 'bg-[#f0b42908] border-[#f0b42925]' :
+                                                                                           'bg-[#00e87a08] border-[#00e87a20]'}`}>
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <span className={
+                                          plagResults[s.id].verdict === 'likely_plagiarised' ? 'text-[#ff4d4d]' :
+                                          plagResults[s.id].verdict === 'suspicious'         ? 'text-[#f0b429]' : 'text-[#00e87a]'
+                                        }>
+                                          {plagResults[s.id].verdict === 'likely_plagiarised' ? '⚠ Likely plagiarised' :
+                                           plagResults[s.id].verdict === 'suspicious'         ? '⚠ Suspicious' : '✓ Looks original'}
+                                        </span>
+                                        <span className="text-[#555]">
+                                          Similarity: {plagResults[s.id].score}%
+                                        </span>
+                                      </div>
+                                      <button
+                                        onClick={() => checkPlagiarism(s)}
+                                        disabled={plagChecking === s.id}
+                                        className="text-[#444] hover:text-[#f0b429] transition-colors"
+                                      >
+                                        ↻
+                                      </button>
+                                    </div>
+                                    {plagResults[s.id].explanation && (
+                                      <p className="text-[#888] leading-relaxed">{plagResults[s.id].explanation}</p>
+                                    )}
+                                    {plagResults[s.id].matches?.length > 0 && (
+                                      <ul className="space-y-0.5 pl-2">
+                                        {plagResults[s.id].matches.map((m: string, i: number) => (
+                                          <li key={i} className="text-[#666] before:content-['•'] before:mr-1.5">{m}</li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span
@@ -1791,10 +1940,14 @@ export default function AdminPage({ user }: AdminPageProps) {
                         </span>
                       </div>
                     </div>
-                    <div className="mb-4 p-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono text-[#bbb]">
-                      ℹ Points formula: base × (1 − strikes×0.1) × time_factor
-                      (0.5–1.0). Faster solves earn a higher time_factor. You
-                      can override before approving.
+                    <div className="mb-4 p-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono text-[#bbb] space-y-1">
+                      <div>
+                        <span className="text-[#e0e0e0] font-bold">Points formula: </span>
+                        base × (tests_passed / tests_total) × time_factor × (1 − strikes×0.1)
+                      </div>
+                      <div className="text-[#555]">
+                        Auto-submitted (time expired) = 0 tests run → 0 pts by default. Review code manually and override if deserved.
+                      </div>
                     </div>
                     {arenaSubs.length === 0 && (
                       <div className="text-center py-16 text-[#999] font-mono">
@@ -1861,137 +2014,218 @@ export default function AdminPage({ user }: AdminPageProps) {
                                     const pendingUserSubs = userSubs.filter(
                                       (a) => a.status === "submitted",
                                     );
+                                    // Sort submissions by problem order in contest
+                                    const contestProbIds = contest
+                                      ? (contest.problem_ids?.length ? contest.problem_ids : contest.problem_id ? [contest.problem_id] : [])
+                                      : [];
+                                    const sortedSubs = [...userSubs].sort((a, b) => {
+                                      const ai = contestProbIds.indexOf(a.problem_id || '');
+                                      const bi = contestProbIds.indexOf(b.problem_id || '');
+                                      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+                                    });
                                     return (
                                       <div key={github} className="px-5 py-4">
+                                        {/* User header */}
                                         <div className="flex items-center gap-3 mb-3">
                                           <img
                                             src={`https://github.com/${github}.png?size=28`}
                                             alt={github}
                                             className="w-7 h-7 rounded-full ring-1 ring-[#2a2a2a] shrink-0"
-                                            onError={(e) => {
-                                              (
-                                                e.target as HTMLImageElement
-                                              ).style.display = "none";
-                                            }}
+                                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                                           />
-                                          <span className="font-mono font-bold text-[#e0e0e0] text-sm">
-                                            @{github}
-                                          </span>
-                                          <span className="text-[10px] text-[#999] font-mono">
-                                            {userSubs.length} problem
-                                            {userSubs.length !== 1 ? "s" : ""}
-                                          </span>
-                                          {totalAwarded > 0 && (
-                                            <span className="ml-auto text-xs font-mono text-[#00e87a] font-bold">
-                                              {totalAwarded} pts awarded
-                                            </span>
-                                          )}
-                                          {pendingUserSubs.length > 0 &&
-                                            totalAwarded === 0 && (
-                                              <span className="ml-auto text-[10px] font-mono text-[#f0b429]">
-                                                {pendingUserSubs.length} pending
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                              <span className="font-mono font-bold text-[#e0e0e0] text-sm">@{github}</span>
+                                              <span className="text-[10px] text-[#555] font-mono">
+                                                {sortedSubs.length}/{contestProbIds.length || '?'} problems submitted
                                               </span>
-                                            )}
+                                              {totalAwarded > 0 && (
+                                                <span className="ml-auto text-xs font-mono text-[#00e87a] font-bold">
+                                                  {totalAwarded} pts total
+                                                </span>
+                                              )}
+                                              {pendingUserSubs.length > 0 && totalAwarded === 0 && (
+                                                <span className="ml-auto text-[10px] font-mono text-[#f0b429]">
+                                                  {pendingUserSubs.length} pending
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
                                         </div>
+
+                                        {/* Per-problem submissions */}
                                         <div className="space-y-2 pl-10">
-                                          {userSubs.map((a) => {
-                                            const probId =
-                                              a.problem_id ||
-                                              contest?.problem_id ||
-                                              null;
+                                          {sortedSubs.map((a, subIdx) => {
+                                            // Fix: look up in both problem_ids and legacy problem_id
+                                            const probId = a.problem_id || null;
                                             const prob = probId
-                                              ? probs.find(
-                                                  (p) => p.id === probId,
-                                                )
+                                              ? probs.find((p) => p.id === probId)
                                               : null;
                                             const basePts = prob?.points || 200;
+                                            const problemNum = contestProbIds.indexOf(a.problem_id || '') + 1;
+                                            const codeKey = `${a.id}_code`;
                                             return (
                                               <div
                                                 key={a.id}
-                                                className={`bg-[#0d0d0d] border rounded-xl p-3 transition-all ${a.status === "submitted" ? "border-[#f0b42930]" : a.status === "disqualified" ? "border-[#ff4d4d20]" : "border-[#1a1a1a]"}`}
+                                                className={`bg-[#0d0d0d] border rounded-xl p-3 transition-all
+                                                  ${a.status === "submitted"    ? "border-[#f0b42930]" :
+                                                    a.status === "disqualified" ? "border-[#ff4d4d20]" :
+                                                                                  "border-[#1a1a1a]"}`}
                                               >
                                                 <div className="flex items-start justify-between gap-3 flex-wrap">
                                                   <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                      <span className="text-sm font-mono text-[#a78bfa] font-medium">
-                                                        {prob?.title ||
-                                                          a.problem_title ||
-                                                          "Unknown Problem"}
+                                                    {/* Problem label */}
+                                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                      {problemNum > 0 && (
+                                                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#a78bfa15] text-[#a78bfa]">
+                                                          P{problemNum}
+                                                        </span>
+                                                      )}
+                                                      <span className="text-sm font-mono text-[#e0e0e0] font-medium">
+                                                        {prob?.title || a.problem_title || "Unknown Problem"}
                                                       </span>
-                                                      <span className="text-[10px] text-[#999] font-mono">
+                                                      <span className="text-[10px] text-[#555] font-mono">
                                                         {basePts} pts base
                                                       </span>
+                                                      {a.tests_total === 0 && a.status === "submitted" && (
+                                                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#444] text-[#999]">
+                                                          ⏱ auto-submitted
+                                                        </span>
+                                                      )}
                                                       {a.strikes > 0 && (
                                                         <span className="text-[10px] font-mono bg-[#ff4d4d15] text-[#ff4d4d] px-1.5 py-0.5 rounded">
                                                           ⚠ {a.strikes} strikes
                                                         </span>
                                                       )}
                                                     </div>
-                                                    <div className="text-[10px] text-[#aaa] font-mono mt-0.5">
-                                                      {a.lang} ·{" "}
-                                                      {new Date(
-                                                        a.created_at,
-                                                      ).toLocaleString()}
-                                                      {a.strike_penalty_factor &&
-                                                        a.strike_penalty_factor !==
-                                                          1 && (
-                                                          <span className="ml-2 text-[#a78bfa]">
-                                                            time×
-                                                            {a.strike_penalty_factor.toFixed(
-                                                              2,
-                                                            )}
-                                                          </span>
-                                                        )}
-                                                    </div>
-                                                    {a.points_awarded > 0 &&
-                                                      a.status ===
-                                                        "reviewed" && (
-                                                        <div className="text-xs text-[#00e87a] font-mono mt-0.5 font-bold">
-                                                          ✓ Awarded:{" "}
-                                                          {a.points_awarded} pts
-                                                        </div>
+
+                                                    {/* Meta */}
+                                                    <div className="text-[10px] text-[#666] font-mono">
+                                                      {a.lang} · {new Date(a.created_at).toLocaleString()}
+                                                      {a.tests_total > 0 && (
+                                                        <span className={`ml-2 font-bold ${a.tests_passed === a.tests_total ? 'text-[#00e87a]' : 'text-[#f0b429]'}`}>
+                                                          {a.tests_passed}/{a.tests_total} tests
+                                                        </span>
                                                       )}
-                                                    {a.code && (
-                                                      <CodeViewer
-                                                        code={a.code}
-                                                        lang={a.lang}
-                                                      />
+                                                      {a.tests_total === 0 && (
+                                                        <span className="ml-2 text-[#444]">no tests run</span>
+                                                      )}
+                                                      {a.strike_penalty_factor && a.strike_penalty_factor !== 1 && (
+                                                        <span className="ml-2 text-[#a78bfa]">
+                                                          ×{a.strike_penalty_factor.toFixed(2)} factor
+                                                        </span>
+                                                      )}
+                                                    </div>
+
+                                                    {a.points_awarded > 0 && a.status === "reviewed" && (
+                                                      <div className="text-xs text-[#00e87a] font-mono mt-0.5 font-bold">
+                                                        ✓ Awarded: {a.points_awarded} pts
+                                                      </div>
+                                                    )}
+
+                                                    {/* Collapsible code */}
+                                                    {a.code && a.code !== '-- No code submitted --' && a.code !== '-- Time expired before submission --' ? (
+                                                      <div className="mt-2">
+                                                        <button
+                                                          onClick={() => setExpandedCode(expandedCode === codeKey ? null : codeKey)}
+                                                          className="text-[10px] font-mono text-[#555] hover:text-[#a78bfa] transition-colors"
+                                                        >
+                                                          {expandedCode === codeKey ? "▲ hide code" : "▼ view code"}
+                                                        </button>
+                                                        {expandedCode === codeKey && (
+                                                          <CodeViewer code={a.code} lang={a.lang} />
+                                                        )}
+                                                      </div>
+                                                    ) : (
+                                                      <div className="text-[10px] font-mono text-[#444] mt-1 italic">
+                                                        {a.code || 'No code submitted'}
+                                                      </div>
                                                     )}
                                                   </div>
+
+                                                  {/* Actions */}
                                                   <div className="flex items-center gap-2 shrink-0">
-                                                    <span
-                                                      className={`text-xs font-mono px-2 py-0.5 rounded font-bold ${a.status === "reviewed" ? "bg-[#00e87a15] text-[#00e87a]" : a.status === "disqualified" ? "bg-[#ff4d4d15] text-[#ff4d4d]" : "bg-[#f0b42915] text-[#f0b429]"}`}
-                                                    >
+                                                    <span className={`text-xs font-mono px-2 py-0.5 rounded font-bold
+                                                      ${a.status === "reviewed"     ? "bg-[#00e87a15] text-[#00e87a]" :
+                                                        a.status === "disqualified" ? "bg-[#ff4d4d15] text-[#ff4d4d]" :
+                                                                                      "bg-[#f0b42915] text-[#f0b429]"}`}>
                                                       {a.status}
                                                     </span>
-                                                    {a.status ===
-                                                      "submitted" && (
+                                                    {a.status === "submitted" && (
                                                       <>
                                                         <button
-                                                          onClick={() =>
-                                                            approveArenaSubmission(
-                                                              a,
-                                                              basePts,
-                                                            )
-                                                          }
+                                                          onClick={() => approveArenaSubmission(a, basePts)}
                                                           className="px-3 py-1.5 bg-[#00e87a] text-black text-xs font-mono font-bold rounded-lg hover:bg-[#00ff88] transition-all"
                                                         >
                                                           ✓ Approve
                                                         </button>
                                                         <button
-                                                          onClick={() =>
-                                                            rejectArenaSubmission(
-                                                              a.id,
-                                                              a.github,
-                                                            )
-                                                          }
+                                                          onClick={() => rejectArenaSubmission(a.id, a.github)}
                                                           className="px-3 py-1.5 bg-[#ff4d4d20] text-[#ff4d4d] text-xs font-mono rounded-lg hover:bg-[#ff4d4d30] transition-all"
                                                         >
                                                           ✗ Reject
                                                         </button>
                                                       </>
                                                     )}
+                                                    {a.status === "reviewed" && (
+                                                      expandedCode === `${a.id}_editpts` ? (
+                                                        <div className="flex items-center gap-1.5">
+                                                          <input
+                                                            type="number"
+                                                            defaultValue={a.points_awarded}
+                                                            className="w-16 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-2 py-1 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                                                            onKeyDown={async (e) => {
+                                                              if (e.key === 'Enter') {
+                                                                const pts = Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0);
+                                                                await (db.from('arena_submissions') as any)
+                                                                  .update({ points_awarded: pts })
+                                                                  .eq('id', a.id);
+                                                                // Update local state so UI reflects change without full reload
+                                                                setArenaSubs(prev => prev.map(s =>
+                                                                  s.id === a.id ? { ...s, points_awarded: pts } : s
+                                                                ));
+                                                                setExpandedCode(null);
+                                                              }
+                                                              if (e.key === 'Escape') setExpandedCode(null);
+                                                            }}
+                                                            autoFocus
+                                                          />
+                                                          <button
+                                                            onClick={() => setExpandedCode(null)}
+                                                            className="text-[10px] font-mono text-[#555] hover:text-[#999]"
+                                                          >✕</button>
+                                                        </div>
+                                                      ) : (
+                                                        <button
+                                                          onClick={() => setExpandedCode(`${a.id}_editpts`)}
+                                                          className="text-[10px] font-mono text-[#555] hover:text-[#a78bfa] transition-colors"
+                                                        >
+                                                          ✎ edit pts
+                                                        </button>
+                                                      )
+                                                    )}
                                                   </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+
+                                          {/* Show missing problems — submitted but no record */}
+                                          {contestProbIds.filter(pid => !sortedSubs.find(s => s.problem_id === pid)).map(pid => {
+                                            const prob = probs.find(p => p.id === pid);
+                                            const problemNum = contestProbIds.indexOf(pid) + 1;
+                                            return (
+                                              <div key={pid} className="bg-[#0a0a0a] border border-[#1a1a1a] border-dashed rounded-xl p-3 opacity-50">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#ffffff10] text-[#666]">
+                                                    P{problemNum}
+                                                  </span>
+                                                  <span className="text-xs font-mono text-[#555]">
+                                                    {prob?.title || `Problem ${problemNum}`}
+                                                  </span>
+                                                  <span className="text-[10px] font-mono text-[#444] ml-auto">
+                                                    Not submitted
+                                                  </span>
                                                 </div>
                                               </div>
                                             );
@@ -2326,7 +2560,10 @@ export default function AdminPage({ user }: AdminPageProps) {
         )}
 
         {/* ════════ WEEKLY CHALLENGE SECTION ════════ */}
-        {section === "weekly" && <WeeklyAdminSection user={user} />}
+        {section === "weekly"      && <WeeklyAdminSection user={user} />}
+        {section === "subscribers" && <SubscriberAdminSection />}
+        {section === "ai-generate" && <AiGenerateSection />}
+        {section === "announcements" && <AnnouncementAdminSection />}
       </div>
     </div>
   );
@@ -2379,6 +2616,32 @@ function WeeklyAdminSection({ user }: { user: User }) {
   >({});
   const [editingPts, setEditingPts] = useState<Record<string, string>>({});
   const [carryFromId, setCarryFromId] = useState<string>("");
+  const [selectedSubs, setSelectedSubs] = useState<Set<string>>(new Set());
+  const [bulkApproving, setBulkApproving] = useState(false);
+  const [expandedCode, setExpandedCode] = useState<string | null>(null);
+  const [weeklyPlagResults, setWeeklyPlagResults] = useState<Record<string, any>>({});
+  const [weeklyPlagChecking, setWeeklyPlagChecking] = useState<string | null>(null);
+  const [modal, setModal] = useState<ModalState>({ type: null, id: "", github: "" });
+  const modalResolve = useRef<((v: string | null) => void) | null>(null);
+
+  function openModal(
+    m: Omit<ModalState, "type"> & { type: NonNullable<ModalState["type"]> },
+  ): Promise<string | null> {
+    return new Promise((resolve) => {
+      modalResolve.current = resolve;
+      setModal(m);
+    });
+  }
+  function closeModal(value: string) {
+    modalResolve.current?.(value);
+    modalResolve.current = null;
+    setModal({ type: null, id: "", github: "" });
+  }
+  function cancelModal() {
+    modalResolve.current?.(null);
+    modalResolve.current = null;
+    setModal({ type: null, id: "", github: "" });
+  }
 
   useEffect(() => {
     load();
@@ -2507,7 +2770,13 @@ function WeeklyAdminSection({ user }: { user: User }) {
   }
 
   async function deleteChallenge(id: string) {
-    if (!confirm("Delete this weekly challenge?")) return;
+    const result = await openModal({
+      type: "confirm-delete",
+      id,
+      github: "",
+      confirmMsg: "Delete this weekly challenge? This cannot be undone.",
+    });
+    if (result === null) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db.from("weekly_challenges") as any).delete().eq("id", id);
     load();
@@ -2551,10 +2820,12 @@ function WeeklyAdminSection({ user }: { user: User }) {
       return;
     }
 
-    const finalStr = prompt(
-      `Approve weekly submission for ${sub.github}`,
-      String(sub.points_awarded),
-    );
+    const finalStr = await openModal({
+      type: "approve-weekly",
+      id: sub.id,
+      github: sub.github,
+      suggestedPoints: sub.points_awarded,
+    });
 
     if (finalStr === null) return;
 
@@ -2583,7 +2854,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
     if (member) {
       await (db
-        .from("members")as any)
+        .from("members") as any)
         .update({
           total_points: (member.total_points || 0) + finalPts,
           problems_solved: (member.problems_solved || 0) + 1,
@@ -2607,12 +2878,13 @@ function WeeklyAdminSection({ user }: { user: User }) {
   }
 
   async function rejectWeeklySubmission(sub: any) {
-    const reason = prompt("Reason for rejection?") || "Rejected";
+    const reason = await openModal({ type: "reject-weekly", id: sub.id, github: sub.github });
+    if (reason === null) return;
 
     const { error } = await (db.from("weekly_submissions") as any)
       .update({
         status: "rejected",
-        review_notes: reason,
+        review_notes: (reason as string).trim() || "Rejected",
       })
       .eq("id", sub.id);
 
@@ -2624,6 +2896,46 @@ function WeeklyAdminSection({ user }: { user: User }) {
     showToast(`Rejected ${sub.github}`);
 
     load();
+  }
+
+  async function bulkApproveSelected(pendingSubs: any[]) {
+    const toApprove = pendingSubs.filter((s) => selectedSubs.has(s.id));
+    if (toApprove.length === 0) return;
+
+    setBulkApproving(true);
+    let done = 0;
+    for (const sub of toApprove) {
+      await approveWeeklySubmission(sub);
+      done++;
+      showToast(`Approved ${done}/${toApprove.length} — @${sub.github}`);
+    }
+    setSelectedSubs(new Set());
+    setBulkApproving(false);
+    showToast(`✓ Bulk approved ${done} submission${done !== 1 ? "s" : ""}`);
+  }
+
+  async function checkWeeklyPlagiarism(sub: any) {
+    if (weeklyPlagChecking === sub.id) return;
+    setWeeklyPlagChecking(sub.id);
+    try {
+      const { data: others } = await (db.from("weekly_submissions") as any)
+        .select("github, code")
+        .eq("problem_id", sub.problem_id)
+        .neq("github", sub.github)
+        .in("status", ["pending", "approved"])
+        .limit(10);
+
+      const { detectPlagiarism } = await import("@/lib/gemini");
+      const result = await detectPlagiarism(
+        sub.code || "",
+        sub.lang,
+        (others || []).filter((o: any) => o.code),
+      );
+      setWeeklyPlagResults(prev => ({ ...prev, [sub.id]: result }));
+    } catch {
+      setWeeklyPlagResults(prev => ({ ...prev, [sub.id]: { score: 0, verdict: "clean", matches: [], explanation: "Check failed." } }));
+    }
+    setWeeklyPlagChecking(null);
   }
 
   function toggleProblem(id: string) {
@@ -2638,6 +2950,13 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
   return (
     <div className="space-y-6 animate-fade-up">
+      {modal.type && (
+        <ActionModal
+          modal={modal}
+          onConfirm={closeModal}
+          onCancel={cancelModal}
+        />
+      )}
       {toast && (
         <div className="fixed top-20 right-4 z-[200] px-4 py-2 bg-[#00e87a] text-black font-mono text-sm rounded-xl shadow-xl">
           {toast}
@@ -2929,92 +3248,8 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
               {isOpen && (
                 <div className="border-t border-[#1a1a1a] px-5 py-4">
-                  {/* Sub-tabs */}
-                  <div className="flex gap-1 mb-4">
-                    {(["payments", "submissions"] as const).map((t) => (
-                      <button
-                        key={t}
-                        onClick={() =>
-                          setManageTab((prev) => ({ ...prev, [ch.id]: t }))
-                        }
-                        className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all capitalize
-                          ${
-                            (manageTab[ch.id] || "payments") === t
-                              ? "bg-[#00e87a] text-black font-bold"
-                              : "bg-[#1a1a1a] text-[#aaa] hover:text-[#e0e0e0]"
-                          }`}
-                      >
-                        {t === "payments"
-                          ? `Payments (${chAccesses.length})`
-                          : `Submissions (${submissions.filter((s) => s.weekly_challenge_id === ch.id).length})`}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Payments tab */}
-                  {(manageTab[ch.id] || "payments") === "payments" && (
-                    <>
-                      {chAccesses.length === 0 ? (
-                        <p className="text-xs text-[#ccc] font-mono">
-                          No payment submissions yet.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {chAccesses.map((a) => (
-                            <div
-                              key={a.id}
-                              className="flex items-center gap-3 flex-wrap px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl"
-                            >
-                              <img
-                                src={`https://github.com/${a.github}.png?size=24`}
-                                className="w-6 h-6 rounded-full"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display =
-                                    "none";
-                                }}
-                              />
-                              <span className="text-xs font-mono text-[#e0e0e0] flex-1 min-w-0 truncate">
-                                {a.name}{" "}
-                                <span className="text-[#999]">@{a.github}</span>
-                              </span>
-                              <span className="text-[10px] font-mono text-[#aaa]">
-                                Txn: {a.txn_id || "—"}
-                              </span>
-                              <span
-                                className={`text-[10px] font-mono px-2 py-0.5 rounded-lg ${a.status === "confirmed" ? "bg-[#00e87a15] text-[#00e87a]" : a.status === "pending" ? "bg-[#f0b42915] text-[#f0b429]" : "bg-[#ff4d4d15] text-[#ff4d4d]"}`}
-                              >
-                                {a.status}
-                              </span>
-                              {a.status === "pending" && (
-                                <div className="flex gap-1.5">
-                                  <button
-                                    onClick={() =>
-                                      updateAccessStatus(a.id, "confirmed")
-                                    }
-                                    className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
-                                  >
-                                    Confirm
-                                  </button>
-                                  <button
-                                    onClick={() =>
-                                      updateAccessStatus(a.id, "rejected")
-                                    }
-                                    className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-1 rounded-lg hover:bg-[#ff4d4d25]"
-                                  >
-                                    Reject
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {/* Submissions tab — grouped by person */}
-                  {manageTab[ch.id] === "submissions" &&
-                    (() => {
+                  {/* Submissions — payments tab removed (using subscriber model) */}
+                  {(() => {
                       const chSubs = submissions.filter(
                         (s) => s.weekly_challenge_id === ch.id,
                       );
@@ -3042,8 +3277,38 @@ function WeeklyAdminSection({ user }: { user: User }) {
                         byUser.get(s.github)!.push(s);
                       }
 
+                      const pendingSubsList = Array.from(latestPerKey.values()).filter((s: any) => s.status === "pending");
+                      const allPendingSelected = pendingSubsList.length > 0 && pendingSubsList.every((s: any) => selectedSubs.has(s.id));
+                      const somePendingSelected = pendingSubsList.some((s: any) => selectedSubs.has(s.id));
+
                       return (
                         <div className="space-y-4">
+                          {/* Bulk action bar */}
+                          {somePendingSelected && (
+                            <div className="flex items-center justify-between px-4 py-3 bg-[#00e87a08] border border-[#00e87a20] rounded-2xl">
+                              <span className="text-xs font-mono text-[#00e87a]">
+                                {Array.from(selectedSubs).filter(id => pendingSubsList.some((s: any) => s.id === id)).length} submission{Array.from(selectedSubs).filter(id => pendingSubsList.some((s: any) => s.id === id)).length !== 1 ? "s" : ""} selected
+                              </span>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setSelectedSubs(new Set())}
+                                  className="text-[10px] font-mono text-[#666] bg-[#1a1a1a] px-3 py-1.5 rounded-lg hover:text-[#aaa]"
+                                >
+                                  Clear
+                                </button>
+                                <button
+                                  onClick={() => bulkApproveSelected(pendingSubsList)}
+                                  disabled={bulkApproving}
+                                  className="text-[10px] font-mono text-black bg-[#00e87a] px-3 py-1.5 rounded-lg font-bold hover:bg-[#00ff88] disabled:opacity-50 flex items-center gap-1.5"
+                                >
+                                  {bulkApproving ? (
+                                    <><span className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin inline-block" /> Approving…</>
+                                  ) : "✓ Approve All Selected"}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
                           {Array.from(byUser.entries()).map(([github, userSubs]) => {
                             const totalPts = userSubs.reduce((sum: number, s: any) => sum + (s.points_awarded || 0), 0);
                             const pendingCount = userSubs.filter((s: any) => s.status === "pending").length;
@@ -3082,7 +3347,25 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                 {/* This person's submissions — one row per problem */}
                                 <div className="divide-y divide-[#141414]">
                                   {/* Column header */}
-                                  <div className="hidden sm:grid grid-cols-[1fr_5rem_4rem_4rem_5rem_7rem] gap-3 px-4 py-1.5 text-[10px] text-[#444] font-mono uppercase tracking-widest">
+                                  <div className="hidden sm:grid grid-cols-[1.5rem_1fr_5rem_4rem_4rem_5rem_7rem] gap-3 px-4 py-1.5 text-[10px] text-[#444] font-mono uppercase tracking-widest">
+                                    <div className="flex items-center">
+                                      {pendingCount > 0 && (
+                                        <input
+                                          type="checkbox"
+                                          checked={userSubs.filter((s: any) => s.status === "pending").every((s: any) => selectedSubs.has(s.id))}
+                                          onChange={(e) => {
+                                            const pending = userSubs.filter((s: any) => s.status === "pending");
+                                            setSelectedSubs(prev => {
+                                              const next = new Set(prev);
+                                              pending.forEach((s: any) => e.target.checked ? next.add(s.id) : next.delete(s.id));
+                                              return next;
+                                            });
+                                          }}
+                                          className="w-3 h-3 accent-[#00e87a] cursor-pointer"
+                                          title="Select all pending for this user"
+                                        />
+                                      )}
+                                    </div>
                                     <div>Problem</div>
                                     <div>Lang</div>
                                     <div>Tests</div>
@@ -3106,18 +3389,101 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                     return (
                                       <div
                                         key={s.id}
-                                        className="grid grid-cols-1 sm:grid-cols-[1fr_5rem_4rem_4rem_5rem_7rem] gap-3 items-center px-4 py-2.5 hover:bg-[#0d0d0d] transition-colors"
+                                        className={`grid grid-cols-1 sm:grid-cols-[1.5rem_1fr_5rem_4rem_4rem_5rem_7rem] gap-3 items-center px-4 py-2.5 transition-colors
+                                          ${selectedSubs.has(s.id) ? "bg-[#00e87a06]" : "hover:bg-[#0d0d0d]"}`}
                                       >
-                                        {/* Problem title + status badge */}
+                                        {/* Checkbox — only for pending */}
+                                        <div className="hidden sm:flex items-center">
+                                          {s.status === "pending" && (
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedSubs.has(s.id)}
+                                              onChange={(e) => {
+                                                setSelectedSubs(prev => {
+                                                  const next = new Set(prev);
+                                                  e.target.checked ? next.add(s.id) : next.delete(s.id);
+                                                  return next;
+                                                });
+                                              }}
+                                              className="w-3 h-3 accent-[#00e87a] cursor-pointer"
+                                            />
+                                          )}
+                                        </div>
+                                        {/* Problem title + status badge + code toggle */}
                                         <div className="min-w-0">
-                                          <div className="flex items-center gap-1.5">
+                                          <div className="flex items-center gap-1.5 flex-wrap">
                                             <span className="text-xs font-mono text-[#e0e0e0] truncate">
                                               {s.problem_title}
                                             </span>
                                             <span className={`text-[9px] font-mono uppercase ${statusColor} shrink-0`}>
                                               {s.status}
                                             </span>
+                                            {s.code && (
+                                              <button
+                                                onClick={() => setExpandedCode(expandedCode === s.id ? null : s.id)}
+                                                className="text-[9px] font-mono text-[#555] hover:text-[#a78bfa] transition-colors shrink-0"
+                                              >
+                                                {expandedCode === s.id ? "▲ hide code" : "▼ view code"}
+                                              </button>
+                                            )}
                                           </div>
+                                          {/* Code viewer + plagiarism — expanded */}
+                                          {expandedCode === s.id && s.code && (
+                                            <div className="mt-2 col-span-full">
+                                              <CodeViewer code={s.code} lang={s.lang} />
+                                              {/* Plagiarism check */}
+                                              <div className="mt-2">
+                                                {!weeklyPlagResults[s.id] ? (
+                                                  <button
+                                                    onClick={() => checkWeeklyPlagiarism(s)}
+                                                    disabled={weeklyPlagChecking === s.id}
+                                                    className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-lg
+                                                      bg-[#f0b42910] border border-[#f0b42920] text-[#f0b429]
+                                                      hover:bg-[#f0b42918] disabled:opacity-50 transition-all"
+                                                  >
+                                                    {weeklyPlagChecking === s.id
+                                                      ? <><span className="w-2.5 h-2.5 border border-[#f0b429] border-t-transparent rounded-full animate-spin inline-block" /> Checking…</>
+                                                      : "✦ Check Plagiarism"}
+                                                  </button>
+                                                ) : (
+                                                  <div className={`rounded-xl p-3 border text-[10px] font-mono space-y-1.5
+                                                    ${weeklyPlagResults[s.id].verdict === "likely_plagiarised" ? "bg-[#ff4d4d08] border-[#ff4d4d25]" :
+                                                      weeklyPlagResults[s.id].verdict === "suspicious"        ? "bg-[#f0b42908] border-[#f0b42925]" :
+                                                                                                                "bg-[#00e87a08] border-[#00e87a20]"}`}>
+                                                    <div className="flex items-center justify-between">
+                                                      <div className="flex items-center gap-2">
+                                                        <span className={
+                                                          weeklyPlagResults[s.id].verdict === "likely_plagiarised" ? "text-[#ff4d4d]" :
+                                                          weeklyPlagResults[s.id].verdict === "suspicious"        ? "text-[#f0b429]" : "text-[#00e87a]"
+                                                        }>
+                                                          {weeklyPlagResults[s.id].verdict === "likely_plagiarised" ? "⚠ Likely plagiarised" :
+                                                           weeklyPlagResults[s.id].verdict === "suspicious"        ? "⚠ Suspicious" : "✓ Looks original"}
+                                                        </span>
+                                                        <span className="text-[#555]">
+                                                          Similarity: {weeklyPlagResults[s.id].score}%
+                                                        </span>
+                                                      </div>
+                                                      <button
+                                                        onClick={() => checkWeeklyPlagiarism(s)}
+                                                        disabled={weeklyPlagChecking === s.id}
+                                                        className="text-[#444] hover:text-[#f0b429] transition-colors"
+                                                      >↻</button>
+                                                    </div>
+                                                    {weeklyPlagResults[s.id].explanation && (
+                                                      <p className="text-[#888] leading-relaxed">{weeklyPlagResults[s.id].explanation}</p>
+                                                    )}
+                                                    {weeklyPlagResults[s.id].matches?.length > 0 && (
+                                                      <ul className="space-y-0.5 pl-2">
+                                                        {weeklyPlagResults[s.id].matches.map((m: string, i: number) => (
+                                                          <li key={i} className="text-[#666] before:content-['•'] before:mr-1.5">{m}</li>
+                                                        ))}
+                                                      </ul>
+                                                    )}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          )}
                                         </div>
 
                                         <div className="text-[10px] font-mono text-[#aaa]">{s.lang}</div>
@@ -3215,6 +3581,568 @@ function WeeklyAdminSection({ user }: { user: User }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// SubscriberAdminSection
+// ════════════════════════════════════════════════════════════
+
+function AnnouncementAdminSection() {
+  const db = getSupabaseClient();
+  const [text, setText] = useState("");
+  const [active, setActive] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState("");
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  }
+
+  async function load() {
+    setLoading(true);
+    try {
+      const { data } = await (db.from("app_config") as any)
+        .select("*")
+        .in("key", ["announcement_text", "announcement_active"]);
+      for (const c of data || []) {
+        if (c.key === "announcement_text") setText(c.value || "");
+        if (c.key === "announcement_active") setActive(c.value === "true");
+      }
+    } catch {}
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function save(nextActive?: boolean) {
+    setSaving(true);
+    try {
+      await Promise.all([
+        (db.from("app_config") as any).upsert({ key: "announcement_text", value: text }),
+        (db.from("app_config") as any).upsert({
+          key: "announcement_active",
+          value: String(nextActive ?? active),
+        }),
+      ]);
+      showToast("✓ Announcement saved");
+    } catch {
+      showToast("Save failed");
+    }
+    setSaving(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="spinner" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 animate-fade-up max-w-2xl">
+      {toast && (
+        <div className="fixed top-6 right-6 z-50 bg-[#111] border border-[#00e87a30] text-[#00e87a]
+          font-mono text-xs px-4 py-2.5 rounded-xl shadow-lg">
+          {toast}
+        </div>
+      )}
+
+      <div>
+        <h2 className="font-display font-bold text-lg text-[#e2e2e2] mb-1">📣 Announcement Banner</h2>
+        <p className="text-[#777] text-xs font-mono">
+          Shown as a banner at the top of the homepage when active.
+        </p>
+      </div>
+
+      <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-2xl p-5 space-y-4">
+        <div>
+          <label className="block text-[10px] font-mono uppercase tracking-wider text-[#666] mb-2">
+            Message
+          </label>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={3}
+            placeholder="e.g. 🎉 New weekly challenge is live — solve by Sunday!"
+            className="w-full bg-[#080808] border border-[#1a1a1a] rounded-xl px-3 py-2.5
+              text-sm font-mono text-[#e0e0e0] placeholder-[#333]
+              focus:outline-none focus:border-[#00e87a25] transition-colors resize-none"
+          />
+        </div>
+
+        <label className="flex items-center gap-2.5 cursor-pointer w-fit">
+          <input
+            type="checkbox"
+            checked={active}
+            onChange={(e) => setActive(e.target.checked)}
+            className="w-4 h-4 accent-[#00e87a]"
+          />
+          <span className="text-xs font-mono text-[#bbb]">Show banner on homepage</span>
+        </label>
+
+        <button
+          onClick={() => save()}
+          disabled={saving || !text.trim()}
+          className="px-4 py-2 rounded-xl font-mono text-xs font-bold bg-[#00e87a] text-black
+            hover:bg-[#00ff88] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {saving ? "Saving…" : "Save Announcement"}
+        </button>
+      </div>
+
+      {active && text.trim() && (
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-wider text-[#666] mb-2">Preview</p>
+          <div className="px-4 py-3 bg-[#00e87a08] border border-[#00e87a20] rounded-2xl
+            flex items-center gap-2 text-sm font-mono text-[#00e87a]">
+            <span>📣</span>
+            <span>{text}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubscriberAdminSection() {
+  const db = getSupabaseClient();
+
+  const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [toast,       setToast]       = useState("");
+  const [fee,         setFee]         = useState("");
+  const [upi,         setUpi]         = useState("");
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [modal, setModal] = useState<ModalState>({ type: null, id: "", github: "" });
+  const modalResolve = useRef<((v: string | null) => void) | null>(null);
+
+  function openModal(m: Omit<ModalState, "type"> & { type: NonNullable<ModalState["type"]> }): Promise<string | null> {
+    return new Promise((resolve) => {
+      modalResolve.current = resolve;
+      setModal(m);
+    });
+  }
+  function closeModal(value: string) {
+    modalResolve.current?.(value);
+    modalResolve.current = null;
+    setModal({ type: null, id: "", github: "" });
+  }
+  function cancelModal() {
+    modalResolve.current?.(null);
+    modalResolve.current = null;
+    setModal({ type: null, id: "", github: "" });
+  }
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [{ data: subs }, { data: configs }] = await Promise.all([
+        (db.from("subscribers") as any).select("*").order("created_at", { ascending: false }),
+        (db.from("app_config") as any).select("*").in("key", ["subscription_fee", "subscription_upi"]),
+      ]);
+      setSubscribers((subs || []) as Subscriber[]);
+      for (const c of configs || []) {
+        if (c.key === "subscription_fee") setFee(c.value);
+        if (c.key === "subscription_upi") setUpi(c.value);
+      }
+    } catch {}
+    setLoading(false);
+  }
+
+  async function updateStatus(sub: Subscriber, status: "confirmed" | "rejected") {
+    if (status === "rejected") {
+      const reason = await openModal({ type: "reject-reg", id: sub.id, github: sub.github });
+      if (reason === null) return;
+    }
+    await (db.from("subscribers") as any).update({ status }).eq("id", sub.id);
+    showToast(`${status === "confirmed" ? "✓ Confirmed" : "✗ Rejected"} @${sub.github}`);
+    load();
+  }
+
+  async function saveConfig() {
+    if (!fee || !upi) return;
+    setSavingConfig(true);
+    try {
+      await Promise.all([
+        (db.from("app_config") as any).upsert({ key: "subscription_fee", value: fee }),
+        (db.from("app_config") as any).upsert({ key: "subscription_upi", value: upi }),
+      ]);
+      showToast("✓ Config saved");
+    } catch { showToast("Save failed"); }
+    setSavingConfig(false);
+  }
+
+  const pending   = subscribers.filter(s => s.status === "pending");
+  const confirmed = subscribers.filter(s => s.status === "confirmed");
+  const rejected  = subscribers.filter(s => s.status === "rejected");
+
+  return (
+    <div className="space-y-6 animate-fade-up">
+      {modal.type && <ActionModal modal={modal} onConfirm={closeModal} onCancel={cancelModal} />}
+      {toast && (
+        <div className="fixed top-20 right-6 z-50 bg-[#00e87a] text-black px-4 py-2.5 rounded-lg font-mono text-sm shadow-xl">
+          {toast}
+        </div>
+      )}
+
+      {/* Config editor */}
+      <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-5">
+        <h3 className="font-mono font-bold text-[#e0e0e0] text-sm mb-4">⚙️ Subscription Settings</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div>
+            <label className="block text-[10px] text-[#666] font-mono uppercase tracking-wider mb-1.5">
+              One-time Fee (₹)
+            </label>
+            <input
+              type="number"
+              value={fee}
+              onChange={e => setFee(e.target.value)}
+              placeholder="e.g. 499"
+              className="w-full bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-[#666] font-mono uppercase tracking-wider mb-1.5">
+              UPI ID
+            </label>
+            <input
+              value={upi}
+              onChange={e => setUpi(e.target.value)}
+              placeholder="e.g. yourname@upi"
+              className="w-full bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+            />
+          </div>
+        </div>
+        <button
+          onClick={saveConfig}
+          disabled={savingConfig}
+          className="px-4 py-2 bg-[#00e87a] text-black font-mono text-xs font-bold rounded-xl hover:bg-[#00ff88] disabled:opacity-50 transition-all"
+        >
+          {savingConfig ? "Saving…" : "Save Settings"}
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "Pending",   value: pending.length,   color: "text-[#f0b429]" },
+          { label: "Confirmed", value: confirmed.length, color: "text-[#00e87a]" },
+          { label: "Rejected",  value: rejected.length,  color: "text-[#ff4d4d]" },
+        ].map(s => (
+          <div key={s.label} className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center">
+            <div className={`text-2xl font-display font-bold ${s.color}`}>{s.value}</div>
+            <div className="text-[10px] font-mono text-[#555] mt-1">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Subscriber list */}
+      {loading ? (
+        <div className="flex items-center gap-2 text-[#555] font-mono text-xs py-6">
+          <div className="spinner" /> Loading…
+        </div>
+      ) : subscribers.length === 0 ? (
+        <div className="text-center py-12 text-[#555] font-mono text-sm">No subscribers yet</div>
+      ) : (
+        <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden">
+          {/* Header */}
+          <div className="hidden sm:grid grid-cols-[2rem_1fr_1fr_8rem_7rem_8rem] gap-3 px-4 py-2.5
+            border-b border-[#161616] text-[10px] text-[#555] font-mono uppercase tracking-widest">
+            <div />
+            <div>User</div>
+            <div>Txn ID</div>
+            <div>Status</div>
+            <div>Date</div>
+            <div className="text-center">Actions</div>
+          </div>
+
+          {subscribers.map(sub => {
+            const statusColor =
+              sub.status === "confirmed" ? "text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]" :
+              sub.status === "rejected"  ? "text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]" :
+                                           "text-[#f0b429] bg-[#f0b42910] border-[#f0b42920]";
+            return (
+              <div key={sub.id}
+                className="grid grid-cols-1 sm:grid-cols-[2rem_1fr_1fr_8rem_7rem_8rem] gap-3 items-center
+                  px-4 py-3 border-b border-[#141414] last:border-0 hover:bg-[#0d0d0d] transition-colors">
+                <img
+                  src={`https://github.com/${sub.github}.png?size=28`}
+                  className="w-7 h-7 rounded-full ring-1 ring-[#2a2a2a] hidden sm:block"
+                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
+                <div className="min-w-0">
+                  <div className="text-xs font-mono font-bold text-[#e0e0e0] truncate">{sub.name}</div>
+                  <div className="text-[10px] font-mono text-[#555]">@{sub.github}</div>
+                </div>
+                <div className="text-xs font-mono text-[#777] truncate">{sub.txn_id}</div>
+                <div>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${statusColor}`}>
+                    {sub.status === "confirmed" ? "✓ Confirmed" :
+                     sub.status === "rejected"  ? "✗ Rejected"  : "⏳ Pending"}
+                  </span>
+                </div>
+                <div className="text-[10px] font-mono text-[#555]">
+                  {new Date(sub.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
+                </div>
+                <div className="flex items-center gap-2 justify-center">
+                  {sub.status !== "confirmed" && (
+                    <button
+                      onClick={() => updateStatus(sub, "confirmed")}
+                      className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a10] border border-[#00e87a20] px-2 py-1 rounded-lg hover:bg-[#00e87a18] transition-all"
+                    >
+                      Confirm
+                    </button>
+                  )}
+                  {sub.status !== "rejected" && (
+                    <button
+                      onClick={() => updateStatus(sub, "rejected")}
+                      className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d10] border border-[#ff4d4d20] px-2 py-1 rounded-lg hover:bg-[#ff4d4d18] transition-all"
+                    >
+                      Reject
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+// ════════════════════════════════════════════════════════════
+// AiGenerateSection — AI Problem Generator for Admin
+// ════════════════════════════════════════════════════════════
+
+function AiGenerateSection() {
+  const db = getSupabaseClient();
+  const [concept,    setConcept]    = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generated,  setGenerated]  = useState<any>(null);
+  const [saving,     setSaving]     = useState(false);
+  const [saved,      setSaved]      = useState(false);
+  const [err,        setErr]        = useState("");
+  const [toast,      setToast]      = useState("");
+
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  }
+
+  async function handleGenerate() {
+    if (!concept.trim()) return;
+    setGenerating(true);
+    setGenerated(null);
+    setSaved(false);
+    setErr("");
+    try {
+      const { generateFullProblem } = await import("@/lib/gemini");
+      const result = await generateFullProblem(concept.trim());
+      if (!result) {
+        setErr("AI couldn't generate a problem. Try rephrasing your concept.");
+      } else {
+        setGenerated(result);
+      }
+    } catch {
+      setErr("Generation failed. Try again.");
+    }
+    setGenerating(false);
+  }
+
+  async function handleSaveProblem() {
+    if (!generated) return;
+    setSaving(true);
+    try {
+      const { error } = await (db.from("problems") as any).insert({
+        title:         generated.title,
+        description:   generated.description,
+        difficulty:    generated.difficulty,
+        points:        generated.points,
+        tags:          generated.tags || [],
+        example:       generated.example || "",
+        param_types:   generated.param_types || [],
+        return_type:   generated.return_type || "bool",
+        hints:         generated.hints || [],
+        test_cases:    generated.test_cases || [],
+        starter_code:  "",
+        submission_count: 0,
+        visibility:    "public",
+      });
+      if (error) throw error;
+      setSaved(true);
+      showToast("✓ Problem saved! Find it in the Problems section.");
+    } catch (e: any) {
+      setErr(e.message || "Save failed");
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-up">
+      {toast && (
+        <div className="fixed top-20 right-6 z-50 bg-[#00e87a] text-black px-4 py-2.5 rounded-lg font-mono text-sm shadow-xl">
+          {toast}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-2xl">✦</span>
+          <div>
+            <h3 className="font-mono font-bold text-[#e0e0e0] text-sm">AI Problem Generator</h3>
+            <p className="text-[10px] font-mono text-[#555]">
+              Describe a concept → AI generates a complete problem with test cases, hints, and starter code
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            value={concept}
+            onChange={e => setConcept(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleGenerate()}
+            placeholder="e.g. two sum using hashmap, binary search on rotated array, valid parentheses with stack…"
+            className="flex-1 bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3.5 py-2.5 text-sm font-mono
+              text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a30] transition-colors"
+          />
+          <button
+            onClick={handleGenerate}
+            disabled={generating || !concept.trim()}
+            className="px-4 py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
+              hover:bg-[#00ff88] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 shrink-0"
+          >
+            {generating
+              ? <><span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />Generating…</>
+              : "✦ Generate"}
+          </button>
+        </div>
+
+        {err && <p className="text-[10px] text-[#ff4d4d] font-mono mt-2">{err}</p>}
+      </div>
+
+      {/* Generated problem preview */}
+      {generated && (
+        <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden">
+          {/* Preview header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-[#161616] bg-[#0d0d0d]">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-mono font-bold text-[#e0e0e0]">{generated.title}</span>
+              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg
+                ${generated.difficulty === "Easy"   ? "text-[#00e87a] bg-[#00e87a12]" :
+                  generated.difficulty === "Medium" ? "text-[#f0b429] bg-[#f0b42912]" :
+                                                      "text-[#ff4d4d] bg-[#ff4d4d12]"}`}>
+                {generated.difficulty}
+              </span>
+              <span className="text-[10px] font-mono text-[#a78bfa]">{generated.points} pts</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="text-[10px] font-mono px-3 py-1.5 bg-[#141414] border border-[#1f1f1f] text-[#777] rounded-lg hover:text-[#ccc] transition-all"
+              >
+                ↻ Regenerate
+              </button>
+              {!saved ? (
+                <button
+                  onClick={handleSaveProblem}
+                  disabled={saving}
+                  className="text-[10px] font-mono px-3 py-1.5 bg-[#00e87a] text-black font-bold rounded-lg hover:bg-[#00ff88] disabled:opacity-50 transition-all"
+                >
+                  {saving ? "Saving…" : "✓ Save Problem"}
+                </button>
+              ) : (
+                <span className="text-[10px] font-mono px-3 py-1.5 bg-[#00e87a12] text-[#00e87a] border border-[#00e87a20] rounded-lg">
+                  ✓ Saved
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Preview body */}
+          <div className="p-5 space-y-4">
+            {/* Tags */}
+            {(generated.tags || []).length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {generated.tags.map((tag: string) => (
+                  <span key={tag} className="px-2 py-0.5 bg-[#141414] text-[#777] text-[10px] font-mono rounded border border-[#1c1c1c]">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Description preview */}
+            <div>
+              <div className="text-[10px] font-mono text-[#555] uppercase tracking-widest mb-2">Description</div>
+              <div className="text-xs font-mono text-[#bbb] leading-relaxed bg-[#060606] rounded-xl p-3 border border-[#141414]"
+                dangerouslySetInnerHTML={{ __html: generated.description || "" }} />
+            </div>
+
+            {/* Example */}
+            {generated.example && (
+              <div>
+                <div className="text-[10px] font-mono text-[#555] uppercase tracking-widest mb-2">Example</div>
+                <pre className="text-xs font-mono text-[#00e87a] bg-[#060606] rounded-xl p-3 border border-[#141414] whitespace-pre-wrap">
+                  {generated.example}
+                </pre>
+              </div>
+            )}
+
+            {/* Test cases */}
+            {(generated.test_cases || []).length > 0 && (
+              <div>
+                <div className="text-[10px] font-mono text-[#555] uppercase tracking-widest mb-2">
+                  Test Cases ({generated.test_cases.length})
+                </div>
+                <div className="space-y-1.5">
+                  {generated.test_cases.map((tc: any, i: number) => (
+                    <div key={i} className="flex items-center gap-2 text-[10px] font-mono bg-[#060606] rounded-lg px-3 py-2 border border-[#141414]">
+                      <span className="text-[#555]">#{i + 1}</span>
+                      <span className="text-[#777]">input:</span>
+                      <code className="text-[#ccc] flex-1">{tc.input}</code>
+                      <span className="text-[#555]">→</span>
+                      <code className="text-[#00e87a]">{tc.expected}</code>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Hints */}
+            {(generated.hints || []).filter(Boolean).length > 0 && (
+              <div>
+                <div className="text-[10px] font-mono text-[#555] uppercase tracking-widest mb-2">Hints</div>
+                <div className="space-y-1.5">
+                  {generated.hints.filter(Boolean).map((hint: string, i: number) => (
+                    <div key={i} className="flex gap-2 text-[10px] font-mono bg-[#060606] rounded-lg px-3 py-2 border border-[#141414]">
+                      <span className="text-[#f0b429] shrink-0">#{i + 1}</span>
+                      <span className="text-[#bbb]">{hint}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="text-[10px] text-[#444] font-mono">
+              ⚠ Review AI-generated content before saving. Test cases may need manual verification.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

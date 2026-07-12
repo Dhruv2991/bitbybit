@@ -4,7 +4,6 @@ import { getSupabaseClient } from "@/lib/supabase";
 import type { Member } from "@/types/database";
 
 type Tab = "overall" | "weekly" | "monthly" | "challenge";
-const db = getSupabaseClient();
 
 interface EnrichedMember extends Member {
   rank_change?: number;
@@ -43,6 +42,7 @@ function ShareLBButton() {
 }
 
 export default function LeaderboardPage() {
+  const db = getSupabaseClient();
   const [members, setMembers] = useState<EnrichedMember[]>([]);
   const [challengeRows, setChallengeRows] = useState<ChallengeRow[]>([]);
   const [challengeTitle, setChallengeTitle] = useState("");
@@ -313,6 +313,7 @@ export default function LeaderboardPage() {
     solved,
     i,
     isChallenge,
+    streak,
   }: {
     github: string;
     name: string;
@@ -320,6 +321,7 @@ export default function LeaderboardPage() {
     solved: number;
     i: number;
     isChallenge?: boolean;
+    streak?: number;
   }) {
     const isTop3 = i < 3 && !search;
     return (
@@ -358,8 +360,16 @@ export default function LeaderboardPage() {
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="font-mono font-bold text-[#e0e0e0] text-sm truncate">
+          <div className="font-mono font-bold text-[#e0e0e0] text-sm truncate flex items-center gap-1.5">
             {name || github}
+            {!!streak && streak > 0 && (
+              <span
+                title={`${streak}-day streak`}
+                className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#f0b429] bg-[#f0b42912] border border-[#f0b42925] rounded-full px-1.5 py-0.5 shrink-0"
+              >
+                🔥{streak}
+              </span>
+            )}
           </div>
           <div className="text-[10px] text-[#999] font-mono mt-0.5">
             <a
@@ -531,6 +541,7 @@ export default function LeaderboardPage() {
               points={m.total_points}
               solved={m.problems_solved}
               i={i}
+              streak={m.streak}
             />
           ))}
         </div>

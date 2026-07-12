@@ -23,6 +23,28 @@
     --grid-color: rgba(255,255,255,0.025);
   }
 
+  [data-theme="light"] {
+    --bg:         #fafafb;
+    --surface:    #f3f3f6;
+    --card:       #eeeef1;
+    --border:     #dadae0;
+    --border2:    #cfcfd7;
+    --muted:      #85858b;
+    --muted2:     #a3a3b0;
+    --text:       #0d0d10;
+    --text2:      #64646b;
+    --grid-color: rgba(0,0,0,0.04);
+  }
+
+  [data-theme="light"] body {
+    background-image: radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1px);
+  }
+
+  [data-theme="light"] ::-webkit-scrollbar-thumb { background: #cfcfd7; }
+  [data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #b8b8c3; }
+
+  [data-theme="light"] .monaco-editor .margin { background: #f7f7f8 !important; }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
 
@@ -100,6 +122,9 @@
   /* ── Inputs ──────────────────────────────────────────────── */
   .spinner {
     @apply w-5 h-5 border-2 border-[#00e87a] border-t-transparent rounded-full animate-spin;
+  }
+  .spinner-sm {
+    @apply w-3.5 h-3.5 border-2 border-[#a78bfa] border-t-transparent rounded-full animate-spin inline-block;
   }
 
   .input-base {
@@ -260,3 +285,94 @@
   50%       { opacity: 0; }
 }
 .cursor-blink { animation: blink 1.1s step-end infinite; }
+/* ══════════════════════════════════════════
+   LIGHT THEME — neutral color overrides
+   Generated from actual hex utility classes used across the app.
+   Brand/status colors (green/purple/amber/red) are left as-is since
+   they remain legible on a light background.
+══════════════════════════════════════════ */
+[data-theme="light"] .bg-\[\#060606\] { background-color: #ffffff !important; }
+[data-theme="light"] .bg-\[\#080808\] { background-color: #fafafb !important; }
+[data-theme="light"] .bg-\[\#0a0a0a\] { background-color: #f7f7f8 !important; }
+[data-theme="light"] .bg-\[\#0d0d0d\] { background-color: #f3f3f6 !important; }
+[data-theme="light"] .bg-\[\#0f0f0f\] { background-color: #f0f0f3 !important; }
+[data-theme="light"] .bg-\[\#111\] { background-color: #ececef !important; }
+[data-theme="light"] .bg-\[\#141414\] { background-color: #e6e6ea !important; }
+[data-theme="light"] .bg-\[\#161616\] { background-color: #e3e3e8 !important; }
+[data-theme="light"] .bg-\[\#1a1a1a\] { background-color: #dadae0 !important; }
+[data-theme="light"] .bg-\[\#1c1c1c\] { background-color: #d5d5dc !important; }
+[data-theme="light"] .bg-\[\#1f1f1f\] { background-color: #cfcfd7 !important; }
+[data-theme="light"] .bg-\[\#222\] { background-color: #c9c9d2 !important; }
+[data-theme="light"] .bg-\[\#333\] { background-color: #a3a3b0 !important; }
+[data-theme="light"] .bg-\[\#444\] { background-color: #8a8a94 !important; }
+[data-theme="light"] .border-\[\#131313\] { border-color: #e9e9ec !important; }
+[data-theme="light"] .border-\[\#141414\] { border-color: #e6e6ea !important; }
+[data-theme="light"] .border-\[\#161616\] { border-color: #e3e3e8 !important; }
+[data-theme="light"] .border-\[\#181818\] { border-color: #dfdfe4 !important; }
+[data-theme="light"] .border-\[\#1a1a1a\] { border-color: #dadae0 !important; }
+[data-theme="light"] .border-\[\#1c1c1c\] { border-color: #d5d5dc !important; }
+[data-theme="light"] .border-\[\#1f1f1f\] { border-color: #cfcfd7 !important; }
+[data-theme="light"] .border-\[\#222\] { border-color: #c9c9d2 !important; }
+[data-theme="light"] .border-\[\#252525\] { border-color: #c2c2cc !important; }
+[data-theme="light"] .border-\[\#2a2a2a\] { border-color: #b8b8c3 !important; }
+[data-theme="light"] .border-\[\#333\] { border-color: #a3a3b0 !important; }
+[data-theme="light"] .border-\[\#3a3a3a\] { border-color: #96969f !important; }
+[data-theme="light"] .divide-\[\#141414\] { border-color: #e6e6ea !important; }
+[data-theme="light"] .divide-\[\#161616\] { border-color: #e3e3e8 !important; }
+[data-theme="light"] .divide-\[\#1a1a1a\] { border-color: #dadae0 !important; }
+[data-theme="light"] .placeholder-\[\#222\]::placeholder { color: #c9c9d2 !important; }
+[data-theme="light"] .placeholder-\[\#2a2a2a\]::placeholder { color: #b8b8c3 !important; }
+[data-theme="light"] .placeholder-\[\#333\]::placeholder { color: #a3a3b0 !important; }
+[data-theme="light"] .ring-\[\#222\] { --tw-ring-color: #c9c9d2 !important; }
+[data-theme="light"] .ring-\[\#2a2a2a\] { --tw-ring-color: #b8b8c3 !important; }
+[data-theme="light"] .text-\[\#2a2a2a\] { color: #b8b8c3 !important; }
+[data-theme="light"] .text-\[\#333\] { color: #a3a3b0 !important; }
+[data-theme="light"] .text-\[\#444\] { color: #8a8a94 !important; }
+[data-theme="light"] .text-\[\#555\] { color: #85858b !important; }
+[data-theme="light"] .text-\[\#666\] { color: #7a7a81 !important; }
+[data-theme="light"] .text-\[\#777\] { color: #6f6f76 !important; }
+[data-theme="light"] .text-\[\#888\] { color: #64646b !important; }
+[data-theme="light"] .text-\[\#999\] { color: #58585f !important; }
+[data-theme="light"] .text-\[\#aaa\] { color: #46464e !important; }
+[data-theme="light"] .text-\[\#bbb\] { color: #3a3a41 !important; }
+[data-theme="light"] .text-\[\#ccc\] { color: #2e2e34 !important; }
+[data-theme="light"] .text-\[\#ddd\] { color: #242429 !important; }
+[data-theme="light"] .text-\[\#e0e0e0\] { color: #17171b !important; }
+[data-theme="light"] .text-\[\#e2e2e2\] { color: #0d0d10 !important; }[data-theme="light"] .bg-\[\#080808\]\/90 { background-color: rgb(250 250 251 / 0.9) !important; }
+[data-theme="light"] .bg-\[\#080808\]\/95 { background-color: rgb(250 250 251 / 0.95) !important; }
+[data-theme="light"] .bg-\[\#080808\]\/98 { background-color: rgb(250 250 251 / 0.98) !important; }
+[data-theme="light"] .bg-\[\#0a0a0a\]\/98 { background-color: rgb(247 247 248 / 0.98) !important; }
+
+/* Pseudo-class (hover/focus/group-hover) neutral overrides */
+[data-theme="light"] .group:hover .group-hover\:text-\[\#aaa\] { color: #46464e !important; }
+[data-theme="light"] .hover\:bg-\[\#0d0d0d\]:hover { background-color: #f3f3f6 !important; }
+[data-theme="light"] .hover\:bg-\[\#0f0f0f\]:hover { background-color: #f0f0f3 !important; }
+[data-theme="light"] .hover\:bg-\[\#111\]:hover { background-color: #ececef !important; }
+[data-theme="light"] .hover\:bg-\[\#161616\]:hover { background-color: #e3e3e8 !important; }
+[data-theme="light"] .hover\:bg-\[\#222\]:hover { background-color: #c9c9d2 !important; }
+[data-theme="light"] .hover\:border-\[\#1a1a1a\]:hover { border-color: #dadae0 !important; }
+[data-theme="light"] .hover\:border-\[\#1c1c1c\]:hover { border-color: #d5d5dc !important; }
+[data-theme="light"] .hover\:border-\[\#222\]:hover { border-color: #c9c9d2 !important; }
+[data-theme="light"] .hover\:border-\[\#252525\]:hover { border-color: #c2c2cc !important; }
+[data-theme="light"] .hover\:border-\[\#2a2a2a\]:hover { border-color: #b8b8c3 !important; }
+[data-theme="light"] .hover\:border-\[\#333\]:hover { border-color: #a3a3b0 !important; }
+[data-theme="light"] .hover\:border-\[\#3a3a3a\]:hover { border-color: #96969f !important; }
+[data-theme="light"] .hover\:text-\[\#999\]:hover { color: #58585f !important; }
+[data-theme="light"] .hover\:text-\[\#aaa\]:hover { color: #46464e !important; }
+[data-theme="light"] .hover\:text-\[\#bbb\]:hover { color: #3a3a41 !important; }
+[data-theme="light"] .hover\:text-\[\#ccc\]:hover { color: #2e2e34 !important; }
+[data-theme="light"] .hover\:text-\[\#e0e0e0\]:hover { color: #17171b !important; }[data-theme="light"] .hover\:bg-\[\#ffffff06\]:hover { background-color: rgba(0,0,0,0.035) !important; }
+[data-theme="light"] .hover\:bg-\[\#ffffff08\]:hover { background-color: rgba(0,0,0,0.045) !important; }
+
+/* @apply-based component classes need their own overrides
+   (Tailwind inlines these colors directly into the component class,
+   so the utility-class overrides above don't reach them) */
+[data-theme="light"] .btn-ghost { border-color: #c2c2cc !important; color: #17171b !important; }
+[data-theme="light"] .card,
+[data-theme="light"] .card-hover,
+[data-theme="light"] .card-glow { background-color: #f0f0f3 !important; border-color: #d5d5dc !important; }
+[data-theme="light"] .card-hover:hover { border-color: #b8b8c3 !important; background-color: #e6e6ea !important; }
+[data-theme="light"] .input-base { background-color: #f7f7f8 !important; border-color: #d5d5dc !important; color: #17171b !important; }
+[data-theme="light"] .input-base::placeholder { color: #b8b8c3 !important; }
+[data-theme="light"] .badge-ended { background-color: #dadae0 !important; color: #85858b !important; border-color: #c9c9d2 !important; }
+[data-theme="light"] .bg-\[\#1a1a2e\] { background-color: #e8e6f5 !important; }

@@ -9,8 +9,9 @@ import LeaderboardPage      from "@/components/pages/LeaderboardPage";
 import ArenaPage            from "@/components/pages/ArenaPage";
 import AdminPage            from "@/components/pages/AdminPage";
 import WeeklyChallengePage  from "@/components/pages/WeeklyChallengePage";
+import AboutPage            from "@/components/pages/AboutPage";
 
-type PageId = "home" | "problems" | "leaderboard" | "arena" | "weekly" | "admin";
+type PageId = "home" | "problems" | "leaderboard" | "arena" | "weekly" | "admin" | "about";
 const PAGE_KEY = "bb_page";
 
 const NAV_ITEMS: { id: PageId; label: string; icon: string }[] = [
@@ -55,6 +56,28 @@ export default function App() {
   const [toasts,         setToasts]         = useState<Toast[]>([]);
   const [liveItems,      setLiveItems]      = useState<{ id: string; label: string; page: PageId; type: 'arena' | 'weekly'; status: 'live' | 'upcoming' }[]>([]);
   const [notifOpen,      setNotifOpen]      = useState(false);
+  const [userStreak,     setUserStreak]     = useState(0);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  // Load saved theme preference and apply it to <html data-theme="...">
+  useEffect(() => {
+    let saved: 'dark' | 'light' = 'dark';
+    try {
+      const stored = localStorage.getItem('bb_theme');
+      if (stored === 'light' || stored === 'dark') saved = stored;
+    } catch {}
+    setTheme(saved);
+    document.documentElement.setAttribute('data-theme', saved);
+  }, []);
+
+  function toggleTheme() {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('bb_theme', next); } catch {}
+      return next;
+    });
+  }
   const toastCounter = useRef(0);
   const resolving    = useRef(false);
   const notifRef     = useRef<HTMLDivElement>(null);
@@ -80,7 +103,7 @@ export default function App() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const hash = window.location.hash.replace("#", "") as PageId;
-    const validPages: PageId[] = ["home", "problems", "leaderboard", "arena", "weekly", "admin"];
+    const validPages: PageId[] = ["home", "problems", "leaderboard", "arena", "weekly", "admin", "about"];
     const stored = sessionStorage.getItem(PAGE_KEY);
     // Only navigate to hash if it's valid AND there's no stored session page
     if (hash && validPages.includes(hash) && !stored) {
@@ -143,6 +166,20 @@ export default function App() {
 
     return () => { alive = false; subscription.unsubscribe(); };
   }, []);
+
+  // Fetch the current user's streak for the navbar badge
+  useEffect(() => {
+    let alive = true;
+    if (!user?.github) { setUserStreak(0); return; }
+    const db = getSupabaseClient();
+    (async () => {
+      try {
+        const { data }: any = await db.from("members").select("streak").eq("github", user.github).maybeSingle();
+        if (alive) setUserStreak(data?.streak || 0);
+      } catch { if (alive) setUserStreak(0); }
+    })();
+    return () => { alive = false; };
+  }, [user?.github]);
 
   // Poll for live and upcoming contests and weekly challenges every 60s
   useEffect(() => {
@@ -316,6 +353,11 @@ export default function App() {
 
           {/* Auth — desktop */}
           <div className="hidden md:flex items-center gap-3">
+            {/* Theme toggle */}
+            <button onClick={toggleTheme} title="Toggle theme"
+              className="p-2 text-[#777] hover:text-[#e0e0e0] transition-colors rounded-xl hover:bg-[#ffffff08]">
+              <span className="text-base">{theme === 'dark' ? '☀️' : '🌙'}</span>
+            </button>
             {/* 🔔 Desktop bell */}
             <div className="relative" ref={notifRef}>
               <button onClick={() => setNotifOpen(o => !o)}
@@ -338,6 +380,12 @@ export default function App() {
                   onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                 />
                 <span className="text-xs font-mono text-[#888]">{user.name}</span>
+                {userStreak > 0 && (
+                  <span title={`${userStreak}-day streak`}
+                    className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#f0b429] bg-[#f0b42912] border border-[#f0b42925] rounded-full px-1.5 py-0.5">
+                    🔥{userStreak}
+                  </span>
+                )}
                 <button onClick={signOut}
                   className="px-3 py-1.5 rounded-xl font-mono text-xs border border-[#222]
                     text-[#777] hover:text-[#ff4d4d] hover:border-[#ff4d4d30] transition-all">
@@ -395,6 +443,16 @@ export default function App() {
                 <span className="w-5">⚙</span> Admin
               </button>
             )}
+            <button onClick={() => navigate("about")}
+              className={`w-full text-left px-5 py-3 font-mono text-sm flex items-center gap-3
+                ${page === "about" ? "text-[#00e87a]" : "text-[#555] hover:text-[#e0e0e0]"}`}>
+              <span className="w-5">ℹ</span> About
+            </button>
+            <button onClick={toggleTheme}
+              className="w-full text-left px-5 py-3 font-mono text-sm flex items-center gap-3 text-[#555] hover:text-[#e0e0e0]">
+              <span className="w-5">{theme === 'dark' ? '☀️' : '🌙'}</span>
+              {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            </button>
             <div className="mt-2 border-t border-[#1a1a1a] pt-2 px-4">
               {!authChecked ? null : user ? (
                 <div className="flex items-center justify-between py-2">
@@ -403,6 +461,12 @@ export default function App() {
                       className="w-7 h-7 rounded-full object-cover"
                       onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                     <span className="text-sm font-mono text-[#e0e0e0] truncate max-w-[160px]">{user.name}</span>
+                    {userStreak > 0 && (
+                      <span title={`${userStreak}-day streak`}
+                        className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#f0b429] bg-[#f0b42912] border border-[#f0b42925] rounded-full px-1.5 py-0.5 shrink-0">
+                        🔥{userStreak}
+                      </span>
+                    )}
                   </div>
                   <button onClick={signOut} className="text-xs font-mono text-[#555] hover:text-[#ff4d4d] transition-colors">
                     Sign out
@@ -425,9 +489,29 @@ export default function App() {
         {page === "problems"    && <ProblemsPage    user={user} onNavigate={navigate} />}
         {page === "leaderboard" && <LeaderboardPage />}
         {page === "arena"       && <ArenaPage       user={user} onArenaLockChange={setArenaLocked} />}
-        {page === "weekly"      && <WeeklyChallengePage user={user} />}
+        {page === "weekly"      && <WeeklyChallengePage user={user} onNavigate={navigate as (page: string) => void} />}
         {page === "admin"       && user?.is_admin   && <AdminPage user={user} />}
+        {page === "about"       && <AboutPage onNavigate={navigate as (page: string) => void} />}
       </main>
+
+      {/* Footer — copyright + about link */}
+      <footer className="border-t border-[#161616] py-5 px-6">
+        <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-3">
+          <span className="text-[11px] font-mono text-[#555]">
+            © {new Date().getFullYear()} Dhruv G Nayak · TeamCodeLocked · BMS College of Engineering
+          </span>
+          <div className="flex items-center gap-4">
+            <a href="https://www.instagram.com/teamcodelocked/" target="_blank" rel="noopener noreferrer"
+              className="text-[11px] font-mono text-[#666] hover:text-[#f0b429] transition-colors">
+              Instagram
+            </a>
+            <button onClick={() => navigate("about")}
+              className="text-[11px] font-mono text-[#666] hover:text-[#00e87a] transition-colors">
+              About & Legal
+            </button>
+          </div>
+        </div>
+      </footer>
 
       {/* Bottom mobile nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#080808]/98 backdrop-blur-xl
