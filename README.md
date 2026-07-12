@@ -52,8 +52,18 @@ This is enforced in one place: [`src/lib/gemini.ts`](src/lib/gemini.ts).
 | Problem recommendations | `getRecommendations()` | 5 |
 | AI editorial | `generateEditorial()` | 2 |
 | Approach validator | `validateApproach()` | subscriber-only, no separate cap |
+| Spoiler detection on comments | `detectSpoiler()` | subscriber-only, no separate cap |
+| Weekly challenge AI summary | `generateChallengeSummary()` | subscriber-only, no separate cap |
+
+> **Fixed:** `detectSpoiler()` (called automatically when *any* user posts a discussion comment) and `generateChallengeSummary()` (called when *any* user views a weekly challenge) originally had **no** subscriber gate at all — they'd silently call the AI provider for logged-out visitors and non-subscribers alike. Both now call `subscriberCheck()` first and return a "no result" response for non-subscribers instead of hitting Groq/Ollama. Comment posting itself is unaffected — non-subscribers can still comment, they just don't get the AI spoiler check run on their comment, and non-subscribers simply won't see a generated weekly summary.
 
 > Admin-only AI tools (test case generator, description improver, full problem generator, plagiarism detector) are called only from the Admin Panel, which is already restricted to admins via `resolveAdminStatus()` in `src/lib/supabase.ts` — these are not exposed to regular users at all.
+
+### Not gated on purpose — "Admin Hints" (static, free)
+
+Each problem can also have **admin-authored static hints** (`problem.hints`, edited in the Admin Panel — optionally AI-assisted at authoring time via `generateFullProblem`/admin tools, but stored as plain text afterward). These are shown in the workspace via a "💡 Admin Hints" panel, revealed progressively by clicking, with only a 30s client-side cooldown between reveals — **no login and no subscription required**.
+
+This is intentional: unlike the "AI Hint" button next to it (which calls `getAiHint()` live and is subscriber-gated per the table above), revealing an Admin Hint makes **no AI call at request time** — it's just displaying pre-written text already stored on the problem, so there's no AI cost or provider request to protect. Admin Hints are meant to be a free feature available to everyone, distinct from the paid live AI Hint feature. If this policy changes later, gate `revealNextHint()` in `src/app/problems/Workspace.tsx` behind the same subscriber/login check used elsewhere.
 
 ### Enforcing this correctly when you extend the app
 
