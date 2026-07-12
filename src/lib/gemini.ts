@@ -656,6 +656,10 @@ export async function generateChallengeSummary(
   topFinishers:   { name: string; github: string; points: number }[],
   totalParticipants: number,
 ): Promise<ChallengeSummary | null> {
+  // AI features are subscriber-only — non-subscribers / signed-out users
+  // simply don't get a generated summary (UI just shows nothing for them).
+  if (subscriberCheck()) return null;
+
   const problemList = problems.map((p, i) =>
     `${i + 1}. "${p.title}" (${p.difficulty}) — tags: ${p.tags.join(', ') || 'none'}`
   ).join('\n');
@@ -711,6 +715,13 @@ export async function detectSpoiler(
   problemTitle: string,
   commentBody:  string,
 ): Promise<SpoilerResult> {
+  // AI features are subscriber-only. Non-subscribers / signed-out users
+  // skip the spoiler check silently (comment still posts normally) rather
+  // than being blocked from commenting — but no AI call is made for them.
+  if (subscriberCheck()) {
+    return { isSpoiler: false, confidence: 'low', reason: '', suggestion: '' };
+  }
+
   // Skip check for short comments — can't be a meaningful spoiler
   if (commentBody.trim().length < 30) {
     return { isSpoiler: false, confidence: 'low', reason: '', suggestion: '' };
