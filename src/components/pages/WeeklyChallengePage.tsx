@@ -799,7 +799,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3 text-[10px] font-mono">
-                  {['All current & future weekly problems', 'Time bonus scoring', 'Weekly leaderboard'].map(f => (
+                  {['All current & future weekly problems', 'Time bonus scoring', 'Weekly leaderboard','AI features'].map(f => (
                     <span key={f} className="flex items-center gap-1 text-[#bbb]">
                       <span className="text-[#00e87a]">✓</span>{f}
                     </span>
