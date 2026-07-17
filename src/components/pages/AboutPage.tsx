@@ -113,7 +113,7 @@ export default function AboutPage({ onNavigate }: Props) {
           {[
             ["{ }", "Problems library",      "Curated problems with hidden test cases"],
             ["🏅",  "Weekly challenges",     "New problems every week, time bonus scoring"],
-            ["🏆",  "Proctored arena",       "Live supervised contests, ranked on the leaderboard"],
+            ["🏆",  "Proctored arena",       "Live supervised contests with prizes for top finishers"],
             ["⭐",  "Lifetime subscription", "One-time fee, unlimited weekly access"],
             ["✦",  "AI features",           "Hints, debugger, and code review"],
             ["💬",  "Discussion threads",    "Community discussion on every problem"],
@@ -131,10 +131,10 @@ export default function AboutPage({ onNavigate }: Props) {
         </div>
       </div>
 
-      {/* Payments */}
+      {/* Payments & Prizes */}
       <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-6 mb-5">
         <h2 className="font-display font-bold text-[#e0e0e0] text-base mb-3 flex items-center gap-2">
-          <span className="text-[#00e87a]">✦</span> Payments
+          <span className="text-[#00e87a]">✦</span> Payments &amp; prizes
         </h2>
         <div className="space-y-2 text-[#888] font-mono text-xs leading-relaxed">
           <p>
@@ -143,8 +143,8 @@ export default function AboutPage({ onNavigate }: Props) {
             proctored Arena contests.
           </p>
           <p>
-            There are no cash prizes, rewards, or payouts of any kind. Contests are ranked purely by points
-            and leaderboard position — no money is ever paid out to users through this platform.
+            Contest winners may receive a prize. Any prize is arranged and given separately, directly by the
+            organizer — it is never processed, held, or paid out through Razorpay or this platform.
           </p>
         </div>
       </div>

@@ -584,7 +584,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
       {/* Header */}
       <div className="mb-6">
         <h1 className="font-display font-bold text-xl md:text-2xl mb-1 text-[var(--text)]">Proctored Arena 🏟️</h1>
-        <p className="text-xs font-mono text-[var(--muted)] mb-5">Supervised coding contests. No shortcuts.</p>
+        <p className="text-xs font-mono text-[var(--muted)] mb-5">Supervised coding contests. Prizes for top finishers. No shortcuts.</p>
         <p className="text-[var(--text2)] text-sm font-mono">
           Pay the entry fee · get confirmed · compete in a supervised contest
         </p>
@@ -820,6 +820,13 @@ function ContestRulesModal({
             <div className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-widest mb-1">Problems</div>
             <div className="font-mono font-bold text-[var(--text)]">{problemCount}</div>
           </div>
+        </div>
+
+        <div className="flex gap-2 items-start bg-[rgba(var(--warn-rgb),0.08)] border border-[rgba(var(--warn-rgb),0.2)] rounded-xl px-3.5 py-2.5 mb-5">
+          <span className="text-sm">🏆</span>
+          <p className="text-xs font-mono text-[var(--warn)] leading-relaxed">
+            Top finishers may receive a prize, arranged and given separately by the organizer — not processed through Razorpay or this platform.
+          </p>
         </div>
 
         <div className="space-y-3 mb-6">

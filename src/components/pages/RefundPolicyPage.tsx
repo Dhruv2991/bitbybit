@@ -63,8 +63,8 @@ export default function RefundPolicyPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">6. No cash prizes or payouts</h2>
-          <p>For clarity: this policy governs refunds of payments you make to the platform. BitByBit does not pay out cash prizes or rewards to users under any circumstance — see our Terms & Conditions for details.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">6. Prizes are separate from platform payments</h2>
+          <p>This policy governs refunds of payments you make to the platform (subscriptions and contest entry fees) only. Any contest prize is arranged and given separately, directly by the organizer, outside of Razorpay and this platform — see our Terms &amp; Conditions for details.</p>
         </section>
       </div>
 

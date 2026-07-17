@@ -39,8 +39,8 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">3. No prizes or payouts</h2>
-          <p>BitByBit does not offer cash prizes, rewards, or payouts of any kind to users. Contests and challenges are ranked purely by points and leaderboard position. No money is ever paid out to users through this platform.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">3. Prizes</h2>
+          <p>Contest winners may receive a prize. Any prize is arranged and given separately, directly by the organizer, outside of this platform. Razorpay and the platform are used only to collect payments (subscription fees and contest entry fees) — they are never used to pay out, transfer, or disburse any prize or money to users.</p>
         </section>
 
         <section>
