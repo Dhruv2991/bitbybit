@@ -94,7 +94,6 @@ export interface Contest {
   duration_mins: number;
 
   upi_id: string;
-  prize_note: string;
 
   leaderboard_discount: number;
 
@@ -117,6 +116,8 @@ export interface ContestRegistration {
   name: string;
 
   txn_id: string | null;
+  razorpay_order_id?:   string | null;
+  razorpay_payment_id?: string | null;
 
   status: RegStatus;
 
@@ -536,6 +537,8 @@ export interface Subscriber {
   github:     string;
   name:       string;
   txn_id:     string;
+  razorpay_order_id?:   string | null;
+  razorpay_payment_id?: string | null;
   status:     SubscriberStatus;
   created_at: string;
 }

@@ -256,9 +256,9 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
     },
     {
       icon: '🏆',
-      label: 'Rewards',
-      title: 'Points & Prizes',
-      desc: 'Every test case you pass earns points. Contest winners get real UPI payouts directly to their account.',
+      label: 'Rankings',
+      title: 'Points & Leaderboard',
+      desc: 'Every test case you pass earns points. Climb the leaderboard and track your progress against other coders.',
       color: '#00e87a',
       glow: 'rgba(0,232,122,0.08)',
       page: 'leaderboard',
@@ -465,7 +465,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
             { n: '01', t: 'Pick a problem', d: 'Browse by difficulty or weekly challenge pool', c: '#00e87a' },
             { n: '02', t: 'Write & run', d: 'Code in your language, run against real test cases', c: '#a78bfa' },
             { n: '03', t: 'Submit', d: 'Admin reviews your approach, awards points', c: '#f0b429' },
-            { n: '04', t: 'Climb the ranks', d: 'Points accumulate, top coders win real prizes', c: '#ff4d4d' },
+            { n: '04', t: 'Climb the ranks', d: 'Points accumulate, track your rank on the leaderboard', c: '#ff4d4d' },
           ].map((step, i) => (
             <div key={step.n} className="flex items-start gap-3 animate-fade-up"
               style={{ animationDelay: `${900 + i * 100}ms` }}>

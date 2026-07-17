@@ -4,7 +4,7 @@
 // Weekly Challenge: 3 paid problems, open all week.
 // Points = base_points × time_bonus (earlier = more pts).
 // ════════════════════════════════════════════════════════════
-
+import { payWithRazorpay } from "@/lib/razorpay";
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -598,31 +598,26 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
     setLoadingSummary(null);
   }
 
-  async function submitPayment() {
-    if (!user || !txnId.trim()) return;
-    const tid = txnId.trim();
-    if (tid.length < 6) { setPayErr("Transaction ID seems too short"); return; }
-    setSubmitting(true);
+  function submitPayment() {
+    if (!user || fee === null || submitting) return;
     setPayErr("");
-    try {
-      const { data: existing } = await (db.from("subscribers") as any)
-        .select("id").eq("github", user.github).maybeSingle();
-      if (existing) {
-        setPayErr("You already have a subscription request pending.");
+    setSubmitting(true);
+
+    payWithRazorpay({
+      purpose: "subscription",
+      name: "BitByBit",
+      description: "Lifetime Subscription",
+      prefillName: user.name,
+      onSuccess: (paymentId) => {
+        setSubStatus("confirmed");
+        setIsSubscribed(true);
         setSubmitting(false);
-        return;
-      }
-      const { error } = await (db.from("subscribers") as any).insert({
-        github: user.github, name: user.name, txn_id: tid, status: "pending",
-      });
-      if (error) throw error;
-      setSubmitted(true);
-      setSubStatus("pending");
-    } catch (e: any) {
-      setPayErr(e.message || "Submission failed. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
+      },
+      onFailure: (msg) => {
+        setPayErr(msg);
+        setSubmitting(false);
+      },
+    });
   }
 
   // Called by Workspace when a problem is submitted
@@ -808,78 +803,32 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
               </div>
 
               {/* Payment */}
-              <div className="px-5 py-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
-                {/* QR side */}
-                <div className="flex flex-col items-center gap-3">
-                  <p className="text-[10px] font-mono text-[#666] uppercase tracking-widest">Scan to pay via UPI</p>
-                  {upiId ? (
-                    <div className="bg-white p-2.5 rounded-xl">
-                      <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(`upi://pay?pa=${upiId}&pn=BitByBit&am=${fee}&cu=INR&tn=BitByBit+Subscription`)}`}
-                        alt="UPI QR"
-                        width={160}
-                        height={160}
-                        style={{ width: 160, height: 160 }}
-                        className="rounded-lg"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-[160px] h-[160px] bg-[#111] rounded-xl flex items-center justify-center">
-                      <div className="w-5 h-5 border-2 border-[#333] border-t-[#555] rounded-full animate-spin" />
-                    </div>
-                  )}
-                  {/* UPI ID */}
-                  <div className="w-full flex items-center gap-2 bg-[#111] border border-[#1a1a1a] rounded-xl px-3 py-2">
-                    <span className="text-xs font-mono text-[#ccc] flex-1 truncate">{upiId || '—'}</span>
+              <div className="px-5 py-5">
+                {payErr && <p className="text-[10px] text-[#ff4d4d] font-mono mb-3 text-center">{payErr}</p>}
+                {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' ? (
+                  <>
                     <button
-                      onClick={() => { navigator.clipboard?.writeText(upiId); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-                      className="text-[10px] font-mono text-[#00e87a] shrink-0"
+                      onClick={submitPayment}
+                      disabled={submitting || fee === null}
+                      className="w-full py-3 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
+                        hover:bg-[#00ff88] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                     >
-                      {copied ? '✓' : 'Copy'}
+                      {submitting ? 'Processing…' : `Pay ₹${fee ?? '—'} →`}
                     </button>
+                    <p className="text-[10px] text-[#444] font-mono text-center mt-3">
+                      Secured by Razorpay · Access unlocks instantly
+                    </p>
+                  </>
+                ) : (
+                  <div className="text-center">
+                    <div className="w-full py-3 bg-[#1a1a1a] text-[#666] font-mono font-bold text-sm rounded-xl cursor-not-allowed">
+                      We'll be back soon
+                    </div>
+                    <p className="text-[10px] text-[#555] font-mono mt-3">
+                      Subscriptions are temporarily unavailable while we finish setting things up. Check back shortly.
+                    </p>
                   </div>
-                  {/* App shortcuts */}
-                  <div className="grid grid-cols-3 gap-2 w-full">
-                    {[
-                      { name: 'GPay',    url: `gpay://upi/pay?pa=${upiId}&pn=BitByBit&cu=INR` },
-                      { name: 'PhonePe', url: `phonepe://pay?pa=${upiId}&pn=BitByBit&cu=INR` },
-                      { name: 'Paytm',   url: `paytmmp://pay?pa=${upiId}&pn=BitByBit&cu=INR` },
-                    ].map(app => (
-                      <a key={app.name} href={app.url}
-                        className="flex items-center justify-center py-1.5 bg-[#111] border border-[#1a1a1a] rounded-lg text-[10px] font-mono text-[#ccc] hover:border-[#333] transition-all text-center">
-                        {app.name}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Txn input side */}
-                <div className="flex flex-col justify-center gap-3">
-                  <div>
-                    <label className="block text-[10px] text-[#666] font-mono uppercase tracking-widest mb-2">
-                      Enter Transaction / UTR ID after payment
-                    </label>
-                    <input
-                      value={txnId}
-                      onChange={e => { setTxnId(e.target.value); setPayErr(""); }}
-                      placeholder="e.g. 423987654321"
-                      className="w-full bg-[#060606] border border-[#1a1a1a] rounded-xl px-3.5 py-2.5 text-sm font-mono
-                        text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a30] transition-colors"
-                    />
-                    {payErr && <p className="text-[10px] text-[#ff4d4d] font-mono mt-1.5">{payErr}</p>}
-                  </div>
-                  <button
-                    onClick={submitPayment}
-                    disabled={submitting || !txnId.trim()}
-                    className="w-full py-3 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
-                      hover:bg-[#00ff88] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  >
-                    {submitting ? 'Submitting…' : 'Submit Payment →'}
-                  </button>
-                  <p className="text-[10px] text-[#444] font-mono text-center">
-                    Payments verified manually · Access granted within a few hours
-                  </p>
-                </div>
+                )}
               </div>
             </div>
           )}

@@ -27,7 +27,18 @@ export function getSupabaseClient() {
 }
 
 export function createServerSupabaseClient() {
-  return createClient<Database>(SUPABASE_URL, SUPABASE_ANON);
+  // Uses the service role key — this client is only ever used from
+  // server-side API routes (never exposed to the browser), and needs
+  // to bypass RLS to write confirmed payment/subscription status.
+  // Using the anon key here would either silently fail on RLS-protected
+  // writes, or — worse — imply those tables allow anon writes, which
+  // would let anyone set their own subscription to "confirmed" directly
+  // from the browser without paying at all.
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set — required for server-side writes.');
+  }
+  return createClient<Database>(SUPABASE_URL, serviceKey);
 }
 
 export async function resolveAdminStatus(github: string): Promise<boolean> {

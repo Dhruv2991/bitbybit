@@ -113,7 +113,7 @@ export default function AboutPage({ onNavigate }: Props) {
           {[
             ["{ }", "Problems library",      "Curated problems with hidden test cases"],
             ["🏅",  "Weekly challenges",     "New problems every week, time bonus scoring"],
-            ["🏆",  "Proctored arena",       "Live supervised contests with real prizes"],
+            ["🏆",  "Proctored arena",       "Live supervised contests, ranked on the leaderboard"],
             ["⭐",  "Lifetime subscription", "One-time fee, unlimited weekly access"],
             ["✦",  "AI features",           "Hints, debugger, and code review"],
             ["💬",  "Discussion threads",    "Community discussion on every problem"],
@@ -128,6 +128,24 @@ export default function AboutPage({ onNavigate }: Props) {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Payments */}
+      <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-6 mb-5">
+        <h2 className="font-display font-bold text-[#e0e0e0] text-base mb-3 flex items-center gap-2">
+          <span className="text-[#00e87a]">✦</span> Payments
+        </h2>
+        <div className="space-y-2 text-[#888] font-mono text-xs leading-relaxed">
+          <p>
+            Payments on this platform (via Razorpay) are collected only for two things: a one-time lifetime
+            subscription fee for access to weekly problems and AI features, and a per-contest entry fee for
+            proctored Arena contests.
+          </p>
+          <p>
+            There are no cash prizes, rewards, or payouts of any kind. Contests are ranked purely by points
+            and leaderboard position — no money is ever paid out to users through this platform.
+          </p>
         </div>
       </div>
 
@@ -189,6 +207,17 @@ export default function AboutPage({ onNavigate }: Props) {
                 ddhruvgnayak@gmail.com
               </a>
             </p>
+          </div>
+          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-[#1f1f1f]">
+            <button onClick={() => onNavigate("privacy")} className="text-[10px] font-mono text-[#00e87a] hover:text-[#00ff88] transition-colors">
+              Privacy Policy
+            </button>
+            <button onClick={() => onNavigate("terms")} className="text-[10px] font-mono text-[#00e87a] hover:text-[#00ff88] transition-colors">
+              Terms &amp; Conditions
+            </button>
+            <button onClick={() => onNavigate("refunds")} className="text-[10px] font-mono text-[#00e87a] hover:text-[#00ff88] transition-colors">
+              Refund Policy
+            </button>
           </div>
         </div>
       </div>

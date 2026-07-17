@@ -10,8 +10,11 @@ import ArenaPage            from "@/components/pages/ArenaPage";
 import AdminPage            from "@/components/pages/AdminPage";
 import WeeklyChallengePage  from "@/components/pages/WeeklyChallengePage";
 import AboutPage            from "@/components/pages/AboutPage";
+import PrivacyPolicyPage    from "@/components/pages/PrivacyPolicyPage";
+import TermsPage            from "@/components/pages/TermsPage";
+import RefundPolicyPage     from "@/components/pages/RefundPolicyPage";
 
-type PageId = "home" | "problems" | "leaderboard" | "arena" | "weekly" | "admin" | "about";
+type PageId = "home" | "problems" | "leaderboard" | "arena" | "weekly" | "admin" | "about" | "privacy" | "terms" | "refunds";
 const PAGE_KEY = "bb_page";
 
 const NAV_ITEMS: { id: PageId; label: string; icon: string }[] = [
@@ -492,6 +495,9 @@ export default function App() {
         {page === "weekly"      && <WeeklyChallengePage user={user} onNavigate={navigate as (page: string) => void} />}
         {page === "admin"       && user?.is_admin   && <AdminPage user={user} />}
         {page === "about"       && <AboutPage onNavigate={navigate as (page: string) => void} />}
+        {page === "privacy"     && <PrivacyPolicyPage onNavigate={navigate as (page: string) => void} />}
+        {page === "terms"       && <TermsPage onNavigate={navigate as (page: string) => void} />}
+        {page === "refunds"     && <RefundPolicyPage onNavigate={navigate as (page: string) => void} />}
       </main>
 
       {/* Footer — copyright + about link */}
@@ -508,6 +514,18 @@ export default function App() {
             <button onClick={() => navigate("about")}
               className="text-[11px] font-mono text-[#666] hover:text-[#00e87a] transition-colors">
               About & Legal
+            </button>
+            <button onClick={() => navigate("privacy")}
+              className="text-[11px] font-mono text-[#666] hover:text-[#00e87a] transition-colors">
+              Privacy
+            </button>
+            <button onClick={() => navigate("terms")}
+              className="text-[11px] font-mono text-[#666] hover:text-[#00e87a] transition-colors">
+              Terms
+            </button>
+            <button onClick={() => navigate("refunds")}
+              className="text-[11px] font-mono text-[#666] hover:text-[#00e87a] transition-colors">
+              Refunds
             </button>
           </div>
         </div>
