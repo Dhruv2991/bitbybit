@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import dynamic                          from 'next/dynamic';
 import { getSupabaseClient }            from '@/lib/supabase';
-import PaymentButton                    from '@/components/arena/PaymentButton';
+import ContestEntryButton               from '@/components/arena/ContestEntryButton';
 import type { Contest, ContestRegistration, Problem, User } from '@/types/database';
 
 const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false });
@@ -11,14 +11,16 @@ const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false
 interface ArenaPageProps {
   user:              User | null;
   onArenaLockChange: (locked: boolean) => void;
+  onNavigate?:       (page: string) => void;
 }
 
 type ContestOutcome = 'submitted' | 'disqualified';
 
-export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
+export default function ArenaPage({ user, onArenaLockChange, onNavigate }: ArenaPageProps) {
   const db = getSupabaseClient();
   const [contests,      setContests]      = useState<Contest[]>([]);
   const [userRegs,      setUserRegs]      = useState<ContestRegistration[]>([]);
+  const [isSubscriber,  setIsSubscriber]  = useState(false);
   const [arenaProblems, setArenaProblems] = useState<Record<string, Problem>>({});
   const [contestOutcomes, setContestOutcomes] = useState<Map<string, ContestOutcome>>(new Map());
   const [loading,       setLoading]       = useState(true);
@@ -94,7 +96,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
   async function loadContests() {
     setLoading(true);
     try {
-      const [{ data: c }, { data: r }, { data: arenaSubs }] = await Promise.all([
+      const [{ data: c }, { data: r }, { data: arenaSubs }, { data: sub }] = await Promise.all([
         db.from('contests').select('*').order('created_at', { ascending: false }),
         user
           ? db.from('contest_registrations').select('*').eq('github', user.github)
@@ -102,10 +104,15 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
         user
           ? db.from('arena_submissions').select('contest_id, status').eq('github', user.github)
           : Promise.resolve({ data: [] }),
+        user
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? (db.from('subscribers') as any).select('status').eq('github', user.github).maybeSingle()
+          : Promise.resolve({ data: null }),
       ]);
       const contestList = (c || []) as Contest[];
       setContests(contestList);
       setUserRegs((r as ContestRegistration[]) || []);
+      setIsSubscriber((sub as { status?: string } | null)?.status === 'confirmed');
 
       const outcomes = new Map<string, ContestOutcome>();
       for (const row of (arenaSubs || []) as { contest_id: string; status: string }[]) {
@@ -586,7 +593,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
         <h1 className="font-display font-bold text-xl md:text-2xl mb-1 text-[var(--text)]">Proctored Arena 🏟️</h1>
         <p className="text-xs font-mono text-[var(--muted)] mb-5">Supervised coding contests. Prizes for top finishers. No shortcuts.</p>
         <p className="text-[var(--text2)] text-sm font-mono">
-          Pay the entry fee · get confirmed · compete in a supervised contest
+          Free for subscribers · get confirmed · compete in a supervised contest
         </p>
       </div>
 
@@ -662,7 +669,7 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                   {ct.status === 'live'     ? <span className="badge-live flex items-center gap-1.5"><span className="live-dot" /> LIVE</span> :
                    ct.status === 'upcoming' ? <span className="badge-upcoming">◌ Upcoming</span> :
                                               <span className="badge-ended">✓ Ended</span>}
-                  <span className="text-[var(--purple)] font-mono font-bold text-sm">₹{ct.entry_fee}</span>
+                  <span className="text-[var(--acc)] font-mono font-bold text-xs">Free for subscribers</span>
                 </div>
 
                 {/* Contest info */}
@@ -759,10 +766,11 @@ export default function ArenaPage({ user, onArenaLockChange }: ArenaPageProps) {
                       Sign in to register
                     </button>
                   ) : (
-                    <PaymentButton
-                      contest={ct} user={user}
-                      onSuccess={(txnId) => { showToast(`Payment submitted! ID: ${txnId} — awaiting review.`, 'info'); loadContests(); }}
+                    <ContestEntryButton
+                      contest={ct} user={user} isSubscriber={isSubscriber}
+                      onSuccess={() => { showToast(`You're registered — see you in the arena!`, 'ok'); loadContests(); }}
                       onError={(msg) => showToast(msg, 'err')}
+                      onNavigateSubscribe={() => onNavigate?.('weekly')}
                     />
                   )}
                 </div>

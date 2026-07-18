@@ -31,19 +31,18 @@ export default function RefundPolicyPage({ onNavigate }: Props) {
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">1. Lifetime subscription</h2>
-          <p>The one-time lifetime subscription grants immediate, permanent access to weekly challenges and AI features upon successful payment. Because access is granted instantly and is not time-limited or consumable, subscription payments are <span className="text-[#e0e0e0] font-bold">non-refundable</span> once access has been granted, except as required by applicable law.</p>
+          <p>The one-time lifetime subscription grants immediate, permanent access to weekly challenges, AI features, and free entry to every proctored Arena contest, upon successful payment. Because access is granted instantly and is not time-limited or consumable, subscription payments are <span className="text-[#e0e0e0] font-bold">non-refundable</span> once access has been granted, except as required by applicable law.</p>
           <p className="mt-2">If you believe you were charged in error (e.g. a duplicate charge, or a technical failure where payment succeeded but access was not granted), contact us within 7 days of the transaction and we will investigate and issue a refund if a genuine error is confirmed.</p>
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">2. Contest entry fees</h2>
-          <p>Contest entry fees are <span className="text-[#e0e0e0] font-bold">non-refundable</span> once a contest has started. If you wish to withdraw before a contest starts, contact us — refunds for pre-start cancellations are considered on a case-by-case basis.</p>
-          <p className="mt-2">If a contest is cancelled or postponed indefinitely by us, all paid entry fees for that contest will be refunded in full within 7–10 business days.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">2. Contest entry</h2>
+          <p>Contest entry is <span className="text-[#e0e0e0] font-bold">free for confirmed subscribers</span> — no separate fee is ever charged to enter a contest. Since no payment is collected for contest entry, there is nothing to refund in connection with entering, participating in, or being disqualified from a contest.</p>
         </section>
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">3. Disqualification</h2>
-          <p>If you are disqualified from a contest for a violation of the contest rules (e.g. excessive tab-switching in the proctored Arena, cheating, or plagiarism), your entry fee for that contest is not refunded.</p>
+          <p>If you are disqualified from a contest for a violation of the contest rules (e.g. excessive tab-switching in the proctored Arena, cheating, or plagiarism), you may lose access to that specific contest, but your underlying subscription is unaffected.</p>
         </section>
 
         <section>
@@ -64,7 +63,7 @@ export default function RefundPolicyPage({ onNavigate }: Props) {
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">6. Prizes are separate from platform payments</h2>
-          <p>This policy governs refunds of payments you make to the platform (subscriptions and contest entry fees) only. Any contest prize is arranged and given separately, directly by the organizer, outside of Razorpay and this platform — see our Terms &amp; Conditions for details.</p>
+          <p>This policy governs refunds of the lifetime subscription payment only, since that is the only payment collected by the platform. Any contest prize is arranged and given separately, directly by the organizer, outside of Razorpay and this platform — see our Terms &amp; Conditions for details.</p>
         </section>
       </div>
 

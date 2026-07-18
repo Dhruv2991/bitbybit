@@ -138,9 +138,9 @@ export default function AboutPage({ onNavigate }: Props) {
         </h2>
         <div className="space-y-2 text-[#888] font-mono text-xs leading-relaxed">
           <p>
-            Payments on this platform (via Razorpay) are collected only for two things: a one-time lifetime
-            subscription fee for access to weekly problems and AI features, and a per-contest entry fee for
-            proctored Arena contests.
+            Payments on this platform are collected via Razorpay for exactly one thing: a one-time lifetime
+            subscription fee. That single payment unlocks weekly problems, AI features, and free entry to
+            every proctored Arena contest — no separate contest entry fee is ever charged.
           </p>
           <p>
             Contest winners may receive a prize. Any prize is arranged and given separately, directly by the

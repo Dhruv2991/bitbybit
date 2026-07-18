@@ -56,6 +56,9 @@ export default function App() {
   const [authChecked,    setAuthChecked]    = useState(false);
   const [arenaLocked,    setArenaLocked]    = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navRef      = useRef<HTMLDivElement>(null);
+  const navItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [pillStyle, setPillStyle] = useState<{ left: number; width: number; opacity: number; color: 'green' | 'purple' }>({ left: 0, width: 0, opacity: 0, color: 'green' });
   const [toasts,         setToasts]         = useState<Toast[]>([]);
   const [liveItems,      setLiveItems]      = useState<{ id: string; label: string; page: PageId; type: 'arena' | 'weekly'; status: 'live' | 'upcoming' }[]>([]);
   const [notifOpen,      setNotifOpen]      = useState(false);
@@ -306,6 +309,29 @@ export default function App() {
     </div>
   );
 
+  useEffect(() => {
+    function measure() {
+      const activeKey = page === "admin" && user?.is_admin ? "admin" : page;
+      const btn = navItemRefs.current[activeKey as string];
+      const container = navRef.current;
+      if (btn && container) {
+        const btnRect = btn.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        setPillStyle({
+          left:    btnRect.left - containerRect.left,
+          width:   btnRect.width,
+          opacity: 1,
+          color:   activeKey === "admin" ? "purple" : "green",
+        });
+      } else {
+        setPillStyle(s => ({ ...s, opacity: 0 }));
+      }
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [page, user?.is_admin, authChecked]);
+
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
 
@@ -332,23 +358,32 @@ export default function App() {
           </button>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-0.5">
+          <nav ref={navRef} className="hidden md:flex items-center gap-0.5 relative">
+            <span
+              className={`absolute top-0 h-full rounded-xl border transition-all duration-300 ease-out pointer-events-none
+                ${pillStyle.color === 'purple' ? 'bg-[#a78bfa15] border-[#a78bfa30]' : 'bg-[#00e87a10] border-[#00e87a20]'}`}
+              style={{ left: pillStyle.left, width: pillStyle.width, opacity: pillStyle.opacity }}
+            />
             {NAV_ITEMS.map(item => (
-              <button key={item.id} onClick={() => navigate(item.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-mono text-sm transition-all duration-150
+              <button key={item.id}
+                ref={el => { navItemRefs.current[item.id] = el; }}
+                onClick={() => navigate(item.id)}
+                className={`relative z-10 flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-mono text-sm transition-colors duration-200
                   ${page === item.id
-                    ? "bg-[#00e87a10] text-[#00e87a] font-bold border border-[#00e87a20]"
-                    : "text-[#666] hover:text-[#e0e0e0] hover:bg-[#ffffff06]"}`}>
+                    ? "text-[#00e87a] font-bold"
+                    : "text-[#666] hover:text-[#e0e0e0]"}`}>
                 <span className="text-xs opacity-70">{item.icon}</span>
                 {item.label}
               </button>
             ))}
             {user?.is_admin && (
-              <button onClick={() => navigate("admin")}
-                className={`px-3.5 py-1.5 rounded-xl font-mono text-sm transition-all duration-150
+              <button
+                ref={el => { navItemRefs.current["admin"] = el; }}
+                onClick={() => navigate("admin")}
+                className={`relative z-10 px-3.5 py-1.5 rounded-xl font-mono text-sm transition-colors duration-200
                   ${page === "admin"
-                    ? "bg-[#a78bfa15] text-[#a78bfa] font-bold"
-                    : "text-[#777] hover:text-[#a78bfa] hover:bg-[#a78bfa08]"}`}>
+                    ? "text-[#a78bfa] font-bold"
+                    : "text-[#777] hover:text-[#a78bfa]"}`}>
                 Admin
               </button>
             )}
@@ -491,7 +526,7 @@ export default function App() {
         {page === "home"        && <HomePage        user={user} onNavigate={navigate} />}
         {page === "problems"    && <ProblemsPage    user={user} onNavigate={navigate} />}
         {page === "leaderboard" && <LeaderboardPage />}
-        {page === "arena"       && <ArenaPage       user={user} onArenaLockChange={setArenaLocked} />}
+        {page === "arena"       && <ArenaPage       user={user} onArenaLockChange={setArenaLocked} onNavigate={navigate as (page: string) => void} />}
         {page === "weekly"      && <WeeklyChallengePage user={user} onNavigate={navigate as (page: string) => void} />}
         {page === "admin"       && user?.is_admin   && <AdminPage user={user} />}
         {page === "about"       && <AboutPage onNavigate={navigate as (page: string) => void} />}

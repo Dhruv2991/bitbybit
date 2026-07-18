@@ -35,17 +35,17 @@ export default function TermsPage({ onNavigate }: Props) {
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">2. What BitByBit is</h2>
-          <p>BitByBit is a competitive coding practice platform offering a problems library, weekly challenges, a proctored contest arena, AI-assisted hints and code review, and a leaderboard. Access to weekly challenges and AI features requires a one-time lifetime subscription. Access to proctored Arena contests requires a separate per-contest entry fee.</p>
+          <p>BitByBit is a competitive coding practice platform offering a problems library, weekly challenges, a proctored contest arena, AI-assisted hints and code review, and a leaderboard. A single one-time lifetime subscription unlocks weekly challenges, AI features, and free entry to every proctored Arena contest — no separate contest entry fee is charged.</p>
         </section>
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">3. Prizes</h2>
-          <p>Contest winners may receive a prize. Any prize is arranged and given separately, directly by the organizer, outside of this platform. Razorpay and the platform are used only to collect payments (subscription fees and contest entry fees) — they are never used to pay out, transfer, or disburse any prize or money to users.</p>
+          <p>Contest winners may receive a prize. Any prize is arranged and given separately, directly by the organizer, outside of this platform. Razorpay and the platform are used only to collect the lifetime subscription fee — they are never used to pay out, transfer, or disburse any prize or money to users, and no separate charge is ever collected for contest entry.</p>
         </section>
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">4. Payments</h2>
-          <p>All payments are processed securely via Razorpay. Subscription payments grant lifetime access to weekly challenges and AI features. Contest entry fees grant access to a single specified contest. All payments are confirmed automatically upon successful, verified transaction — no manual approval step is required.</p>
+          <p>All payments are processed securely via Razorpay. The one-time subscription payment grants lifetime access to weekly challenges, AI features, and free entry to every proctored Arena contest while your subscription is active. No separate fee is ever charged for entering a contest. Subscription payments are confirmed automatically upon successful, verified transaction — no manual approval step is required.</p>
         </section>
 
         <section>
