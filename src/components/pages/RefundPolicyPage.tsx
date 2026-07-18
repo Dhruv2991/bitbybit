@@ -47,7 +47,7 @@ export default function RefundPolicyPage({ onNavigate }: Props) {
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">4. How refunds are processed</h2>
-          <p>Approved refunds are issued to the original payment method via Razorpay and typically reflect within 5–10 business days, depending on your bank/payment provider.</p>
+          <p>Approved refunds are issued to the original payment method via payment gateway and typically reflect within 5–10 business days, depending on your bank/payment provider.</p>
         </section>
 
         <section>
@@ -57,13 +57,13 @@ export default function RefundPolicyPage({ onNavigate }: Props) {
             <a href="mailto:ddhruvgnayak@gmail.com" className="text-[#a78bfa] hover:text-[#c4b5fd] transition-colors">
               ddhruvgnayak@gmail.com
             </a>{" "}
-            with your GitHub username, the payment ID from your Razorpay receipt, and the reason for your request. We aim to respond within 3–5 business days.
+            with your GitHub username, the payment ID from your payment gateway receipt, and the reason for your request. We aim to respond within 3–5 business days.
           </p>
         </section>
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">6. Prizes are separate from platform payments</h2>
-          <p>This policy governs refunds of the lifetime subscription payment only, since that is the only payment collected by the platform. Any contest prize is arranged and given separately, directly by the organizer, outside of Razorpay and this platform — see our Terms &amp; Conditions for details.</p>
+          <p>This policy governs refunds of the lifetime subscription payment only, since that is the only payment collected by the platform. Any contest prize is arranged and given separately, directly by the organizer, outside of payment gateway and this platform — see our Terms &amp; Conditions for details.</p>
         </section>
       </div>
 

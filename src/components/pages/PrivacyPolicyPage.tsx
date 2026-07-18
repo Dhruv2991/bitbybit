@@ -36,7 +36,7 @@ export default function PrivacyPolicyPage({ onNavigate }: Props) {
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">2. Payment data</h2>
-          <p>All payments are processed by Razorpay. We never see or store your card number, UPI PIN, or bank credentials. We only store the payment/order ID that Razorpay returns after a successful transaction, which we use to confirm your subscription or contest entry.</p>
+          <p>All payments are processed by payment gateway. We never see or store your card number, UPI PIN, or bank credentials. We only store the payment/order ID that payment gateway returns after a successful transaction, which we use to confirm your subscription or contest entry.</p>
         </section>
 
         <section>
@@ -56,7 +56,7 @@ export default function PrivacyPolicyPage({ onNavigate }: Props) {
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">6. Third parties</h2>
-          <p>We share data with: GitHub (authentication), Razorpay (payments), Supabase (database/auth hosting), Vercel (application hosting), and our AI providers (Groq / self-hosted). Each of these has its own privacy policy governing how they handle data.</p>
+          <p>We share data with: GitHub (authentication), payment gateway (payments), Supabase (database/auth hosting), Vercel (application hosting), and our AI providers (Groq / self-hosted). Each of these has its own privacy policy governing how they handle data.</p>
         </section>
 
         <section>

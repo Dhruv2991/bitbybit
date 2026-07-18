@@ -23,66 +23,174 @@ export default function TermsPage({ onNavigate }: Props) {
         <h1 className="font-display font-black text-3xl md:text-4xl text-[#e2e2e2] mb-2 tracking-tight">
           Terms &amp; Conditions
         </h1>
-        <p className="text-[#666] font-mono text-xs">Last updated: {LAST_UPDATED}</p>
+        <p className="text-[#666] font-mono text-xs">
+          Last updated: {LAST_UPDATED}
+        </p>
       </div>
 
       <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-6 mb-5 space-y-5 text-[#888] font-mono text-xs leading-relaxed">
-
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">1. Acceptance of terms</h2>
-          <p>By creating an account or using BitByBit ("the platform"), you agree to these Terms & Conditions. If you do not agree, please do not use the platform.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+            1. Acceptance of terms
+          </h2>
+          <p>
+            By creating an account or using BitByBit ("the platform"), you agree
+            to these Terms & Conditions. If you do not agree, please do not use
+            the platform.
+          </p>
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">2. What BitByBit is</h2>
-          <p>BitByBit is a competitive coding practice platform offering a problems library, weekly challenges, a proctored contest arena, AI-assisted hints and code review, and a leaderboard. A single one-time lifetime subscription unlocks weekly challenges, AI features, and free entry to every proctored Arena contest — no separate contest entry fee is charged.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+            2. What BitByBit is
+          </h2>
+          <p>
+            BitByBit is an AI-powered coding practice and interview preparation
+            platform offering a curated problems library, weekly coding
+            challenges, proctored coding assessments, AI-assisted hints, code
+            review, performance analytics, and community leaderboards. A
+            one-time lifetime subscription unlocks premium educational features,
+            including AI tools, advanced challenges, and access to proctored
+            coding assessments. No separate fee is charged to participate in
+            platform-hosted coding challenges.
+          </p>
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">3. Prizes</h2>
-          <p>Contest winners may receive a prize. Any prize is arranged and given separately, directly by the organizer, outside of this platform. Razorpay and the platform are used only to collect the lifetime subscription fee — they are never used to pay out, transfer, or disburse any prize or money to users, and no separate charge is ever collected for contest entry.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+            3. Coding Challenges
+          </h2>
+          <p>
+            BitByBit periodically hosts coding challenges and proctored coding
+            assessments to encourage learning, problem-solving, and technical
+            skill development.
+          </p>
+
+          <p className="mt-2">
+            Points, rankings, streaks, badges, and leaderboards are used solely
+            as gamified educational features to help users track their progress
+            and engage with the community.
+          </p>
+
+          <p className="mt-2">
+            Where a third-party organizer independently announces any prize or
+            recognition, such arrangements are governed entirely by the
+            organizer's own terms and are not administered, processed, or
+            guaranteed by BitByBit.
+          </p>
         </section>
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">4. Payments</h2>
-          <p>All payments are processed securely via Razorpay. The one-time subscription payment grants lifetime access to weekly challenges, AI features, and free entry to every proctored Arena contest while your subscription is active. No separate fee is ever charged for entering a contest. Subscription payments are confirmed automatically upon successful, verified transaction — no manual approval step is required.</p>
+          <p>
+            Payments are securely processed through our authorized payment
+            gateway partner.
+          </p>
+
+          <p className="mt-2">
+            A one-time lifetime subscription grants access to premium
+            educational features including AI-powered tools, weekly coding
+            challenges, the complete problems library, advanced analytics, and
+            participation in proctored coding assessments.
+          </p>
+
+          <p className="mt-2">
+            Subscription payments are made solely for accessing premium platform
+            features and are not linked to leaderboard rankings, coding
+            challenge outcomes, or prizes.
+          </p>
+
+          <p className="mt-2">
+            Subscription access is activated automatically after a successful
+            verified payment.
+          </p>
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">5. Account & eligibility</h2>
-          <p>You must sign in with a valid GitHub account to use the platform. You are responsible for maintaining the security of your GitHub account. One subscription/entry is tied to one GitHub account and is non-transferable.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+            5. Account & eligibility
+          </h2>
+          <p>
+            You must sign in with a valid GitHub account to use the platform.
+            You are responsible for maintaining the security of your GitHub
+            account. One subscription/entry is tied to one GitHub account and is
+            non-transferable.
+          </p>
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">6. Acceptable use</h2>
-          <p>You agree not to: cheat, plagiarize solutions, exploit bugs for unfair advantage, use automated tools to solve problems on your behalf in ways that violate contest rules, attempt to access other users' data, or attempt to disrupt the platform's operation. In proctored Arena contests, tab-switching and other monitored behaviors may result in disqualification per the contest's stated rules (e.g. a 3-strike policy).</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+            6. Acceptable use
+          </h2>
+          <p>
+            You agree not to: cheat, plagiarize solutions, exploit bugs for
+            unfair advantage, use automated tools to solve problems on your
+            behalf in ways that violate contest rules, attempt to access other
+            users' data, or attempt to disrupt the platform's operation. In
+            proctored coding assessments, monitored behaviours such as repeated
+            tab switching or attempts to bypass platform rules may result in
+            warnings, disqualification, or other actions in accordance with the
+            applicable challenge rules.
+          </p>
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">7. Intellectual property</h2>
-          <p>The platform's source code, design, problem content, UI components, AI integration, and scoring system are the exclusive property of Dhruv G Nayak and TeamCodeLocked, BMS College of Engineering. Unauthorized copying, reproduction, or redistribution is prohibited — see the About page for full copyright terms.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+            7. Intellectual property
+          </h2>
+          <p>
+            The platform's source code, design, problem content, UI components,
+            AI integration, and scoring system are the exclusive property of
+            Dhruv G Nayak and TeamCodeLocked, BMS College of Engineering.
+            Unauthorized copying, reproduction, or redistribution is prohibited
+            — see the About page for full copyright terms.
+          </p>
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">8. AI features</h2>
-          <p>AI-generated hints, code reviews, and editorials are provided for educational assistance and may occasionally be inaccurate or incomplete. You should independently verify any AI-generated guidance rather than relying on it as a sole source of truth.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+            8. AI features
+          </h2>
+          <p>
+            AI-generated hints, code reviews, and editorials are provided for
+            educational assistance and may occasionally be inaccurate or
+            incomplete. You should independently verify any AI-generated
+            guidance rather than relying on it as a sole source of truth.
+          </p>
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">9. Availability & changes</h2>
-          <p>We aim to keep the platform available but do not guarantee uninterrupted access. Features, pricing, and these terms may change over time; continued use after a change constitutes acceptance of the updated terms.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+            9. Availability & changes
+          </h2>
+          <p>
+            We aim to keep the platform available but do not guarantee
+            uninterrupted access. Features, pricing, and these terms may change
+            over time; continued use after a change constitutes acceptance of
+            the updated terms.
+          </p>
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">10. Limitation of liability</h2>
-          <p>The platform is provided "as is" without warranties of any kind. To the maximum extent permitted by law, we are not liable for indirect, incidental, or consequential damages arising from your use of the platform.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+            10. Limitation of liability
+          </h2>
+          <p>
+            The platform is provided "as is" without warranties of any kind. To
+            the maximum extent permitted by law, we are not liable for indirect,
+            incidental, or consequential damages arising from your use of the
+            platform.
+          </p>
         </section>
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">11. Contact</h2>
           <p>
             Questions about these terms?{" "}
-            <a href="mailto:ddhruvgnayak@gmail.com" className="text-[#a78bfa] hover:text-[#c4b5fd] transition-colors">
+            <a
+              href="mailto:ddhruvgnayak@gmail.com"
+              className="text-[#a78bfa] hover:text-[#c4b5fd] transition-colors"
+            >
               ddhruvgnayak@gmail.com
             </a>
           </p>
