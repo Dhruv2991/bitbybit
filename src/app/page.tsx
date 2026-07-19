@@ -104,18 +104,25 @@ export default function App() {
     }
   }
 
-  // On mount, read URL hash to navigate to the right page
-  // Only use hash if sessionStorage doesn't have a page stored
+  // On mount, read URL hash to navigate to the right page.
+  // A valid hash always wins over any stored session page, so shared
+  // or bookmarked links (e.g. #privacy) work reliably every time —
+  // not just on a completely fresh session.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const hash = window.location.hash.replace("#", "") as PageId;
-    const validPages: PageId[] = ["home", "problems", "leaderboard", "arena", "weekly", "admin", "about"];
-    const stored = sessionStorage.getItem(PAGE_KEY);
-    // Only navigate to hash if it's valid AND there's no stored session page
-    if (hash && validPages.includes(hash) && !stored) {
-      setPageState(hash);
-      try { sessionStorage.setItem(PAGE_KEY, hash); } catch {}
+    const validPages: PageId[] = ["home", "problems", "leaderboard", "arena", "weekly", "admin", "about", "privacy", "terms", "refunds"];
+
+    function applyHash() {
+      const hash = window.location.hash.replace("#", "") as PageId;
+      if (hash && validPages.includes(hash)) {
+        setPageState(hash);
+        try { sessionStorage.setItem(PAGE_KEY, hash); } catch {}
+      }
     }
+
+    applyHash(); // initial load
+    window.addEventListener("hashchange", applyHash); // back/forward + manual hash edits
+    return () => window.removeEventListener("hashchange", applyHash);
   }, []);
 
   useEffect(() => {

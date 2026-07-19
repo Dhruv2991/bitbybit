@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { JetBrains_Mono, Syne } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 const jetbrainsMono = JetBrains_Mono({
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-[#0a0a0a] text-[#e0e0e0] min-h-screen antialiased">
         {children}
+        <Analytics />
       </body>
     </html>
   );
