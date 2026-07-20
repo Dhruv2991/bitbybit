@@ -15,8 +15,8 @@ import type {
   ArenaSubmission,
   Difficulty,
   WeeklyChallenge,
-  WeeklyAccess,
   Subscriber,
+  ContestFeedback,
 } from "@/types/database";
 
 type Section =
@@ -26,6 +26,7 @@ type Section =
   | "problems"
   | "members"
   | "contests"
+  | "feedback"
   | "weekly"
   | "subscribers"
   | "ai-generate"
@@ -48,9 +49,9 @@ const blankProblem = (): Omit<Problem, "id" | "created_at" | "updated_at"> => ({
 
 const blankContest = (): Omit<Contest, "id" | "created_at"> => ({
   name: "",
-  entry_fee: 50,
+  entry_fee: 0, // unused — contest entry is free for confirmed subscribers
   duration_mins: 60,
-  upi_id: "",
+  upi_id: "", // unused — kept for legacy schema compatibility only
   leaderboard_discount: 0,
   problem_id: null,
   problem_ids: [],
@@ -643,18 +644,11 @@ function ContestForm({
             type: "text",
           },
           {
-            label: "Entry Fee (₹)",
-            key: "entry_fee",
-            ph: "50",
-            type: "number",
-          },
-          {
             label: "Duration (min)",
             key: "duration_mins",
             ph: "60",
             type: "number",
           },
-          { label: "UPI ID", key: "upi_id", ph: "yourname@upi", type: "text" },
         ].map(({ label, key, ph, type }) => (
           <div key={key}>
             <label className="block text-xs text-[#bbb] font-mono mb-1 uppercase tracking-wider">
@@ -1076,6 +1070,8 @@ export default function AdminPage({ user }: AdminPageProps) {
   const [plagResults,    setPlagResults]    = useState<Record<string, any>>({});
   const [plagChecking,   setPlagChecking]   = useState<string | null>(null);
   const [expandedCode,   setExpandedCode]   = useState<string | null>(null);
+  const [subFilter,      setSubFilter]      = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  const [subVisibleCount, setSubVisibleCount] = useState(20);
 
   const [modal, setModal] = useState<ModalState>({
     type: null,
@@ -1553,19 +1549,6 @@ export default function AdminPage({ user }: AdminPageProps) {
     showToast("Contest deleted");
   }
 
-  async function confirmReg(id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db.from("contest_registrations") as any)
-      .update({ status: "confirmed" })
-      .eq("id", id);
-    setRegs((prev) =>
-      prev.map((r) =>
-        r.id === id ? { ...r, status: "confirmed" as const } : r,
-      ),
-    );
-    showToast("Registration confirmed ✓");
-  }
-
   async function rejectReg(id: string) {
     const reg = regs.find((r) => r.id === id);
     const reason = await openModal({
@@ -1609,6 +1592,7 @@ export default function AdminPage({ user }: AdminPageProps) {
       label: "🏟 Contests",
       badge: regs.filter((r) => r.status === "pending").length,
     },
+    { id: "feedback",    label: "💬 Feedback" },
     { id: "weekly",      label: "🏅 Weekly" },
     { id: "subscribers", label: "⭐ Subscribers" },
     { id: "ai-generate", label: "✦ AI Generate" },
@@ -1742,7 +1726,7 @@ export default function AdminPage({ user }: AdminPageProps) {
             {/* ── SUBMISSIONS ── */}
             {section === "submissions" && (
               <div>
-                <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
                   <h2 className="font-display font-bold text-xl">
                     Submissions
                   </h2>
@@ -1758,13 +1742,41 @@ export default function AdminPage({ user }: AdminPageProps) {
                     </span>
                   </div>
                 </div>
+
+                {/* Status filter — defaults to Pending so approved/rejected
+                    history doesn't clutter the view once volume grows */}
+                <div className="flex flex-wrap gap-1 bg-[#0d0d0d] border border-[#1f1f1f] rounded-xl p-1 w-fit mb-5">
+                  {([
+                    { id: "pending",  label: `Pending (${subs.filter(s => s.status === "pending").length})` },
+                    { id: "approved", label: "Approved" },
+                    { id: "rejected", label: "Rejected" },
+                    { id: "all",      label: "All" },
+                  ] as const).map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => { setSubFilter(f.id); setSubVisibleCount(20); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-150
+                        ${subFilter === f.id
+                          ? "bg-[#00e87a10] text-[#00e87a] font-bold border border-[#00e87a20]"
+                          : "text-[#666] hover:text-[#e0e0e0] hover:bg-[#ffffff06] border border-transparent"}`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {(() => {
+                  const filtered = subFilter === "all" ? subs : subs.filter((s) => s.status === subFilter);
+                  const visible = filtered.slice(0, subVisibleCount);
+                  return (
+                    <>
                 <div className="space-y-3">
-                  {subs.length === 0 && (
+                  {filtered.length === 0 && (
                     <div className="text-center py-16 text-[#999] font-mono">
-                      No submissions yet.
+                      No {subFilter !== "all" ? subFilter : ""} submissions.
                     </div>
                   )}
-                  {subs.map((s) => (
+                  {visible.map((s) => (
                     <div
                       key={s.id}
                       className={`card p-4 transition-all ${s.status === "pending" ? "border-[#f0b42930]" : ""}`}
@@ -1887,6 +1899,20 @@ export default function AdminPage({ user }: AdminPageProps) {
                     </div>
                   ))}
                 </div>
+                {filtered.length > subVisibleCount && (
+                  <div className="flex justify-center mt-5">
+                    <button
+                      onClick={() => setSubVisibleCount((n) => n + 20)}
+                      className="px-4 py-2 bg-[#1a1a1a] text-[#aaa] text-xs font-mono rounded-xl hover:text-[#e0e0e0] hover:bg-[#222] transition-all"
+                    >
+                      Load {Math.min(20, filtered.length - subVisibleCount)} more
+                      ({filtered.length - subVisibleCount} remaining)
+                    </button>
+                  </div>
+                )}
+                    </>
+                  );
+                })()}
               </div>
             )}
 
@@ -2425,48 +2451,6 @@ export default function AdminPage({ user }: AdminPageProps) {
                     />
                   </div>
                 )}
-                {regs.filter((r) => r.status === "pending").length > 0 && (
-                  <div className="mb-5">
-                    <div className="text-sm text-[#f0b429] font-mono mb-2">
-                      ⚠ {regs.filter((r) => r.status === "pending").length}{" "}
-                      pending registration(s) need review
-                    </div>
-                    <div className="space-y-2">
-                      {regs
-                        .filter((r) => r.status === "pending")
-                        .map((r) => (
-                          <div
-                            key={r.id}
-                            className="card border-[#f0b42930] px-4 py-3 flex items-center justify-between gap-3"
-                          >
-                            <div>
-                              <div className="font-mono text-[#e0e0e0] text-sm">
-                                {r.name}{" "}
-                                <span className="text-[#999]">@{r.github}</span>
-                              </div>
-                              <div className="text-xs text-[#bbb] font-mono mt-0.5">
-                                {r.contest_name} · Txn: {r.txn_id || "N/A"}
-                              </div>
-                            </div>
-                            <div className="flex gap-2 shrink-0">
-                              <button
-                                onClick={() => confirmReg(r.id)}
-                                className="px-3 py-1.5 bg-[#00e87a] text-black text-xs font-mono font-bold rounded-lg hover:bg-[#00ff88] transition-all"
-                              >
-                                ✓ Confirm
-                              </button>
-                              <button
-                                onClick={() => rejectReg(r.id)}
-                                className="px-3 py-1.5 bg-[#ff4d4d20] text-[#ff4d4d] text-xs font-mono rounded-lg hover:bg-[#ff4d4d30] transition-all"
-                              >
-                                ✗ Reject
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
                 <div className="space-y-3">
                   {contests.length === 0 && !showContestForm && (
                     <div className="text-center py-16 text-[#999] font-mono">
@@ -2484,7 +2468,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                             {c.name}
                           </div>
                           <div className="text-xs text-[#bbb] font-mono mt-0.5">
-                            ₹{c.entry_fee} entry · {c.duration_mins}m
+                            Free for subscribers · {c.duration_mins}m
                           </div>
                           {c.problem_id && (
                             <div className="text-xs text-[#a78bfa] font-mono mt-0.5">
@@ -2523,26 +2507,37 @@ export default function AdminPage({ user }: AdminPageProps) {
                           </button>
                         </div>
                       </div>
-                      {regs.filter((r) => r.contest_id === c.id).length > 0 && (
-                        <div className="pt-3 border-t border-[#1a1a1a]">
-                          <div className="text-[10px] text-[#999] font-mono mb-1.5 uppercase">
-                            Registrations (
-                            {regs.filter((r) => r.contest_id === c.id).length})
-                          </div>
-                          <div className="flex flex-wrap gap-1.5">
-                            {regs
-                              .filter((r) => r.contest_id === c.id)
-                              .map((r) => (
+                      {regs.filter((r) => r.contest_id === c.id).length > 0 && (() => {
+                        const contestRegs = regs.filter((r) => r.contest_id === c.id);
+                        const confirmedCount = contestRegs.filter((r) => r.status === "confirmed").length;
+                        return (
+                          <div className="pt-3 border-t border-[#1a1a1a]">
+                            <div className="text-[10px] text-[#999] font-mono mb-1.5 uppercase">
+                              Registrations ({confirmedCount}/70 seats)
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {contestRegs.map((r) => (
                                 <span
                                   key={r.id}
-                                  className={`text-[10px] font-mono px-2 py-0.5 rounded ${r.status === "confirmed" ? "bg-[#00e87a15] text-[#00e87a]" : r.status === "pending" ? "bg-[#f0b42915] text-[#f0b429]" : "bg-[#ff4d4d15] text-[#ff4d4d]"}`}
+                                  className={`group text-[10px] font-mono pl-2 pr-1 py-0.5 rounded flex items-center gap-1
+                                    ${r.status === "confirmed" ? "bg-[#00e87a15] text-[#00e87a]" : "bg-[#ff4d4d15] text-[#ff4d4d]"}`}
                                 >
                                   @{r.github}
+                                  {r.status === "confirmed" && (
+                                    <button
+                                      onClick={() => rejectReg(r.id)}
+                                      title="Remove registrant"
+                                      className="opacity-50 hover:opacity-100 hover:text-[#ff4d4d] transition-all px-1"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
                                 </span>
                               ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   ))}
                 </div>
@@ -2552,6 +2547,7 @@ export default function AdminPage({ user }: AdminPageProps) {
         )}
 
         {/* ════════ WEEKLY CHALLENGE SECTION ════════ */}
+        {section === "feedback"    && <FeedbackAdminSection />}
         {section === "weekly"      && <WeeklyAdminSection user={user} />}
         {section === "subscribers" && <SubscriberAdminSection />}
         {section === "ai-generate" && <AiGenerateSection />}
@@ -2579,8 +2575,8 @@ function blankWeekly(): Omit<WeeklyChallenge, "id" | "created_at"> {
     title: "",
     description: "",
     problem_ids: [],
-    entry_fee: 49,
-    upi_id: "",
+    entry_fee: 0, // unused — weekly challenges have no payment gate
+    upi_id: "", // unused — kept for legacy schema compatibility only
     whatsapp_link: null,
     starts_at: toLocalDatetimeInput(now),
     ends_at: toLocalDatetimeInput(end),
@@ -2592,7 +2588,6 @@ function WeeklyAdminSection({ user }: { user: User }) {
   const db = getSupabaseClient();
 
   const [challenges, setChallenges] = useState<WeeklyChallenge[]>([]);
-  const [accesses, setAccesses] = useState<WeeklyAccess[]>([]);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [form, setForm] = useState<Omit<
@@ -2603,9 +2598,6 @@ function WeeklyAdminSection({ user }: { user: User }) {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [manageTab, setManageTab] = useState<
-    Record<string, "payments" | "submissions">
-  >({});
   const [editingPts, setEditingPts] = useState<Record<string, string>>({});
   const [selectedSubs, setSelectedSubs] = useState<Set<string>>(new Set());
   const [bulkApproving, setBulkApproving] = useState(false);
@@ -2640,12 +2632,9 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
   async function load() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [{ data: ch }, { data: acc }, { data: probs }, { data: subs }] =
+    const [{ data: ch }, { data: probs }, { data: subs }] =
       await Promise.all([
         (db.from("weekly_challenges") as any)
-          .select("*")
-          .order("created_at", { ascending: false }),
-        (db.from("weekly_access") as any)
           .select("*")
           .order("created_at", { ascending: false }),
         db
@@ -2657,7 +2646,6 @@ function WeeklyAdminSection({ user }: { user: User }) {
           .order("submitted_at", { ascending: false }),
       ]);
     setChallenges((ch || []) as WeeklyChallenge[]);
-    setAccesses((acc || []) as WeeklyAccess[]);
     setProblems((probs || []) as Problem[]);
     setSubmissions(subs || []);
   }
@@ -2742,15 +2730,6 @@ function WeeklyAdminSection({ user }: { user: User }) {
     if (result === null) return;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db.from("weekly_challenges") as any).delete().eq("id", id);
-    load();
-  }
-
-  async function updateAccessStatus(
-    id: string,
-    status: "confirmed" | "rejected",
-  ) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (db.from("weekly_access") as any).update({ status }).eq("id", id);
     load();
   }
 
@@ -2965,19 +2944,6 @@ function WeeklyAdminSection({ user }: { user: User }) {
                 className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
               />
             </div>
-            <div>
-              <label className="text-[10px] text-[#999] font-mono uppercase">
-                Entry Fee (₹) *
-              </label>
-              <input
-                type="number"
-                value={form.entry_fee}
-                onChange={(e) =>
-                  setForm({ ...form, entry_fee: +e.target.value })
-                }
-                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
-              />
-            </div>
             <div className="md:col-span-2">
               <label className="text-[10px] text-[#999] font-mono uppercase">
                 Description
@@ -2988,17 +2954,6 @@ function WeeklyAdminSection({ user }: { user: User }) {
                   setForm({ ...form, description: e.target.value })
                 }
                 placeholder="Brief description shown to users"
-                className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-[#999] font-mono uppercase">
-                UPI ID *
-              </label>
-              <input
-                value={form.upi_id}
-                onChange={(e) => setForm({ ...form, upi_id: e.target.value })}
-                placeholder="yourname@upi"
                 className="w-full mt-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
               />
             </div>
@@ -3140,11 +3095,6 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
       <div className="space-y-4">
         {challenges.map((ch) => {
-          const chAccesses = accesses.filter(
-            (a) => a.weekly_challenge_id === ch.id,
-          );
-          const pending = chAccesses.filter((a) => a.status === "pending");
-          const confirmed = chAccesses.filter((a) => a.status === "confirmed");
           const isOpen = expandedId === ch.id;
 
           return (
@@ -3163,18 +3113,11 @@ function WeeklyAdminSection({ user }: { user: User }) {
                     >
                       {ch.status.toUpperCase()}
                     </span>
-                    {pending.length > 0 && (
-                      <span className="text-[10px] font-mono bg-[#ff4d4d20] text-[#ff4d4d] px-2 py-0.5 rounded-lg">
-                        {pending.length} pending payment
-                        {pending.length > 1 ? "s" : ""}
-                      </span>
-                    )}
                   </div>
                   <p className="text-[10px] text-[#999] font-mono mt-1">
-                    ₹{ch.entry_fee} ·{" "}
+                    Free for subscribers ·{" "}
                     {new Date(ch.starts_at).toLocaleDateString()} –{" "}
-                    {new Date(ch.ends_at).toLocaleDateString()} ·{" "}
-                    {confirmed.length} confirmed
+                    {new Date(ch.ends_at).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex gap-2 items-center">
@@ -3662,6 +3605,129 @@ function AnnouncementAdminSection() {
   );
 }
 
+// ════════════════════════════════════════════════════════════
+// FeedbackAdminSection — read-only view of post-contest feedback
+// ════════════════════════════════════════════════════════════
+
+function FeedbackAdminSection() {
+  const db = getSupabaseClient();
+
+  const [feedback, setFeedback] = useState<ContestFeedback[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [contestFilter, setContestFilter] = useState<string>("all");
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data } = await (db.from("contest_feedback") as any)
+        .select("*")
+        .order("created_at", { ascending: false });
+      setFeedback((data || []) as ContestFeedback[]);
+    } catch {}
+    setLoading(false);
+  }
+
+  const contestNames = Array.from(new Set(feedback.map((f) => f.contest_name))).sort();
+  const visible = contestFilter === "all" ? feedback : feedback.filter((f) => f.contest_name === contestFilter);
+
+  const rated = feedback.filter((f) => f.rating);
+  const avgRating = rated.length
+    ? (rated.reduce((sum, f) => sum + (f.rating || 0), 0) / rated.length).toFixed(1)
+    : "—";
+  const recommendYes = feedback.filter((f) => f.would_recommend === true).length;
+  const recommendNo  = feedback.filter((f) => f.would_recommend === false).length;
+
+  return (
+    <div className="space-y-6 animate-fade-up">
+      <div className="flex items-center justify-between mb-1 flex-wrap gap-3">
+        <h2 className="font-display font-bold text-xl">Contest Feedback</h2>
+        {contestNames.length > 0 && (
+          <select
+            value={contestFilter}
+            onChange={(e) => setContestFilter(e.target.value)}
+            className="bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3 py-2 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+          >
+            <option value="all">All contests</option>
+            {contestNames.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center">
+          <div className="text-2xl font-display font-bold text-[#f0b429]">{avgRating}{rated.length ? " ★" : ""}</div>
+          <div className="text-[10px] font-mono text-[#555] mt-1">Avg Rating ({rated.length})</div>
+        </div>
+        <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center">
+          <div className="text-2xl font-display font-bold text-[#00e87a]">{recommendYes}</div>
+          <div className="text-[10px] font-mono text-[#555] mt-1">Would Recommend</div>
+        </div>
+        <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center">
+          <div className="text-2xl font-display font-bold text-[#ff4d4d]">{recommendNo}</div>
+          <div className="text-[10px] font-mono text-[#555] mt-1">Would Not</div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 text-[#555] font-mono text-xs py-6">
+          <div className="spinner" /> Loading…
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="text-center py-12 text-[#555] font-mono text-sm">No feedback submitted yet</div>
+      ) : (
+        <div className="space-y-3">
+          {visible.map((f) => (
+            <div key={f.id} className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4">
+              <div className="flex items-start justify-between gap-3 flex-wrap mb-2">
+                <div>
+                  <div className="font-mono font-bold text-[#e0e0e0] text-sm">
+                    {f.name} <span className="text-[#999]">@{f.github}</span>
+                  </div>
+                  <div className="text-[10px] font-mono text-[#666] mt-0.5">
+                    {f.contest_name} ·{" "}
+                    <span className={f.outcome === "disqualified" ? "text-[#ff4d4d]" : "text-[#00e87a]"}>
+                      {f.outcome === "disqualified" ? "Disqualified" : "Submitted"}
+                    </span>{" "}
+                    · {new Date(f.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {f.rating != null && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg border text-[#f0b429] bg-[#f0b42910] border-[#f0b42920]">
+                      {"★".repeat(f.rating)}{"☆".repeat(5 - f.rating)}
+                    </span>
+                  )}
+                  {f.difficulty && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg border text-[#a78bfa] bg-[#a78bfa10] border-[#a78bfa20] capitalize">
+                      {f.difficulty === "right" ? "Just right" : f.difficulty}
+                    </span>
+                  )}
+                  {f.would_recommend != null && (
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${f.would_recommend ? "text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]" : "text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]"}`}>
+                      {f.would_recommend ? "👍 Recommend" : "👎 Not really"}
+                    </span>
+                  )}
+                </div>
+              </div>
+              {f.comments && (
+                <p className="text-xs font-mono text-[#bbb] mt-2 whitespace-pre-wrap leading-relaxed border-t border-[#141414] pt-2">
+                  {f.comments}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SubscriberAdminSection() {
   const db = getSupabaseClient();
 
@@ -3669,7 +3735,6 @@ function SubscriberAdminSection() {
   const [loading,     setLoading]     = useState(true);
   const [toast,       setToast]       = useState("");
   const [fee,         setFee]         = useState("");
-  const [upi,         setUpi]         = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
   const [modal, setModal] = useState<ModalState>({ type: null, id: "", github: "" });
   const modalResolve = useRef<((v: string | null) => void) | null>(null);
@@ -3703,43 +3768,41 @@ function SubscriberAdminSection() {
     try {
       const [{ data: subs }, { data: configs }] = await Promise.all([
         (db.from("subscribers") as any).select("*").order("created_at", { ascending: false }),
-        (db.from("app_config") as any).select("*").in("key", ["subscription_fee", "subscription_upi"]),
+        (db.from("app_config") as any).select("*").in("key", ["subscription_fee"]),
       ]);
       setSubscribers((subs || []) as Subscriber[]);
       for (const c of configs || []) {
         if (c.key === "subscription_fee") setFee(c.value);
-        if (c.key === "subscription_upi") setUpi(c.value);
       }
     } catch {}
     setLoading(false);
   }
 
-  async function updateStatus(sub: Subscriber, status: "confirmed" | "rejected") {
-    if (status === "rejected") {
-      const reason = await openModal({ type: "reject-reg", id: sub.id, github: sub.github });
-      if (reason === null) return;
-    }
-    await (db.from("subscribers") as any).update({ status }).eq("id", sub.id);
-    showToast(`${status === "confirmed" ? "✓ Confirmed" : "✗ Rejected"} @${sub.github}`);
+  // Subscriptions are confirmed automatically the moment a Razorpay
+  // payment is verified (see /api/razorpay/verify) — there is no
+  // manual approval step anymore. This lets an admin revoke access
+  // in edge cases (refund, chargeback, abuse), which is the only
+  // status change still needed here.
+  async function revokeAccess(sub: Subscriber) {
+    const reason = await openModal({ type: "reject-reg", id: sub.id, github: sub.github });
+    if (reason === null) return;
+    await (db.from("subscribers") as any).update({ status: "rejected" }).eq("id", sub.id);
+    showToast(`Access revoked for @${sub.github}`);
     load();
   }
 
   async function saveConfig() {
-    if (!fee || !upi) return;
+    if (!fee) return;
     setSavingConfig(true);
     try {
-      await Promise.all([
-        (db.from("app_config") as any).upsert({ key: "subscription_fee", value: fee }),
-        (db.from("app_config") as any).upsert({ key: "subscription_upi", value: upi }),
-      ]);
+      await (db.from("app_config") as any).upsert({ key: "subscription_fee", value: fee });
       showToast("✓ Config saved");
     } catch { showToast("Save failed"); }
     setSavingConfig(false);
   }
 
-  const pending   = subscribers.filter(s => s.status === "pending");
   const confirmed = subscribers.filter(s => s.status === "confirmed");
-  const rejected  = subscribers.filter(s => s.status === "rejected");
+  const revoked   = subscribers.filter(s => s.status === "rejected");
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -3753,30 +3816,17 @@ function SubscriberAdminSection() {
       {/* Config editor */}
       <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-5">
         <h3 className="font-mono font-bold text-[#e0e0e0] text-sm mb-4">⚙️ Subscription Settings</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-          <div>
-            <label className="block text-[10px] text-[#666] font-mono uppercase tracking-wider mb-1.5">
-              One-time Fee (₹)
-            </label>
-            <input
-              type="number"
-              value={fee}
-              onChange={e => setFee(e.target.value)}
-              placeholder="e.g. 499"
-              className="w-full bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] text-[#666] font-mono uppercase tracking-wider mb-1.5">
-              UPI ID
-            </label>
-            <input
-              value={upi}
-              onChange={e => setUpi(e.target.value)}
-              placeholder="e.g. yourname@upi"
-              className="w-full bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
-            />
-          </div>
+        <div className="mb-4 max-w-xs">
+          <label className="block text-[10px] text-[#666] font-mono uppercase tracking-wider mb-1.5">
+            One-time Fee (₹)
+          </label>
+          <input
+            type="number"
+            value={fee}
+            onChange={e => setFee(e.target.value)}
+            placeholder="e.g. 499"
+            className="w-full bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+          />
         </div>
         <button
           onClick={saveConfig}
@@ -3788,11 +3838,10 @@ function SubscriberAdminSection() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {[
-          { label: "Pending",   value: pending.length,   color: "text-[#f0b429]" },
-          { label: "Confirmed", value: confirmed.length, color: "text-[#00e87a]" },
-          { label: "Rejected",  value: rejected.length,  color: "text-[#ff4d4d]" },
+          { label: "Active Subscribers", value: confirmed.length, color: "text-[#00e87a]" },
+          { label: "Revoked",            value: revoked.length,   color: "text-[#ff4d4d]" },
         ].map(s => (
           <div key={s.label} className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center">
             <div className={`text-2xl font-display font-bold ${s.color}`}>{s.value}</div>
@@ -3811,11 +3860,11 @@ function SubscriberAdminSection() {
       ) : (
         <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden">
           {/* Header */}
-          <div className="hidden sm:grid grid-cols-[2rem_1fr_1fr_8rem_7rem_8rem] gap-3 px-4 py-2.5
+          <div className="hidden sm:grid grid-cols-[2rem_1fr_1fr_8rem_7rem_6rem] gap-3 px-4 py-2.5
             border-b border-[#161616] text-[10px] text-[#555] font-mono uppercase tracking-widest">
             <div />
             <div>User</div>
-            <div>Txn ID</div>
+            <div>Payment ID</div>
             <div>Status</div>
             <div>Date</div>
             <div className="text-center">Actions</div>
@@ -3824,11 +3873,10 @@ function SubscriberAdminSection() {
           {subscribers.map(sub => {
             const statusColor =
               sub.status === "confirmed" ? "text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]" :
-              sub.status === "rejected"  ? "text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]" :
-                                           "text-[#f0b429] bg-[#f0b42910] border-[#f0b42920]";
+                                           "text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]";
             return (
               <div key={sub.id}
-                className="grid grid-cols-1 sm:grid-cols-[2rem_1fr_1fr_8rem_7rem_8rem] gap-3 items-center
+                className="grid grid-cols-1 sm:grid-cols-[2rem_1fr_1fr_8rem_7rem_6rem] gap-3 items-center
                   px-4 py-3 border-b border-[#141414] last:border-0 hover:bg-[#0d0d0d] transition-colors">
                 <img
                   src={`https://github.com/${sub.github}.png?size=28`}
@@ -3839,31 +3887,22 @@ function SubscriberAdminSection() {
                   <div className="text-xs font-mono font-bold text-[#e0e0e0] truncate">{sub.name}</div>
                   <div className="text-[10px] font-mono text-[#555]">@{sub.github}</div>
                 </div>
-                <div className="text-xs font-mono text-[#777] truncate">{sub.txn_id}</div>
+                <div className="text-xs font-mono text-[#777] truncate">{sub.razorpay_payment_id || sub.txn_id}</div>
                 <div>
                   <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${statusColor}`}>
-                    {sub.status === "confirmed" ? "✓ Confirmed" :
-                     sub.status === "rejected"  ? "✗ Rejected"  : "⏳ Pending"}
+                    {sub.status === "confirmed" ? "✓ Active" : "✗ Revoked"}
                   </span>
                 </div>
                 <div className="text-[10px] font-mono text-[#555]">
                   {new Date(sub.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
                 </div>
                 <div className="flex items-center gap-2 justify-center">
-                  {sub.status !== "confirmed" && (
+                  {sub.status === "confirmed" && (
                     <button
-                      onClick={() => updateStatus(sub, "confirmed")}
-                      className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a10] border border-[#00e87a20] px-2 py-1 rounded-lg hover:bg-[#00e87a18] transition-all"
-                    >
-                      Confirm
-                    </button>
-                  )}
-                  {sub.status !== "rejected" && (
-                    <button
-                      onClick={() => updateStatus(sub, "rejected")}
+                      onClick={() => revokeAccess(sub)}
                       className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d10] border border-[#ff4d4d20] px-2 py-1 rounded-lg hover:bg-[#ff4d4d18] transition-all"
                     >
-                      Reject
+                      Revoke
                     </button>
                   )}
                 </div>

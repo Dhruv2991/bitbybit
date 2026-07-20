@@ -420,24 +420,22 @@ export default function LeaderboardPage() {
         </div>
         <ShareLBButton />
 
-        {/* Tab switcher */}
-        <div className="flex flex-wrap gap-1 bg-[#0d0d0d] border border-[#1f1f1f] rounded-xl p-1 w-fit">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-150
-                ${
-                  tab === t.id
-                    ? t.id === "challenge"
-                      ? "bg-[#f0b42912] text-[#f0b429] font-bold border border-[#f0b42920]"
-                      : "bg-[#00e87a10] text-[#00e87a] font-bold border border-[#00e87a20]"
-                    : "text-[#666] hover:text-[#e0e0e0] hover:bg-[#ffffff06] border border-transparent"
-                }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        {/* Range filter */}
+        <div className="relative w-fit">
+          <select
+            value={tab}
+            onChange={(e) => setTab(e.target.value as Tab)}
+            className="appearance-none bg-[#0d0d0d] border border-[#1f1f1f] rounded-xl pl-3 pr-8 py-2
+              text-xs font-mono font-medium text-[#e0e0e0] hover:border-[#2a2a2a] focus:outline-none
+              focus:border-[#00e87a40] cursor-pointer transition-all duration-150"
+          >
+            {tabs.map((t) => (
+              <option key={t.id} value={t.id}>{t.label}</option>
+            ))}
+          </select>
+          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[#666] text-[10px]">
+            ▾
+          </span>
         </div>
       </div>
 

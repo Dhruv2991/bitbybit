@@ -726,8 +726,8 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                           reg.status === 'pending'   ? 'bg-[rgba(var(--warn-rgb),0.071)] text-[var(--warn)] border border-[rgba(var(--warn-rgb),0.125)]' :
                                                        'bg-[rgba(var(--danger-rgb),0.071)] text-[var(--danger)] border border-[rgba(var(--danger-rgb),0.125)]'}`}>
                         {reg.status === 'confirmed' ? '✓ Registered & confirmed' :
-                         reg.status === 'pending'   ? '⏳ Payment under review'  :
-                                                      '✗ Rejected — please re-apply'}
+                         reg.status === 'pending'   ? '⏳ Registration pending'  :
+                                                      '✗ Registration rejected — please re-apply'}
                       </div>
                       {/* Countdown for confirmed upcoming */}
                       {reg.status === 'confirmed' && ct.status === 'upcoming' && countdowns[ct.id] > 0 && (

@@ -18,8 +18,7 @@ import { createClient } from '@supabase/supabase-js';
 import Razorpay from 'razorpay';
 
 interface Body {
-  purpose:     'subscription' | 'contest';
-  contestId?:  string;
+  purpose: 'subscription';
 }
 
 async function getVerifiedUser(req: NextRequest) {
@@ -54,9 +53,9 @@ export async function POST(req: NextRequest) {
     const { github, name } = authUser;
 
     const body: Body = await req.json();
-    const { purpose, contestId } = body;
+    const { purpose } = body;
 
-    if (purpose !== 'subscription' && purpose !== 'contest') {
+    if (purpose !== 'subscription') {
       return NextResponse.json({ error: 'Invalid purpose' }, { status: 400 });
     }
 
@@ -66,58 +65,28 @@ export async function POST(req: NextRequest) {
     );
 
     let amountInr: number;
-    let notes: Record<string, string> = { type: purpose, github, name };
+    const notes: Record<string, string> = { type: purpose, github, name };
 
-    if (purpose === 'subscription') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: existing } = await (db.from('subscribers') as any)
-        .select('id, status')
-        .eq('github', github)
-        .maybeSingle();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existing } = await (db.from('subscribers') as any)
+      .select('id, status')
+      .eq('github', github)
+      .maybeSingle();
 
-      if (existing?.status === 'confirmed') {
-        return NextResponse.json({ error: 'You already have an active subscription' }, { status: 400 });
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: config } = await (db.from('app_config') as any)
-        .select('*')
-        .eq('key', 'subscription_fee')
-        .maybeSingle();
-
-      if (!config?.value) {
-        return NextResponse.json({ error: 'Subscription fee not configured' }, { status: 500 });
-      }
-      amountInr = Number(config.value);
-    } else {
-      if (!contestId) {
-        return NextResponse.json({ error: 'Missing contestId' }, { status: 400 });
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: contest } = await (db.from('contests') as any)
-        .select('*')
-        .eq('id', contestId)
-        .maybeSingle();
-
-      if (!contest) {
-        return NextResponse.json({ error: 'Contest not found' }, { status: 404 });
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: existingReg } = await (db.from('contest_registrations') as any)
-        .select('id, status')
-        .eq('contest_id', contestId)
-        .eq('github', github)
-        .maybeSingle();
-
-      if (existingReg?.status === 'confirmed') {
-        return NextResponse.json({ error: 'You are already registered for this contest' }, { status: 400 });
-      }
-
-      amountInr = Number(contest.entry_fee);
-      notes = { ...notes, contestId, contestName: contest.name };
+    if (existing?.status === 'confirmed') {
+      return NextResponse.json({ error: 'You already have an active subscription' }, { status: 400 });
     }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: config } = await (db.from('app_config') as any)
+      .select('*')
+      .eq('key', 'subscription_fee')
+      .maybeSingle();
+
+    if (!config?.value) {
+      return NextResponse.json({ error: 'Subscription fee not configured' }, { status: 500 });
+    }
+    amountInr = Number(config.value);
 
     if (!amountInr || amountInr <= 0) {
       return NextResponse.json({ error: 'Invalid amount configured' }, { status: 500 });

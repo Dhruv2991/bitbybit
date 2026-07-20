@@ -5,7 +5,7 @@
 // Points = base_points × time_bonus (earlier = more pts).
 // ════════════════════════════════════════════════════════════
 import { payWithRazorpay } from "@/lib/razorpay";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { Problem, User } from "@/types/database";
@@ -20,82 +20,6 @@ type WeeklySubmission = WeeklySubmissionBase & { status?: string };
 const Workspace = dynamic(() => import("@/app/problems/Workspace"), {
   ssr: false,
 });
-
-// ── QR / Payment helpers (reused from PaymentButton) ────────
-declare global {
-  interface Window {
-    _wqrLoaded?: boolean;
-    _wqrCbs?: Array<() => void>;
-  }
-}
-function loadQrScript(cb: () => void) {
-  if (typeof window === "undefined") return;
-  if (window._wqrLoaded) {
-    cb();
-    return;
-  }
-  if (!window._wqrCbs) window._wqrCbs = [];
-  window._wqrCbs.push(cb);
-  if (document.getElementById("wqr-script")) return;
-  const s = document.createElement("script");
-  s.id = "wqr-script";
-  s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
-  s.onload = () => {
-    window._wqrLoaded = true;
-    window._wqrCbs?.forEach((fn) => fn());
-    window._wqrCbs = [];
-  };
-  document.head.appendChild(s);
-}
-
-function UpiQr({ upiUrl, size = 180 }: { upiUrl: string; size?: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [ok, setOk] = useState(false);
-  const [err, setErr] = useState(false);
-  useEffect(() => {
-    if (!upiUrl) return;
-    loadQrScript(() => {
-      const el = ref.current;
-      if (!el) return;
-      el.innerHTML = "";
-      try {
-        const QRCode = (window as any).QRCode;
-        new QRCode(el, {
-          text: upiUrl,
-          width: size,
-          height: size,
-          colorDark: "#000",
-          colorLight: "#fff",
-        });
-        setOk(true);
-      } catch {
-        setErr(true);
-      }
-    });
-  }, [upiUrl, size]);
-  if (err)
-    return (
-      <div
-        style={{ width: size, height: size }}
-        className="flex items-center justify-center bg-white rounded-lg text-[10px] text-gray-400 font-mono p-2 text-center"
-      >
-        QR unavailable
-      </div>
-    );
-  return (
-    <div className="relative" style={{ width: size, height: size }}>
-      {!ok && (
-        <div
-          style={{ width: size, height: size }}
-          className="absolute inset-0 bg-white rounded-lg flex items-center justify-center"
-        >
-          <div className="w-5 h-5 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-      <div ref={ref} className={ok ? "" : "opacity-0"} />
-    </div>
-  );
-}
 
 // ── Time bonus: 100% at week-start, 20% at week-end ─────────
 function computeBonus(startsAt: string, endsAt: string): number {
@@ -123,222 +47,6 @@ function timeLeft(endsAt: string) {
   if (d > 0) return `${d}d ${h}h left`;
   if (h > 0) return `${h}h ${m}m left`;
   return `${m}m left`;
-}
-
-// ── Payment modal ────────────────────────────────────────────
-function PayModal({
-  challenge,
-  user,
-  onSuccess,
-  onClose,
-}: {
-  challenge: WeeklyChallenge;
-  user: User;
-  onSuccess: () => void;
-  onClose: () => void;
-}) {
-  const [step, setStep] = useState<"qr" | "txn" | "done">("qr");
-  const [txnId, setTxnId] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-  const [copied, setCopied] = useState(false);
-
-  const upiUrl = `upi://pay?${new URLSearchParams({
-    pa: challenge.upi_id,
-    pn: "BitByBit",
-    am: String(challenge.entry_fee),
-    cu: "INR",
-    tn: `Weekly: ${challenge.title}`,
-  })}`;
-
-  async function submit() {
-    const tid = txnId.trim();
-    if (tid.length < 6) {
-      setErr("Transaction ID seems too short");
-      return;
-    }
-    setLoading(true);
-    setErr("");
-    try {
-      const res = await fetch("/api/submit-weekly-payment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          weeklyChallengeId: challenge.id,
-          weeklyChallengeTitle: challenge.title,
-          github: user.github,
-          name: user.name,
-          txnId: tid,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      setStep("done");
-      onSuccess();
-    } catch (e: any) {
-      setErr(e.message || "Submission failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl p-5 relative">
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-[#999] hover:text-[#e0e0e0] font-mono text-lg"
-        >
-          ×
-        </button>
-
-        {step === "qr" && (
-          <>
-            <h3 className="font-mono font-bold text-[#e0e0e0] mb-1">
-              Unlock Weekly Challenge
-            </h3>
-            <p className="text-xs text-[#aaa] font-mono mb-4">
-              {challenge.title}
-            </p>
-            <div className="text-center mb-3">
-              <span className="font-mono font-bold text-2xl text-[#00e87a]">
-                ₹{challenge.entry_fee}
-              </span>
-              <span className="text-[#999] font-mono text-xs ml-2">
-                one-time, valid all week
-              </span>
-            </div>
-            <div className="flex justify-center mb-3 bg-white p-3 rounded-xl">
-              <UpiQr upiUrl={upiUrl} size={180} />
-            </div>
-
-            {/* UPI ID copy */}
-            <div className="bg-[#1a1a1a] rounded-lg px-3 py-2 flex items-center justify-between gap-2 mb-3">
-              <span className="text-xs font-mono text-[#ccc] truncate">
-                {challenge.upi_id}
-              </span>
-              <button
-                onClick={() => {
-                  navigator.clipboard?.writeText(challenge.upi_id).then(() => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  });
-                }}
-                className="text-[10px] font-mono text-[#00e87a] shrink-0"
-              >
-                {copied ? "✓ Copied" : "Copy UPI ID"}
-              </button>
-            </div>
-
-            {/* UPI app shortcuts — amount removed to avoid security rejection */}
-            <div className="mb-3">
-              <p className="text-[10px] text-[#999] font-mono mb-2 text-center">
-                Pay via
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  {
-                    name: "GPay",
-                    url: `gpay://upi/pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
-                  },
-                  {
-                    name: "PhonePe",
-                    url: `phonepe://pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
-                  },
-                  {
-                    name: "Paytm",
-                    url: `paytmmp://pay?${new URLSearchParams({ pa: challenge.upi_id, pn: "BitByBit", cu: "INR", tn: `Weekly: ${challenge.title}` })}`,
-                  },
-                ].map((app) => (
-                  <a
-                    key={app.name}
-                    href={app.url}
-                    className="flex items-center justify-center py-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg text-xs font-mono text-[#ccc] hover:text-[#e0e0e0] hover:border-[#3a3a3a] transition-all"
-                  >
-                    {app.name}
-                  </a>
-                ))}
-              </div>
-              <p className="text-[10px] text-[#888] font-mono mt-2 text-center">
-                Enter <span className="text-[#00e87a] font-bold">₹{challenge.entry_fee}</span> as the amount · or scan the QR above
-              </p>
-            </div>
-
-            <button
-              onClick={() => setStep("txn")}
-              className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-lg hover:bg-[#00ff88] transition-all"
-            >
-              I've Paid → Enter Txn ID
-            </button>
-          </>
-        )}
-
-        {step === "txn" && (
-          <>
-            <h3 className="font-mono font-bold text-[#e0e0e0] mb-1">
-              Enter Transaction ID
-            </h3>
-            <p className="text-[10px] text-[#999] font-mono mb-3">
-              Find it in your UPI app under payment history.
-            </p>
-            {err && (
-              <p className="text-xs text-[#ff4d4d] font-mono mb-2">{err}</p>
-            )}
-            <input
-              value={txnId}
-              onChange={(e) => setTxnId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder="e.g. 426112345678"
-              className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40] mb-3"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => setStep("qr")}
-                className="flex-1 py-2 bg-[#1a1a1a] text-[#bbb] font-mono text-sm rounded-lg hover:text-[#e0e0e0]"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={submit}
-                disabled={loading || !txnId.trim()}
-                className={`flex-1 py-2 font-mono font-bold text-sm rounded-lg transition-all ${loading || !txnId.trim() ? "bg-[#00e87a40] text-[#00e87a60] cursor-not-allowed" : "bg-[#00e87a] text-black hover:bg-[#00ff88]"}`}
-              >
-                {loading ? "Submitting…" : "Submit →"}
-              </button>
-            </div>
-          </>
-        )}
-
-        {step === "done" && (
-          <div className="text-center py-4">
-            <div className="text-3xl mb-3">⏳</div>
-            <p className="text-sm font-mono text-[#f0b429] font-bold mb-1">
-              Payment Submitted
-            </p>
-            <p className="text-xs font-mono text-[#aaa]">
-              Admin will verify and grant access shortly.
-            </p>
-            {challenge.whatsapp_link && (
-              <a
-                href={challenge.whatsapp_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 flex items-center justify-center gap-2 w-full py-2.5 bg-[#25D366] text-white font-mono font-bold text-sm rounded-lg hover:bg-[#22c55e] transition-all"
-              >
-                <span>💬</span> Join WhatsApp Group
-              </a>
-            )}
-            <button
-              onClick={onClose}
-              className="mt-3 px-6 py-2 bg-[#1a1a1a] text-[#ccc] font-mono text-sm rounded-lg hover:text-[#e0e0e0]"
-            >
-              Close
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 // ── Weekly Leaderboard ───────────────────────────────────────
@@ -499,12 +207,8 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
   const [summaries,       setSummaries]       = useState<Record<string, any>>({});
   const [loadingSummary,  setLoadingSummary]  = useState<string | null>(null);
   const [fee,            setFee]            = useState<number | null>(null);
-  const [upiId,          setUpiId]          = useState('');
-  const [txnId,          setTxnId]          = useState('');
   const [submitting,     setSubmitting]     = useState(false);
-  const [submitted,      setSubmitted]      = useState(false);
   const [payErr,         setPayErr]         = useState('');
-  const [copied,         setCopied]         = useState(false);
 
   const db = getSupabaseClient();
 
@@ -517,7 +221,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
     try {
       const [{ data: ch }, { data: configs }] = await Promise.all([
         (db.from("weekly_challenges") as any).select("*").order("created_at", { ascending: false }),
-        (db.from("app_config") as any).select("*").in("key", ["subscription_fee", "subscription_upi"]),
+        (db.from("app_config") as any).select("*").in("key", ["subscription_fee"]),
       ]);
 
       const list = (ch || []) as WeeklyChallenge[];
@@ -525,7 +229,6 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
 
       for (const c of configs || []) {
         if (c.key === "subscription_fee") setFee(Number(c.value));
-        if (c.key === "subscription_upi") setUpiId(c.value);
       }
 
       // Load all problems referenced
@@ -743,7 +446,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
       {/* ── Non-subscriber paywall ───────────────────────────────── */}
       {!isSubscribed && (
         <div className="mb-6">
-          {subStatus === 'pending' || submitted ? (
+          {subStatus === 'pending' ? (
             /* Pending state */
             <div className="bg-[#0a0a0a] border border-[#f0b42925] rounded-2xl p-6 text-center">
               <div className="text-4xl mb-3">⏳</div>
@@ -794,7 +497,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3 text-[10px] font-mono">
-                  {['All current & future weekly problems', 'Time bonus scoring', 'Weekly leaderboard','AI features'].map(f => (
+                  {['All weekly problems', 'Weekly leaderboard','AI features','Proctored Contests'].map(f => (
                     <span key={f} className="flex items-center gap-1 text-[#bbb]">
                       <span className="text-[#00e87a]">✓</span>{f}
                     </span>
@@ -912,7 +615,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                         ⚡ Current bonus: {fmtBonus(bonus)}
                       </span>
                     )}
-                    <span>💰 ₹{ch.entry_fee} entry</span>
+                    <span>🔓 Free with subscription</span>
                   </div>
                 </div>
 

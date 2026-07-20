@@ -97,6 +97,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'You are already registered for this contest' }, { status: 400 });
     }
 
+    // Cap contest capacity at 70 confirmed registrations.
+    const CONTEST_CAPACITY = 70;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { count: confirmedCount } = await (db.from('contest_registrations') as any)
+      .select('id', { count: 'exact', head: true })
+      .eq('contest_id', contestId)
+      .eq('status', 'confirmed');
+
+    if ((confirmedCount ?? 0) >= CONTEST_CAPACITY) {
+      return NextResponse.json(
+        { error: `This contest is full (${CONTEST_CAPACITY}/${CONTEST_CAPACITY} seats taken).` },
+        { status: 400 },
+      );
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (db.from('contest_registrations') as any).upsert(
       {

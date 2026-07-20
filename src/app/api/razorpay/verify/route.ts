@@ -24,9 +24,7 @@ interface Body {
   razorpay_order_id:   string;
   razorpay_payment_id: string;
   razorpay_signature:  string;
-  purpose:             'subscription' | 'contest';
-  contestId?:          string;
-  contestName?:        string;
+  purpose:             'subscription';
 }
 
 async function getVerifiedUser(req: NextRequest) {
@@ -66,8 +64,6 @@ export async function POST(req: NextRequest) {
       razorpay_payment_id,
       razorpay_signature,
       purpose,
-      contestId,
-      contestName,
     } = body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !purpose) {
@@ -115,47 +111,26 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
-    if (purpose === 'subscription') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (db.from('subscribers') as any).upsert(
-        {
-          github, name,
-          txn_id:              razorpay_payment_id,
-          razorpay_order_id,
-          razorpay_payment_id,
-          status:              'confirmed',
-        },
-        { onConflict: 'github' },
-      );
-      if (error) {
-        // Unique constraint on razorpay_payment_id will reject a
-        // replayed payment_id being attached to a second account.
-        console.error('[razorpay/verify] subscribers upsert error:', error);
-        return NextResponse.json({ error: 'This payment has already been used, or the write failed' }, { status: 409 });
-      }
-    } else if (purpose === 'contest') {
-      if (!contestId) {
-        return NextResponse.json({ error: 'Missing contestId' }, { status: 400 });
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (db.from('contest_registrations') as any).upsert(
-        {
-          contest_id:   contestId,
-          contest_name: contestName || (payment.notes?.contestName as string) || '',
-          github, name,
-          txn_id:              razorpay_payment_id,
-          razorpay_order_id,
-          razorpay_payment_id,
-          status:              'confirmed',
-        },
-        { onConflict: 'contest_id,github' },
-      );
-      if (error) {
-        console.error('[razorpay/verify] contest_registrations upsert error:', error);
-        return NextResponse.json({ error: 'This payment has already been used, or the write failed' }, { status: 409 });
-      }
-    } else {
+    if (purpose !== 'subscription') {
       return NextResponse.json({ error: 'Invalid purpose' }, { status: 400 });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (db.from('subscribers') as any).upsert(
+      {
+        github, name,
+        txn_id:              razorpay_payment_id,
+        razorpay_order_id,
+        razorpay_payment_id,
+        status:              'confirmed',
+      },
+      { onConflict: 'github' },
+    );
+    if (error) {
+      // Unique constraint on razorpay_payment_id will reject a
+      // replayed payment_id being attached to a second account.
+      console.error('[razorpay/verify] subscribers upsert error:', error);
+      return NextResponse.json({ error: 'This payment has already been used, or the write failed' }, { status: 409 });
     }
 
     return NextResponse.json({ success: true, paymentId: razorpay_payment_id });

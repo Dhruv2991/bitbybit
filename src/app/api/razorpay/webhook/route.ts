@@ -74,20 +74,6 @@ export async function POST(req: NextRequest) {
         { onConflict: 'github' },
       );
       if (error) console.error('[razorpay/webhook] subscribers upsert error:', error);
-    } else if (notes.type === 'contest' && notes.github && notes.contestId) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (db.from('contest_registrations') as any).upsert(
-        {
-          contest_id: notes.contestId,
-          contest_name: notes.contestName || '',
-          github: notes.github,
-          name: notes.name || notes.github,
-          txn_id: paymentId,
-          status: 'confirmed',
-        },
-        { onConflict: 'contest_id,github' },
-      );
-      if (error) console.error('[razorpay/webhook] contest_registrations upsert error:', error);
     } else {
       // No usable notes — this payment might have already been
       // confirmed by the client-side /verify call, or notes weren't

@@ -544,6 +544,26 @@ export interface Subscriber {
 }
 
 // ════════════════════════════════════════════════════════════
+// Contest Feedback (post-contest survey, submitted by users)
+// ════════════════════════════════════════════════════════════
+
+export type ContestFeedbackOutcome = 'submitted' | 'disqualified';
+
+export interface ContestFeedback {
+  id:              string;
+  contest_id:      string;
+  contest_name:    string;
+  github:          string;
+  name:            string;
+  outcome:         ContestFeedbackOutcome;
+  rating:          number | null;
+  difficulty:      'easy' | 'right' | 'hard' | null;
+  would_recommend: boolean | null;
+  comments:        string | null;
+  created_at:      string;
+}
+
+// ════════════════════════════════════════════════════════════
 // App Config (admin-adjustable key-value settings)
 // ════════════════════════════════════════════════════════════
 
