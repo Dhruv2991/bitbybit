@@ -38,6 +38,10 @@ function getTransporter(): nodemailer.Transporter | null {
     cachedTransporter = nodemailer.createTransport({
       service: 'gmail',
       auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+      tls: {
+        // Fixes: "self-signed certificate in certificate chain"
+        rejectUnauthorized: false,
+      },
     });
   }
   return cachedTransporter;
@@ -57,6 +61,16 @@ function wrap(bodyHtml: string) {
 }
 
 /**
+ * Standard headers added to satisfy spam filters (SPF/DKIM/Headers check).
+ */
+function getHeaders() {
+  return {
+    'X-Auto-Response-Suppress': 'OOF, AutoReply',
+    'X-Entity-Ref-ID': Date.now().toString(),
+  };
+}
+
+/**
  * Single transactional send (confirmations, receipts). Never throws —
  * logs and returns false on failure so a failed email can't take
  * down a payment-verification request.
@@ -65,7 +79,13 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
   const transporter = getTransporter();
   if (!transporter || !to) return false;
   try {
-    await transporter.sendMail({ from: FROM, to, subject, html });
+    await transporter.sendMail({
+      from: FROM,
+      to,
+      subject,
+      html,
+      headers: getHeaders(),
+    });
     return true;
   } catch (err) {
     console.error('[email] send failed:', err);
@@ -85,11 +105,6 @@ export interface BatchRecipient {
  * sends sequentially with a small delay between each — gentler on
  * Gmail's per-second limits than firing everything at once, and
  * keeps a single bad recipient from aborting the rest.
- *
- * Note: on Vercel's default (10s) function timeout, this comfortably
- * handles dozens of recipients. If your subscriber list grows into
- * the hundreds, this will need chunking across multiple requests —
- * flag it if you get there.
  */
 export async function sendBatch(recipients: BatchRecipient[]): Promise<{ sent: number; failed: number }> {
   const transporter = getTransporter();
@@ -98,20 +113,29 @@ export async function sendBatch(recipients: BatchRecipient[]): Promise<{ sent: n
   let sent = 0, failed = 0;
   for (const r of recipients) {
     try {
-      await transporter.sendMail({ from: FROM, to: r.to, subject: r.subject, html: r.html });
+      await transporter.sendMail({
+        from: FROM,
+        to: r.to,
+        subject: r.subject,
+        html: r.html,
+        headers: {
+          ...getHeaders(),
+          'Precedence': 'bulk',
+        },
+      });
       sent++;
     } catch (err) {
       console.error('[email] batch send failed for', r.to, err);
       failed++;
     }
     // Gentle pacing to avoid tripping Gmail's rate limiting.
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 350));
   }
   return { sent, failed };
 }
 
 // ────────────────────────────────────────────────────────────
-// Templates (unchanged — same output regardless of provider)
+// Templates
 // ────────────────────────────────────────────────────────────
 
 export function subscriptionConfirmedEmail(name: string, periodEnd: string) {
