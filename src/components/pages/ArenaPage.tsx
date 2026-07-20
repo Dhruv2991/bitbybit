@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import dynamic                          from 'next/dynamic';
 import { getSupabaseClient }            from '@/lib/supabase';
 import ContestEntryButton               from '@/components/arena/ContestEntryButton';
+import { isActiveSubscription } from '@/lib/subscription';
 import type { Contest, ContestRegistration, Problem, User } from '@/types/database';
 
 const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false });
@@ -106,13 +107,16 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
           : Promise.resolve({ data: [] }),
         user
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ? (db.from('subscribers') as any).select('status').eq('github', user.github).maybeSingle()
+          ? (db.from('subscribers') as any).select('status, current_period_end').eq('github', user.github).maybeSingle()
           : Promise.resolve({ data: null }),
       ]);
       const contestList = (c || []) as Contest[];
       setContests(contestList);
       setUserRegs((r as ContestRegistration[]) || []);
-      setIsSubscriber((sub as { status?: string } | null)?.status === 'confirmed');
+      setIsSubscriber(isActiveSubscription(
+        (sub as { status?: string; current_period_end?: string } | null)?.status,
+        (sub as { status?: string; current_period_end?: string } | null)?.current_period_end,
+      ));
 
       const outcomes = new Map<string, ContestOutcome>();
       for (const row of (arenaSubs || []) as { contest_id: string; status: string }[]) {

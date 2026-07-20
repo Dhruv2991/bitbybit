@@ -30,9 +30,10 @@ export default function RefundPolicyPage({ onNavigate }: Props) {
       <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-6 mb-5 space-y-5 text-[#888] font-mono text-xs leading-relaxed">
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">1. Lifetime subscription</h2>
-          <p>The one-time lifetime subscription grants immediate, permanent access to weekly challenges, AI features, and free entry to every proctored Arena contest, upon successful payment. Because access is granted instantly and is not time-limited or consumable, subscription payments are <span className="text-[#e0e0e0] font-bold">non-refundable</span> once access has been granted, except as required by applicable law.</p>
+          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">1. Monthly subscription</h2>
+          <p>The subscription is a <span className="text-[#e0e0e0] font-bold">₹39/month manually-renewed pass</span> — there is no auto-debit or recurring mandate. Each payment grants immediate access to weekly challenges, AI features, and free entry to every proctored Arena contest for 30 days. Because access is granted instantly for the full period upon payment, subscription payments are <span className="text-[#e0e0e0] font-bold">non-refundable</span> once access has been granted for that period, except as required by applicable law.</p>
           <p className="mt-2">If you believe you were charged in error (e.g. a duplicate charge, or a technical failure where payment succeeded but access was not granted), contact us within 7 days of the transaction and we will investigate and issue a refund if a genuine error is confirmed.</p>
+          <p className="mt-2">There is nothing to "cancel" — since we never charge you automatically, simply not making another payment when your 30 days end is all that's needed to stop. You may renew early at any time, in which case the new 30 days are added on top of whatever time you have remaining, so you never lose paid-for access.</p>
         </section>
 
         <section>
@@ -63,7 +64,7 @@ export default function RefundPolicyPage({ onNavigate }: Props) {
 
         <section>
           <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">6. Prizes are separate from platform payments</h2>
-          <p>This policy governs refunds of the lifetime subscription payment only, since that is the only payment collected by the platform. Any contest prize is arranged and given separately, directly by the organizer, outside of payment gateway and this platform — see our Terms &amp; Conditions for details.</p>
+          <p>This policy governs refunds of the monthly subscription payment only, since that is the only payment collected by the platform. Any contest prize is arranged and given separately, directly by the organizer, outside of payment gateway and this platform — see our Terms &amp; Conditions for details.</p>
         </section>
       </div>
 

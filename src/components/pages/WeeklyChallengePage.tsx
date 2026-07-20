@@ -5,6 +5,7 @@
 // Points = base_points × time_bonus (earlier = more pts).
 // ════════════════════════════════════════════════════════════
 import { payWithRazorpay } from "@/lib/razorpay";
+import { isActiveSubscription } from "@/lib/subscription";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -198,6 +199,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
   const [challenges,     setChallenges]     = useState<WeeklyChallenge[]>([]);
   const [isSubscribed,   setIsSubscribed]   = useState(false);
   const [subStatus,      setSubStatus]      = useState<'none' | 'pending' | 'confirmed' | 'rejected'>('none');
+  const [periodEnd,      setPeriodEnd]      = useState<string | null>(null);
   const [problems,       setProblems]       = useState<Record<string, Problem>>({});
   const [mySubmissions,  setMySubmissions]  = useState<WeeklySubmission[]>([]);
   const [loading,        setLoading]        = useState(true);
@@ -247,13 +249,14 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
       // Check subscription status
       if (user?.github) {
         const { data: sub } = await (db.from("subscribers") as any)
-          .select("status")
+          .select("status, current_period_end")
           .eq("github", user.github)
           .maybeSingle();
 
         const status = sub?.status ?? "none";
         setSubStatus(status);
-        setIsSubscribed(status === "confirmed");
+        setPeriodEnd(sub?.current_period_end ?? null);
+        setIsSubscribed(isActiveSubscription(sub?.status, sub?.current_period_end));
 
         // Load user's weekly submissions
         const { data: subs } = await (db.from("weekly_submissions") as any)
@@ -309,11 +312,12 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
     payWithRazorpay({
       purpose: "subscription",
       name: "BitByBit",
-      description: "Lifetime Subscription",
+      description: "Monthly Access — 30 days",
       prefillName: user.name,
-      onSuccess: (paymentId) => {
+      onSuccess: (paymentId, currentPeriodEnd) => {
         setSubStatus("confirmed");
         setIsSubscribed(true);
+        if (currentPeriodEnd) setPeriodEnd(currentPeriodEnd);
         setSubmitting(false);
       },
       onFailure: (msg) => {
@@ -443,61 +447,57 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
         </div>
       </div>
 
-      {/* ── Non-subscriber paywall ───────────────────────────────── */}
+      {/* ── Non-subscriber / expired paywall ───────────────────────────────── */}
       {!isSubscribed && (
         <div className="mb-6">
-          {subStatus === 'pending' ? (
-            /* Pending state */
+          {subStatus === 'confirmed' && periodEnd ? (
+            /* Subscribed before, but this month's period has lapsed */
             <div className="bg-[#0a0a0a] border border-[#f0b42925] rounded-2xl p-6 text-center">
               <div className="text-4xl mb-3">⏳</div>
-              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Payment under review</h2>
-              <p className="text-[#777] font-mono text-sm">
-                Your transaction has been received. Admin will confirm shortly — weekly problems will unlock automatically.
+              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Your access expired</h2>
+              <p className="text-[#777] font-mono text-sm mb-4">
+                Your monthly access ended on {new Date(periodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. Renew for ₹{fee ?? "—"} to keep going.
               </p>
-            </div>
-          ) : subStatus === 'rejected' ? (
-            /* Rejected — allow retry */
-            <div className="bg-[#0a0a0a] border border-[#ff4d4d25] rounded-2xl p-6 text-center">
-              <div className="text-4xl mb-3">❌</div>
-              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Payment rejected</h2>
-              <p className="text-[#777] font-mono text-sm mb-4">Your previous transaction was rejected. Please make a new payment.</p>
-              <button
-                onClick={async () => {
-                  await (db.from("subscribers") as any).delete().eq("github", user?.github);
-                  setSubStatus("none");
-                }}
-                className="px-5 py-2.5 bg-[#f0b429] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#fbbf24] transition-all"
-              >
-                Try Again →
-              </button>
+              {payErr && <p className="text-[10px] text-[#ff4d4d] font-mono mb-3">{payErr}</p>}
+              {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' ? (
+                <button
+                  onClick={submitPayment}
+                  disabled={submitting || fee === null}
+                  className="px-5 py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] disabled:opacity-40 transition-all"
+                >
+                  {submitting ? 'Processing…' : `Renew — ₹${fee ?? '—'} →`}
+                </button>
+              ) : (
+                <p className="text-[10px] text-[#555] font-mono">Renewals are temporarily unavailable. Check back shortly.</p>
+              )}
             </div>
           ) : !user ? (
             /* Not signed in */
             <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-6 text-center">
               <div className="text-4xl mb-3">🔒</div>
               <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Sign in to subscribe</h2>
-              <p className="text-[#777] font-mono text-sm">Sign in with GitHub to get lifetime access to all weekly challenges.</p>
+              <p className="text-[#777] font-mono text-sm">Sign in with GitHub to get monthly access to all weekly challenges.</p>
             </div>
           ) : (
-            /* Main paywall */
+            /* Main paywall — first-time subscribe */
             <div className="bg-[#0a0a0a] border border-[#00e87a20] rounded-2xl overflow-hidden">
               {/* Hero */}
               <div className="px-5 py-5 border-b border-[#161616]">
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-3xl">⭐</span>
                   <div>
-                    <h2 className="font-display font-bold text-lg text-[#e0e0e0]">Lifetime Subscription</h2>
-                    <p className="text-[10px] font-mono text-[#555]">One-time payment · Unlock all weekly challenges forever</p>
+                    <h2 className="font-display font-bold text-lg text-[#e0e0e0]">Monthly Access</h2>
+                    <p className="text-[10px] font-mono text-[#555]">Unlock all weekly challenges, Arena contests & AI features</p>
                   </div>
                   <div className="ml-auto text-right">
                     <div className="text-2xl font-display font-bold text-[#00e87a]">
                       {fee !== null ? `₹${fee}` : '—'}
                     </div>
-                    <div className="text-[9px] font-mono text-[#555]">one-time</div>
+                    <div className="text-[9px] font-mono text-[#555]">/ month</div>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3 text-[10px] font-mono">
-                  {['All weekly problems', 'Weekly leaderboard','AI features','Proctored Contests'].map(f => (
+                  {['All current & future weekly problems', 'Free Arena contest entry', 'Time bonus scoring', 'Weekly leaderboard', 'AI features'].map(f => (
                     <span key={f} className="flex items-center gap-1 text-[#bbb]">
                       <span className="text-[#00e87a]">✓</span>{f}
                     </span>
@@ -516,10 +516,10 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                       className="w-full py-3 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
                         hover:bg-[#00ff88] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                     >
-                      {submitting ? 'Processing…' : `Pay ₹${fee ?? '—'} →`}
+                      {submitting ? 'Processing…' : `Pay ₹${fee ?? '—'} for 30 days →`}
                     </button>
                     <p className="text-[10px] text-[#444] font-mono text-center mt-3">
-                      Secured by Razorpay · Access unlocks instantly
+                      Secured by Razorpay · Access unlocks instantly · Renews manually every month, no auto-debit
                     </p>
                   </>
                 ) : (
@@ -534,6 +534,24 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                 )}
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Active subscriber — show renewal date */}
+      {isSubscribed && periodEnd && (
+        <div className="mb-6 bg-[#00e87a08] border border-[#00e87a20] rounded-2xl px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+          <span className="text-xs font-mono text-[#bbb]">
+            ✓ Active — access until {new Date(periodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+          </span>
+          {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' && (
+            <button
+              onClick={submitPayment}
+              disabled={submitting || fee === null}
+              className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a10] border border-[#00e87a20] px-3 py-1.5 rounded-lg hover:bg-[#00e87a18] disabled:opacity-40 transition-all"
+            >
+              {submitting ? 'Processing…' : `Renew early — ₹${fee ?? '—'}`}
+            </button>
           )}
         </div>
       )}
@@ -749,14 +767,22 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                         )}
                       </div>
                     </div>
-                  ) : subStatus === "pending" ? (
-                    <div className="flex items-center gap-2 text-xs font-mono text-[#f0b429]">
-                      ⏳ Subscription payment under review — hang tight!
+                  ) : subStatus === "confirmed" ? (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <p className="text-xs font-mono text-[#f0b429] flex-1">
+                        ⏳ Your monthly access has expired — renew to continue
+                      </p>
+                      <button
+                        onClick={() => onNavigate?.('subscribe')}
+                        className="px-4 py-2 bg-[#f0b429] text-black font-mono font-bold text-xs rounded-xl hover:bg-[#fbbf24] transition-all shrink-0"
+                      >
+                        Renew ⭐
+                      </button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-3 flex-wrap">
                       <p className="text-xs font-mono text-[#777] flex-1">
-                        Subscribe for lifetime access to all weekly challenges
+                        Subscribe for monthly access to all weekly challenges
                       </p>
                       <button
                         onClick={() => onNavigate?.('subscribe')}

@@ -48,13 +48,11 @@ async function getAuthToken(): Promise<string | null> {
 }
 
 interface PayOptions {
-  purpose:      'subscription' | 'contest';
-  contestId?:   string;
-  contestName?: string;
+  purpose:      'subscription';
   name:         string;        // Razorpay checkout display name, e.g. "BitByBit"
   description:  string;        // Razorpay checkout description
   prefillName?: string;
-  onSuccess: (paymentId: string) => void;
+  onSuccess: (paymentId: string, currentPeriodEnd?: string) => void;
   onFailure: (msg: string) => void;
 }
 
@@ -79,7 +77,7 @@ export async function payWithRazorpay(opts: PayOptions) {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ purpose: opts.purpose, contestId: opts.contestId }),
+      body: JSON.stringify({ purpose: opts.purpose }),
     });
     order = await orderRes.json();
     if (!orderRes.ok) throw new Error(order.error || 'Order creation failed');
@@ -110,13 +108,11 @@ export async function payWithRazorpay(opts: PayOptions) {
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature:  response.razorpay_signature,
             purpose:      opts.purpose,
-            contestId:    opts.contestId,
-            contestName:  opts.contestName,
           }),
         });
         const verifyData = await verifyRes.json();
         if (!verifyRes.ok) throw new Error(verifyData.error || 'Payment verification failed');
-        opts.onSuccess(response.razorpay_payment_id);
+        opts.onSuccess(response.razorpay_payment_id, verifyData.currentPeriodEnd);
       } catch (e: any) {
         opts.onFailure(
           e.message ||

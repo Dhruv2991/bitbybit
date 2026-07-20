@@ -3,8 +3,8 @@
 // src/components/arena/ContestEntryButton.tsx
 // Arena contest entry — FREE for confirmed subscribers, no
 // payment collected. Non-subscribers are prompted to subscribe
-// (a one-time lifetime fee) rather than being asked to pay per
-// contest, per Razorpay's restriction for unregistered businesses.
+// (₹39/month) rather than being asked to pay per contest, per
+// Razorpay's restriction for unregistered businesses.
 // ════════════════════════════════════════════════════════════
 
 import { useState } from 'react';
@@ -60,7 +60,7 @@ export default function ContestEntryButton({
       <div className="flex flex-col items-center gap-2 p-3 bg-[#0f0f0f] rounded-xl border border-[#1f1f1f]">
         <p className="text-[11px] font-mono text-[#888] text-center leading-relaxed">
           Contest entry is <span className="text-[#00e87a] font-bold">free for subscribers</span> —
-          subscribe once (lifetime) to unlock every contest, weekly problem, and AI feature.
+          subscribe monthly (₹39/month) to unlock every contest, weekly problem, and AI feature.
         </p>
         <button
           onClick={onNavigateSubscribe}

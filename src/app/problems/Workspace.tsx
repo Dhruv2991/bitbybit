@@ -14,6 +14,7 @@ import {
   type RunResult,
 } from '@/lib/browserExecutor';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { isActiveSubscription } from '@/lib/subscription';
 import {
   explainFailure,
   getAiHint,
@@ -657,9 +658,9 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     if (!user?.github) return;
     // Check subscriber status then register with AI module
     (db.from('subscribers') as any)
-      .select('status').eq('github', user.github).maybeSingle()
+      .select('status, current_period_end').eq('github', user.github).maybeSingle()
       .then(({ data }: any) => {
-        const isSub = data?.status === 'confirmed';
+        const isSub = isActiveSubscription(data?.status, data?.current_period_end);
         setAiUser(user.github, isSub);
         refreshUsageFromServer()
           .then(() => setUsage(getUsageStatus()))

@@ -42,7 +42,7 @@
           </p>
           <p className="text-[#888] font-mono text-sm leading-relaxed">
             Problems are executed securely in-browser or within isolated server environments.
-            Subscribers receive lifetime access to premium challenges, AI-powered learning features,
+            Subscribers get monthly access (₹39/month) to premium challenges, AI-powered learning features,
             advanced analytics, and proctored coding assessments.
           </p>
         </div>
@@ -116,7 +116,7 @@
               ["{ }", "Problems library",      "Curated problems with hidden test cases"],
               ["🏅",  "Weekly challenges",     "New problems every week, time bonus scoring"],
               ["🏆",  "Proctored arena", "Live supervised coding assessments with secure proctoring"],
-              ["⭐",  "Lifetime subscription", "One-time fee, unlimited weekly access"],
+              ["⭐",  "Monthly subscription",  "₹39/month, unlocks weekly access & free contest entry"],
               ["✦",  "AI features",           "Hints, debugger, and code review"],
               ["💬",  "Discussion threads",    "Community discussion on every problem"],
               ["⚡",  "Leaderboard",           "Real-time rankings by points and streak"],
@@ -141,9 +141,16 @@
 
   <div className="space-y-2 text-[#888] font-mono text-xs leading-relaxed">
     <p>
-      BitByBit offers a one-time lifetime subscription that unlocks premium educational
+      BitByBit offers a monthly subscription (₹39/month) that unlocks premium educational
       features including weekly coding challenges, AI-powered tools, the complete
-      problems library, advanced analytics, and access to proctored coding assessments.
+      problems library, advanced analytics, and free entry to every proctored coding assessment.
+    </p>
+
+    <p>
+      Each payment covers 30 days of access. This is a manually-renewed pass, not an
+      automatic recurring charge — there's no auto-debit or standing mandate, so nothing
+      is ever charged without you actively paying again. Renewing a few days early simply
+      adds the new 30 days on top of your remaining time.
     </p>
 
     <p>

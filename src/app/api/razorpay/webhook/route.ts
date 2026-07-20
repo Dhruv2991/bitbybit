@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { computeNewPeriodEnd } from '@/lib/subscription';
 
 // Webhook needs the RAW body to verify the signature — do not
 // parse it as JSON before verifying.
@@ -64,12 +65,22 @@ export async function POST(req: NextRequest) {
     // we use them to figure out what this payment was for and who it's for.
     if (notes.type === 'subscription' && notes.github) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: existingSub } = await (db.from('subscribers') as any)
+        .select('status, current_period_end')
+        .eq('github', notes.github)
+        .maybeSingle();
+
+      const newPeriodEnd = computeNewPeriodEnd(existingSub?.status, existingSub?.current_period_end);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (db.from('subscribers') as any).upsert(
         {
           github: notes.github,
           name: notes.name || notes.github,
           txn_id: paymentId,
+          razorpay_payment_id: paymentId,
           status: 'confirmed',
+          current_period_end: newPeriodEnd,
         },
         { onConflict: 'github' },
       );

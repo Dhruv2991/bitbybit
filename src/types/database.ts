@@ -527,7 +527,7 @@ export interface WeeklySubmission {
 }
 
 // ════════════════════════════════════════════════════════════
-// Subscription (one-time lifetime access)
+// Subscription (monthly access — ₹39/month, manually renewed)
 // ════════════════════════════════════════════════════════════
 
 export type SubscriberStatus = 'pending' | 'confirmed' | 'rejected';
@@ -540,6 +540,10 @@ export interface Subscriber {
   razorpay_order_id?:   string | null;
   razorpay_payment_id?: string | null;
   status:     SubscriberStatus;
+  // ISO timestamp the current paid month runs until. Access is only
+  // active while status === 'confirmed' AND this is in the future.
+  // Renewing early stacks the extra days on top instead of wasting them.
+  current_period_end?: string | null;
   created_at: string;
 }
 

@@ -2,16 +2,21 @@
 /**
  * SubscribePage
  *
- * One-time lifetime subscription page.
+ * Monthly access pass — ₹39/month.
  * - Reads fee from app_config table (admin-adjustable)
  * - User pays via Razorpay Checkout
  * - Payment is verified server-side and access is CONFIRMED instantly
- * - Confirmed subscribers get access to all weekly problems
+ *   for 30 days from payment (or from the current period's end, if
+ *   renewing early — extra days are never wasted)
+ * - This is a manually-renewed pass, NOT auto-debit: there is no
+ *   recurring mandate, so nothing is ever charged without the user
+ *   actively clicking pay again each month.
  */
 
 import { useState, useEffect } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import { payWithRazorpay } from "@/lib/razorpay";
+import { isActiveSubscription } from "@/lib/subscription";
 import type { User, Subscriber } from "@/types/database";
 
 interface Props {
@@ -61,16 +66,17 @@ export default function SubscribePage({ user }: Props) {
     payWithRazorpay({
       purpose: "subscription",
       name: "BitByBit",
-      description: "Lifetime Subscription",
+      description: "Monthly Access — 30 days",
       prefillName: user.name,
-      onSuccess: (paymentId) => {
+      onSuccess: (paymentId, currentPeriodEnd) => {
         setMyStatus({
-          id: "",
+          id: myStatus?.id || "",
           github: user.github,
           name: user.name,
           txn_id: paymentId,
           status: "confirmed",
-          created_at: new Date().toISOString(),
+          current_period_end: currentPeriodEnd || myStatus?.current_period_end || null,
+          created_at: myStatus?.created_at || new Date().toISOString(),
         });
         setPaying(false);
       },
@@ -81,6 +87,11 @@ export default function SubscribePage({ user }: Props) {
     });
   }
 
+  const isActive = isActiveSubscription(myStatus?.status, myStatus?.current_period_end);
+  const expiryLabel = myStatus?.current_period_end
+    ? new Date(myStatus.current_period_end).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : null;
+
   // ── What to show based on status ─────────────────────────
 
   if (loading) return (
@@ -90,15 +101,15 @@ export default function SubscribePage({ user }: Props) {
     </div>
   );
 
-  // Already confirmed subscriber
-  if (myStatus?.status === "confirmed") return (
+  // Active subscriber
+  if (isActive) return (
     <div className="max-w-lg mx-auto py-12 text-center animate-fade-up">
       <div className="text-5xl mb-4">🎉</div>
       <h1 className="font-display font-bold text-2xl text-[#e0e0e0] mb-2">You're subscribed!</h1>
       <p className="text-[#777] font-mono text-sm mb-6">
-        Lifetime access to all weekly problems and challenges.
+        {expiryLabel ? `Active until ${expiryLabel}.` : "Monthly access active."} Renew before then to avoid losing access.
       </p>
-      <div className="bg-[#00e87a08] border border-[#00e87a20] rounded-2xl px-5 py-4 text-left space-y-2">
+      <div className="bg-[#00e87a08] border border-[#00e87a20] rounded-2xl px-5 py-4 text-left space-y-2 mb-6">
         <div className="flex items-center gap-2 text-xs font-mono">
           <span className="text-[#00e87a]">✓</span>
           <span className="text-[#bbb]">All weekly challenge problems unlocked</span>
@@ -109,9 +120,19 @@ export default function SubscribePage({ user }: Props) {
         </div>
         <div className="flex items-center gap-2 text-xs font-mono">
           <span className="text-[#00e87a]">✓</span>
-          <span className="text-[#bbb]">Arena contests still require separate entry fee</span>
+          <span className="text-[#bbb]">Free entry to every Arena contest</span>
         </div>
       </div>
+      {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === "true" && (
+        <button
+          onClick={handlePay}
+          disabled={paying || fee === null}
+          className="px-5 py-2.5 bg-[#00e87a10] border border-[#00e87a30] text-[#00e87a] font-mono font-bold text-sm rounded-xl
+            hover:bg-[#00e87a18] active:scale-[0.98] transition-all disabled:opacity-40"
+        >
+          {paying ? "Processing…" : `Renew early — ₹${fee ?? "—"}`}
+        </button>
+      )}
     </div>
   );
 
@@ -121,10 +142,13 @@ export default function SubscribePage({ user }: Props) {
       <div className="text-5xl mb-4">🔒</div>
       <h1 className="font-display font-bold text-2xl text-[#e0e0e0] mb-2">Sign in to subscribe</h1>
       <p className="text-[#777] font-mono text-sm">
-        Please sign in with GitHub to get a lifetime subscription.
+        Please sign in with GitHub to get monthly access.
       </p>
     </div>
   );
+
+  // Lapsed subscriber (paid before, period ended) vs brand-new subscriber
+  const isLapsed = myStatus?.status === "confirmed" && !isActive;
 
   // Main payment page
   return (
@@ -133,10 +157,12 @@ export default function SubscribePage({ user }: Props) {
       <div className="mb-8 text-center">
         <div className="text-4xl mb-3">⭐</div>
         <h1 className="font-display font-bold text-2xl md:text-3xl text-[#e0e0e0] mb-2">
-          Lifetime Subscription
+          {isLapsed ? "Renew Your Access" : "Monthly Access"}
         </h1>
         <p className="text-[#777] font-mono text-sm">
-          One-time payment · Unlock all weekly problems forever
+          {isLapsed && expiryLabel
+            ? `Your access ended on ${expiryLabel}. Renew to continue.`
+            : "₹39/month · Unlock all weekly problems, Arena contests & AI features"}
         </p>
       </div>
 
@@ -145,9 +171,9 @@ export default function SubscribePage({ user }: Props) {
         <p className="text-[10px] text-[#666] font-mono uppercase tracking-widest mb-3">What's included</p>
         {[
           ["✓", "All current and future weekly challenge problems", "#00e87a"],
+          ["✓", "Free entry to every Arena contest", "#00e87a"],
           ["✓", "Early-solver time bonus (solve earlier = more points)", "#00e87a"],
           ["✓", "Weekly leaderboard participation", "#00e87a"],
-          ["→", "Arena contests require separate entry fee per contest", "#555"],
         ].map(([icon, text, color], i) => (
           <div key={i} className="flex items-start gap-3 text-xs font-mono">
             <span style={{ color }} className="shrink-0 mt-0.5">{icon}</span>
@@ -163,7 +189,7 @@ export default function SubscribePage({ user }: Props) {
           <div className="text-4xl font-display font-bold text-[#00e87a] mb-1">
             {fee !== null ? `₹${fee}` : "—"}
           </div>
-          <div className="text-[10px] font-mono text-[#555]">one-time · lifetime access</div>
+          <div className="text-[10px] font-mono text-[#555]">per month · 30 days of access</div>
         </div>
 
         <div className="px-5 py-5">
@@ -179,10 +205,11 @@ export default function SubscribePage({ user }: Props) {
                 className="w-full py-3 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
                   hover:bg-[#00ff88] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {paying ? "Processing…" : `Pay ₹${fee ?? "—"} →`}
+                {paying ? "Processing…" : isLapsed ? `Renew — ₹${fee ?? "—"} →` : `Pay ₹${fee ?? "—"} →`}
               </button>
               <p className="text-center text-[10px] text-[#444] font-mono mt-4">
-                Secured by Razorpay · Cards, UPI, Netbanking, Wallets · Access unlocks instantly
+                Secured by Razorpay · Cards, UPI, Netbanking, Wallets · Access unlocks instantly ·
+                Renews manually every 30 days — no auto-debit, ever
               </p>
             </>
           ) : (

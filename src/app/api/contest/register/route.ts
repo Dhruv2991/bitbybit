@@ -4,7 +4,7 @@
 //
 // Arena contest entry is FREE for confirmed subscribers — no
 // payment is collected for contest entry at all (per Razorpay's
-// unregistered-business restriction: only the lifetime subscription
+// unregistered-business restriction: only the monthly subscription
 // fee may be collected; contest entry fees are not supported without
 // a registered business entity). This route just verifies the
 // caller is a genuine, confirmed subscriber and registers them.
@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isActiveSubscription } from '@/lib/subscription';
 
 interface Body {
   contestId: string;
@@ -58,17 +59,17 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
-    // Must be a confirmed subscriber — this is the ONLY gate for
-    // contest entry, since no payment is collected for it.
+    // Must be an active (non-expired) subscriber — this is the ONLY
+    // gate for contest entry, since no payment is collected for it.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: sub } = await (db.from('subscribers') as any)
-      .select('status')
+      .select('status, current_period_end')
       .eq('github', github)
       .maybeSingle();
 
-    if (sub?.status !== 'confirmed') {
+    if (!isActiveSubscription(sub?.status, sub?.current_period_end)) {
       return NextResponse.json(
-        { error: 'A lifetime subscription is required to enter contests. Subscribe once to unlock free entry to all contests.' },
+        { error: 'An active ₹39/month subscription is required to enter contests. Subscribe to unlock free entry to all contests.' },
         { status: 403 },
       );
     }

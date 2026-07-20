@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
+import { isActiveSubscription } from "@/lib/subscription";
 import type {
   User,
   Submission,
@@ -3021,7 +3022,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                 <span className="text-[#00e87a] text-sm">⭐</span>
                 <p className="text-[10px] text-[#999] font-mono leading-relaxed">
                   <span className="text-[#00e87a] font-bold">Access is automatic for subscribers.</span>{" "}
-                  Anyone with a confirmed lifetime subscription gets this challenge instantly — no
+                  Anyone with an active monthly subscription gets this challenge instantly — no
                   per-challenge payment or setup needed.
                 </p>
               </div>
@@ -3801,8 +3802,9 @@ function SubscriberAdminSection() {
     setSavingConfig(false);
   }
 
-  const confirmed = subscribers.filter(s => s.status === "confirmed");
-  const revoked   = subscribers.filter(s => s.status === "rejected");
+  const active  = subscribers.filter(s => isActiveSubscription(s.status, s.current_period_end));
+  const expired = subscribers.filter(s => s.status === "confirmed" && !isActiveSubscription(s.status, s.current_period_end));
+  const revoked = subscribers.filter(s => s.status === "rejected");
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -3818,13 +3820,13 @@ function SubscriberAdminSection() {
         <h3 className="font-mono font-bold text-[#e0e0e0] text-sm mb-4">⚙️ Subscription Settings</h3>
         <div className="mb-4 max-w-xs">
           <label className="block text-[10px] text-[#666] font-mono uppercase tracking-wider mb-1.5">
-            One-time Fee (₹)
+            Monthly Fee (₹)
           </label>
           <input
             type="number"
             value={fee}
             onChange={e => setFee(e.target.value)}
-            placeholder="e.g. 499"
+            placeholder="e.g. 39"
             className="w-full bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
           />
         </div>
@@ -3838,10 +3840,11 @@ function SubscriberAdminSection() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Active Subscribers", value: confirmed.length, color: "text-[#00e87a]" },
-          { label: "Revoked",            value: revoked.length,   color: "text-[#ff4d4d]" },
+          { label: "Active",  value: active.length,  color: "text-[#00e87a]" },
+          { label: "Expired", value: expired.length,  color: "text-[#f0b429]" },
+          { label: "Revoked", value: revoked.length,  color: "text-[#ff4d4d]" },
         ].map(s => (
           <div key={s.label} className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center">
             <div className={`text-2xl font-display font-bold ${s.color}`}>{s.value}</div>
@@ -3860,23 +3863,25 @@ function SubscriberAdminSection() {
       ) : (
         <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden">
           {/* Header */}
-          <div className="hidden sm:grid grid-cols-[2rem_1fr_1fr_8rem_7rem_6rem] gap-3 px-4 py-2.5
+          <div className="hidden sm:grid grid-cols-[2rem_1fr_1fr_8rem_8rem_6rem] gap-3 px-4 py-2.5
             border-b border-[#161616] text-[10px] text-[#555] font-mono uppercase tracking-widest">
             <div />
             <div>User</div>
             <div>Payment ID</div>
             <div>Status</div>
-            <div>Date</div>
+            <div>Renews / Expired</div>
             <div className="text-center">Actions</div>
           </div>
 
           {subscribers.map(sub => {
+            const active = isActiveSubscription(sub.status, sub.current_period_end);
             const statusColor =
-              sub.status === "confirmed" ? "text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]" :
-                                           "text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]";
+              sub.status === "rejected" ? "text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]" :
+              active                    ? "text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]" :
+                                           "text-[#f0b429] bg-[#f0b42910] border-[#f0b42920]";
             return (
               <div key={sub.id}
-                className="grid grid-cols-1 sm:grid-cols-[2rem_1fr_1fr_8rem_7rem_6rem] gap-3 items-center
+                className="grid grid-cols-1 sm:grid-cols-[2rem_1fr_1fr_8rem_8rem_6rem] gap-3 items-center
                   px-4 py-3 border-b border-[#141414] last:border-0 hover:bg-[#0d0d0d] transition-colors">
                 <img
                   src={`https://github.com/${sub.github}.png?size=28`}
@@ -3890,11 +3895,13 @@ function SubscriberAdminSection() {
                 <div className="text-xs font-mono text-[#777] truncate">{sub.razorpay_payment_id || sub.txn_id}</div>
                 <div>
                   <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${statusColor}`}>
-                    {sub.status === "confirmed" ? "✓ Active" : "✗ Revoked"}
+                    {sub.status === "rejected" ? "✗ Revoked" : active ? "✓ Active" : "⏳ Expired"}
                   </span>
                 </div>
                 <div className="text-[10px] font-mono text-[#555]">
-                  {new Date(sub.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
+                  {sub.current_period_end
+                    ? new Date(sub.current_period_end).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })
+                    : "—"}
                 </div>
                 <div className="flex items-center gap-2 justify-center">
                   {sub.status === "confirmed" && (

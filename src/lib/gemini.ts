@@ -146,7 +146,7 @@ async function incrementHintSupabase(problemId: string): Promise<void> {
 
 function subscriberCheck(): string | null {
   if (!_github)       return '⛔ Sign in to use AI features.';
-  if (!_isSubscriber) return '⭐ AI features are available to subscribers. Subscribe once for lifetime access to all AI tools + weekly challenges.';
+  if (!_isSubscriber) return '⭐ AI features are available to subscribers. Subscribe for ₹39/month for access to all AI tools + weekly challenges.';
   return null;
 }
 

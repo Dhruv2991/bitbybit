@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { User } from '@/types/database';
 import { getRecommendations, setAiUser } from '@/lib/gemini';
+import { isActiveSubscription } from '@/lib/subscription';
 
 interface HomePageProps {
   user:       User | null;
@@ -208,8 +209,8 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
     (async () => {
       try {
         const { data: sub } = await (db.from('subscribers') as any)
-          .select('status').eq('github', user.github).maybeSingle();
-        const isSub = sub?.status === 'confirmed';
+          .select('status, current_period_end').eq('github', user.github).maybeSingle();
+        const isSub = isActiveSubscription(sub?.status, sub?.current_period_end);
         setAiUser(user.github, isSub);
         if (!isSub) { if (alive) setRecommended([]); return; }
 

@@ -68,16 +68,6 @@ export async function POST(req: NextRequest) {
     const notes: Record<string, string> = { type: purpose, github, name };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: existing } = await (db.from('subscribers') as any)
-      .select('id, status')
-      .eq('github', github)
-      .maybeSingle();
-
-    if (existing?.status === 'confirmed') {
-      return NextResponse.json({ error: 'You already have an active subscription' }, { status: 400 });
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: config } = await (db.from('app_config') as any)
       .select('*')
       .eq('key', 'subscription_fee')

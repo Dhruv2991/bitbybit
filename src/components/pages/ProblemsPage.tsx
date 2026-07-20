@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Problem, User } from '@/types/database';
 import { LANG_LABELS, type SupportedLang } from '@/types/database';
+import { isActiveSubscription } from '@/lib/subscription';
 
 const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false });
 
@@ -155,11 +156,11 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         // Check if user is a confirmed subscriber — if so, unlock all weekly problems
         if (user?.github && allWeeklyIds.size) {
           const { data: sub } = await (db.from('subscribers') as any)
-            .select('status')
+            .select('status, current_period_end')
             .eq('github', user.github)
             .maybeSingle();
 
-          if (sub?.status === 'confirmed') {
+          if (isActiveSubscription(sub?.status, sub?.current_period_end)) {
             // Subscriber sees all weekly problems
             setUnlockedIds(new Set(allWeeklyIds));
             setPaidNotStartedIds(new Set());

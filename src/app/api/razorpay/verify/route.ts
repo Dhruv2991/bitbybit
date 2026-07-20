@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import Razorpay from 'razorpay';
+import { computeNewPeriodEnd } from '@/lib/subscription';
 
 interface Body {
   razorpay_order_id:   string;
@@ -116,6 +117,14 @@ export async function POST(req: NextRequest) {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existingSub } = await (db.from('subscribers') as any)
+      .select('status, current_period_end')
+      .eq('github', github)
+      .maybeSingle();
+
+    const newPeriodEnd = computeNewPeriodEnd(existingSub?.status, existingSub?.current_period_end);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (db.from('subscribers') as any).upsert(
       {
         github, name,
@@ -123,6 +132,7 @@ export async function POST(req: NextRequest) {
         razorpay_order_id,
         razorpay_payment_id,
         status:              'confirmed',
+        current_period_end:  newPeriodEnd,
       },
       { onConflict: 'github' },
     );
@@ -133,7 +143,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This payment has already been used, or the write failed' }, { status: 409 });
     }
 
-    return NextResponse.json({ success: true, paymentId: razorpay_payment_id });
+    return NextResponse.json({ success: true, paymentId: razorpay_payment_id, currentPeriodEnd: newPeriodEnd });
   } catch (err: any) {
     console.error('[/api/razorpay/verify]', err);
     return NextResponse.json({ error: err.message || 'Verification failed' }, { status: 500 });

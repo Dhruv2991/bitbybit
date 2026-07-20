@@ -49,10 +49,10 @@ export default function TermsPage({ onNavigate }: Props) {
             platform offering a curated problems library, weekly coding
             challenges, proctored coding assessments, AI-assisted hints, code
             review, performance analytics, and community leaderboards. A
-            one-time lifetime subscription unlocks premium educational features,
-            including AI tools, advanced challenges, and access to proctored
-            coding assessments. No separate fee is charged to participate in
-            platform-hosted coding challenges.
+            monthly subscription (₹39/month) unlocks premium educational
+            features, including AI tools, advanced challenges, and free entry
+            to every proctored coding assessment ("Arena" contest). No
+            separate per-contest fee is charged to subscribers.
           </p>
         </section>
 
@@ -88,21 +88,35 @@ export default function TermsPage({ onNavigate }: Props) {
           </p>
 
           <p className="mt-2">
-            A one-time lifetime subscription grants access to premium
+            A monthly subscription (₹39/month) grants access to premium
             educational features including AI-powered tools, weekly coding
-            challenges, the complete problems library, advanced analytics, and
-            participation in proctored coding assessments.
+            challenges, the complete problems library, advanced analytics,
+            free entry to every proctored coding assessment, and
+            participation in proctored coding assessments, for a period of
+            30 days from the date of payment.
           </p>
 
           <p className="mt-2">
-            Subscription payments are made solely for accessing premium platform
-            features and are not linked to leaderboard rankings, coding
-            challenge outcomes, or prizes.
+            This is a manually-renewed pass, not an automatic recurring
+            billing arrangement. We do not store your card, UPI, or bank
+            details, and no amount is ever charged without you actively
+            initiating a payment. Your access simply expires 30 days after
+            payment unless you choose to pay again; there is no auto-debit,
+            no standing mandate, and no obligation to renew.
+          </p>
+
+          <p className="mt-2">
+            Subscription payments are made solely for accessing premium
+            platform features and are not linked to leaderboard rankings,
+            coding challenge outcomes, or prizes.
           </p>
 
           <p className="mt-2">
             Subscription access is activated automatically after a successful
-            verified payment.
+            verified payment, and is extended by 30 days from whichever is
+            later — the moment of payment, or the end of your current paid
+            period (so renewing a few days early never wastes time you've
+            already paid for).
           </p>
         </section>
 
@@ -113,7 +127,7 @@ export default function TermsPage({ onNavigate }: Props) {
           <p>
             You must sign in with a valid GitHub account to use the platform.
             You are responsible for maintaining the security of your GitHub
-            account. One subscription/entry is tied to one GitHub account and is
+            account. One subscription is tied to one GitHub account and is
             non-transferable.
           </p>
         </section>
