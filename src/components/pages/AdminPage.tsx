@@ -20,6 +20,32 @@ import type {
   ContestFeedback,
 } from "@/types/database";
 
+// Fires the "contest live" / "new weekly challenge" email blast via
+// /api/notify/broadcast. Best-effort from the caller's point of view —
+// returns null (rather than throwing) on any failure so a notify hiccup
+// never blocks the admin action that triggered it.
+async function notifySubscribers(
+  kind: "contest_live" | "weekly_challenge",
+  refId: string,
+  title: string,
+): Promise<{ sent: number; failed: number; skipped: number } | null> {
+  try {
+    const db = getSupabaseClient();
+    const { data: { session } } = await db.auth.getSession();
+    const token = session?.access_token;
+    if (!token) return null;
+    const res = await fetch("/api/notify/broadcast", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ kind, refId, title }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 type Section =
   | "overview"
   | "submissions"
@@ -1528,13 +1554,35 @@ export default function AdminPage({ user }: AdminPageProps) {
     setEditingContest(null);
   }
 
+  const [notifyingContestId, setNotifyingContestId] = useState<string | null>(null);
+  async function notifyContest(c: Contest) {
+    setNotifyingContestId(c.id);
+    const res = await notifySubscribers("contest_live", c.id, c.name);
+    if (res) {
+      showToast(
+        res.sent > 0
+          ? `Notified ${res.sent} subscribers`
+          : `Already notified everyone for this contest (skipped ${res.skipped})`,
+      );
+    } else {
+      showToast("Notify failed — check email config");
+    }
+    setNotifyingContestId(null);
+  }
+
   async function setContestStatus(id: string, status: Contest["status"]) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db.from("contests") as any).update({ status }).eq("id", id);
+    const contest = contests.find((c) => c.id === id);
     setContests((prev) =>
       prev.map((c) => (c.id === id ? { ...c, status } : c)),
     );
     showToast(`Contest set to ${status}`);
+
+    if (status === "live" && contest) {
+      notifySubscribers("contest_live", id, contest.name)
+        .then((res) => { if (res) showToast(`Notified ${res.sent} subscribers`); });
+    }
   }
 
   async function deleteContest(id: string) {
@@ -2501,6 +2549,13 @@ export default function AdminPage({ user }: AdminPageProps) {
                             ✏ Edit
                           </button>
                           <button
+                            onClick={() => notifyContest(c)}
+                            disabled={notifyingContestId === c.id}
+                            className="px-3 py-1 bg-[#00e87a10] text-[#00e87a] hover:bg-[#00e87a20] text-xs font-mono rounded-lg transition-all disabled:opacity-50"
+                          >
+                            {notifyingContestId === c.id ? "Sending…" : "📧 Notify"}
+                          </button>
+                          <button
                             onClick={() => deleteContest(c.id)}
                             className="px-3 py-1 bg-[#ff4d4d10] text-[#ff4d4d] hover:bg-[#ff4d4d20] text-xs font-mono rounded-lg transition-all"
                           >
@@ -2656,6 +2711,22 @@ function WeeklyAdminSection({ user }: { user: User }) {
     setTimeout(() => setToast(""), 3500);
   }
 
+  const [notifyingId, setNotifyingId] = useState<string | null>(null);
+  async function notifyExisting(ch: WeeklyChallenge) {
+    setNotifyingId(ch.id);
+    const res = await notifySubscribers("weekly_challenge", ch.id, ch.title);
+    if (res) {
+      showToast(
+        res.sent > 0
+          ? `Notified ${res.sent} subscribers`
+          : `Already notified everyone for this challenge (skipped ${res.skipped})`,
+      );
+    } else {
+      showToast("Notify failed — check email config");
+    }
+    setNotifyingId(null);
+  }
+
   function startCreate() {
     setEditId(null);
     setForm(blankWeekly());
@@ -2702,14 +2773,17 @@ function WeeklyAdminSection({ user }: { user: User }) {
         showToast("Updated ✓");
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { error } = await (db.from("weekly_challenges") as any).insert(
-          payload,
-        );
+        const { data: created, error } = await (db.from("weekly_challenges") as any)
+          .insert(payload)
+          .select("id")
+          .single();
         if (error) throw error;
 
         // Access is automatic for all confirmed subscribers — nothing
-        // else to do here.
-        showToast("Created ✓");
+        // else to do for access. Still email them that it's up.
+        showToast("Created ✓ — notifying subscribers…");
+        notifySubscribers("weekly_challenge", created.id, payload.title)
+          .then(res => showToast(res ? `Notified ${res.sent} subscribers` : "Notify failed — check email config"));
       }
       setForm(null);
       setEditId(null);
@@ -3133,6 +3207,13 @@ function WeeklyAdminSection({ user }: { user: User }) {
                     className="text-xs font-mono text-[#a78bfa] hover:text-[#c4b5fd] px-3 py-1.5 bg-[#a78bfa15] rounded-lg"
                   >
                     Edit
+                  </button>
+                  <button
+                    onClick={() => notifyExisting(ch)}
+                    disabled={notifyingId === ch.id}
+                    className="text-xs font-mono text-[#00e87a] hover:text-[#00ff88] px-3 py-1.5 bg-[#00e87a15] rounded-lg disabled:opacity-50"
+                  >
+                    {notifyingId === ch.id ? "Sending…" : "📧 Notify"}
                   </button>
                   <button
                     onClick={() => deleteChallenge(ch.id)}
@@ -3802,6 +3883,25 @@ function SubscriberAdminSection() {
     setSavingConfig(false);
   }
 
+  const [nudging, setNudging] = useState(false);
+  async function nudgeNonSubscribers() {
+    setNudging(true);
+    try {
+      const { data: { session } } = await db.auth.getSession();
+      const token = session?.access_token;
+      const res = await fetch("/api/notify/subscribe-nudge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed");
+      showToast(`Nudged ${json.sent} · skipped ${json.skipped} already this month`);
+    } catch (e: any) {
+      showToast("Nudge failed: " + (e.message || "Unknown"));
+    }
+    setNudging(false);
+  }
+
   const active  = subscribers.filter(s => isActiveSubscription(s.status, s.current_period_end));
   const expired = subscribers.filter(s => s.status === "confirmed" && !isActiveSubscription(s.status, s.current_period_end));
   const revoked = subscribers.filter(s => s.status === "rejected");
@@ -3836,6 +3936,22 @@ function SubscriberAdminSection() {
           className="px-4 py-2 bg-[#00e87a] text-black font-mono text-xs font-bold rounded-xl hover:bg-[#00ff88] disabled:opacity-50 transition-all"
         >
           {savingConfig ? "Saving…" : "Save Settings"}
+        </button>
+      </div>
+
+      {/* Notifications */}
+      <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-5">
+        <h3 className="font-mono font-bold text-[#e0e0e0] text-sm mb-1.5">📧 Notifications</h3>
+        <p className="text-xs font-mono text-[#666] mb-4">
+          Email everyone who's logged in but isn't currently subscribed. Safe to click more
+          than once — each person only gets nudged once per calendar month.
+        </p>
+        <button
+          onClick={nudgeNonSubscribers}
+          disabled={nudging}
+          className="px-4 py-2 bg-[#f0b429] text-black font-mono text-xs font-bold rounded-xl hover:bg-[#ffc94d] disabled:opacity-50 transition-all"
+        >
+          {nudging ? "Sending…" : "Nudge non-subscribers"}
         </button>
       </div>
 

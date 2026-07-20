@@ -138,6 +138,13 @@ export default function App() {
       return { name: su.user_metadata?.full_name || github, github, is_admin: isAdmin };
     }
 
+    // GitHub OAuth returns the account's email via Supabase's session
+    // (su.email) as long as the user has a public/verified email — we
+    // never ask for it separately. Some users genuinely have none.
+    function extractEmail(su: any): string | null {
+      return su?.email || su?.user_metadata?.email || null;
+    }
+
     db.auth.getSession().then(async ({ data: { session } }) => {
       if (!alive) return;
       if (session?.user) {
@@ -161,7 +168,9 @@ export default function App() {
         if (!alive) return;
         setUser(u);
         resolving.current = false;
-        // Upsert into members so homepage count reflects all GitHub logins
+        // Upsert into members so homepage count reflects all GitHub logins.
+        // ignoreDuplicates so an existing member's points/streak are never
+        // reset by a later login.
         if (u?.github) {
           (db.from("members") as any).upsert({
             github:          u.github,
@@ -170,6 +179,17 @@ export default function App() {
             problems_solved: 0,
             streak:          0,
           }, { onConflict: "github", ignoreDuplicates: true }).then(() => {});
+
+          // Separate, narrow update just for email/name — safe to run on
+          // every login since it never touches points/streak, and keeps
+          // the address fresh if the user's GitHub email changes.
+          const email = extractEmail(session.user);
+          if (email) {
+            (db.from("members") as any)
+              .update({ email, name: u.name })
+              .eq("github", u.github)
+              .then(() => {});
+          }
         }
       } else if (event === "SIGNED_OUT") {
         setUser(null);

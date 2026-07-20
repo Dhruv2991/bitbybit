@@ -50,6 +50,7 @@ export interface Member {
   id: string;
   github: string;
   name: string;
+  email?: string | null;
 
   total_points: number;
   problems_solved: number;
@@ -539,6 +540,7 @@ export interface Subscriber {
   txn_id:     string;
   razorpay_order_id?:   string | null;
   razorpay_payment_id?: string | null;
+  email?:     string | null;
   status:     SubscriberStatus;
   // ISO timestamp the current paid month runs until. Access is only
   // active while status === 'confirmed' AND this is in the future.

@@ -20,6 +20,7 @@ import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import Razorpay from 'razorpay';
 import { computeNewPeriodEnd } from '@/lib/subscription';
+import { sendEmail, subscriptionConfirmedEmail } from '@/lib/email';
 
 interface Body {
   razorpay_order_id:   string;
@@ -42,9 +43,10 @@ async function getVerifiedUser(req: NextRequest) {
 
   const github = data.user.user_metadata?.user_name as string | undefined;
   const name   = data.user.user_metadata?.full_name as string | undefined;
+  const email  = data.user.email as string | undefined;
   if (!github) return null;
 
-  return { github, name: name || github };
+  return { github, name: name || github, email: email || null };
 }
 
 export async function POST(req: NextRequest) {
@@ -57,7 +59,7 @@ export async function POST(req: NextRequest) {
     if (!authUser) {
       return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
     }
-    const { github, name } = authUser;
+    const { github, name, email } = authUser;
 
     const body: Body = await req.json();
     const {
@@ -127,7 +129,7 @@ export async function POST(req: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (db.from('subscribers') as any).upsert(
       {
-        github, name,
+        github, name, email,
         txn_id:              razorpay_payment_id,
         razorpay_order_id,
         razorpay_payment_id,
@@ -141,6 +143,13 @@ export async function POST(req: NextRequest) {
       // replayed payment_id being attached to a second account.
       console.error('[razorpay/verify] subscribers upsert error:', error);
       return NextResponse.json({ error: 'This payment has already been used, or the write failed' }, { status: 409 });
+    }
+
+    // Best-effort confirmation email — never blocks or fails the
+    // payment response if sending doesn't work.
+    if (email) {
+      const { subject, html } = subscriptionConfirmedEmail(name, newPeriodEnd);
+      sendEmail(email, subject, html).catch(() => {});
     }
 
     return NextResponse.json({ success: true, paymentId: razorpay_payment_id, currentPeriodEnd: newPeriodEnd });
