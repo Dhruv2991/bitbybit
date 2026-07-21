@@ -35,9 +35,10 @@ async function getVerifiedUser(req: NextRequest) {
 
   const github = data.user.user_metadata?.user_name as string | undefined;
   const name   = data.user.user_metadata?.full_name as string | undefined;
+  const email  = data.user.email as string | undefined;
   if (!github) return null;
 
-  return { github, name: name || github };
+  return { github, name: name || github, email: email || '' };
 }
 
 export async function POST(req: NextRequest) {
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
     if (!authUser) {
       return NextResponse.json({ error: 'Sign in required' }, { status: 401 });
     }
-    const { github, name } = authUser;
+    const { github, name, email } = authUser;
 
     const body: Body = await req.json();
     const { purpose } = body;
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
     );
 
     let amountInr: number;
-    const notes: Record<string, string> = { type: purpose, github, name };
+    const notes: Record<string, string> = { type: purpose, github, name, email };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: config } = await (db.from('app_config') as any)

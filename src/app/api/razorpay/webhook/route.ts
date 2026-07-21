@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { computeNewPeriodEnd } from '@/lib/subscription';
+import { sendEmail, subscriptionConfirmedEmail } from '@/lib/email';
 
 // Webhook needs the RAW body to verify the signature — do not
 // parse it as JSON before verifying.
@@ -71,12 +72,14 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       const newPeriodEnd = computeNewPeriodEnd(existingSub?.status, existingSub?.current_period_end);
+      const email = notes.email || null;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (db.from('subscribers') as any).upsert(
         {
           github: notes.github,
           name: notes.name || notes.github,
+          email,
           txn_id: paymentId,
           razorpay_payment_id: paymentId,
           status: 'confirmed',
@@ -85,6 +88,25 @@ export async function POST(req: NextRequest) {
         { onConflict: 'github' },
       );
       if (error) console.error('[razorpay/webhook] subscribers upsert error:', error);
+
+      // Same dedupe pattern as /api/razorpay/verify — keyed on
+      // payment_id, so if the client-side verify call already sent
+      // this confirmation, this is a silent no-op instead of a
+      // duplicate email.
+      if (email && !error) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: logged } = await (db.from('email_log') as any)
+          .upsert(
+            { github: notes.github, email, kind: 'subscription_confirmed', ref_id: paymentId },
+            { onConflict: 'github,kind,ref_id', ignoreDuplicates: true },
+          )
+          .select('github')
+          .maybeSingle();
+        if (logged) {
+          const { subject, html } = subscriptionConfirmedEmail(notes.name || notes.github, newPeriodEnd);
+          sendEmail(email, subject, html).catch(() => {});
+        }
+      }
     } else {
       // No usable notes — this payment might have already been
       // confirmed by the client-side /verify call, or notes weren't

@@ -146,10 +146,25 @@ export async function POST(req: NextRequest) {
     }
 
     // Best-effort confirmation email — never blocks or fails the
-    // payment response if sending doesn't work.
+    // payment response if sending doesn't work. Deduped on payment_id
+    // via email_log so it can never double-send even if the webhook
+    // safety-net route also processes this same payment.
     if (email) {
-      const { subject, html } = subscriptionConfirmedEmail(name, newPeriodEnd);
-      sendEmail(email, subject, html).catch(() => {});
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: logged } = await (db.from('email_log') as any)
+        .upsert(
+          { github, email, kind: 'subscription_confirmed', ref_id: razorpay_payment_id },
+          { onConflict: 'github,kind,ref_id', ignoreDuplicates: true },
+        )
+        .select('github')
+        .maybeSingle();
+      // A returned row means this is the first time we've logged this
+      // payment — safe to send. null means it was already logged
+      // (e.g. by the webhook safety-net route) — skip re-sending.
+      if (logged) {
+        const { subject, html } = subscriptionConfirmedEmail(name, newPeriodEnd);
+        sendEmail(email, subject, html).catch(() => {});
+      }
     }
 
     return NextResponse.json({ success: true, paymentId: razorpay_payment_id, currentPeriodEnd: newPeriodEnd });
