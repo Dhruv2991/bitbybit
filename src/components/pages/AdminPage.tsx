@@ -3813,6 +3813,26 @@ function FeedbackAdminSection() {
 function SubscriberAdminSection() {
   const db = getSupabaseClient();
 
+  const [resendingGithub, setResendingGithub] = useState<string | null>(null);
+  async function resendConfirmation(sub: Subscriber) {
+    setResendingGithub(sub.github);
+    try {
+      const { data: { session } } = await db.auth.getSession();
+      const token = session?.access_token;
+      const res = await fetch("/api/notify/resend-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ github: sub.github }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed");
+      setToast(`Sent to ${json.sentTo}`);
+    } catch (e: any) {
+      setToast("Resend failed: " + (e.message || "Unknown"));
+    }
+    setResendingGithub(null);
+  }
+
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [toast,       setToast]       = useState("");
@@ -4021,12 +4041,22 @@ function SubscriberAdminSection() {
                 </div>
                 <div className="flex items-center gap-2 justify-center">
                   {sub.status === "confirmed" && (
-                    <button
-                      onClick={() => revokeAccess(sub)}
-                      className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d10] border border-[#ff4d4d20] px-2 py-1 rounded-lg hover:bg-[#ff4d4d18] transition-all"
-                    >
-                      Revoke
-                    </button>
+                    <>
+                      <button
+                        onClick={() => resendConfirmation(sub)}
+                        disabled={resendingGithub === sub.github}
+                        className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a10] border border-[#00e87a20] px-2 py-1 rounded-lg hover:bg-[#00e87a18] transition-all disabled:opacity-50"
+                        title={sub.email ? `Resend to ${sub.email}` : "No email on file"}
+                      >
+                        {resendingGithub === sub.github ? "…" : "✉ Resend"}
+                      </button>
+                      <button
+                        onClick={() => revokeAccess(sub)}
+                        className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d10] border border-[#ff4d4d20] px-2 py-1 rounded-lg hover:bg-[#ff4d4d18] transition-all"
+                      >
+                        Revoke
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
