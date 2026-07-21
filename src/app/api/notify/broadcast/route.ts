@@ -3,16 +3,25 @@
 // POST /api/notify/broadcast
 //
 // Admin-only. Emails every *active* subscriber that a contest just
-// went live or a new weekly challenge dropped. Dedupes against
-// email_log so re-triggering (double click, retry) never sends the
-// same alert twice to the same person.
+// went live or a new weekly challenge dropped.
+//
+// email_log rows are written ONLY after a send actually succeeds —
+// so a row existing there is a reliable "this was delivered" signal,
+// not just "we tried." Anyone whose send fails is simply left out of
+// the log, which means the next click will retry them automatically
+// (that's the desired behavior — a failed send should be retriable).
 // ════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { isActiveSubscription } from '@/lib/subscription';
-import { sendBatch, contestLiveEmail, weeklyChallengeEmail, type BatchRecipient } from '@/lib/email';
+import { sendEmail, contestLiveEmail, weeklyChallengeEmail } from '@/lib/email';
+
+// Sending to dozens of subscribers sequentially can take longer than
+// Vercel's 10s default. 60 is the max allowed on the Hobby plan without
+// Fluid Compute — comfortably covers ~40-100 recipients with pooling.
+export const maxDuration = 60;
 
 interface Body {
   kind:  'contest_live' | 'weekly_challenge';
@@ -55,36 +64,45 @@ export async function POST(req: NextRequest) {
 
     const db = createServerSupabaseClient();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: subs } = await (db.from('subscribers') as any)
-      .select('github, name, email, status, current_period_end');
+    const [{ data: subs }, { data: alreadyLogged }] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (db.from('subscribers') as any).select('github, name, email, status, current_period_end'),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (db.from('email_log') as any).select('github').eq('kind', kind).eq('ref_id', refId),
+    ]);
 
+    const alreadyGithubs = new Set((alreadyLogged || []).map((r: any) => r.github));
     const active = (subs || []).filter((s: any) =>
-      isActiveSubscription(s.status, s.current_period_end) && s.email,
+      isActiveSubscription(s.status, s.current_period_end) && s.email && !alreadyGithubs.has(s.github),
     );
+    const alreadySent = (subs || []).filter((s: any) => alreadyGithubs.has(s.github)).length;
+
     if (active.length === 0) {
-      return NextResponse.json({ sent: 0, skipped: 0, message: 'No active subscribers with an email on file' });
+      return NextResponse.json({
+        sent: 0, failed: 0, skipped: alreadySent,
+        message: alreadySent > 0 ? 'Everyone eligible was already notified' : 'No active subscribers with an email on file',
+      });
     }
 
-    // Reserve dedupe rows first — insert with onConflict/ignore, then
-    // only email the rows that were newly inserted (i.e. not already sent).
-    const logRows = active.map((s: any) => ({ github: s.github, email: s.email, kind, ref_id: refId }));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: inserted } = await (db.from('email_log') as any)
-      .upsert(logRows, { onConflict: 'github,kind,ref_id', ignoreDuplicates: true })
-      .select('github');
-
-    const alreadySent = active.length - (inserted?.length || 0);
-    const toEmail = active.filter((s: any) => (inserted || []).some((i: any) => i.github === s.github));
-
-    const recipients: BatchRecipient[] = toEmail.map((s: any) => {
+    // Send one at a time so we know exactly who succeeded — only
+    // those get logged, so a failed send is automatically retried
+    // on the next click instead of silently disappearing.
+    let sent = 0, failed = 0;
+    for (const s of active) {
       const { subject, html } = kind === 'contest_live'
         ? contestLiveEmail(s.name, title)
         : weeklyChallengeEmail(s.name, title);
-      return { to: s.email, subject, html };
-    });
+      const ok = await sendEmail(s.email, subject, html);
+      if (ok) {
+        sent++;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (db.from('email_log') as any)
+          .upsert({ github: s.github, email: s.email, kind, ref_id: refId }, { onConflict: 'github,kind,ref_id' });
+      } else {
+        failed++;
+      }
+    }
 
-    const { sent, failed } = await sendBatch(recipients);
     return NextResponse.json({ sent, failed, skipped: alreadySent });
   } catch (err: any) {
     console.error('[/api/notify/broadcast]', err);
