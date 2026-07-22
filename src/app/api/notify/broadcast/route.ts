@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { isActiveSubscription } from '@/lib/subscription';
-import { sendEmail, contestLiveEmail, weeklyChallengeEmail } from '@/lib/email';
+import { sendEmailDetailed, contestLiveEmail, weeklyChallengeEmail } from '@/lib/email';
 
 // Sending to dozens of subscribers sequentially can take longer than
 // Vercel's 10s default. 60 is the max allowed on the Hobby plan without
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
 
     if (active.length === 0) {
       return NextResponse.json({
-        sent: 0, failed: 0, skipped: alreadySent,
+        sent: 0, failed: 0, skipped: alreadySent, total: 0,
         message: alreadySent > 0 ? 'Everyone eligible was already notified' : 'No active subscribers with an email on file',
       });
     }
@@ -88,22 +88,24 @@ export async function POST(req: NextRequest) {
     // those get logged, so a failed send is automatically retried
     // on the next click instead of silently disappearing.
     let sent = 0, failed = 0;
+    let lastError: string | undefined;
     for (const s of active) {
       const { subject, html } = kind === 'contest_live'
         ? contestLiveEmail(s.name, title)
         : weeklyChallengeEmail(s.name, title);
-      const ok = await sendEmail(s.email, subject, html);
-      if (ok) {
+      const result = await sendEmailDetailed(s.email, subject, html);
+      if (result.ok) {
         sent++;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (db.from('email_log') as any)
           .upsert({ github: s.github, email: s.email, kind, ref_id: refId }, { onConflict: 'github,kind,ref_id' });
       } else {
         failed++;
+        lastError = result.error;
       }
     }
 
-    return NextResponse.json({ sent, failed, skipped: alreadySent });
+    return NextResponse.json({ sent, failed, skipped: alreadySent, total: active.length, lastError });
   } catch (err: any) {
     console.error('[/api/notify/broadcast]', err);
     return NextResponse.json({ error: err.message || 'Broadcast failed' }, { status: 500 });

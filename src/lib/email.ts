@@ -1,54 +1,66 @@
 // ════════════════════════════════════════════════════════════
 // src/lib/email.ts
 // Sends every outbound email (subscription confirmations,
-// contest/challenge alerts, subscribe nudges) through Gmail SMTP
-// via Nodemailer — no domain verification needed, unlike Resend.
+// contest/challenge alerts, subscribe nudges) through Brevo's
+// transactional email API (https://api.brevo.com) — a plain HTTPS
+// call, no SMTP handshake, no domain verification required to get
+// started.
 //
-// Requires GMAIL_USER (your Gmail address) and GMAIL_APP_PASSWORD
-// (a 16-character App Password, NOT your normal Gmail password —
-// generate one at https://myaccount.google.com/apppasswords, which
-// requires 2-Step Verification to be turned on first).
+// Requires BREVO_API_KEY (Settings → SMTP & API → API Keys in your
+// Brevo dashboard) and BREVO_SENDER_EMAIL (must be a "Sender"
+// verified in Brevo — Settings → Senders & IP).
 //
-// Trade-offs vs. a verified domain:
-//   - Free, works immediately, no DNS required.
-//   - Can send to ANY recipient (not just your own address).
-//   - Capped around ~500 emails/day by Gmail.
-//   - Sent from your personal Gmail address, so it's more likely
-//     to get flagged as spam than mail from a verified domain —
-//     fine for now, worth revisiting once you have a domain.
+// Trade-offs:
+//   - Free tier: 300 emails/day, no credit card required.
+//   - Sending from a domain-verified sender lands in inboxes more
+//     reliably than a personal Gmail address did.
+//   - No daily send-rate footgun like Gmail's undocumented limits —
+//     Brevo enforces a clear, visible quota in its dashboard.
 //
 // Server-only — never import this from a client component.
 // ════════════════════════════════════════════════════════════
 
-import nodemailer from 'nodemailer';
-
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
-const FROM = process.env.EMAIL_FROM || `Bit by Bit <${GMAIL_USER}>`;
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL;
+const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || 'Bit by Bit';
+const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
-let cachedTransporter: nodemailer.Transporter | null = null;
-
-function getTransporter(): nodemailer.Transporter | null {
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
-    console.error('[email] GMAIL_USER / GMAIL_APP_PASSWORD not set — skipping send');
-    return null;
+function ready(): boolean {
+  if (!BREVO_API_KEY || !BREVO_SENDER_EMAIL) {
+    console.error('[email] BREVO_API_KEY / BREVO_SENDER_EMAIL not set — skipping send');
+    return false;
   }
-  if (!cachedTransporter) {
-    cachedTransporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
-      // Reuse one connection across a whole batch instead of doing a
-      // fresh TLS handshake per email — this is the difference between
-      // ~2s and ~300ms per send, which matters a lot once you're
-      // sending to dozens of people in one request.
-      pool: true,
-      maxConnections: 1,
-      rateDelta: 1000,
-      rateLimit: 4, // stay well under Gmail's per-second throttling
+  return true;
+}
+
+async function brevoSend(to: string, subject: string, html: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(BREVO_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'api-key': BREVO_API_KEY!,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: BREVO_SENDER_NAME, email: BREVO_SENDER_EMAIL },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      const msg = body?.message || `HTTP ${res.status}`;
+      console.error('[email] Brevo send failed for', to, msg);
+      return { ok: false, error: msg };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    console.error('[email] Brevo request failed for', to, err);
+    return { ok: false, error: err?.message || String(err) };
   }
-  return cachedTransporter;
 }
 
 function wrap(bodyHtml: string) {
@@ -70,15 +82,20 @@ function wrap(bodyHtml: string) {
  * down a payment-verification request.
  */
 export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
-  const transporter = getTransporter();
-  if (!transporter || !to) return false;
-  try {
-    await transporter.sendMail({ from: FROM, to, subject, html });
-    return true;
-  } catch (err) {
-    console.error('[email] send failed:', err);
-    return false;
-  }
+  if (!ready() || !to) return false;
+  const result = await brevoSend(to, subject, html);
+  return result.ok;
+}
+
+/**
+ * Same as sendEmail but also returns the failure reason — used by
+ * the broadcast route so a failed send can show *why* in the admin
+ * toast instead of just a bare failed count.
+ */
+export async function sendEmailDetailed(to: string, subject: string, html: string): Promise<{ ok: boolean; error?: string }> {
+  if (!ready()) return { ok: false, error: 'BREVO_API_KEY / BREVO_SENDER_EMAIL not set' };
+  if (!to) return { ok: false, error: 'No recipient email' };
+  return brevoSend(to, subject, html);
 }
 
 export interface BatchRecipient {
@@ -89,9 +106,9 @@ export interface BatchRecipient {
 
 /**
  * Batch send for broadcasts (contest live, weekly challenge,
- * subscribe nudge). Gmail SMTP has no true batch endpoint, so this
- * sends sequentially with a small delay between each — gentler on
- * Gmail's per-second limits than firing everything at once, and
+ * subscribe nudge). Brevo's API is per-recipient like Gmail's SMTP
+ * was, so this still sends sequentially with a small delay between
+ * each — gentler on rate limits than firing everything at once, and
  * keeps a single bad recipient from aborting the rest.
  *
  * Note: on Vercel's default (10s) function timeout, this comfortably
@@ -99,23 +116,19 @@ export interface BatchRecipient {
  * the hundreds, this will need chunking across multiple requests —
  * flag it if you get there.
  */
-export async function sendBatch(recipients: BatchRecipient[]): Promise<{ sent: number; failed: number }> {
-  const transporter = getTransporter();
-  if (!transporter) return { sent: 0, failed: recipients.length };
+export async function sendBatch(recipients: BatchRecipient[]): Promise<{ sent: number; failed: number; lastError?: string }> {
+  if (!ready()) return { sent: 0, failed: recipients.length, lastError: 'BREVO_API_KEY / BREVO_SENDER_EMAIL not set' };
 
   let sent = 0, failed = 0;
+  let lastError: string | undefined;
   for (const r of recipients) {
-    try {
-      await transporter.sendMail({ from: FROM, to: r.to, subject: r.subject, html: r.html });
-      sent++;
-    } catch (err) {
-      console.error('[email] batch send failed for', r.to, err);
-      failed++;
-    }
-    // Gentle pacing to avoid tripping Gmail's rate limiting.
+    const result = await brevoSend(r.to, r.subject, r.html);
+    if (result.ok) sent++;
+    else { failed++; lastError = result.error; }
+    // Gentle pacing to avoid tripping Brevo's per-second rate limit.
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  return { sent, failed };
+  return { sent, failed, lastError };
 }
 
 // ────────────────────────────────────────────────────────────

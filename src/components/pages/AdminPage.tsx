@@ -28,22 +28,50 @@ async function notifySubscribers(
   kind: "contest_live" | "weekly_challenge",
   refId: string,
   title: string,
-): Promise<{ sent: number; failed: number; skipped: number } | null> {
+): Promise<{ sent: number; failed: number; skipped: number; total: number; message?: string; lastError?: string } | { error: string } | null> {
   try {
     const db = getSupabaseClient();
     const { data: { session } } = await db.auth.getSession();
     const token = session?.access_token;
     if (!token) return null;
-    const res = await fetch("/api/notify/broadcast", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ kind, refId, title }),
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
+    // The server sends emails one-by-one — for more than a handful of
+    // recipients this can run long enough to exceed the hosting
+    // platform's function timeout, in which case the request just hangs
+    // with no response ever coming back. Cap it client-side so the UI
+    // can't get stuck on "Sending..." forever.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+    let res: Response;
+    try {
+      res = await fetch("/api/notify/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ kind, refId, title }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    const body = await res.json().catch(() => null);
+    if (!res.ok) return body?.error ? { error: body.error } : null;
+    return body;
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      return { error: "Timed out — likely still running server-side (check function logs); large recipient lists can exceed the function time limit" };
+    }
     return null;
   }
+}
+
+// Turns a notifySubscribers() result into a single toast message,
+// distinguishing "nothing to send" from real send failures.
+function notifyResultToast(res: Awaited<ReturnType<typeof notifySubscribers>>): string {
+  if (!res) return "Notify failed — check email config (see server logs)";
+  if ("error" in res) return `Notify failed — ${res.error}`;
+  if (res.total === 0) return res.message || "No active subscribers with an email on file";
+  if (res.sent > 0) return res.failed > 0 ? `Notified ${res.sent} subscribers (${res.failed} failed: ${res.lastError || "unknown error"})` : `Notified ${res.sent} subscribers`;
+  if (res.skipped === res.total) return `Already notified everyone for this (skipped ${res.skipped})`;
+  return `Notify sent to 0 of ${res.total} — ${res.lastError || "check email config"}`;
 }
 
 type Section =
@@ -1080,6 +1108,27 @@ interface AdminPageProps {
 
 export default function AdminPage({ user }: AdminPageProps) {
   const db = getSupabaseClient();
+  const [backfillingEmails, setBackfillingEmails] = useState(false);
+  async function backfillEmails() {
+    setBackfillingEmails(true);
+    try {
+      const { data: { session } } = await db.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { showToast("Sign in required"); setBackfillingEmails(false); return; }
+      const res = await fetch("/api/admin/backfill-emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) showToast(`Backfill failed — ${body?.error || "unknown error"}`);
+      else if (body?.message) showToast(body.message);
+      else showToast(`Backfilled ${body.membersUpdated} members, ${body.subscribersUpdated} subscribers (scanned ${body.scanned} auth users)`);
+    } catch {
+      showToast("Backfill failed — network error");
+    }
+    setBackfillingEmails(false);
+  }
+
   const [section, setSection] = useState<Section>("overview");
   const [subs, setSubs] = useState<Submission[]>([]);
   const [arenaSubs, setArenaSubs] = useState<ArenaSubmission[]>([]);
@@ -1557,17 +1606,12 @@ export default function AdminPage({ user }: AdminPageProps) {
   const [notifyingContestId, setNotifyingContestId] = useState<string | null>(null);
   async function notifyContest(c: Contest) {
     setNotifyingContestId(c.id);
-    const res = await notifySubscribers("contest_live", c.id, c.name);
-    if (res) {
-      showToast(
-        res.sent > 0
-          ? `Notified ${res.sent} subscribers`
-          : `Already notified everyone for this contest (skipped ${res.skipped})`,
-      );
-    } else {
-      showToast("Notify failed — check email config");
+    try {
+      const res = await notifySubscribers("contest_live", c.id, c.name);
+      showToast(notifyResultToast(res));
+    } finally {
+      setNotifyingContestId(null);
     }
-    setNotifyingContestId(null);
   }
 
   async function setContestStatus(id: string, status: Contest["status"]) {
@@ -1581,7 +1625,7 @@ export default function AdminPage({ user }: AdminPageProps) {
 
     if (status === "live" && contest) {
       notifySubscribers("contest_live", id, contest.name)
-        .then((res) => { if (res) showToast(`Notified ${res.sent} subscribers`); });
+        .then((res) => showToast(notifyResultToast(res)));
     }
   }
 
@@ -2419,8 +2463,16 @@ export default function AdminPage({ user }: AdminPageProps) {
             {/* ── MEMBERS ── */}
             {section === "members" && (
               <div>
-                <h2 className="font-display font-bold text-xl mb-5">
-                  Members ({members.length})
+                <h2 className="font-display font-bold text-xl mb-5 flex items-center justify-between gap-4">
+                  <span>Members ({members.length})</span>
+                  <button
+                    onClick={backfillEmails}
+                    disabled={backfillingEmails}
+                    className="text-xs font-mono px-3 py-1.5 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] text-[#00e87a] hover:border-[#00e87a40] disabled:opacity-50"
+                    title="Pull email from Supabase Auth for every member/subscriber who hasn't been synced yet"
+                  >
+                    {backfillingEmails ? "Backfilling…" : "📧 Backfill emails"}
+                  </button>
                 </h2>
                 <div className="space-y-2">
                   {members.length === 0 && (
@@ -2714,17 +2766,12 @@ function WeeklyAdminSection({ user }: { user: User }) {
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
   async function notifyExisting(ch: WeeklyChallenge) {
     setNotifyingId(ch.id);
-    const res = await notifySubscribers("weekly_challenge", ch.id, ch.title);
-    if (res) {
-      showToast(
-        res.sent > 0
-          ? `Notified ${res.sent} subscribers`
-          : `Already notified everyone for this challenge (skipped ${res.skipped})`,
-      );
-    } else {
-      showToast("Notify failed — check email config");
+    try {
+      const res = await notifySubscribers("weekly_challenge", ch.id, ch.title);
+      showToast(notifyResultToast(res));
+    } finally {
+      setNotifyingId(null);
     }
-    setNotifyingId(null);
   }
 
   function startCreate() {
@@ -2783,7 +2830,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
         // else to do for access. Still email them that it's up.
         showToast("Created ✓ — notifying subscribers…");
         notifySubscribers("weekly_challenge", created.id, payload.title)
-          .then(res => showToast(res ? `Notified ${res.sent} subscribers` : "Notify failed — check email config"));
+          .then(res => showToast(notifyResultToast(res)));
       }
       setForm(null);
       setEditId(null);

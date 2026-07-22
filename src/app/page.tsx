@@ -138,11 +138,24 @@ export default function App() {
       return { name: su.user_metadata?.full_name || github, github, is_admin: isAdmin };
     }
 
-    // GitHub OAuth returns the account's email via Supabase's session
-    // (su.email) as long as the user has a public/verified email — we
-    // never ask for it separately. Some users genuinely have none.
-    function extractEmail(su: any): string | null {
-      return su?.email || su?.user_metadata?.email || null;
+    // Writes email/name into `members` (and `subscribers`, if a row
+    // already exists) via a server-side route using the service-role
+    // key — see /api/auth/sync. This replaced a client-side
+    // `db.from("members").update(...)` that failed *silently* whenever
+    // RLS didn't allow the anon key to write that column. Runs on every
+    // session detection, not just fresh sign-ins, so existing logged-in
+    // users get backfilled too and not only people who sign in again.
+    async function syncEmail(session: any) {
+      const token = session?.access_token;
+      if (!token) return;
+      try {
+        await fetch("/api/auth/sync", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {
+        // Best-effort — a failed sync here shouldn't block sign-in.
+      }
     }
 
     db.auth.getSession().then(async ({ data: { session } }) => {
@@ -154,6 +167,7 @@ export default function App() {
         if (!alive) return;
         setUser(u);
         resolving.current = false;
+        syncEmail(session);
       } else {
         setUser(null);
       }
@@ -179,18 +193,8 @@ export default function App() {
             problems_solved: 0,
             streak:          0,
           }, { onConflict: "github", ignoreDuplicates: true }).then(() => {});
-
-          // Separate, narrow update just for email/name — safe to run on
-          // every login since it never touches points/streak, and keeps
-          // the address fresh if the user's GitHub email changes.
-          const email = extractEmail(session.user);
-          if (email) {
-            (db.from("members") as any)
-              .update({ email, name: u.name })
-              .eq("github", u.github)
-              .then(() => {});
-          }
         }
+        syncEmail(session);
       } else if (event === "SIGNED_OUT") {
         setUser(null);
         setPage("home");
