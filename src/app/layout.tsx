@@ -33,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className="bg-[#0a0a0a] text-[#e0e0e0] min-h-screen antialiased">
+      <body className="bg-[#0b0d12] text-[#e0e0e0] min-h-screen antialiased">
         {children}
         <Analytics />
       </body>

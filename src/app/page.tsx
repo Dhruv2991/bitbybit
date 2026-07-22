@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient, resolveAdminStatus } from "@/lib/supabase";
 import type { User } from "@/types/database";
+import AnimatedBackground from "@/components/pages/AnimatedBackground";
 import HomePage             from "@/components/pages/HomePage";
 import ProblemsPage         from "@/components/pages/ProblemsPage";
 import LeaderboardPage      from "@/components/pages/LeaderboardPage";
@@ -364,7 +365,8 @@ export default function App() {
   }, [page, user?.is_admin, authChecked]);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-transparent">
+      <AnimatedBackground />
 
       {/* Global toasts */}
       <div className="fixed top-20 right-4 md:right-6 z-[200] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
