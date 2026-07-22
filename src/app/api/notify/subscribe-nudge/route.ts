@@ -56,11 +56,33 @@ async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
   return admin ? github : null;
 }
 
+// Vercel Cron always sends GET requests, and automatically attaches
+// `Authorization: Bearer ${CRON_SECRET}` when CRON_SECRET is set in
+// your project's env vars — no extra config needed beyond the
+// vercel.json schedule entry. This lets the monthly nudge run fully
+// unattended instead of needing an admin to click a button.
+export async function GET(req: NextRequest) {
+  const authHeader = req.headers.get('authorization') || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token || !process.env.CRON_SECRET || token !== process.env.CRON_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return runNudge();
+}
+
 export async function POST(req: NextRequest) {
   try {
     const caller = await getVerifiedAdmin(req);
     if (!caller) return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    return runNudge();
+  } catch (err: any) {
+    console.error('[/api/notify/subscribe-nudge]', err);
+    return NextResponse.json({ error: err.message || 'Nudge failed' }, { status: 500 });
+  }
+}
 
+async function runNudge() {
+  try {
     const db = createServerSupabaseClient();
     const monthKey = new Date().toISOString().slice(0, 7); // e.g. '2026-08'
 
