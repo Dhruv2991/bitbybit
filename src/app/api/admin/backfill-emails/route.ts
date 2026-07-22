@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
       else if (count) membersUpdated += count;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: sErr, count: sCount } = await (db.from('subscribers') as any)
+      const { error: sErr, count: sCount } = await(db.from('subscribers') as any)
         .update({ email: r.email, name: r.name })
         .eq('github', r.github)
         .select('github', { count: 'exact' });
