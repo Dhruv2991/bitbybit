@@ -47,6 +47,21 @@ function readStoredUser(): User | null {
   } catch { return null; }
 }
 
+// Wipes any locally-cached auth data. Used whenever we detect a session
+// that can't actually be validated/refreshed anymore (expired or reused
+// refresh token after the tab's been left open/closed for a long time) —
+// without this, a broken token stays cached forever and every DB call
+// keeps silently failing until someone manually clears site data.
+function clearAuthStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem("bitbybit-auth");
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith("bb_admin_")) localStorage.removeItem(k);
+    });
+  } catch {}
+}
+
 export default function App() {
   const [page, setPageState] = useState<PageId>(() => {
     if (typeof window === "undefined") return "home";
@@ -180,8 +195,20 @@ export default function App() {
       }
     }
 
-    db.auth.getSession().then(async ({ data: { session } }) => {
+    db.auth.getSession().then(async ({ data: { session }, error }) => {
       if (!alive) return;
+      if (error) {
+        // The stored refresh token is dead (expired / already rotated by
+        // a previous tab or a long-dormant session) and couldn't be
+        // renewed. Without this, the SDK keeps hanging onto a token that
+        // will fail on every request forever — the only way out used to
+        // be manually clearing site data. Purge it and drop back to a
+        // clean logged-out state instead.
+        clearAuthStorage();
+        await db.auth.signOut({ scope: "local" }).catch(() => {});
+        setUser(null);
+        return;
+      }
       if (session?.user) {
         if (resolving.current) return;
         resolving.current = true;
@@ -191,9 +218,19 @@ export default function App() {
         resolving.current = false;
         syncEmail(session);
       } else {
+        // No error, but also no session — likely stale/partial data left
+        // over in localStorage from a previous visit. Clear it so
+        // readStoredUser() doesn't keep resurrecting a dead user on
+        // every future load.
+        clearAuthStorage();
         setUser(null);
       }
-    }).catch(() => { if (alive) setUser(null); });
+    }).catch(async () => {
+      if (!alive) return;
+      clearAuthStorage();
+      await db.auth.signOut({ scope: "local" }).catch(() => {});
+      setUser(null);
+    });
 
     const { data: { subscription } } = db.auth.onAuthStateChange(async (event, session) => {
       if (!alive) return;
@@ -218,12 +255,34 @@ export default function App() {
         }
         syncEmail(session);
       } else if (event === "SIGNED_OUT") {
+        // Fires both on an explicit signOut() and automatically whenever
+        // a background token refresh fails — clear local storage in both
+        // cases so a dead token never lingers past this point.
+        clearAuthStorage();
         setUser(null);
         setPage("home");
       }
     });
 
     return () => { alive = false; subscription.unsubscribe(); };
+  }, []);
+
+  // A tab left open (or backgrounded/suspended by the OS/browser) for a
+  // long time can come back with an access token that's expired and a
+  // refresh token that's no longer valid. Auto-refresh timers don't
+  // reliably fire while a tab is hidden, so re-check the session as soon
+  // as the user returns — getSession() will attempt a refresh, and the
+  // .catch/error handling above will clear things out if that fails,
+  // instead of leaving every DB call silently broken until a full
+  // reload (or manually clearing site data).
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        getSupabaseClient().auth.getSession().catch(() => {});
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   // Fetch the current user's streak for the navbar badge
