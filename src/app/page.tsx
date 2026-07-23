@@ -63,6 +63,7 @@ export default function App() {
   const [toasts,         setToasts]         = useState<Toast[]>([]);
   const [liveItems,      setLiveItems]      = useState<{ id: string; label: string; page: PageId; type: 'arena' | 'weekly'; status: 'live' | 'upcoming' }[]>([]);
   const [notifOpen,      setNotifOpen]      = useState(false);
+  const [profileOpen,    setProfileOpen]    = useState(false);
   const [userStreak,     setUserStreak]     = useState(0);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
@@ -89,6 +90,26 @@ export default function App() {
   const resolving    = useRef(false);
   const notifRef     = useRef<HTMLDivElement>(null);
   const notifRefMob  = useRef<HTMLDivElement>(null);
+  const profileRef   = useRef<HTMLDivElement>(null);
+
+  // Close the profile dropdown on outside click or Escape
+  useEffect(() => {
+    if (!profileOpen) return;
+    function handlePointer(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setProfileOpen(false);
+    }
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [profileOpen]);
 
   function showToast(msg: string, type: ToastType = "info") {
     const id = ++toastCounter.current;
@@ -282,7 +303,17 @@ export default function App() {
     const db = getSupabaseClient();
     await db.auth.signInWithOAuth({
       provider: "github",
-      options: { redirectTo: window.location.origin },
+      options: {
+        redirectTo: window.location.origin,
+        // Forces GitHub's account picker to appear instead of silently
+        // re-authenticating with whichever GitHub account is active in
+        // the browser. Since this function only ever runs when there's
+        // no valid persisted Supabase session (i.e. after an explicit
+        // sign-out, or on a fresh device), a user who never logs out
+        // stays auto-logged-in via their existing session and never
+        // hits this flow at all.
+        queryParams: { prompt: "select_account" },
+      },
     });
   }
 
@@ -290,6 +321,17 @@ export default function App() {
     const github = user?.github;
     await getSupabaseClient().auth.signOut();
     if (github) try { localStorage.removeItem(`bb_admin_${github}`); } catch {}
+  }
+
+  // Fully signs the current user out, then immediately re-opens the
+  // GitHub OAuth flow so they land straight on the account picker
+  // (signIn() always passes prompt: "select_account") instead of
+  // having to sign out, see the logged-out header, and click sign in
+  // again themselves.
+  async function switchAccount() {
+    setProfileOpen(false);
+    await signOut();
+    await signIn();
   }
 
   const toastColors: Record<ToastType, string> = {
@@ -443,25 +485,53 @@ export default function App() {
             {!authChecked ? (
               <div className="w-24 h-8 rounded-xl bg-[#111] animate-pulse" />
             ) : user ? (
-              <div className="flex items-center gap-2.5">
-                <img
-                  src={`https://github.com/${user.github}.png?size=32`}
-                  alt={user.name}
-                  className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a2a]"
-                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                />
-                <span className="text-xs font-mono text-[#888]">{user.name}</span>
-                {userStreak > 0 && (
-                  <span title={`${userStreak}-day streak`}
-                    className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#f0b429] bg-[#f0b42912] border border-[#f0b42925] rounded-full px-1.5 py-0.5">
-                    🔥{userStreak}
-                  </span>
-                )}
-                <button onClick={signOut}
-                  className="px-3 py-1.5 rounded-xl font-mono text-xs border border-[#222]
-                    text-[#777] hover:text-[#ff4d4d] hover:border-[#ff4d4d30] transition-all">
-                  Sign out
+              <div className="relative" ref={profileRef}>
+                <button
+                  onClick={() => setProfileOpen(o => !o)}
+                  aria-haspopup="menu"
+                  aria-expanded={profileOpen}
+                  className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl hover:bg-[#ffffff08] transition-colors">
+                  <img
+                    src={`https://github.com/${user.github}.png?size=32`}
+                    alt={user.name}
+                    className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a2a]"
+                    onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                  <span className="text-xs font-mono text-[#888]">{user.name}</span>
+                  {userStreak > 0 && (
+                    <span title={`${userStreak}-day streak`}
+                      className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#f0b429] bg-[#f0b42912] border border-[#f0b42925] rounded-full px-1.5 py-0.5">
+                      🔥{userStreak}
+                    </span>
+                  )}
+                  <span className={`text-[10px] text-[#555] transition-transform ${profileOpen ? "rotate-180" : ""}`}>▾</span>
                 </button>
+
+                {profileOpen && (
+                  <div role="menu"
+                    className="absolute right-0 top-11 w-56 bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down">
+                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2.5">
+                      <img
+                        src={`https://github.com/${user.github}.png?size=32`}
+                        alt={user.name}
+                        className="w-8 h-8 rounded-full object-cover ring-1 ring-[#2a2a2a]"
+                        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-mono text-[#e0e0e0] truncate">{user.name}</p>
+                        <p className="text-[10px] font-mono text-[#666] truncate">@{user.github}</p>
+                      </div>
+                    </div>
+                    <button role="menuitem" onClick={switchAccount}
+                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#ffffff06] transition-colors flex items-center gap-2.5">
+                      <span className="text-sm">🔁</span> Switch account
+                    </button>
+                    <button role="menuitem" onClick={() => { setProfileOpen(false); signOut(); }}
+                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[#aaa] hover:text-[#ff4d4d] hover:bg-[#ff4d4d0a] transition-colors flex items-center gap-2.5 border-t border-[#1a1a1a]">
+                      <span className="text-sm">⏻</span> Sign out
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <button onClick={signIn}
@@ -526,8 +596,8 @@ export default function App() {
             </button>
             <div className="mt-2 border-t border-[#1a1a1a] pt-2 px-4">
               {!authChecked ? null : user ? (
-                <div className="flex items-center justify-between py-2">
-                  <div className="flex items-center gap-2">
+                <div className="py-2">
+                  <div className="flex items-center gap-2 mb-2.5">
                     <img src={`https://github.com/${user.github}.png?size=28`} alt={user.name}
                       className="w-7 h-7 rounded-full object-cover"
                       onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
@@ -539,9 +609,16 @@ export default function App() {
                       </span>
                     )}
                   </div>
-                  <button onClick={signOut} className="text-xs font-mono text-[#555] hover:text-[#ff4d4d] transition-colors">
-                    Sign out
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setMobileMenuOpen(false); switchAccount(); }}
+                      className="flex-1 text-center py-2 rounded-xl font-mono text-xs border border-[#222] text-[#aaa] hover:text-[#e0e0e0] hover:border-[#2a2a2a] transition-colors">
+                      🔁 Switch account
+                    </button>
+                    <button onClick={() => { setMobileMenuOpen(false); signOut(); }}
+                      className="flex-1 text-center py-2 rounded-xl font-mono text-xs border border-[#222] text-[#aaa] hover:text-[#ff4d4d] hover:border-[#ff4d4d30] transition-colors">
+                      ⏻ Sign out
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <button onClick={signIn}
