@@ -10,14 +10,17 @@
 // Configure in Razorpay Dashboard → Settings → Webhooks:
 //   URL:    https://yourdomain.com/api/razorpay/webhook
 //   Secret: any string you choose — put it in RAZORPAY_WEBHOOK_SECRET
-//   Events: payment.captured (minimum), payment.failed (optional)
+//   Events: payment.captured (required), payment.failed (optional),
+//           refund.processed (required — without this checked,
+//           refunding someone in the Razorpay dashboard will NOT
+//           revoke their access automatically).
 // ════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { computeNewPeriodEnd } from '@/lib/subscription';
-import { sendEmail, subscriptionConfirmedEmail } from '@/lib/email';
+import { sendEmail, subscriptionConfirmedEmail, subscriptionRevokedEmail } from '@/lib/email';
 
 // Webhook needs the RAW body to verify the signature — do not
 // parse it as JSON before verifying.
@@ -47,8 +50,67 @@ export async function POST(req: NextRequest) {
 
     const event = JSON.parse(rawBody);
 
-    // We only care about successful captures. Everything else we
-    // just acknowledge so Razorpay stops retrying.
+    // Refund events: Razorpay fires refund.processed once the money is
+    // actually back with the customer. We find the subscriber this
+    // payment belongs to and revoke their access the same way the
+    // admin's manual "Revoke access" button does, so an admin doesn't
+    // have to remember to do it by hand every time they refund someone
+    // from the Razorpay dashboard.
+    if (event.event === 'refund.processed') {
+      const paymentId: string | undefined = event.payload?.refund?.entity?.payment_id;
+
+      if (!paymentId) {
+        console.warn('[razorpay/webhook] refund event with no payment_id', event.event);
+        return NextResponse.json({ success: true, ignored: 'no payment_id' });
+      }
+
+      const db = createServerSupabaseClient();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: sub } = await (db.from('subscribers') as any)
+        .select('id, github, name, email, status')
+        .eq('razorpay_payment_id', paymentId)
+        .maybeSingle();
+
+      if (!sub) {
+        console.warn('[razorpay/webhook] refund for unknown payment_id', paymentId);
+        return NextResponse.json({ success: true, ignored: 'no matching subscriber' });
+      }
+
+      // Already revoked (e.g. the admin already clicked "Revoke access",
+      // or we already processed this refund via the other event type) —
+      // nothing left to do.
+      if (sub.status !== 'rejected') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (db.from('subscribers') as any)
+          .update({ status: 'rejected' })
+          .eq('id', sub.id);
+        if (error) console.error('[razorpay/webhook] revoke on refund failed:', error);
+      }
+
+      // Dedupe on payment_id so refund.processed and payment.refunded
+      // firing for the same refund only sends one email, same pattern
+      // as the payment.captured confirmation email below.
+      if (sub.email) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: logged } = await (db.from('email_log') as any)
+          .upsert(
+            { github: sub.github, email: sub.email, kind: 'subscription_refunded', ref_id: paymentId },
+            { onConflict: 'github,kind,ref_id', ignoreDuplicates: true },
+          )
+          .select('github')
+          .maybeSingle();
+        if (logged) {
+          const { subject, html } = subscriptionRevokedEmail(sub.name || sub.github);
+          sendEmail(sub.email, subject, html).catch(() => {});
+        }
+      }
+
+      return NextResponse.json({ success: true, revoked: sub.github });
+    }
+
+    // We only care about successful captures beyond this point.
+    // Everything else we just acknowledge so Razorpay stops retrying.
     if (event.event !== 'payment.captured') {
       return NextResponse.json({ success: true, ignored: event.event });
     }

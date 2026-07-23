@@ -153,6 +153,20 @@ export function subscriptionConfirmedEmail(name: string, periodEnd: string) {
   };
 }
 
+export function subscriptionRevokedEmail(name: string) {
+  return {
+    subject: 'Your subscription has been refunded',
+    html: wrap(`
+      <p style="font-size:15px;">Hey ${name},</p>
+      <p style="font-size:14px;color:#aaa;line-height:1.6;">
+        We've processed a refund for your subscription, and your access has been
+        turned off accordingly. If you think this was a mistake, just reply to this
+        email and we'll sort it out.
+      </p>
+    `),
+  };
+}
+
 export function contestLiveEmail(name: string, contestName: string) {
   return {
     subject: `🏆 ${contestName} is live now`,
