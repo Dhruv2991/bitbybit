@@ -2918,23 +2918,40 @@ function WeeklyAdminSection({ user }: { user: User }) {
     load();
   }
 
-  async function updatePoints(subId: string, newPts: string) {
+  async function updatePoints(sub: any, newPts: string) {
     const pts = parseInt(newPts, 10);
     if (isNaN(pts) || pts < 0) {
       showToast("Enter a valid number");
       return;
     }
+    const delta = pts - (sub.points_awarded || 0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (db.from("weekly_submissions") as any)
       .update({ points_awarded: pts })
-      .eq("id", subId);
+      .eq("id", sub.id);
     if (error) {
       showToast("Update failed");
       return;
     }
+    // Weekly submissions with test cases are auto-approved at submit
+    // time now, same as regular Problems — if this one's already
+    // approved, its points already counted toward the member's total,
+    // so editing them here has to apply just the difference, not the
+    // full new value (which would double-count what was already added).
+    if (sub.status === "approved" && delta !== 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: mem } = await (db.from("members") as any)
+        .select("total_points").eq("github", sub.github).maybeSingle();
+      if (mem) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (db.from("members") as any)
+          .update({ total_points: Math.max(0, (mem.total_points || 0) + delta) })
+          .eq("github", sub.github);
+      }
+    }
     setEditingPts((prev) => {
       const n = { ...prev };
-      delete n[subId];
+      delete n[sub.id];
       return n;
     });
     showToast("Points updated ✓");
@@ -3614,7 +3631,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                           {isEditing ? (
                                             <>
                                               <button
-                                                onClick={() => updatePoints(s.id, editingPts[s.id])}
+                                                onClick={() => updatePoints(s, editingPts[s.id])}
                                                 className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
                                               >
                                                 Save

@@ -81,7 +81,7 @@ function clearArenaDraft(contestId: string, problemId: string, lang: SupportedLa
 // Streak/last_solved_at always update on a genuine submit, even on a
 // resubmission of an already-solved problem — that's what makes
 // resubmitting today still count toward today's streak.
-async function syncMemberProgress(
+export async function syncMemberProgress(
   db: ReturnType<typeof getSupabaseClient>,
   github: string,
   name: string,

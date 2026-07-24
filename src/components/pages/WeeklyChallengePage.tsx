@@ -15,6 +15,7 @@ import type {
   WeeklyAccess,
   WeeklySubmission as WeeklySubmissionBase,
 } from "@/types/database";
+import { syncMemberProgress } from "@/app/problems/Workspace";
 
 type WeeklySubmission = WeeklySubmissionBase & { status?: string };
 
@@ -348,11 +349,38 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
       activeChallenge.ends_at,
     );
     const basePts = details?.pointsAwarded ?? problem.points ?? 100;
-    const finalPoints = Math.round(basePts * (1 + bonus));
+    const finalPointsBase = Math.round(basePts * (1 + bonus));
     const passed = details?.passed ?? (problem.test_cases?.length || 0);
     const total = details?.total ?? (problem.test_cases?.length || 0);
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: existingRows } = await (db.from("weekly_submissions") as any)
+        .select("id, status, points_awarded")
+        .eq("weekly_challenge_id", activeChallenge.id)
+        .eq("problem_id", problemId)
+        .eq("github", user.github)
+        .limit(1);
+      const prevRow = existingRows?.[0];
+
+      // Same auto-grading rule as the regular Problems flow: if this
+      // problem actually has test cases, grade and approve it right
+      // now instead of waiting on manual admin review. Problems with
+      // no test cases still can't be auto-verified, so those stay
+      // pending for the admin.
+      const canAutoGrade = total > 0;
+      const isFirstSolve = prevRow?.status !== "approved";
+      // Never let a resubmission lower the score already on record —
+      // the time bonus naturally decays through the week, so this also
+      // protects an earlier, higher-bonus attempt from being
+      // overwritten by a later, lower-scoring resubmission.
+      const finalPoints = canAutoGrade
+        ? Math.max(finalPointsBase, prevRow?.points_awarded || 0)
+        : finalPointsBase;
+      const pointsDelta = canAutoGrade
+        ? finalPoints - (prevRow?.points_awarded || 0)
+        : 0;
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (db.from("weekly_submissions") as any).upsert(
         {
@@ -367,11 +395,15 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
           tests_total: total,
           points_awarded: finalPoints,
           time_bonus: bonus,
-          status: "pending",
+          status: canAutoGrade ? "approved" : "pending",
           submitted_at: new Date().toISOString(),
         },
         { onConflict: "weekly_challenge_id,problem_id,github" },
       );
+
+      if (canAutoGrade) {
+        await syncMemberProgress(db, user.github, user.name, pointsDelta, isFirstSolve);
+      }
 
       // Refresh submissions
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
