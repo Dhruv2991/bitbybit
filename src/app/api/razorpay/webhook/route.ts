@@ -20,7 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { computeNewPeriodEnd } from '@/lib/subscription';
-import { sendEmail, subscriptionConfirmedEmail, subscriptionRevokedEmail } from '@/lib/email';
+import { sendEmailDetailed, subscriptionConfirmedEmail, subscriptionRevokedEmail } from '@/lib/email';
 
 // Webhook needs the RAW body to verify the signature — do not
 // parse it as JSON before verifying.
@@ -102,7 +102,21 @@ export async function POST(req: NextRequest) {
           .maybeSingle();
         if (logged) {
           const { subject, html } = subscriptionRevokedEmail(sub.name || sub.github);
-          sendEmail(sub.email, subject, html).catch(() => {});
+          const result = await sendEmailDetailed(sub.email, subject, html);
+          if (!result.ok) {
+            // Surface this loudly in Vercel's function logs — an
+            // email_log row existing is NOT proof Brevo ever received
+            // this, only that we decided to attempt it. If the actual
+            // send failed, remove the dedupe row so a Razorpay webhook
+            // retry (or a manual replay) can actually try again instead
+            // of silently being blocked by ignoreDuplicates thinking
+            // it already succeeded.
+            console.error(`[razorpay/webhook] refund email to ${sub.email} FAILED:`, result.error);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (db.from('email_log') as any)
+              .delete()
+              .eq('github', sub.github).eq('kind', 'subscription_refunded').eq('ref_id', paymentId);
+          }
         }
       }
 
@@ -166,7 +180,14 @@ export async function POST(req: NextRequest) {
           .maybeSingle();
         if (logged) {
           const { subject, html } = subscriptionConfirmedEmail(notes.name || notes.github, newPeriodEnd);
-          sendEmail(email, subject, html).catch(() => {});
+          const result = await sendEmailDetailed(email, subject, html);
+          if (!result.ok) {
+            console.error(`[razorpay/webhook] confirmation email to ${email} FAILED:`, result.error);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (db.from('email_log') as any)
+              .delete()
+              .eq('github', notes.github).eq('kind', 'subscription_confirmed').eq('ref_id', paymentId);
+          }
         }
       }
     } else {
