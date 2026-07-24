@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import { isActiveSubscription } from "@/lib/subscription";
+import { effectiveStreak } from "@/lib/streak";
 import type {
   User,
   Submission,
@@ -902,6 +903,7 @@ interface ModalState {
   type:
     | "approve-sub"
     | "reject-sub"
+    | "edit-points"
     | "approve-arena"
     | "reject-arena"
     | "approve-weekly"
@@ -932,9 +934,10 @@ function ActionModal({
     modal.type === "approve-sub" ||
     modal.type === "approve-arena" ||
     modal.type === "approve-weekly";
+  const isPointsInput = isApprove || modal.type === "edit-points";
 
   useEffect(() => {
-    if (modal.type === "approve-sub" || modal.type === "approve-weekly")
+    if (modal.type === "approve-sub" || modal.type === "approve-weekly" || modal.type === "edit-points")
       setValue(String(modal.suggestedPoints ?? 100));
     if (modal.type === "approve-arena") {
       const sub = modal.arenaSubRef!;
@@ -967,7 +970,9 @@ function ActionModal({
   const title =
     modal.type === "approve-sub"
       ? `Approve submission — @${modal.github}`
-      : modal.type === "reject-sub"
+      : modal.type === "edit-points"
+        ? `Edit points — @${modal.github}`
+        : modal.type === "reject-sub"
         ? `Reject submission — @${modal.github}`
         : modal.type === "approve-arena"
           ? `Approve arena entry — @${modal.github}`
@@ -999,6 +1004,13 @@ function ActionModal({
           <p className="text-xs text-[#aaa] font-mono mb-4">
             Points are auto-calculated from test results. Adjust before
             confirming.
+          </p>
+        )}
+        {modal.type === "edit-points" && (
+          <p className="text-xs text-[#aaa] font-mono mb-4">
+            This submission was auto-graded from test results. Changing
+            the value here updates the user&apos;s total points by the
+            difference.
           </p>
         )}
         {modal.type === "approve-arena" && modal.arenaSubRef && (
@@ -1041,7 +1053,7 @@ function ActionModal({
           </p>
         )}
         <form onSubmit={handleSubmit} className="space-y-3">
-          {isApprove && (
+          {isPointsInput && (
             <div>
               <label className="block text-[10px] text-[#999] font-mono uppercase mb-1">
                 Points to award
@@ -1080,13 +1092,15 @@ function ActionModal({
             <button
               type="submit"
               className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold transition-all
-                ${isApprove ? "bg-[#00e87a] text-black hover:bg-[#00ff88]" : "bg-[#ff4d4d20] text-[#ff4d4d] hover:bg-[#ff4d4d30] border border-[#ff4d4d20]"}`}
+                ${isApprove ? "bg-[#00e87a] text-black hover:bg-[#00ff88]" : modal.type === "edit-points" ? "bg-[#a78bfa] text-black hover:bg-[#b39bff]" : "bg-[#ff4d4d20] text-[#ff4d4d] hover:bg-[#ff4d4d30] border border-[#ff4d4d20]"}`}
             >
               {isApprove
                 ? "✓ Confirm Approval"
-                : modal.type === "confirm-delete"
-                  ? "🗑 Delete"
-                  : "✗ Confirm"}
+                : modal.type === "edit-points"
+                  ? "💾 Save points"
+                  : modal.type === "confirm-delete"
+                    ? "🗑 Delete"
+                    : "✗ Confirm"}
             </button>
             <button
               type="button"
@@ -1362,6 +1376,46 @@ export default function AdminPage({ user }: AdminPageProps) {
       ),
     );
     showToast(`✗ Rejected submission for @${github}`);
+  }
+
+  // Regular problem submissions are now auto-graded and auto-approved
+  // from test results at submit time — there's no approval step left
+  // for the admin to do here. This lets an admin correct the point
+  // value afterward (e.g. a mis-weighted problem, a partial-credit
+  // dispute) without re-running the whole grading flow. It applies
+  // just the difference to the member's total_points so it doesn't
+  // touch problems_solved or streak, which are already correct.
+  async function editSubmissionPoints(sub: Submission) {
+    const input = await openModal({
+      type: "edit-points",
+      id: sub.id,
+      github: sub.github,
+      suggestedPoints: sub.points_awarded || 0,
+    });
+    if (input === null) return;
+    const newPoints = Math.max(0, parseInt(input as string, 10) || 0);
+    const delta = newPoints - (sub.points_awarded || 0);
+    if (delta === 0) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (db.from("submissions") as any)
+      .update({ points_awarded: newPoints })
+      .eq("id", sub.id);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: mem } = await (db.from("members") as any)
+      .select("total_points").eq("github", sub.github).maybeSingle();
+    if (mem) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (db.from("members") as any)
+        .update({ total_points: Math.max(0, (mem.total_points || 0) + delta) })
+        .eq("github", sub.github);
+    }
+
+    setSubs((prev) =>
+      prev.map((s) => (s.id === sub.id ? { ...s, points_awarded: newPoints } : s)),
+    );
+    showToast(`💾 Points updated for @${sub.github}: ${sub.points_awarded || 0} → ${newPoints}`);
   }
 
   async function checkPlagiarism(sub: Submission) {
@@ -1987,6 +2041,15 @@ export default function AdminPage({ user }: AdminPageProps) {
                               </button>
                             </>
                           )}
+                          {s.status === "approved" && (
+                            <button
+                              onClick={() => editSubmissionPoints(s)}
+                              title="Auto-graded from test results — adjust if needed"
+                              className="px-3 py-1.5 bg-[#a78bfa15] text-[#a78bfa] text-xs font-mono font-bold rounded-lg border border-[#a78bfa25] hover:bg-[#a78bfa25] transition-all"
+                            >
+                              ✎ Edit points
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2504,7 +2567,7 @@ export default function AdminPage({ user }: AdminPageProps) {
                           {m.total_points} XP
                         </div>
                         <div className="text-xs text-[#999] font-mono">
-                          {m.problems_solved} solved · {m.streak}🔥
+                          {m.problems_solved} solved · {effectiveStreak(m.streak, m.last_solved_at)}🔥
                         </div>
                       </div>
                     </div>

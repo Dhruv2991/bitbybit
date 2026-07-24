@@ -70,6 +70,54 @@ function clearArenaDraft(contestId: string, problemId: string, lang: SupportedLa
   try { localStorage.removeItem(arenaDraftKey(contestId, problemId, lang)); } catch {}
 }
 
+// Applies the same streak/points/problems_solved logic as the admin's
+// manual awardPoints() used to, but runs automatically at submit time
+// now that regular problem submissions are auto-graded from test
+// results instead of waiting on manual admin approval.
+//   - pointsDelta: how much to ADD to total_points (0 if a resubmission
+//     didn't beat the user's previous best score for this problem)
+//   - isFirstSolve: whether this is the first time this problem has
+//     ever had a submission from this user (controls problems_solved)
+// Streak/last_solved_at always update on a genuine submit, even on a
+// resubmission of an already-solved problem — that's what makes
+// resubmitting today still count toward today's streak.
+async function syncMemberProgress(
+  db: ReturnType<typeof getSupabaseClient>,
+  github: string,
+  name: string,
+  pointsDelta: number,
+  isFirstSolve: boolean,
+) {
+  const now = new Date();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: ex } = await (db.from('members') as any)
+    .select('*').eq('github', github).maybeSingle();
+
+  if (ex) {
+    const last = ex.last_solved_at ? new Date(ex.last_solved_at) : null;
+    const daysSinceLast = last ? Math.floor((now.getTime() - last.getTime()) / 86_400_000) : 999;
+    const newStreak =
+      daysSinceLast === 0 ? (ex.streak || 1) :
+      daysSinceLast === 1 ? (ex.streak || 0) + 1 : 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (db.from('members') as any).update({
+      total_points:    (ex.total_points || 0) + pointsDelta,
+      problems_solved: (ex.problems_solved || 0) + (isFirstSolve ? 1 : 0),
+      streak:          newStreak,
+      last_solved_at:  now.toISOString(),
+    }).eq('github', github);
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (db.from('members') as any).insert([{
+      github, name,
+      total_points:    pointsDelta,
+      problems_solved: isFirstSolve ? 1 : 0,
+      streak:          1,
+      last_solved_at:  now.toISOString(),
+    }]);
+  }
+}
+
 // ── Tiny markdown parser: bold + inline code ─────────────────────────────────
 
 function renderInline(text: string): React.ReactNode[] {
@@ -725,6 +773,23 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     onArenaCodeChange?.(nextCode, l);
   }, [problem, onArenaSubmit]);
 
+  // Wipes whatever's in the editor (and any saved draft for this
+  // problem+language) and restores the original starter code — for
+  // when someone's gone down a dead end and just wants a clean slate.
+  async function resetEditor() {
+    const starter = STARTER_CODE[lang](problem);
+    if (code === starter) return;
+    const proceed = await confirmAction('Reset the editor to the starter code? This clears your current code and any saved draft for this problem — it can\'t be undone.');
+    if (!proceed) return;
+    if (onArenaSubmit && contestId) clearArenaDraft(contestId, problem.id, lang);
+    if (!onArenaSubmit) clearDraft(problem.id, lang);
+    setCode(starter);
+    setTestResult(null); setRunError(null); setRunStatus(''); setProgress(null);
+    setStatusMsg('Editor reset to starter code.');
+    onArenaCodeChange?.(starter, lang);
+    showToast('↺ Editor reset to starter code', 'info');
+  }
+
   function revealNextHint() {
     const hints = problem.hints || [];
     if (hintsRevealed >= hints.length || hintCooldown) return;
@@ -868,26 +933,56 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         return;
       }
 
-      const { data: existing } = await db.from('submissions').select('id, status')
+      const { data: existing } = await db.from('submissions').select('id, status, points_awarded')
         .eq('problem_id', problem.id).eq('github', user.github)
-        .in('status', ['pending', 'approved']).limit(1).returns<{ id: string; status: string }[]>();
-      if (existing?.length) {
-        const proceed = await confirmAction(existing[0].status === 'approved'
-          ? 'This problem is already approved. Do you want to resubmit? This will replace your approved submission and require admin re-approval.'
-          : 'You already have a pending submission for this problem. Do you want to resubmit and replace it?');
+        .limit(1).returns<{ id: string; status: string; points_awarded: number }[]>();
+      const prevRow = existing?.[0];
+      if (prevRow && prevRow.status === 'pending') {
+        const proceed = await confirmAction('You already have a submission pending manual review for this problem (it has no test cases to auto-grade). Resubmitting will replace it.');
         if (!proceed) { setStatusMsg('Resubmission cancelled.'); setSubmitting(false); return; }
       }
+
+      // Problems with test cases can be graded automatically right now —
+      // no more waiting on an admin to manually approve. Problems with
+      // no test cases at all can't be auto-verified, so those still go
+      // to the admin review queue same as before.
+      const canAutoGrade = total > 0;
+      // "First solve" means no previously *approved* row for this problem
+      // — checking row existence alone would wrongly skip the count for
+      // a leftover unapproved row from before auto-grading existed.
+      const isFirstSolve = prevRow?.status !== 'approved';
+      // Never let a resubmission lower the score already on record —
+      // keep whichever attempt scored higher.
+      const finalPointsAwarded = canAutoGrade
+        ? Math.max(pointsAwarded, prevRow?.points_awarded || 0)
+        : pointsAwarded;
+      const pointsDelta = canAutoGrade
+        ? finalPointsAwarded - (prevRow?.points_awarded || 0)
+        : 0;
 
       const { error } = await (db.from('submissions') as any).upsert([{
         problem_id: problem.id, problem_title: problem.title,
         name: user.name, github: user.github, lang, code, approach,
-        status: 'pending', tests_passed: passed, tests_total: total, points_awarded: pointsAwarded,
+        status: canAutoGrade ? 'approved' : 'pending',
+        tests_passed: passed, tests_total: total, points_awarded: finalPointsAwarded,
       }], { onConflict: 'problem_id,github' });
       if (error) throw error;
 
-      clearDraft(problem.id, lang); setStatusMsg('⏳ Pending review.'); setApproach('');
-      onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded });
-      showToast(`✅ Submitted "${problem.title}" — ${total > 0 ? `${passed}/${total} tests passed, up to ${pointsAwarded} pts` : 'pending review'}`, 'ok');
+      if (canAutoGrade) {
+        await syncMemberProgress(db, user.github, user.name, pointsDelta, isFirstSolve);
+      }
+
+      clearDraft(problem.id, lang); setApproach('');
+      onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded: finalPointsAwarded });
+      if (canAutoGrade) {
+        setStatusMsg(passed === total
+          ? `✅ All tests passed — ${finalPointsAwarded} pts awarded!`
+          : `✅ ${passed}/${total} tests passed — ${finalPointsAwarded} pts awarded.`);
+        showToast(`✅ "${problem.title}" — ${passed}/${total} tests passed, ${finalPointsAwarded} pts awarded${pointsDelta === 0 && !isFirstSolve ? ' (no change — previous attempt scored the same or higher)' : ''}`, 'ok');
+      } else {
+        setStatusMsg('⏳ No test cases on this problem — sent for manual review.');
+        showToast(`✅ Submitted "${problem.title}" — pending manual review (no test cases to auto-grade)`, 'ok');
+      }
     } catch (e: any) {
       setStatusMsg('Error — try again');
       showToast('Submission error: ' + (e.message || 'Unknown'), 'err');
@@ -1190,7 +1285,13 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
             <span className="text-[10px] font-mono text-[var(--text3)] uppercase tracking-widest">Choose Language</span>
             <div className="flex items-center gap-2">
               {code !== STARTER_CODE[lang](problem) && (
-                <span className="text-[10px] font-mono text-[var(--text3)] px-2 py-0.5 rounded-lg border border-[var(--border2)] bg-[var(--card3)]">draft saved</span>
+                <>
+                  <span className="text-[10px] font-mono text-[var(--text3)] px-2 py-0.5 rounded-lg border border-[var(--border2)] bg-[var(--card3)]">draft saved</span>
+                  <button onClick={resetEditor} title="Reset to starter code"
+                    className="text-[10px] font-mono px-2 py-0.5 rounded-lg border border-[var(--border2)] text-[var(--text3)] hover:text-[var(--danger)] hover:border-[rgba(255,92,108,0.3)] transition-colors flex items-center gap-1">
+                    ↺ Reset
+                  </button>
+                </>
               )}
               <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${execBadge.cls}`}>{execBadge.label}</span>
             </div>

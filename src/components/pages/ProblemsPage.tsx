@@ -5,6 +5,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import type { Problem, User } from '@/types/database';
 import { LANG_LABELS, type SupportedLang } from '@/types/database';
 import { isActiveSubscription } from '@/lib/subscription';
+import { getRecommendations, setAiUser } from '@/lib/gemini';
 
 const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false });
 
@@ -21,6 +22,7 @@ interface SubmissionRow {
   submitted_at:  string;
   type:          'normal' | 'weekly';
   review_notes?: string;
+  code:          string;
 }
 
 interface ProblemsPageProps {
@@ -70,9 +72,12 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   const [pageView,          setPageView]          = useState<PageView>('problems');
   const [submissions,       setSubmissions]       = useState<SubmissionRow[]>([]);
   const [subsLoading,       setSubsLoading]       = useState(false);
+  const [viewingCode,       setViewingCode]       = useState<SubmissionRow | null>(null);
   const [shareCard, setShareCard] = useState<{
     title: string; lang: string; passed: number; total: number; points: number;
   } | null>(null);
+  const [recommended, setRecommended] = useState<Problem[]>([]);
+  const [recLoading,  setRecLoading]  = useState(false);
 
   useEffect(() => {
     try { setSolved(JSON.parse(localStorage.getItem('bb_solved') || '[]')); } catch {}
@@ -277,6 +282,40 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problems]);
 
+  // AI recommendations — subscriber-only, based on what they've solved.
+  // Reuses the problems list already loaded above instead of re-fetching it.
+  useEffect(() => {
+    if (!user?.github || !problems.length) { setRecommended([]); return; }
+    const db = getSupabaseClient();
+    let alive = true;
+    (async () => {
+      try {
+        const { data: sub } = await (db.from('subscribers') as any)
+          .select('status, current_period_end').eq('github', user.github).maybeSingle();
+        const isSub = isActiveSubscription(sub?.status, sub?.current_period_end);
+        setAiUser(user.github, isSub);
+        if (!isSub) { if (alive) setRecommended([]); return; }
+
+        const pool = problems.filter(p => !p.is_contest_problem);
+        const { data: solvedSubs } = await db.from('submissions').select('problem_title')
+          .eq('github', user.github).eq('status', 'approved');
+        const solvedTitles = [...new Set((solvedSubs || []).map((s: any) => s.problem_title))];
+        const availableTitles = pool.filter(p => !solvedTitles.includes(p.title)).map(p => p.title);
+        if (!availableTitles.length) { if (alive) setRecommended([]); return; }
+
+        setRecLoading(true);
+        const picks = await getRecommendations(solvedTitles as string[], availableTitles);
+        if (!alive) return;
+        const matched = picks.map(title => pool.find(p => p.title === title)).filter(Boolean) as Problem[];
+        setRecommended(matched);
+      } catch {
+        if (alive) setRecommended([]);
+      }
+      if (alive) setRecLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [user?.github, problems]);
+
   function handleRowClick(p: Problem) {
     const isWeekly      = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
     const isUnlocked    = unlockedIds.has(p.id);
@@ -308,12 +347,12 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       const [{ data: normal }, { data: weekly }] = await Promise.all([
         db
           .from('submissions')
-          .select('id, problem_title, lang, status, points_awarded, created_at, review_notes')
+          .select('id, problem_title, lang, status, points_awarded, created_at, review_notes, code')
           .eq('github', user.github)
           .order('created_at', { ascending: false })
           .limit(100),
         (db.from('weekly_submissions') as any)
-          .select('id, problem_title, lang, status, points_awarded, submitted_at, review_notes')
+          .select('id, problem_title, lang, status, points_awarded, submitted_at, review_notes, code')
           .eq('github', user.github)
           .order('submitted_at', { ascending: false })
           .limit(100),
@@ -328,6 +367,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         submitted_at:  s.created_at,
         type:          'normal',
         review_notes:  s.review_notes,
+        code:          s.code || '',
       }));
 
       const weeklyRows: SubmissionRow[] = (weekly || []).map((s: any) => ({
@@ -339,6 +379,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         submitted_at:  s.submitted_at,
         type:          'weekly',
         review_notes:  s.review_notes,
+        code:          s.code || '',
       }));
 
       const merged = [...normalRows, ...weeklyRows].sort(
@@ -530,6 +571,35 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         )}
       </div>
 
+      {pageView === 'problems' && (recLoading || recommended.length > 0) && (
+        <div className="mb-6 px-5 py-4 bg-[#0d0d0d] border border-[#1a1a1a] rounded-2xl">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-sm">✦</span>
+            <span className="text-xs font-mono font-bold text-[#a78bfa] uppercase tracking-wider">Based on what you've solved</span>
+          </div>
+          {recLoading ? (
+            <div className="flex items-center gap-2 text-[#666] font-mono text-xs py-2">
+              <div className="spinner-sm" /> Finding problems for you…
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {recommended.map((p) => (
+                <button key={p.id} onClick={() => handleRowClick(p)}
+                  className="text-left p-3 bg-[#080808] border border-[#1a1a1a] rounded-xl hover:border-[#a78bfa30] transition-all">
+                  <div className="text-xs font-mono font-bold text-[#e0e0e0] truncate mb-1">{p.title}</div>
+                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded
+                    ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
+                      p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
+                      'text-[#ff4d4d] bg-[#ff4d4d12]'}`}>
+                    {p.difficulty}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {pageView === 'submissions' ? (
         /* ── My Submissions view ─────────────────────────────── */
         subsLoading ? (
@@ -570,10 +640,14 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               return (
                 <div key={s.id}>
                   {/* Desktop row */}
-                  <div className="hidden md:grid grid-cols-[1fr_5rem_5rem_6rem_5rem_8rem] gap-4 px-5 py-4
-                    border-b border-[#161616] last:border-0 items-center hover:bg-[#0f0f0f] transition-colors">
+                  <div onClick={() => s.code && setViewingCode(s)}
+                    className={`hidden md:grid grid-cols-[1fr_5rem_5rem_6rem_5rem_8rem] gap-4 px-5 py-4
+                    border-b border-[#161616] last:border-0 items-center hover:bg-[#0f0f0f] transition-colors ${s.code ? 'cursor-pointer' : ''}`}>
                     <div>
-                      <div className="text-[#ddd] font-mono text-sm truncate">{s.problem_title}</div>
+                      <div className="text-[#ddd] font-mono text-sm truncate flex items-center gap-2">
+                        {s.problem_title}
+                        {s.code && <span className="text-[10px] text-[#555] shrink-0" title="View submitted code">{'</>'}</span>}
+                      </div>
                       {s.status === 'rejected' && s.review_notes && (
                         <div className="text-[10px] text-[#ff4d4d80] font-mono mt-0.5 truncate">{s.review_notes}</div>
                       )}
@@ -602,9 +676,13 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                   </div>
 
                   {/* Mobile card */}
-                  <div className="md:hidden px-4 py-3.5 border-b border-[#161616] last:border-0 hover:bg-[#0f0f0f] transition-colors">
+                  <div onClick={() => s.code && setViewingCode(s)}
+                    className={`md:hidden px-4 py-3.5 border-b border-[#161616] last:border-0 hover:bg-[#0f0f0f] transition-colors ${s.code ? 'cursor-pointer' : ''}`}>
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="text-[#ddd] font-mono text-sm flex-1 truncate">{s.problem_title}</span>
+                      <span className="text-[#ddd] font-mono text-sm flex-1 truncate flex items-center gap-2">
+                        {s.problem_title}
+                        {s.code && <span className="text-[10px] text-[#555] shrink-0">{'</>'}</span>}
+                      </span>
                       <span className={`shrink-0 text-[10px] font-mono px-2 py-0.5 rounded-lg border ${statusColor}`}>
                         {statusLabel}
                       </span>
@@ -776,6 +854,9 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       {shareCard && (
         <ShareCardModal card={shareCard} onClose={() => setShareCard(null)} />
       )}
+      {viewingCode && (
+        <SubmittedCodeModal submission={viewingCode} onClose={() => setViewingCode(null)} />
+      )}
     </div>
   );
 }
@@ -787,6 +868,77 @@ interface ShareCard {
   passed: number;
   total: number;
   points: number;
+}
+
+function SubmittedCodeModal({ submission, onClose }: { submission: SubmissionRow; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose(); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const date = new Date(submission.submitted_at);
+  const statusColor =
+    submission.status === 'approved' ? 'text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]' :
+    submission.status === 'rejected' ? 'text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]' :
+                                        'text-[#f0b429] bg-[#f0b42910] border-[#f0b42920]';
+  const statusLabel =
+    submission.status === 'approved' ? '✓ Approved' :
+    submission.status === 'rejected' ? '✗ Rejected' : '⏳ Pending';
+
+  function copyCode() {
+    navigator.clipboard?.writeText(submission.code).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className="w-full max-w-2xl max-h-[85vh] flex flex-col bg-[#0d0d0d] border border-[#1f1f1f] rounded-2xl shadow-2xl overflow-hidden animate-slide-down">
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[#1a1a1a] shrink-0">
+          <div className="min-w-0">
+            <h3 className="font-display font-bold text-sm text-[#e0e0e0] truncate">{submission.problem_title}</h3>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${statusColor}`}>{statusLabel}</span>
+              <span className="text-[10px] font-mono text-[#666]">{submission.lang}</span>
+              <span className="text-[10px] font-mono text-[#444]">
+                {date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })} · {date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+              {submission.status === 'approved' && (
+                <span className="text-[10px] font-mono text-[#a78bfa] font-bold">{submission.points_awarded} pts</span>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="Close"
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-[#666] hover:text-[#e0e0e0] hover:bg-[#ffffff08] transition-colors">
+            ✕
+          </button>
+        </div>
+
+        {submission.status === 'rejected' && submission.review_notes && (
+          <div className="px-5 py-2.5 bg-[#ff4d4d0a] border-b border-[#ff4d4d15] text-xs font-mono text-[#ff4d4d90] shrink-0">
+            {submission.review_notes}
+          </div>
+        )}
+
+        <pre className="flex-1 overflow-auto px-5 py-4 text-xs font-mono text-[#ccc] leading-relaxed bg-[#0a0a0a]">
+          {submission.code || '// No code recorded for this submission.'}
+        </pre>
+
+        <div className="px-5 py-3 border-t border-[#1a1a1a] shrink-0 flex justify-end">
+          <button onClick={copyCode}
+            className="flex items-center gap-2 px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl font-mono text-xs text-[#666] hover:text-[#e0e0e0] hover:border-[#252525] transition-all duration-200">
+            {copied ? (<><span className="text-[#00e87a]">✓</span><span className="text-[#00e87a]">Copied</span></>) : (<><span>📋</span><span>Copy code</span></>)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ShareCardModal({ card, onClose }: { card: ShareCard; onClose: () => void }) {

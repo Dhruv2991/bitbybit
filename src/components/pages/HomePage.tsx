@@ -2,8 +2,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { User } from '@/types/database';
-import { getRecommendations, setAiUser } from '@/lib/gemini';
-import { isActiveSubscription } from '@/lib/subscription';
 
 interface HomePageProps {
   user:       User | null;
@@ -35,7 +33,7 @@ function StatCard({ value, label, delay }: { value: string; label: string; delay
   const isLoaded = value !== undefined;
   return (
     <div className="text-center animate-counter-up" style={{ animationDelay: `${delay}ms` }}>
-      <div className="text-3xl md:text-4xl font-display font-extrabold stat-glow text-[#00e87a] tabular-nums">
+      <div className="text-2xl sm:text-3xl md:text-4xl font-display font-extrabold stat-glow text-[#00e87a] tabular-nums">
         {isLoaded ? (num > 0 ? counted.toLocaleString() : value) : (
           <span className="inline-block w-14 h-9 bg-[#1a1a1a] rounded-lg animate-pulse" />
         )}
@@ -199,52 +197,6 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
     onNavigate('problems');
   }
 
-  const [recommended, setRecommended] = useState<any[]>([]);
-  const [recLoading, setRecLoading] = useState(false);
-
-  useEffect(() => {
-    if (!user?.github) { setRecommended([]); return; }
-    const db = getSupabaseClient();
-    let alive = true;
-    (async () => {
-      try {
-        const { data: sub } = await (db.from('subscribers') as any)
-          .select('status, current_period_end').eq('github', user.github).maybeSingle();
-        const isSub = isActiveSubscription(sub?.status, sub?.current_period_end);
-        setAiUser(user.github, isSub);
-        if (!isSub) { if (alive) setRecommended([]); return; }
-
-        const [{ data: allProblems }, { data: solvedSubs }] = await Promise.all([
-          db.from('problems').select('id, title, difficulty, points, tags').eq('visibility', 'public'),
-          db.from('submissions').select('problem_title').eq('github', user.github).eq('status', 'approved'),
-        ]);
-        const pool = ((allProblems || []) as any[]).filter(p => !p.is_contest_problem);
-        const solvedTitles = [...new Set((solvedSubs || []).map((s: any) => s.problem_title))];
-        const availableTitles = pool
-          .filter(p => !solvedTitles.includes(p.title))
-          .map(p => p.title);
-        if (!availableTitles.length) { if (alive) setRecommended([]); return; }
-
-        setRecLoading(true);
-        const picks = await getRecommendations(solvedTitles as string[], availableTitles);
-        if (!alive) return;
-        const matched = picks
-          .map(title => pool.find(p => p.title === title))
-          .filter(Boolean);
-        setRecommended(matched);
-      } catch {
-        if (alive) setRecommended([]);
-      }
-      if (alive) setRecLoading(false);
-    })();
-    return () => { alive = false; };
-  }, [user?.github]);
-
-  function openRecommendedProblem(id: string) {
-    try { sessionStorage.setItem('bb_open_problem_id', id); } catch {}
-    onNavigate('problems');
-  }
-
   const features = [
     {
       icon: '⚡',
@@ -302,63 +254,6 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
         </div>
       )}
 
-      {dailyProblem && (
-        <button onClick={openDailyProblem}
-          className="w-full flex items-center gap-4 px-5 py-4 mb-4 bg-[#f0b42908] border border-[#f0b42925]
-            rounded-2xl text-left hover:border-[#f0b42945] transition-all duration-200 group">
-          <div className="w-11 h-11 rounded-xl bg-[#f0b42912] flex items-center justify-center text-xl shrink-0">
-            🗓️
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[#f0b429] font-bold">Daily Problem</span>
-              {dailySolvedToday && (
-                <span className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a12] border border-[#00e87a20] rounded-full px-2 py-0.5">
-                  ✓ Solved today
-                </span>
-              )}
-            </div>
-            <div className="font-display font-bold text-[#e2e2e2] text-sm truncate">{dailyProblem.title}</div>
-          </div>
-          <span className={`text-xs font-mono font-bold shrink-0 px-2 py-1 rounded-lg
-            ${dailyProblem.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
-              dailyProblem.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
-              'text-[#ff4d4d] bg-[#ff4d4d12]'}`}>
-            {dailyProblem.difficulty}
-          </span>
-          <span className="text-[#666] group-hover:text-[#f0b429] transition-colors shrink-0">→</span>
-        </button>
-      )}
-
-      {user && (recLoading || recommended.length > 0) && (
-        <div className="mb-4 px-5 py-4 bg-[#0d0d0d] border border-[#1a1a1a] rounded-2xl">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm">✦</span>
-            <span className="text-xs font-mono font-bold text-[#a78bfa] uppercase tracking-wider">Based on what you've solved</span>
-          </div>
-          {recLoading ? (
-            <div className="flex items-center gap-2 text-[#666] font-mono text-xs py-2">
-              <div className="spinner-sm" /> Finding problems for you…
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {recommended.map((p: any) => (
-                <button key={p.id} onClick={() => openRecommendedProblem(p.id)}
-                  className="text-left p-3 bg-[#080808] border border-[#1a1a1a] rounded-xl hover:border-[#a78bfa30] transition-all">
-                  <div className="text-xs font-mono font-bold text-[#e0e0e0] truncate mb-1">{p.title}</div>
-                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded
-                    ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
-                      p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
-                      'text-[#ff4d4d] bg-[#ff4d4d12]'}`}>
-                    {p.difficulty}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ── Hero ───────────────────────────────────────────── */}
       <section className="relative text-center pt-12 pb-16 md:pt-20 md:pb-24 overflow-hidden">
 
@@ -407,11 +302,11 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
         </div>
 
         {/* Stats row */}
-        <div className="relative flex items-center justify-center gap-12 md:gap-20">
+        <div className="relative flex items-center justify-center flex-wrap gap-6 sm:gap-10 md:gap-20 px-4">
           <StatCard value={stats?.problems ?? ''} label="Problems" delay={400} />
-          <div className="w-px h-10 bg-[#1c1c1c]" />
+          <div className="w-px h-10 bg-[#1c1c1c] hidden sm:block" />
           <StatCard value={stats?.submissions ?? ''} label="Submissions" delay={500} />
-          <div className="w-px h-10 bg-[#1c1c1c]" />
+          <div className="w-px h-10 bg-[#1c1c1c] hidden sm:block" />
           <StatCard value={stats?.members ?? ''} label="Members" delay={600} />
         </div>
       </section>
@@ -448,6 +343,39 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
           </button>
         ))}
       </section>
+
+      {/* ── Daily Problem ─────────────────────────────────────
+           Kept on the homepage but not glued to the very top —
+           one section further down, still a single click away. */}
+      {dailyProblem && (
+        <section className="pb-8">
+          <button onClick={openDailyProblem}
+            className="w-full flex items-center gap-4 px-5 py-4 bg-[#f0b42908] border border-[#f0b42925]
+              rounded-2xl text-left hover:border-[#f0b42945] transition-all duration-200 group">
+            <div className="w-11 h-11 rounded-xl bg-[#f0b42912] flex items-center justify-center text-xl shrink-0">
+              🗓️
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-[#f0b429] font-bold">Daily Problem</span>
+                {dailySolvedToday && (
+                  <span className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a12] border border-[#00e87a20] rounded-full px-2 py-0.5">
+                    ✓ Solved today
+                  </span>
+                )}
+              </div>
+              <div className="font-display font-bold text-[#e2e2e2] text-sm truncate">{dailyProblem.title}</div>
+            </div>
+            <span className={`text-xs font-mono font-bold shrink-0 px-2 py-1 rounded-lg
+              ${dailyProblem.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
+                dailyProblem.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
+                'text-[#ff4d4d] bg-[#ff4d4d12]'}`}>
+              {dailyProblem.difficulty}
+            </span>
+            <span className="text-[#666] group-hover:text-[#f0b429] transition-colors shrink-0">→</span>
+          </button>
+        </section>
+      )}
 
       {/* ── Terminal snippet + how it works ────────────────── */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 pb-8">

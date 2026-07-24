@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { Member } from "@/types/database";
+import { effectiveStreak } from "@/lib/streak";
 
 type Tab = "overall" | "weekly" | "monthly" | "challenge";
 
@@ -91,7 +92,7 @@ export default function LeaderboardPage() {
               name: m.name,
               total_points: m.total,
               problems_solved: m.solved,
-              streak: member?.streak || 0,
+              streak: effectiveStreak(member?.streak, member?.last_solved_at),
               last_solved_at: member?.last_solved_at || null,
               created_at: member?.created_at || "",
             } as EnrichedMember;

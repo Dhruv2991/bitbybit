@@ -14,8 +14,10 @@ import AboutPage            from "@/components/pages/AboutPage";
 import PrivacyPolicyPage    from "@/components/pages/PrivacyPolicyPage";
 import TermsPage            from "@/components/pages/TermsPage";
 import RefundPolicyPage     from "@/components/pages/RefundPolicyPage";
+import ProfilePage          from "@/components/pages/ProfilePage";
+import { effectiveStreak }  from "@/lib/streak";
 
-type PageId = "home" | "problems" | "leaderboard" | "arena" | "weekly" | "admin" | "about" | "privacy" | "terms" | "refunds";
+type PageId = "home" | "problems" | "leaderboard" | "arena" | "weekly" | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile";
 const PAGE_KEY = "bb_page";
 
 const NAV_ITEMS: { id: PageId; label: string; icon: string }[] = [
@@ -147,7 +149,7 @@ export default function App() {
   // not just on a completely fresh session.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const validPages: PageId[] = ["home", "problems", "leaderboard", "arena", "weekly", "admin", "about", "privacy", "terms", "refunds"];
+    const validPages: PageId[] = ["home", "problems", "leaderboard", "arena", "weekly", "admin", "about", "privacy", "terms", "refunds", "profile"];
 
     function applyHash() {
       const hash = window.location.hash.replace("#", "") as PageId;
@@ -292,8 +294,8 @@ export default function App() {
     const db = getSupabaseClient();
     (async () => {
       try {
-        const { data }: any = await db.from("members").select("streak").eq("github", user.github).maybeSingle();
-        if (alive) setUserStreak(data?.streak || 0);
+        const { data }: any = await db.from("members").select("streak, last_solved_at").eq("github", user.github).maybeSingle();
+        if (alive) setUserStreak(effectiveStreak(data?.streak, data?.last_solved_at));
       } catch { if (alive) setUserStreak(0); }
     })();
     return () => { alive = false; };
@@ -581,6 +583,10 @@ export default function App() {
                         <p className="text-[10px] font-mono text-[#666] truncate">@{user.github}</p>
                       </div>
                     </div>
+                    <button role="menuitem" onClick={() => { setProfileOpen(false); navigate("profile"); }}
+                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#ffffff06] transition-colors flex items-center gap-2.5">
+                      <span className="text-sm">👤</span> My profile
+                    </button>
                     <button role="menuitem" onClick={switchAccount}
                       className="w-full text-left px-4 py-2.5 text-xs font-mono text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#ffffff06] transition-colors flex items-center gap-2.5">
                       <span className="text-sm">🔁</span> Switch account
@@ -668,6 +674,10 @@ export default function App() {
                       </span>
                     )}
                   </div>
+                  <button onClick={() => { setMobileMenuOpen(false); navigate("profile"); }}
+                    className="w-full text-center py-2 mb-2 rounded-xl font-mono text-xs border border-[#222] text-[#aaa] hover:text-[#e0e0e0] hover:border-[#2a2a2a] transition-colors">
+                    👤 My profile
+                  </button>
                   <div className="flex items-center gap-2">
                     <button onClick={() => { setMobileMenuOpen(false); switchAccount(); }}
                       className="flex-1 text-center py-2 rounded-xl font-mono text-xs border border-[#222] text-[#aaa] hover:text-[#e0e0e0] hover:border-[#2a2a2a] transition-colors">
@@ -695,6 +705,7 @@ export default function App() {
         {page === "home"        && <HomePage        user={user} onNavigate={navigate} />}
         {page === "problems"    && <ProblemsPage    user={user} onNavigate={navigate} />}
         {page === "leaderboard" && <LeaderboardPage />}
+        {page === "profile"     && <ProfilePage user={user} onNavigate={navigate} />}
         {page === "arena"       && <ArenaPage       user={user} onArenaLockChange={setArenaLocked} onNavigate={navigate as (page: string) => void} />}
         {page === "weekly"      && <WeeklyChallengePage user={user} onNavigate={navigate as (page: string) => void} />}
         {page === "admin"       && user?.is_admin   && <AdminPage user={user} />}
