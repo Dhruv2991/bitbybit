@@ -1113,7 +1113,7 @@ function ShareCardModal({ card, onClose }: { card: ShareCard; onClose: () => voi
           <button onClick={onClose} className="text-[#666] hover:text-[#e0e0e0] transition-colors text-lg">✕</button>
         </div>
         <div className="p-4">
-          <canvas ref={canvasRef} className="w-full rounded-xl border border-[#1a1a1a]" />
+          <canvas ref={canvasRef} className="w-full rounded-xl border border-[#1a1a1a]"/>
         </div>
         <div className="flex gap-2 px-4 pb-4">
           <button onClick={handleShare}
