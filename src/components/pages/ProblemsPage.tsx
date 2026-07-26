@@ -58,6 +58,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   const [problems,       setProblems]       = useState<Problem[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [filter,         setFilter]         = useState<string>('all');
+  const [accessFilter,   setAccessFilter]   = useState<'all' | 'free' | 'weekly'>('all');
   const [selected,       setSelected]       = useState<Problem | null>(null);
   const [solved,         setSolved]         = useState<string[]>([]);
   const [weeklyIds,      setWeeklyIds]      = useState<Set<string>>(new Set());
@@ -196,16 +197,31 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     new Set(problems.flatMap(p => p.tags || []))
   ).sort((a, b) => a.localeCompare(b));
 
-  const afterFilter = filter === 'all'
-    ? problems
-    : problems.filter(p => p.difficulty === filter || (p.tags || []).includes(filter));
+  function isWeeklyProblem(p: Problem) {
+    return (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
+  }
 
-  const filtered = search.trim()
+  const afterFilter = (filter === 'all'
+    ? problems
+    : problems.filter(p => p.difficulty === filter || (p.tags || []).includes(filter))
+  ).filter(p =>
+    accessFilter === 'all' ? true :
+    accessFilter === 'free' ? !isWeeklyProblem(p) :
+    isWeeklyProblem(p)
+  );
+
+  const searched = search.trim()
     ? afterFilter.filter(p =>
         p.title.toLowerCase().includes(search.toLowerCase()) ||
         (p.tags || []).some((t: string) => t.toLowerCase().includes(search.toLowerCase()))
       )
     : afterFilter;
+
+  // Free problems first, paid (weekly) problems after — within each
+  // group the original order is preserved (stable sort).
+  const filtered = [...searched].sort((a, b) =>
+    Number(isWeeklyProblem(a)) - Number(isWeeklyProblem(b))
+  );
 
   async function handleSolved(
     problemId: string,
@@ -549,25 +565,40 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               );
             })}
           </div>
-        </div>
-        )}
 
-        {/* Tag filter pills — only on problems tab */}
-        {pageView === 'problems' && allTags.length > 0 && (
-          <div className="flex gap-1.5 flex-wrap mt-3">
-            {allTags.map(tag => (
-              <button
-                key={tag}
-                onClick={() => setFilter(filter === tag ? 'all' : tag)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-mono transition-all duration-150
-                  ${filter === tag
-                    ? 'bg-[#a78bfa18] text-[#a78bfa] border border-[#a78bfa35]'
-                    : 'bg-[#080808] border border-[#1a1a1a] text-[#777] hover:text-[#e0e0e0] hover:border-[#252525]'}`}
-              >
-                #{tag}
+          {/* Free vs Weekly (paid) filter */}
+          <div className="flex bg-[#080808] border border-[#1a1a1a] rounded-xl p-1 gap-1 shrink-0">
+            {([
+              { id: 'all',    label: 'All' },
+              { id: 'free',   label: '🔓 Free' },
+              { id: 'weekly', label: '⭐ Weekly' },
+            ] as const).map(opt => (
+              <button key={opt.id} onClick={() => setAccessFilter(opt.id)}
+                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all duration-150 whitespace-nowrap
+                  ${accessFilter === opt.id
+                    ? 'bg-[#141414] text-[#e0e0e0] border border-[#252525]'
+                    : 'text-[#666] hover:text-[#999] border border-transparent'}`}>
+                {opt.label}
               </button>
             ))}
           </div>
+
+          {/* Tag filter — dropdown instead of a pill row so it doesn't eat vertical space */}
+          {allTags.length > 0 && (
+            <select
+              value={allTags.includes(filter) ? filter : ''}
+              onChange={e => setFilter(e.target.value || 'all')}
+              className="shrink-0 bg-[#080808] border border-[#1a1a1a] rounded-xl px-3 py-2.5
+                text-xs font-mono text-[#888] focus:outline-none focus:border-[#a78bfa30] transition-colors
+                hover:text-[#e0e0e0] hover:border-[#222] cursor-pointer"
+            >
+              <option value="">#tag</option>
+              {allTags.map(tag => (
+                <option key={tag} value={tag}>#{tag}</option>
+              ))}
+            </select>
+          )}
+        </div>
         )}
       </div>
 

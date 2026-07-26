@@ -207,6 +207,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
   const [activeChallenge, setActiveChallenge] = useState<WeeklyChallenge | null>(null);
   const [activeProblem,   setActiveProblem]   = useState<Problem | null>(null);
   const [showLeader,      setShowLeader]      = useState<string | null>(null);
+  const [expandedMonths,  setExpandedMonths]  = useState<Record<string, boolean>>({});
   const [summaries,       setSummaries]       = useState<Record<string, any>>({});
   const [loadingSummary,  setLoadingSummary]  = useState<string | null>(null);
   const [fee,            setFee]            = useState<number | null>(null);
@@ -443,162 +444,10 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
     );
   }
 
-  return (
-    <div className="animate-fade-up max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="font-display font-bold text-xl md:text-2xl mb-1 text-[#e2e2e2]">
-          Weekly Challenge <span className="text-[#f0b429]">🏅</span>
-        </h1>
-        <p className="text-[#777] text-xs font-mono">
-          3 new problems every week · Subscribe once · Solve earlier for more points
-        </p>
-      </div>
-
-      {/* Scoring info */}
-      <div className="mb-6 bg-[#080808] border border-[#161616] rounded-2xl p-4 flex flex-wrap gap-4">
-        <div className="flex-1 min-w-[140px]">
-          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
-            Scoring Formula
-          </p>
-          <p className="text-xs text-[#e0e0e0] font-mono">
-            Points = Base × Time Bonus
-          </p>
-        </div>
-        <div className="flex-1 min-w-[140px]">
-          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
-            Day 1 bonus
-          </p>
-          <p className="text-sm font-bold text-[#00e87a] font-mono">100%</p>
-        </div>
-        <div className="flex-1 min-w-[140px]">
-          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
-            Day 7 bonus
-          </p>
-          <p className="text-sm font-bold text-[#f0b429] font-mono">20%</p>
-        </div>
-      </div>
-
-      {/* ── Non-subscriber / expired paywall ───────────────────────────────── */}
-      {!isSubscribed && (
-        <div className="mb-6">
-          {subStatus === 'confirmed' && periodEnd ? (
-            /* Subscribed before, but this month's period has lapsed */
-            <div className="bg-[#0a0a0a] border border-[#f0b42925] rounded-2xl p-6 text-center">
-              <div className="text-4xl mb-3">⏳</div>
-              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Your access expired</h2>
-              <p className="text-[#777] font-mono text-sm mb-4">
-                Your monthly access ended on {new Date(periodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. Renew for ₹{fee ?? "—"} to keep going.
-              </p>
-              {payErr && <p className="text-[10px] text-[#ff4d4d] font-mono mb-3">{payErr}</p>}
-              {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' ? (
-                <button
-                  onClick={submitPayment}
-                  disabled={submitting || fee === null}
-                  className="px-5 py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] disabled:opacity-40 transition-all"
-                >
-                  {submitting ? 'Processing…' : `Renew — ₹${fee ?? '—'} →`}
-                </button>
-              ) : (
-                <p className="text-[10px] text-[#555] font-mono">Renewals are temporarily unavailable. Check back shortly.</p>
-              )}
-            </div>
-          ) : !user ? (
-            /* Not signed in */
-            <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-6 text-center">
-              <div className="text-4xl mb-3">🔒</div>
-              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Sign in to subscribe</h2>
-              <p className="text-[#777] font-mono text-sm">Sign in with GitHub to get monthly access to all weekly challenges.</p>
-            </div>
-          ) : (
-            /* Main paywall — first-time subscribe */
-            <div className="bg-[#0a0a0a] border border-[#00e87a20] rounded-2xl overflow-hidden">
-              {/* Hero */}
-              <div className="px-5 py-5 border-b border-[#161616]">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-3xl">⭐</span>
-                  <div>
-                    <h2 className="font-display font-bold text-lg text-[#e0e0e0]">Monthly Access</h2>
-                    <p className="text-[10px] font-mono text-[#555]">Unlock all weekly challenges, Arena contests & AI features</p>
-                  </div>
-                  <div className="ml-auto text-right">
-                    <div className="text-2xl font-display font-bold text-[#00e87a]">
-                      {fee !== null ? `₹${fee}` : '—'}
-                    </div>
-                    <div className="text-[9px] font-mono text-[#555]">/ month</div>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-3 text-[10px] font-mono">
-                  {['All current & future weekly problems', 'Free Arena contest entry', 'Time bonus scoring', 'Weekly leaderboard', 'AI features'].map(f => (
-                    <span key={f} className="flex items-center gap-1 text-[#bbb]">
-                      <span className="text-[#00e87a]">✓</span>{f}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Payment */}
-              <div className="px-5 py-5">
-                {payErr && <p className="text-[10px] text-[#ff4d4d] font-mono mb-3 text-center">{payErr}</p>}
-                {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' ? (
-                  <>
-                    <button
-                      onClick={submitPayment}
-                      disabled={submitting || fee === null}
-                      className="w-full py-3 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
-                        hover:bg-[#00ff88] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                    >
-                      {submitting ? 'Processing…' : `Pay ₹${fee ?? '—'} for 30 days →`}
-                    </button>
-                    <p className="text-[10px] text-[#444] font-mono text-center mt-3">
-                      Secured by Razorpay · Access unlocks instantly · Renews manually every month, no auto-debit
-                    </p>
-                  </>
-                ) : (
-                  <div className="text-center">
-                    <div className="w-full py-3 bg-[#1a1a1a] text-[#666] font-mono font-bold text-sm rounded-xl cursor-not-allowed">
-                      We'll be back soon
-                    </div>
-                    <p className="text-[10px] text-[#555] font-mono mt-3">
-                      Subscriptions are temporarily unavailable while we finish setting things up. Check back shortly.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Active subscriber — show renewal date */}
-      {isSubscribed && periodEnd && (
-        <div className="mb-6 bg-[#00e87a08] border border-[#00e87a20] rounded-2xl px-4 py-3 flex items-center justify-between flex-wrap gap-2">
-          <span className="text-xs font-mono text-[#bbb]">
-            ✓ Active — access until {new Date(periodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-          </span>
-          {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' && (
-            <button
-              onClick={submitPayment}
-              disabled={submitting || fee === null}
-              className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a10] border border-[#00e87a20] px-3 py-1.5 rounded-lg hover:bg-[#00e87a18] disabled:opacity-40 transition-all"
-            >
-              {submitting ? 'Processing…' : `Renew early — ₹${fee ?? '—'}`}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── Challenge list — shown to everyone (subscribers get full access, others see preview) ── */}
-      {challenges.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="text-4xl opacity-20">📅</div>
-          <p className="text-[#999] font-mono text-sm">
-            No active weekly challenge right now — check back soon!
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {challenges.map((ch) => {
+  // Renders one challenge card — shared between the standalone live
+  // card and the cards nested inside a collapsed month group, so this
+  // long, detail-heavy markup only has to exist once.
+  function renderChallengeCard(ch: WeeklyChallenge) {
             const now = Date.now();
             const startMs = new Date(ch.starts_at).getTime();
             const endMs = new Date(ch.ends_at).getTime();
@@ -895,6 +744,216 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                     </div>
                   )}
                 </div>
+              </div>
+            );
+  }
+
+  const nowTs = Date.now();
+  const liveChallenge = challenges.find((ch) => {
+    const startMs = new Date(ch.starts_at).getTime();
+    const endMs = new Date(ch.ends_at).getTime();
+    return nowTs >= startMs && nowTs <= endMs && ch.status !== "ended";
+  });
+  const otherChallenges = challenges.filter((ch) => ch.id !== liveChallenge?.id);
+
+  // Group everything that is not the live challenge by the month it
+  // starts in, most recent month first — keeps the page from turning
+  // into an endless stack of individual weekly cards.
+  const monthGroups = new Map<string, WeeklyChallenge[]>();
+  for (const ch of otherChallenges) {
+    const d = new Date(ch.starts_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (!monthGroups.has(key)) monthGroups.set(key, []);
+    monthGroups.get(key)!.push(ch);
+  }
+  const monthKeys = [...monthGroups.keys()].sort().reverse();
+  const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+
+  return (
+    <div className="animate-fade-up max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="font-display font-bold text-xl md:text-2xl mb-1 text-[#e2e2e2]">
+          Weekly Challenge <span className="text-[#f0b429]">🏅</span>
+        </h1>
+        <p className="text-[#777] text-xs font-mono">
+          3 new problems every week · Subscribe once · Solve earlier for more points
+        </p>
+      </div>
+
+      {/* Scoring info */}
+      <div className="mb-6 bg-[#080808] border border-[#161616] rounded-2xl p-4 flex flex-wrap gap-4">
+        <div className="flex-1 min-w-[140px]">
+          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
+            Scoring Formula
+          </p>
+          <p className="text-xs text-[#e0e0e0] font-mono">
+            Points = Base × Time Bonus
+          </p>
+        </div>
+        <div className="flex-1 min-w-[140px]">
+          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
+            Day 1 bonus
+          </p>
+          <p className="text-sm font-bold text-[#00e87a] font-mono">100%</p>
+        </div>
+        <div className="flex-1 min-w-[140px]">
+          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
+            Day 7 bonus
+          </p>
+          <p className="text-sm font-bold text-[#f0b429] font-mono">20%</p>
+        </div>
+      </div>
+
+      {/* ── Non-subscriber / expired paywall ───────────────────────────────── */}
+      {!isSubscribed && (
+        <div className="mb-6">
+          {subStatus === 'confirmed' && periodEnd ? (
+            /* Subscribed before, but this month's period has lapsed */
+            <div className="bg-[#0a0a0a] border border-[#f0b42925] rounded-2xl p-6 text-center">
+              <div className="text-4xl mb-3">⏳</div>
+              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Your access expired</h2>
+              <p className="text-[#777] font-mono text-sm mb-4">
+                Your monthly access ended on {new Date(periodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. Renew for ₹{fee ?? "—"} to keep going.
+              </p>
+              {payErr && <p className="text-[10px] text-[#ff4d4d] font-mono mb-3">{payErr}</p>}
+              {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' ? (
+                <button
+                  onClick={submitPayment}
+                  disabled={submitting || fee === null}
+                  className="px-5 py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] disabled:opacity-40 transition-all"
+                >
+                  {submitting ? 'Processing…' : `Renew — ₹${fee ?? '—'} →`}
+                </button>
+              ) : (
+                <p className="text-[10px] text-[#555] font-mono">Renewals are temporarily unavailable. Check back shortly.</p>
+              )}
+            </div>
+          ) : !user ? (
+            /* Not signed in */
+            <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-6 text-center">
+              <div className="text-4xl mb-3">🔒</div>
+              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Sign in to subscribe</h2>
+              <p className="text-[#777] font-mono text-sm">Sign in with GitHub to get monthly access to all weekly challenges.</p>
+            </div>
+          ) : (
+            /* Main paywall — first-time subscribe */
+            <div className="bg-[#0a0a0a] border border-[#00e87a20] rounded-2xl overflow-hidden">
+              {/* Hero */}
+              <div className="px-5 py-5 border-b border-[#161616]">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-3xl">⭐</span>
+                  <div>
+                    <h2 className="font-display font-bold text-lg text-[#e0e0e0]">Monthly Access</h2>
+                    <p className="text-[10px] font-mono text-[#555]">Unlock all weekly challenges, Arena contests & AI features</p>
+                  </div>
+                  <div className="ml-auto text-right">
+                    <div className="text-2xl font-display font-bold text-[#00e87a]">
+                      {fee !== null ? `₹${fee}` : '—'}
+                    </div>
+                    <div className="text-[9px] font-mono text-[#555]">/ month</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3 text-[10px] font-mono">
+                  {['All current & future weekly problems', 'Free Arena contest entry', 'Time bonus scoring', 'Weekly leaderboard', 'AI features'].map(f => (
+                    <span key={f} className="flex items-center gap-1 text-[#bbb]">
+                      <span className="text-[#00e87a]">✓</span>{f}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Payment */}
+              <div className="px-5 py-5">
+                {payErr && <p className="text-[10px] text-[#ff4d4d] font-mono mb-3 text-center">{payErr}</p>}
+                {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' ? (
+                  <>
+                    <button
+                      onClick={submitPayment}
+                      disabled={submitting || fee === null}
+                      className="w-full py-3 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
+                        hover:bg-[#00ff88] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >
+                      {submitting ? 'Processing…' : `Pay ₹${fee ?? '—'} for 30 days →`}
+                    </button>
+                    <p className="text-[10px] text-[#444] font-mono text-center mt-3">
+                      Secured by Razorpay · Access unlocks instantly · Renews manually every month, no auto-debit
+                    </p>
+                  </>
+                ) : (
+                  <div className="text-center">
+                    <div className="w-full py-3 bg-[#1a1a1a] text-[#666] font-mono font-bold text-sm rounded-xl cursor-not-allowed">
+                      We'll be back soon
+                    </div>
+                    <p className="text-[10px] text-[#555] font-mono mt-3">
+                      Subscriptions are temporarily unavailable while we finish setting things up. Check back shortly.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Active subscriber — show renewal date */}
+      {isSubscribed && periodEnd && (
+        <div className="mb-6 bg-[#00e87a08] border border-[#00e87a20] rounded-2xl px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+          <span className="text-xs font-mono text-[#bbb]">
+            ✓ Active — access until {new Date(periodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+          </span>
+          {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' && (
+            <button
+              onClick={submitPayment}
+              disabled={submitting || fee === null}
+              className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a10] border border-[#00e87a20] px-3 py-1.5 rounded-lg hover:bg-[#00e87a18] disabled:opacity-40 transition-all"
+            >
+              {submitting ? 'Processing…' : `Renew early — ₹${fee ?? '—'}`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Challenge list — shown to everyone (subscribers get full access, others see preview) ── */}
+      {challenges.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-3">
+          <div className="text-4xl opacity-20">📅</div>
+          <p className="text-[#999] font-mono text-sm">
+            No active weekly challenge right now — check back soon!
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Only the currently-live challenge sits outside, front and
+              center — everything else (upcoming + past) is tucked into
+              collapsible month groups below it. */}
+          {liveChallenge && renderChallengeCard(liveChallenge)}
+
+          {monthKeys.map((key) => {
+            const group = monthGroups.get(key)!;
+            const [y, m] = key.split('-');
+            const label = new Date(Number(y), Number(m) - 1, 1)
+              .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            const isOpen = expandedMonths[key] ?? (key === currentMonthKey);
+            return (
+              <div key={key} className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden">
+                <button
+                  onClick={() => setExpandedMonths((prev) => ({ ...prev, [key]: !isOpen }))}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#0f0f0f] transition-colors"
+                >
+                  <span className="font-mono font-bold text-[#e2e2e2] text-sm flex items-center gap-2">
+                    📅 {label}
+                    <span className="text-[10px] text-[#666] font-normal">
+                      ({group.length} challenge{group.length !== 1 ? 's' : ''})
+                    </span>
+                  </span>
+                  <span className={`text-[#666] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>▾</span>
+                </button>
+                {isOpen && (
+                  <div className="px-4 pb-4 space-y-4 border-t border-[#161616] pt-4">
+                    {group.map((ch) => renderChallengeCard(ch))}
+                  </div>
+                )}
               </div>
             );
           })}
