@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://bitbybit-9h8e.vercel.app/sitemap.xml
