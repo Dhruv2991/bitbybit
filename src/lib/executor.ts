@@ -57,14 +57,21 @@ interface SanitizedCode {
 
 function sanitizeUserCode(code: string, lang: string): SanitizedCode {
   if (lang === "cpp") {
+    // We no longer include the catch-all <bits/stdc++.h> (see buildBatchedProgram),
+    // so any specific header the user wrote (e.g. <cstring>, <tuple>) might be one
+    // we don't already provide — collect it instead of silently discarding it.
+    const extra: string[] = [];
     const body = code
       .split("\n")
       .filter((line) => {
         const t = line.trim();
-        return !t.startsWith("#include") && !/^using\s+namespace\s+std\s*;?$/.test(t);
+        if (/^using\s+namespace\s+std\s*;?$/.test(t)) return false;
+        const m = t.match(/^#include\s*[<"]([^">]+)[">]\s*$/);
+        if (m) { extra.push(m[1]); return false; }
+        return true;
       })
       .join("\n");
-    return { body, extra: [] };
+    return { body, extra: Array.from(new Set(extra)) };
   }
 
   if (lang === "java") {
@@ -390,6 +397,14 @@ function buildBatchedProgram(
       });
 
       return [
+        // Deliberately using the catch-all <bits/stdc++.h> here rather than
+        // a hand-picked list of headers: it's slightly slower to parse, but
+        // it guarantees every standard-library facility a solution might use
+        // (memset, INT_MAX, tuple, pair helpers, etc.) is always available,
+        // even if the user's own code never explicitly included it — which
+        // is how most LeetCode-style starter code is written. A narrower
+        // header set was tried and caused real solutions to silently fail
+        // to compile, which is far worse than a bit of extra compile time.
         "#include <bits/stdc++.h>",
         "using namespace std;",
         "",
