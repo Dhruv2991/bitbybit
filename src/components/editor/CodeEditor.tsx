@@ -45,6 +45,10 @@ interface CodeEditorProps {
   onChange:  (value: string) => void;
   readOnly?: boolean;
   height?:   string;
+  /** Ctrl/Cmd+Enter while focused in the editor */
+  onRun?:    () => void;
+  /** Ctrl/Cmd+Shift+Enter while focused in the editor */
+  onSubmit?: () => void;
 }
 
 export default function CodeEditor({
@@ -53,9 +57,20 @@ export default function CodeEditor({
   onChange,
   readOnly = false,
   height = '420px',
+  onRun,
+  onSubmit,
 }: CodeEditorProps) {
 
   const [monacoTheme, setMonacoTheme] = useState<'bitbybit-dark' | 'bitbybit-light'>('bitbybit-dark');
+
+  // Monaco actions are registered once on mount, so the callbacks they
+  // invoke need to go through a ref — otherwise they'd keep calling
+  // whatever onRun/onSubmit were on the very first render (e.g. always
+  // seeing running=false) instead of the latest ones.
+  const onRunRef    = useRef(onRun);
+  const onSubmitRef = useRef(onSubmit);
+  useEffect(() => { onRunRef.current = onRun; }, [onRun]);
+  useEffect(() => { onSubmitRef.current = onSubmit; }, [onSubmit]);
 
   useEffect(() => {
     const read = () =>
@@ -125,12 +140,24 @@ export default function CodeEditor({
     });
   };
 
-  const handleMount: OnMount = (editor) => {
+  const handleMount: OnMount = (editor, monaco) => {
     editor.addAction({
       id:    'format-code',
       label: 'Format Code',
       keybindings: [(2048 | 49)], // Ctrl/Cmd+S
       run: (ed) => { ed.getAction('editor.action.formatDocument')?.run(); },
+    });
+    editor.addAction({
+      id:    'run-tests',
+      label: 'Run Tests',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+      run: () => { onRunRef.current?.(); },
+    });
+    editor.addAction({
+      id:    'submit-solution',
+      label: 'Submit Solution',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter],
+      run: () => { onSubmitRef.current?.(); },
     });
   };
 

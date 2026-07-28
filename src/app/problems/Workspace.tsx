@@ -70,6 +70,15 @@ function clearArenaDraft(contestId: string, problemId: string, lang: SupportedLa
   try { localStorage.removeItem(arenaDraftKey(contestId, problemId, lang)); } catch {}
 }
 
+// Formats a keyboard shortcut hint for tooltips — ⌘ on Mac, Ctrl elsewhere,
+// matching what Monaco's own keybindings actually respond to.
+function shortcutLabel(key: string, withShift = false) {
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  const mod = isMac ? '⌘' : 'Ctrl+';
+  const shift = withShift ? (isMac ? '⇧' : 'Shift+') : '';
+  return `${mod}${shift}${key}`;
+}
+
 // Applies the same streak/points/problems_solved logic as the admin's
 // manual awardPoints() used to, but runs automatically at submit time
 // now that regular problem submissions are auto-graded from test
@@ -1299,9 +1308,20 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           <LangTabs current={lang} onChange={handleLangChange} />
         </div>
 
-        <CodeEditor value={code} language={lang} onChange={handleCodeChange} height="380px" />
+        <CodeEditor
+          value={code}
+          language={lang}
+          onChange={handleCodeChange}
+          height="380px"
+          onRun={() => { if (!running) { setMobileTab('editor'); runTests(); } }}
+          onSubmit={() => {
+            const submitDisabled = submitting || submitBlocked || !user || (!!isWeekly && !testResult && !practiceMode) || (!!practiceMode && !testResult);
+            if (!submitDisabled) submitSolution();
+          }}
+        />
 
         <button onClick={() => { setMobileTab('editor'); runTests(); }} disabled={running}
+          title={`Run tests (${shortcutLabel('Enter')})`}
           className="w-full py-2.5 bg-[var(--bg2)] border border-[var(--card)] hover:border-[rgba(var(--acc-rgb),0.125)]
             text-[var(--acc)] font-mono text-sm font-bold rounded-xl transition-all duration-200 hover:bg-[rgba(var(--acc-rgb),0.02)]
             disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2">
@@ -1374,6 +1394,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         )}
 
         <button onClick={submitSolution}
+          title={`Submit (${shortcutLabel('Enter', true)})`}
           disabled={submitting || submitBlocked || !user || (!!isWeekly && !testResult && !practiceMode) || (!!practiceMode && !testResult)}
           className={`w-full py-3 rounded-xl font-mono font-bold text-sm transition-all
             ${submitBlocked || !user ? 'bg-[var(--border)] text-[var(--muted2)] cursor-not-allowed border border-[var(--border)]'
