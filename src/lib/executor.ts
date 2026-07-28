@@ -640,13 +640,17 @@ async function executeWithWandbox(
 
 // ── Public API ───────────────────────────────────────────────
 //
-// Each test case is compiled/run as its own, independent Judge0
-// submission — run it, get the result back, then move on to the
-// next one — instead of stitching every case into a single batched
-// program behind one call. This mirrors the way the browser-run
-// languages (Python/JS) already work, gives accurate per-case
-// timing, and means one broken case can't take the rest down with
-// it. Falls back to Wandbox per-case if Judge0 is unreachable.
+// IMPORTANT: compiled languages (cpp/java/go/rust) are compiled
+// ONCE and all test cases run inside that same binary in a single
+// Judge0 call. Compilation is by far the slowest part of running
+// C++/Java/Go/Rust — recompiling per test case (one full compile
+// per case) multiplies total run time by the number of cases for
+// no benefit, since the cases themselves execute in milliseconds.
+// So we batch them together like before, and report progress by
+// revealing each parsed result in turn once the single call returns.
+//
+// runSingleTestCase() below still exists (e.g. for isolated re-runs
+// of a single case) but the main multi-case path uses one call.
 
 export async function runSingleTestCase(
   userCode: string,
@@ -695,10 +699,6 @@ export async function runSingleTestCase(
   };
 }
 
-// Runs every test case in sequence, one Judge0 round-trip per case,
-// reporting progress after each one comes back — same shape/contract
-// as before (RunResult), so existing callers keep working, but now
-// each case truly runs and returns before the next one starts.
 export async function runAgainstTestCases(
   userCode: string,
   language: string,
@@ -707,12 +707,56 @@ export async function runAgainstTestCases(
 ): Promise<RunResult> {
   if (!testCases.length) return { passed: 0, total: 0, results: [] };
 
-  const results: TestResult[] = [];
-  for (let i = 0; i < testCases.length; i++) {
-    const result = await runSingleTestCase(userCode, language, testCases[i]);
-    results.push(result);
-    onProgress?.(i + 1, testCases.length);
+  const batchedCode = buildBatchedProgram(userCode, language, testCases);
+  const t0 = Date.now();
+  let stdout = "";
+  let stderr = "";
+
+  try {
+    const out = await executeWithJudge0(batchedCode, language);
+    stdout = out.stdout;
+    stderr = out.stderr;
+  } catch (e: any) {
+    console.warn("[executor] Judge0 failed, trying Wandbox fallback:", e.message);
+    try {
+      const out = await executeWithWandbox(batchedCode, language);
+      stdout = out.stdout;
+      stderr = out.stderr;
+    } catch (e2: any) {
+      const errMsg = e2.message || "Execution error";
+      const results = testCases.map((tc) => ({
+        input:    tc.input,
+        expected: String(tc.expected).trim(),
+        actual:   "",
+        ok:       false,
+        error:    errMsg,
+      }));
+      results.forEach((_, i) => onProgress?.(i + 1, testCases.length));
+      return { passed: 0, total: testCases.length, results };
+    }
   }
+
+  const totalMs = Date.now() - t0;
+  const rawBlocks = stdout.split(SENTINEL + "\n");
+  if (rawBlocks[rawBlocks.length - 1].trim() === "") rawBlocks.pop();
+
+  const results: TestResult[] = testCases.map((tc, idx) => {
+    const rawOutput = (rawBlocks[idx] ?? "").trim();
+    const actual    = rawOutput.replace(/\s+/g, "");
+    const expected  = String(tc.expected).trim().replace(/\s+/g, "");
+    const ok        = jsonEqual(actual, expected);
+
+    const result: TestResult = {
+      input:    tc.input,
+      expected: String(tc.expected).trim(),
+      actual:   rawOutput,
+      ok,
+      error:    stderr || undefined,
+      time:     `~${Math.round(totalMs / testCases.length)}ms`,
+    };
+    onProgress?.(idx + 1, testCases.length);
+    return result;
+  });
 
   return {
     passed: results.filter((r) => r.ok).length,

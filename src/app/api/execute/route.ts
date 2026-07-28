@@ -41,14 +41,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Single test case per request — the case runs, compiles, and
-    // returns before the client asks for the next one.
+    // Single test case (e.g. a targeted re-run of one case).
     if (test_case) {
       const result = await runSingleTestCase(code, language, test_case);
       return NextResponse.json(result);
     }
 
-    // Legacy array form — still runs one Judge0 call per case internally.
+    // Normal run: all test cases compiled/run together in one call —
+    // compiled languages (cpp/java/go/rust) only pay the compile cost once.
     const result = await runAgainstTestCases(code, language, test_cases!);
     return NextResponse.json(result);
   } catch (err: any) {

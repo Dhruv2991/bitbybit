@@ -208,18 +208,23 @@ export async function runOnServer(
 ): Promise<RunResult> {
   if (!testCases.length) return { passed: 0, total: 0, results: [] };
 
-  const results: TestResult[] = [];
-  for (let i = 0; i < testCases.length; i++) {
-    const res = await fetch('/api/execute', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: userCode, language, test_case: testCases[i] }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Execution failed');
-    results.push(data as TestResult);
-    onProgress?.(i + 1, testCases.length);
+  // Compiled languages (cpp/java/go/rust) are compiled ONCE on the
+  // server and all cases run inside that same binary in one request —
+  // compiling per test case would multiply run time by the case count
+  // for no benefit. We still reveal results one-by-one client-side so
+  // the UI keeps the same "test N / total" progress feel.
+  const res = await fetch('/api/execute', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: userCode, language, test_cases: testCases }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Execution failed');
+  const result = data as RunResult;
+
+  if (onProgress) {
+    for (let i = 0; i < result.results.length; i++) onProgress(i + 1, result.results.length);
   }
 
-  return { passed: results.filter(r => r.ok).length, total: results.length, results };
+  return result;
 }
