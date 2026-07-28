@@ -449,14 +449,16 @@ Generate 8 diverse test cases covering:
 
 CRITICAL FORMAT — respond with ONLY a JSON array, no markdown, no explanation:
 [
-  {"input": "[2,7,11,15], 9", "expected": "[0,1]"},
-  {"input": "[], 0", "expected": "[]"}
+  {"input": "[[2,7,11,15], 9]", "expected": "[0,1]"},
+  {"input": "[[], 0]", "expected": "[]"}
 ]
 
-Each "input" must be a comma-separated list of JSON arguments matching the parameter types.
+Each "input" must be a SINGLE valid JSON array containing every argument in order — i.e. exactly
+the format "[[2,7,11,15], 9]", NOT the comma-separated form "[2,7,11,15], 9" (that is invalid JSON
+and will be rejected). If there is only one parameter, still wrap it in an outer array, e.g. "[5]".
 Each "expected" must be valid JSON matching the return type.`,
     800,
-    'You are a competitive programming test case generator. Output ONLY valid JSON array. No markdown fences, no explanation, no extra text.',
+    'You are a competitive programming test case generator. Output ONLY valid JSON array, where every "input" value is itself a single valid JSON array of arguments (e.g. "[[2,7,11,15], 9]"), never a bare comma-separated list. No markdown fences, no explanation, no extra text.',
   );
 
   try {
@@ -465,9 +467,35 @@ Each "expected" must be valid JSON matching the return type.`,
     if (!match) throw new Error('No array found');
     const parsed: GeneratedTestCase[] = JSON.parse(match[0]);
     if (!Array.isArray(parsed)) throw new Error('Not an array');
-    return parsed.filter(c => c.input !== undefined && c.expected !== undefined).slice(0, 10);
+    return parsed
+      .filter(c => c.input !== undefined && c.expected !== undefined)
+      .map(c => ({ ...c, input: normalizeTestInput(c.input) }))
+      .slice(0, 10);
   } catch {
     return [];
+  }
+}
+
+// Defensive normalizer: the platform (admin editor + executor) expects
+// "input" to be a single valid JSON array of arguments, e.g. "[[2,7,11,15], 9]".
+// If the model ever slips back into the old comma-separated form
+// ("[2,7,11,15], 9") — which is NOT valid JSON on its own — wrap it so it
+// still parses correctly instead of silently producing broken test cases.
+function normalizeTestInput(input: string): string {
+  const trimmed = input.trim();
+  try {
+    JSON.parse(trimmed);
+    return trimmed; // already valid JSON as-is
+  } catch {
+    // Not valid JSON by itself — try wrapping in an outer array,
+    // which is exactly what fixes "[2,7,11,15], 9" → "[[2,7,11,15], 9]"
+    const wrapped = `[${trimmed}]`;
+    try {
+      JSON.parse(wrapped);
+      return wrapped;
+    } catch {
+      return trimmed; // give up — leave as-is, admin can fix manually
+    }
   }
 }
 
@@ -539,8 +567,8 @@ Output ONLY a valid JSON object with this exact structure (no markdown, no expla
   "return_type": "int[]",
   "hints": ["Think about what complement each number needs", "A hashmap gives O(1) lookup"],
   "test_cases": [
-    {"input": "[2,7,11,15], 9", "expected": "[0,1]"},
-    {"input": "[3,2,4], 6", "expected": "[1,2]"}
+    {"input": "[[2,7,11,15], 9]", "expected": "[0,1]"},
+    {"input": "[[3,2,4], 6]", "expected": "[1,2]"}
   ]
 }
 
@@ -550,9 +578,12 @@ Rules:
 - param_types: array of Java-style types (int, int[], String, boolean, etc.)
 - return_type: single Java-style type
 - hints: exactly 2-3 progressive hints, no code
-- test_cases: exactly 5 diverse test cases`,
+- test_cases: exactly 5 diverse test cases. Each "input" MUST be a single valid JSON array
+  wrapping every argument in order (e.g. "[[2,7,11,15], 9]"), never the bare comma-separated
+  form "[2,7,11,15], 9" — that is not valid JSON and will break execution. A single-argument
+  problem still needs the outer array, e.g. "[5]".`,
     1000,
-    'You are a competitive programming problem generator. Output ONLY valid JSON. No markdown, no explanation.',
+    'You are a competitive programming problem generator. Output ONLY valid JSON, where every test case "input" is itself a single valid JSON array of arguments, never a bare comma-separated list. No markdown, no explanation.',
   );
 
   try {
@@ -560,6 +591,12 @@ Rules:
     const match   = cleaned.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('No object found');
     const parsed = JSON.parse(match[0]);
+    if (Array.isArray(parsed.test_cases)) {
+      parsed.test_cases = parsed.test_cases.map((c: GeneratedTestCase) => ({
+        ...c,
+        input: normalizeTestInput(c.input),
+      }));
+    }
     return parsed as GeneratedProblem;
   } catch {
     return null;

@@ -203,14 +203,23 @@ export async function runInBrowser(
 export async function runOnServer(
   userCode:  string,
   language:  string,
-  testCases: { input: string; expected: string }[]
+  testCases: { input: string; expected: string }[],
+  onProgress?: (done: number, total: number) => void
 ): Promise<RunResult> {
-  const res = await fetch('/api/execute', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: userCode, language, test_cases: testCases, use_harness: true }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Execution failed');
-  return data as RunResult;
+  if (!testCases.length) return { passed: 0, total: 0, results: [] };
+
+  const results: TestResult[] = [];
+  for (let i = 0; i < testCases.length; i++) {
+    const res = await fetch('/api/execute', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: userCode, language, test_case: testCases[i] }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Execution failed');
+    results.push(data as TestResult);
+    onProgress?.(i + 1, testCases.length);
+  }
+
+  return { passed: results.filter(r => r.ok).length, total: results.length, results };
 }
