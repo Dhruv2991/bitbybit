@@ -38,96 +38,6 @@ const JUDGE0_LANGUAGE_ID: Record<string, number> = {
 // Sentinel printed between test case outputs so we can split the stdout
 const SENTINEL = "---CASE---";
 
-// ── Strip user-written headers/imports ────────────────────────
-// The harness already supplies its own includes/imports/package
-// declaration for cpp/java/go/rust. If the user also writes their
-// own (#include, import, package, using namespace) it either
-// duplicates what we add or — worse — breaks compilation entirely
-// (e.g. an `import` statement inside the generated Java class body,
-// or a second `package main` in Go). So for these four languages we
-// strip those lines out before embedding the user's code, merging
-// any extra imports the user needed into our own header block.
-// Python and JS are left completely untouched — the user's own
-// imports are kept exactly as written.
-
-interface SanitizedCode {
-  body:  string;    // user code with header lines removed
-  extra: string[];  // any additional import/package identifiers found (go/java only)
-}
-
-function sanitizeUserCode(code: string, lang: string): SanitizedCode {
-  if (lang === "cpp") {
-    // We no longer include the catch-all <bits/stdc++.h> (see buildBatchedProgram),
-    // so any specific header the user wrote (e.g. <cstring>, <tuple>) might be one
-    // we don't already provide — collect it instead of silently discarding it.
-    const extra: string[] = [];
-    const body = code
-      .split("\n")
-      .filter((line) => {
-        const t = line.trim();
-        if (/^using\s+namespace\s+std\s*;?$/.test(t)) return false;
-        const m = t.match(/^#include\s*[<"]([^">]+)[">]\s*$/);
-        if (m) { extra.push(m[1]); return false; }
-        return true;
-      })
-      .join("\n");
-    return { body, extra: Array.from(new Set(extra)) };
-  }
-
-  if (lang === "java") {
-    const extra: string[] = [];
-    const body = code
-      .split("\n")
-      .filter((line) => {
-        const t = line.trim();
-        if (/^package\s+[\w.]+\s*;$/.test(t)) return false;
-        const m = t.match(/^import\s+(?:static\s+)?([\w.]+(?:\.\*)?)\s*;$/);
-        if (m) {
-          if (m[1] !== "java.util.*") extra.push(m[1]);
-          return false;
-        }
-        return true;
-      })
-      .join("\n");
-    return { body, extra };
-  }
-
-  if (lang === "go") {
-    const extra: string[] = [];
-    // Strip a multi-line `import ( ... )` block, collecting the paths inside it.
-    let stripped = code.replace(/import\s*\(([\s\S]*?)\)/g, (_m, inner: string) => {
-      const paths = inner.match(/"[^"]+"/g) || [];
-      for (const p of paths) {
-        const pkg = p.slice(1, -1);
-        if (pkg !== "encoding/json" && pkg !== "fmt") extra.push(pkg);
-      }
-      return "";
-    });
-    // Strip single-line `import "pkg"`.
-    stripped = stripped.replace(/^\s*import\s+"([^"]+)"\s*$/gm, (_m, pkg: string) => {
-      if (pkg !== "encoding/json" && pkg !== "fmt") extra.push(pkg);
-      return "";
-    });
-    // Strip the package declaration (we always declare `package main` ourselves).
-    stripped = stripped.replace(/^\s*package\s+\w+\s*$/m, "");
-    return { body: stripped, extra: Array.from(new Set(extra)) };
-  }
-
-  if (lang === "rust") {
-    // Rust doesn't get wrapped in a class/package, so there's no structural
-    // conflict — but strip crate-level attributes some users paste in from
-    // LeetCode/Codeforces templates, since those must appear first in the file.
-    const body = code
-      .split("\n")
-      .filter((line) => !/^\s*#!\[.*\]\s*$/.test(line))
-      .join("\n");
-    return { body, extra: [] };
-  }
-
-  // python / javascript: leave completely untouched
-  return { body: code, extra: [] };
-}
-
 // ── Extract function name from user code ─────────────────────
 
 function extractFuncName(code: string, lang: string): string {
@@ -358,11 +268,10 @@ function detectCppReturnType(code: string): string {
 // ── Build a single batched program (all test cases, one compile) ─
 
 function buildBatchedProgram(
-  rawUserCode: string,
+  userCode: string,
   lang: string,
   testCases: { input: string; expected: string }[],
 ): string {
-  const { body: userCode, extra: extraImports } = sanitizeUserCode(rawUserCode, lang);
   const fn = extractFuncName(userCode, lang);
 
   const parsedArgs: any[][] = testCases.map((tc) => {
@@ -397,14 +306,6 @@ function buildBatchedProgram(
       });
 
       return [
-        // Deliberately using the catch-all <bits/stdc++.h> here rather than
-        // a hand-picked list of headers: it's slightly slower to parse, but
-        // it guarantees every standard-library facility a solution might use
-        // (memset, INT_MAX, tuple, pair helpers, etc.) is always available,
-        // even if the user's own code never explicitly included it — which
-        // is how most LeetCode-style starter code is written. A narrower
-        // header set was tried and caused real solutions to silently fail
-        // to compile, which is far worse than a bit of extra compile time.
         "#include <bits/stdc++.h>",
         "using namespace std;",
         "",
@@ -456,10 +357,8 @@ function buildBatchedProgram(
         ].join("\n");
       });
 
-      const extraJavaImports = extraImports.map((p) => `import ${p};`).join("\n");
       return [
         "import java.util.*;",
-        extraJavaImports,
         "",
         "class Main {",
         "",
@@ -491,14 +390,12 @@ function buildBatchedProgram(
         ].join("\n");
       });
 
-      const extraGoImports = extraImports.map((p) => `    "${p}"`).join("\n");
       return [
         "package main",
         "",
         "import (",
         '    "encoding/json"',
         '    "fmt"',
-        extraGoImports,
         ")",
         "",
         userCode,
@@ -655,70 +552,14 @@ async function executeWithWandbox(
 
 // ── Public API ───────────────────────────────────────────────
 //
-// IMPORTANT: compiled languages (cpp/java/go/rust) are compiled
-// ONCE and all test cases run inside that same binary in a single
-// Judge0 call. Compilation is by far the slowest part of running
-// C++/Java/Go/Rust — recompiling per test case (one full compile
-// per case) multiplies total run time by the number of cases for
-// no benefit, since the cases themselves execute in milliseconds.
-// So we batch them together like before, and report progress by
-// revealing each parsed result in turn once the single call returns.
-//
-// runSingleTestCase() below still exists (e.g. for isolated re-runs
-// of a single case) but the main multi-case path uses one call.
-
-export async function runSingleTestCase(
-  userCode: string,
-  language: string,
-  testCase: { input: string; expected: string },
-): Promise<TestResult> {
-  const program = buildBatchedProgram(userCode, language, [testCase]);
-  const t0 = Date.now();
-  let stdout = "";
-  let stderr = "";
-
-  try {
-    const out = await executeWithJudge0(program, language);
-    stdout = out.stdout;
-    stderr = out.stderr;
-  } catch (e: any) {
-    console.warn("[executor] Judge0 failed, trying Wandbox fallback:", e.message);
-    try {
-      const out = await executeWithWandbox(program, language);
-      stdout = out.stdout;
-      stderr = out.stderr;
-    } catch (e2: any) {
-      return {
-        input:    testCase.input,
-        expected: String(testCase.expected).trim(),
-        actual:   "",
-        ok:       false,
-        error:    e2.message || "Execution error",
-      };
-    }
-  }
-
-  const ms = Date.now() - t0;
-  const rawOutput = stdout.split(SENTINEL + "\n")[0]?.trim() ?? "";
-  const actual    = rawOutput.replace(/\s+/g, "");
-  const expected  = String(testCase.expected).trim().replace(/\s+/g, "");
-  const ok        = jsonEqual(actual, expected);
-
-  return {
-    input:    testCase.input,
-    expected: String(testCase.expected).trim(),
-    actual:   rawOutput,
-    ok,
-    error:    stderr || undefined,
-    time:     `${ms}ms`,
-  };
-}
+// runAgainstTestCases makes exactly ONE Judge0 call for all
+// test cases combined, instead of one call per test case.
+// Falls back to Wandbox if Judge0 is unreachable.
 
 export async function runAgainstTestCases(
   userCode: string,
   language: string,
   testCases: { input: string; expected: string }[],
-  onProgress?: (done: number, total: number) => void,
 ): Promise<RunResult> {
   if (!testCases.length) return { passed: 0, total: 0, results: [] };
 
@@ -728,30 +569,35 @@ export async function runAgainstTestCases(
   let stderr = "";
 
   try {
+    // Try Judge0 first
     const out = await executeWithJudge0(batchedCode, language);
     stdout = out.stdout;
     stderr = out.stderr;
   } catch (e: any) {
     console.warn("[executor] Judge0 failed, trying Wandbox fallback:", e.message);
     try {
+      // Fallback to Wandbox
       const out = await executeWithWandbox(batchedCode, language);
       stdout = out.stdout;
       stderr = out.stderr;
     } catch (e2: any) {
       const errMsg = e2.message || "Execution error";
-      const results = testCases.map((tc) => ({
-        input:    tc.input,
-        expected: String(tc.expected).trim(),
-        actual:   "",
-        ok:       false,
-        error:    errMsg,
-      }));
-      results.forEach((_, i) => onProgress?.(i + 1, testCases.length));
-      return { passed: 0, total: testCases.length, results };
+      return {
+        passed: 0,
+        total:  testCases.length,
+        results: testCases.map((tc) => ({
+          input:    tc.input,
+          expected: String(tc.expected).trim(),
+          actual:   "",
+          ok:       false,
+          error:    errMsg,
+        })),
+      };
     }
   }
 
   const totalMs = Date.now() - t0;
+
   const rawBlocks = stdout.split(SENTINEL + "\n");
   if (rawBlocks[rawBlocks.length - 1].trim() === "") rawBlocks.pop();
 
@@ -761,16 +607,14 @@ export async function runAgainstTestCases(
     const expected  = String(tc.expected).trim().replace(/\s+/g, "");
     const ok        = jsonEqual(actual, expected);
 
-    const result: TestResult = {
+    return {
       input:    tc.input,
       expected: String(tc.expected).trim(),
       actual:   rawOutput,
       ok,
       error:    stderr || undefined,
-      time:     `~${Math.round(totalMs / testCases.length)}ms`,
+      time: `~${Math.round(totalMs / testCases.length)}ms`,
     };
-    onProgress?.(idx + 1, testCases.length);
-    return result;
   });
 
   return {

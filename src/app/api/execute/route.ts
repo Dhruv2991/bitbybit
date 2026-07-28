@@ -7,7 +7,7 @@
 // ════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
-import { runAgainstTestCases, runSingleTestCase } from '@/lib/executor';
+import { runAgainstTestCases }       from '@/lib/executor';
 
 // Reduced to just javascript as per your new architecture
 const BROWSER_LANGS = new Set(['javascript']);
@@ -15,20 +15,15 @@ const BROWSER_LANGS = new Set(['javascript']);
 interface ExecuteBody {
   code:       string;
   language:   string;
-  // Preferred: one test case per request, so each case truly runs
-  // and comes back on its own round trip.
-  test_case?: { input: string; expected: string };
-  // Legacy: an array — still supported, but internally this now
-  // loops case-by-case instead of batching them into one compile.
-  test_cases?: { input: string; expected: string }[];
+  test_cases: { input: string; expected: string }[];
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body: ExecuteBody = await req.json();
-    const { code, language, test_case, test_cases } = body;
+    const { code, language, test_cases } = body;
 
-    if (code === undefined || code === null || !language || (!test_case && !Array.isArray(test_cases))) {
+    if (code === undefined || code === null || !language || !Array.isArray(test_cases)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -41,15 +36,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Single test case (e.g. a targeted re-run of one case).
-    if (test_case) {
-      const result = await runSingleTestCase(code, language, test_case);
-      return NextResponse.json(result);
-    }
-
-    // Normal run: all test cases compiled/run together in one call —
-    // compiled languages (cpp/java/go/rust) only pay the compile cost once.
-    const result = await runAgainstTestCases(code, language, test_cases!);
+    // Python, C++, Java, Go, Rust will all flow down here seamlessly to Wandbox
+    const result = await runAgainstTestCases(code, language, test_cases);
     return NextResponse.json(result);
   } catch (err: any) {
     console.error('[/api/execute]', err);

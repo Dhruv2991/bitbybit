@@ -868,10 +868,8 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           setRunStatus(`Running test ${done} / ${total}…`); setProgress({ done, total });
         });
       } else {
-        setRunStatus(`Running test 1 / ${cases.length}…`); setProgress({ done: 0, total: cases.length });
-        result = await runOnServer(code, lang, cases, (done, total) => {
-          setRunStatus(`Running test ${done} / ${total}…`); setProgress({ done, total });
-        });
+        setRunStatus(`Compiling ${lang}…`);
+        result = await runOnServer(code, lang, cases);
       }
       setTestResult(result);
       if (practiceMode && user) {
