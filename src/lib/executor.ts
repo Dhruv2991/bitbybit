@@ -10,6 +10,11 @@
 //   - Args are injected as native literals at build time (no runtime JSON parsing)
 //   - User writes real typed functions (no json/Value/interface{} wrappers)
 //   - Output is serialized with each language's stdlib only
+//
+// FIX: argument types are inferred ONCE PER ARGUMENT POSITION across
+// ALL test cases in the batch (not per-case), so an empty array `[]`
+// in one case can't silently declare the wrong type (e.g. vector<int>
+// instead of vector<vector<int>>) and break the whole compiled batch.
 // ════════════════════════════════════════════════════════════
 
 export interface TestResult {
@@ -141,7 +146,7 @@ function toNativeLiteral(value: any, lang: string): string {
   return JSON.stringify(value);
 }
 
-// ── Type inference helpers ───────────────────────────────────
+// ── Type inference helpers (single value) ────────────────────
 
 function cppType(value: any): string {
   if (value === null || value === undefined) return "void*";
@@ -197,6 +202,51 @@ function rustType(value: any): string {
     return `Vec<${rustType(first)}>`;
   }
   return "i32";
+}
+
+// ── NEW: infer a type per argument POSITION across ALL cases ─
+//
+// Empty arrays carry no element-type information, so a single
+// empty-array test case must never be allowed to decide the type
+// for that argument position on its own. We scan every test case
+// for that position and prefer the first one that gives us real
+// (non-empty) type information. Only if EVERY case at that position
+// is an empty array do we fall back to a generic type.
+
+function inferArgTypesAcrossCases(
+  parsedArgs: any[][],
+  typeFn: (value: any) => string,
+  fallback: string,
+): string[] {
+  const numArgs = parsedArgs.reduce(
+    (max, args) => Math.max(max, args.length),
+    0,
+  );
+
+  const argTypes: string[] = [];
+  for (let i = 0; i < numArgs; i++) {
+    let chosen: string | null = null;
+
+    for (const args of parsedArgs) {
+      const v = args[i];
+      if (v === undefined) continue;
+
+      const isEmptyArray = Array.isArray(v) && v.length === 0;
+      if (isEmptyArray) {
+        // Only use this as a last resort if nothing better is found
+        if (chosen === null) chosen = typeFn(v);
+        continue;
+      }
+
+      // Non-empty value: definitive type info, use it and stop.
+      chosen = typeFn(v);
+      break;
+    }
+
+    argTypes.push(chosen ?? fallback);
+  }
+
+  return argTypes;
 }
 
 // ── Serialize result back to JSON for comparison ─────────────
@@ -287,10 +337,18 @@ function buildBatchedProgram(
     case "cpp": {
       const returnType = detectCppReturnType(userCode);
 
+      // Infer each argument position's type ONCE across all cases,
+      // so an empty-array case can't clobber a nested-array type.
+      const argTypes = inferArgTypesAcrossCases(
+        parsedArgs,
+        cppType,
+        "std::vector<int>",
+      );
+
       const caseBlocks = parsedArgs.map((args, idx) => {
         const decls = args
           .map((arg, i) => {
-            const type    = cppType(arg);
+            const type    = argTypes[i] ?? cppType(arg);
             const literal = toNativeLiteral(arg, "cpp");
             return `    ${type} __a${idx}_${i}__ = ${literal};`;
           })
@@ -373,10 +431,13 @@ function buildBatchedProgram(
     }
 
     case "go": {
+      // Infer each argument position's type ONCE across all cases.
+      const argTypes = inferArgTypesAcrossCases(parsedArgs, goType, "[]int");
+
       const caseBlocks = parsedArgs.map((args, idx) => {
         const decls = args
           .map((arg, i) => {
-            const type    = goType(arg);
+            const type    = argTypes[i] ?? goType(arg);
             const literal = toNativeLiteral(arg, "go");
             return `    var __a${idx}_${i}__ ${type} = ${literal}`;
           })
@@ -412,10 +473,13 @@ function buildBatchedProgram(
       const isVec           = rustReturnHint.startsWith("Vec");
       const printFmt        = isVec ? '"{:?}"' : '"{}"';
 
+      // Infer each argument position's type ONCE across all cases.
+      const argTypes = inferArgTypesAcrossCases(parsedArgs, rustType, "Vec<i32>");
+
       const caseBlocks = parsedArgs.map((args, idx) => {
         const decls = args
           .map((arg, i) => {
-            const type    = rustType(arg);
+            const type    = argTypes[i] ?? rustType(arg);
             const literal = toNativeLiteral(arg, "rust");
             return `    let __a${idx}_${i}__: ${type} = ${literal};`;
           })
@@ -489,13 +553,13 @@ async function executeWithJudge0(
     method: "POST",
     headers,
     body: JSON.stringify({
-  source_code: fullCode,
-  language_id: languageId,
-  stdin: "",
-  cpu_time_limit: 10,
-  compile_timeout: 30,
-  wall_time_limit: 15,
-}),
+      source_code: fullCode,
+      language_id: languageId,
+      stdin: "",
+      cpu_time_limit: 10,
+      compile_timeout: 30,
+      wall_time_limit: 15,
+    }),
     signal: AbortSignal.timeout(30000),
   });
 
@@ -505,10 +569,10 @@ async function executeWithJudge0(
   }
 
   const data = await submitRes.json();
-const stdout = data.stdout ?? "";
-const stderr =
-  (data.stderr ?? "") +
-  (data.compile_output ??"");
+  const stdout = data.stdout ?? "";
+  const stderr =
+    (data.stderr ?? "") +
+    (data.compile_output ?? "");
 
   return { stdout, stderr };
 }
