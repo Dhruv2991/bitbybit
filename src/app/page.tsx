@@ -15,10 +15,11 @@ import PrivacyPolicyPage    from "@/components/pages/PrivacyPolicyPage";
 import TermsPage            from "@/components/pages/TermsPage";
 import RefundPolicyPage     from "@/components/pages/RefundPolicyPage";
 import ProfilePage          from "@/components/pages/ProfilePage";
+import GlobalSearch          from "@/components/GlobalSearch";
 import { effectiveStreak }  from "@/lib/streak";
 
-type PageId = "home" | "problems" | "leaderboard" | "arena" | "weekly" | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile";
 const PAGE_KEY = "bb_page";
+type PageId = "home" | "problems" | "leaderboard" | "arena" | "weekly" | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile";
 
 const NAV_ITEMS: { id: PageId; label: string; icon: string }[] = [
   { id: "home",        label: "Home",        icon: "⌂"   },
@@ -81,6 +82,7 @@ export default function App() {
   const [liveItems,      setLiveItems]      = useState<{ id: string; label: string; page: PageId; type: 'arena' | 'weekly'; status: 'live' | 'upcoming' }[]>([]);
   const [notifOpen,      setNotifOpen]      = useState(false);
   const [profileOpen,    setProfileOpen]    = useState(false);
+  const [searchOpen,     setSearchOpen]     = useState(false);
   const [userStreak,     setUserStreak]     = useState(0);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
@@ -470,6 +472,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-transparent">
       <AnimatedBackground />
+      <GlobalSearch user={user} navigate={navigate as (page: string) => void} open={searchOpen} onOpenChange={setSearchOpen} />
 
       {/* Global toasts */}
       <div className="fixed top-20 right-4 md:right-6 z-[200] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
@@ -504,7 +507,7 @@ export default function App() {
               <button key={item.id}
                 ref={el => { navItemRefs.current[item.id] = el; }}
                 onClick={() => navigate(item.id)}
-                className={`relative z-10 flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-mono text-sm transition-colors duration-200
+                className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-sm transition-colors duration-200
                   ${page === item.id
                     ? "text-[#00e87a] font-bold"
                     : "text-[#666] hover:text-[#e0e0e0]"}`}>
@@ -526,7 +529,12 @@ export default function App() {
           </nav>
 
           {/* Auth — desktop */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-1">
+            {/* Search trigger — icon-only, same treatment as the icons beside it */}
+            <button onClick={() => setSearchOpen(true)} title="Search (⌘K)"
+              className="p-2 text-[#777] hover:text-[#e0e0e0] transition-colors rounded-xl hover:bg-[#ffffff08]">
+              <span className="text-base">🔍</span>
+            </button>
             {/* Theme toggle */}
             <button onClick={toggleTheme} title="Toggle theme"
               className="p-2 text-[#777] hover:text-[#e0e0e0] transition-colors rounded-xl hover:bg-[#ffffff08]">
@@ -543,6 +551,7 @@ export default function App() {
               </button>
               {bellDropdown}
             </div>
+            <div className="w-px h-5 bg-[#1a1a1a] mx-1" />
             {!authChecked ? (
               <div className="w-24 h-8 rounded-xl bg-[#111] animate-pulse" />
             ) : user ? (
@@ -609,6 +618,10 @@ export default function App() {
 
           {/* Mobile — bell + hamburger */}
           <div className="md:hidden flex items-center gap-1">
+            <button onClick={() => setSearchOpen(true)} title="Search"
+              className="p-2 text-[#555] hover:text-[#e0e0e0] transition-colors">
+              <span className="text-base">🔍</span>
+            </button>
             {/* 🔔 Mobile bell */}
             <div className="relative" ref={notifRefMob}>
               <button onClick={() => setNotifOpen(o => !o)}
