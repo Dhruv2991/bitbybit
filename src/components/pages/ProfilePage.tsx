@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { User } from '@/types/database';
 import { effectiveStreak } from '@/lib/streak';
+import { BADGES, computeUnlockedBadges, type Badge } from '@/lib/badges';
 
 interface ProfilePageProps {
   user:       User | null;
@@ -26,6 +27,7 @@ interface Stats {
   lastSolvedAt:   string | null;
   rank:           number | null;
   recent:         SolvedRow[];
+  badges:         Badge[];
 }
 
 export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
@@ -109,13 +111,24 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
     const monthIdx = monthRanked.findIndex(([github]) => github === user.github);
     const rank = monthIdx === -1 ? null : monthIdx + 1;
 
+    const currentStreak = effectiveStreak(memberRow?.streak, memberRow?.last_solved_at);
+    const badges = computeUnlockedBadges({
+      problemsSolved: deduped.length,
+      totalPoints,
+      everSolvedArena:  (arenaSubs || []).length > 0,
+      everSolvedWeekly: (weeklySubs || []).length > 0,
+      currentStreak,
+      monthlyRank: rank,
+    });
+
     setStats({
       totalPoints,
       problemsSolved: deduped.length,
-      streak: effectiveStreak(memberRow?.streak, memberRow?.last_solved_at),
+      streak: currentStreak,
       lastSolvedAt: memberRow?.last_solved_at || null,
       rank,
       recent,
+      badges,
     });
     setLoading(false);
   }, [db, user]);
@@ -195,6 +208,35 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
           <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide">
             Day streak {!isActiveToday && stats.streak > 0 && '(solve today to keep it!)'}
           </p>
+        </div>
+      </div>
+
+      {/* Badges */}
+      <div className="card p-5 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display font-bold text-sm text-[#e0e0e0]">
+            Badges <span className="text-[#666] font-mono font-normal">({stats.badges.length}/{BADGES.length})</span>
+          </h2>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          {BADGES.map(b => {
+            const unlocked = stats.badges.some(ub => ub.id === b.id);
+            return (
+              <div key={b.id} title={`${b.label} — ${b.description}${!b.permanent ? ' (current status, can change)' : ''}`}
+                className={`flex flex-col items-center text-center gap-1.5 p-3 rounded-xl border transition-all
+                  ${unlocked
+                    ? 'bg-[#00e87a0a] border-[#00e87a25]'
+                    : 'bg-[#0a0a0a] border-[#161616] opacity-40 grayscale'}`}>
+                <span className="text-2xl">{b.icon}</span>
+                <span className={`text-[10px] font-mono leading-tight ${unlocked ? 'text-[#e0e0e0]' : 'text-[#666]'}`}>
+                  {b.label}
+                </span>
+                {!b.permanent && unlocked && (
+                  <span className="text-[8px] font-mono text-[#f0b429] uppercase">current</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
