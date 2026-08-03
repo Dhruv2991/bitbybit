@@ -115,21 +115,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid purpose' }, { status: 400 });
     }
 
-    // 1. Include razorpay_payment_id in query to check for previous automated transactions
+    // Fetch existing subscriber row
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existingSub } = await (db.from('subscribers') as any)
       .select('status, current_period_end, razorpay_payment_id')
       .eq('github', github)
       .maybeSingle();
 
-    // 2. Determine whether this is their first automated Razorpay payment
-    const hasPriorPayment = Boolean(existingSub?.razorpay_payment_id);
+    // ── Idempotency Check ──────────────────────────────────────
+    // If the webhook route already processed this EXACT payment_id, return immediately 
+    // to prevent recalculating and double-stacking dates.
+    if (existingSub?.razorpay_payment_id === razorpay_payment_id) {
+      return NextResponse.json({
+        success: true,
+        paymentId: razorpay_payment_id,
+        currentPeriodEnd: existingSub.current_period_end,
+      });
+    }
 
-    // 3. Compute period end
+    // ── Prior Payment Check ────────────────────────────────────
+    // A prior payment MUST exist, start with 'pay_', and NOT be equal to the current payment.
+    const previousPaymentId = existingSub?.razorpay_payment_id;
+    const hasPriorPayment =
+      typeof previousPaymentId === 'string' &&
+      previousPaymentId.startsWith('pay_') &&
+      previousPaymentId !== razorpay_payment_id;
+
     const newPeriodEnd = computeNewPeriodEnd(
-      existingSub?.status, 
-      existingSub?.current_period_end, 
-      hasPriorPayment
+      existingSub?.status,
+      existingSub?.current_period_end,
+      hasPriorPayment,
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

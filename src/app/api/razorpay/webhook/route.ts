@@ -1,6 +1,19 @@
 // ════════════════════════════════════════════════════════════
 // src/app/api/razorpay/webhook/route.ts
 // POST /api/razorpay/webhook
+//
+// Safety net: if the browser tab closes right after payment but
+// before our client-side /api/razorpay/verify call fires, this
+// webhook still confirms the payment server-side using Razorpay's
+// own signed event.
+//
+// Configure in Razorpay Dashboard → Settings → Webhooks:
+//   URL:     https://yourdomain.com/api/razorpay/webhook
+//   Secret: any string you choose — put it in RAZORPAY_WEBHOOK_SECRET
+//   Events: payment.captured (required), payment.failed (optional),
+//           refund.processed (required — without this checked,
+//           refunding someone in the Razorpay dashboard will NOT
+//           revoke their access automatically).
 // ════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -103,24 +116,33 @@ export async function POST(req: NextRequest) {
     const db = createServerSupabaseClient();
 
     if (notes.type === 'subscription' && notes.github) {
-      // 1. Fetch razorpay_payment_id alongside status & current_period_end
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: existingSub } = await (db.from('subscribers') as any)
         .select('status, current_period_end, razorpay_payment_id')
         .eq('github', notes.github)
         .maybeSingle();
 
-      // 2. Determine if they have paid via Razorpay before.
-      // If `existingSub` has a valid `razorpay_payment_id`, this isn't their first payment.
-      const hasPriorPayment = Boolean(existingSub?.razorpay_payment_id);
+      // ── Idempotency Check ──────────────────────────────────────
+      // If client-side /verify route already processed this payment,
+      // acknowledge and exit without re-calculating or double-stacking dates.
+      if (existingSub?.razorpay_payment_id === paymentId) {
+        return NextResponse.json({ success: true, alreadyProcessed: true });
+      }
 
-      // 3. Compute period end based on payment history
+      // ── Prior Payment Check ────────────────────────────────────
+      // A prior payment MUST exist, start with 'pay_', and NOT be equal to the current payment.
+      const previousPaymentId = existingSub?.razorpay_payment_id;
+      const hasPriorPayment =
+        typeof previousPaymentId === 'string' &&
+        previousPaymentId.startsWith('pay_') &&
+        previousPaymentId !== paymentId;
+
       const newPeriodEnd = computeNewPeriodEnd(
-        existingSub?.status, 
+        existingSub?.status,
         existingSub?.current_period_end,
-        hasPriorPayment
+        hasPriorPayment,
       );
-      
+
       const email = notes.email || null;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

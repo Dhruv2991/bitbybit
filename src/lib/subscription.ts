@@ -1,6 +1,13 @@
 // ════════════════════════════════════════════════════════════
 // src/lib/subscription.ts
 // Shared helpers for the monthly (₹39/mo) subscription model.
+//
+// This is a manually-renewed monthly pass, NOT an auto-debit
+// recurring mandate — Razorpay Checkout only creates one-time
+// orders here. Each successful payment extends `current_period_end`
+// by 30 days. There is no silent auto-charge; the user pays again
+// each month to keep access, and can renew early (which stacks the
+// extra days on top of their current period instead of wasting them).
 // ════════════════════════════════════════════════════════════
 
 const PERIOD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -12,8 +19,9 @@ export function computeNewPeriodEnd(
 ): string {
   const now = Date.now();
 
-  // If this is their first automated Razorpay payment, force-reset the 30-day 
-  // window from `now` to wipe out any grandfathered/manual dates.
+  // If they do NOT have a legitimate prior Razorpay payment on record
+  // (e.g. converting from a pre-Razorpay manual/admin grant), force a fresh 
+  // 30-day window starting from today instead of stacking on top of the old manual date.
   if (!hasPriorPayment) {
     return new Date(now + PERIOD_MS).toISOString();
   }
@@ -23,7 +31,7 @@ export function computeNewPeriodEnd(
       ? new Date(currentPeriodEnd).getTime()
       : NaN;
 
-  // Standard stacking: if they still have time left, add 30 days on top of existing end date.
+  // Stacking logic only applies to people who genuinely paid through Razorpay before
   const base = !Number.isNaN(existingEnd) && existingEnd > now ? existingEnd : now;
   return new Date(base + PERIOD_MS).toISOString();
 }
