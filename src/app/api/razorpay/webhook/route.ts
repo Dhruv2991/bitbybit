@@ -1,19 +1,6 @@
 // ════════════════════════════════════════════════════════════
 // src/app/api/razorpay/webhook/route.ts
 // POST /api/razorpay/webhook
-//
-// Safety net: if the browser tab closes right after payment but
-// before our client-side /api/razorpay/verify call fires, this
-// webhook still confirms the payment server-side using Razorpay's
-// own signed event.
-//
-// Configure in Razorpay Dashboard → Settings → Webhooks:
-//   URL:    https://yourdomain.com/api/razorpay/webhook
-//   Secret: any string you choose — put it in RAZORPAY_WEBHOOK_SECRET
-//   Events: payment.captured (required), payment.failed (optional),
-//           refund.processed (required — without this checked,
-//           refunding someone in the Razorpay dashboard will NOT
-//           revoke their access automatically).
 // ════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,8 +9,6 @@ import { createServerSupabaseClient } from '@/lib/supabase';
 import { computeNewPeriodEnd } from '@/lib/subscription';
 import { sendEmailDetailed, subscriptionConfirmedEmail, subscriptionRevokedEmail } from '@/lib/email';
 
-// Webhook needs the RAW body to verify the signature — do not
-// parse it as JSON before verifying.
 export async function POST(req: NextRequest) {
   try {
     if (!process.env.RAZORPAY_WEBHOOK_SECRET) {
@@ -50,12 +35,6 @@ export async function POST(req: NextRequest) {
 
     const event = JSON.parse(rawBody);
 
-    // Refund events: Razorpay fires refund.processed once the money is
-    // actually back with the customer. We find the subscriber this
-    // payment belongs to and revoke their access the same way the
-    // admin's manual "Revoke access" button does, so an admin doesn't
-    // have to remember to do it by hand every time they refund someone
-    // from the Razorpay dashboard.
     if (event.event === 'refund.processed') {
       const paymentId: string | undefined = event.payload?.refund?.entity?.payment_id;
 
@@ -77,9 +56,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, ignored: 'no matching subscriber' });
       }
 
-      // Already revoked (e.g. the admin already clicked "Revoke access",
-      // or we already processed this refund via the other event type) —
-      // nothing left to do.
       if (sub.status !== 'rejected') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { error } = await (db.from('subscribers') as any)
@@ -88,9 +64,6 @@ export async function POST(req: NextRequest) {
         if (error) console.error('[razorpay/webhook] revoke on refund failed:', error);
       }
 
-      // Dedupe on payment_id so refund.processed and payment.refunded
-      // firing for the same refund only sends one email, same pattern
-      // as the payment.captured confirmation email below.
       if (sub.email) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: logged } = await (db.from('email_log') as any)
@@ -104,13 +77,6 @@ export async function POST(req: NextRequest) {
           const { subject, html } = subscriptionRevokedEmail(sub.name || sub.github);
           const result = await sendEmailDetailed(sub.email, subject, html);
           if (!result.ok) {
-            // Surface this loudly in Vercel's function logs — an
-            // email_log row existing is NOT proof Brevo ever received
-            // this, only that we decided to attempt it. If the actual
-            // send failed, remove the dedupe row so a Razorpay webhook
-            // retry (or a manual replay) can actually try again instead
-            // of silently being blocked by ignoreDuplicates thinking
-            // it already succeeded.
             console.error(`[razorpay/webhook] refund email to ${sub.email} FAILED:`, result.error);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await (db.from('email_log') as any)
@@ -123,8 +89,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, revoked: sub.github });
     }
 
-    // We only care about successful captures beyond this point.
-    // Everything else we just acknowledge so Razorpay stops retrying.
     if (event.event !== 'payment.captured') {
       return NextResponse.json({ success: true, ignored: event.event });
     }
@@ -138,16 +102,25 @@ export async function POST(req: NextRequest) {
     const paymentId = payment.id as string;
     const db = createServerSupabaseClient();
 
-    // notes were set when the order was created (create-order route) —
-    // we use them to figure out what this payment was for and who it's for.
     if (notes.type === 'subscription' && notes.github) {
+      // 1. Fetch razorpay_payment_id alongside status & current_period_end
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: existingSub } = await (db.from('subscribers') as any)
-        .select('status, current_period_end')
+        .select('status, current_period_end, razorpay_payment_id')
         .eq('github', notes.github)
         .maybeSingle();
 
-      const newPeriodEnd = computeNewPeriodEnd(existingSub?.status, existingSub?.current_period_end);
+      // 2. Determine if they have paid via Razorpay before.
+      // If `existingSub` has a valid `razorpay_payment_id`, this isn't their first payment.
+      const hasPriorPayment = Boolean(existingSub?.razorpay_payment_id);
+
+      // 3. Compute period end based on payment history
+      const newPeriodEnd = computeNewPeriodEnd(
+        existingSub?.status, 
+        existingSub?.current_period_end,
+        hasPriorPayment
+      );
+      
       const email = notes.email || null;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -165,10 +138,6 @@ export async function POST(req: NextRequest) {
       );
       if (error) console.error('[razorpay/webhook] subscribers upsert error:', error);
 
-      // Same dedupe pattern as /api/razorpay/verify — keyed on
-      // payment_id, so if the client-side verify call already sent
-      // this confirmation, this is a silent no-op instead of a
-      // duplicate email.
       if (email && !error) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: logged } = await (db.from('email_log') as any)
@@ -191,9 +160,6 @@ export async function POST(req: NextRequest) {
         }
       }
     } else {
-      // No usable notes — this payment might have already been
-      // confirmed by the client-side /verify call, or notes weren't
-      // passed. Either way, acknowledge so Razorpay doesn't retry.
       console.warn('[razorpay/webhook] payment.captured with no matching notes', { paymentId, notes });
     }
 

@@ -98,10 +98,7 @@ export async function POST(req: NextRequest) {
     if (payment.status !== 'captured') {
       return NextResponse.json({ error: `Payment not captured (status: ${payment.status})` }, { status: 400 });
     }
-    // The notes on the order were set server-side in create-order,
-    // using the SAME verified identity — so they must match this
-    // request's authenticated user. If they don't, something's off
-    // (e.g. token/order mismatch) and we refuse rather than guess.
+
     if (payment.notes?.github && payment.notes.github !== github) {
       console.error('[razorpay/verify] identity mismatch between order notes and authenticated user', {
         orderGithub: payment.notes.github, authGithub: github,
@@ -118,13 +115,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid purpose' }, { status: 400 });
     }
 
+    // 1. Include razorpay_payment_id in query to check for previous automated transactions
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existingSub } = await (db.from('subscribers') as any)
-      .select('status, current_period_end')
+      .select('status, current_period_end, razorpay_payment_id')
       .eq('github', github)
       .maybeSingle();
 
-    const newPeriodEnd = computeNewPeriodEnd(existingSub?.status, existingSub?.current_period_end);
+    // 2. Determine whether this is their first automated Razorpay payment
+    const hasPriorPayment = Boolean(existingSub?.razorpay_payment_id);
+
+    // 3. Compute period end
+    const newPeriodEnd = computeNewPeriodEnd(
+      existingSub?.status, 
+      existingSub?.current_period_end, 
+      hasPriorPayment
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (db.from('subscribers') as any).upsert(
@@ -139,16 +145,10 @@ export async function POST(req: NextRequest) {
       { onConflict: 'github' },
     );
     if (error) {
-      // Unique constraint on razorpay_payment_id will reject a
-      // replayed payment_id being attached to a second account.
       console.error('[razorpay/verify] subscribers upsert error:', error);
       return NextResponse.json({ error: 'This payment has already been used, or the write failed' }, { status: 409 });
     }
 
-    // Best-effort confirmation email — never blocks or fails the
-    // payment response if sending doesn't work. Deduped on payment_id
-    // via email_log so it can never double-send even if the webhook
-    // safety-net route also processes this same payment.
     if (email) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: logged } = await (db.from('email_log') as any)
@@ -158,9 +158,7 @@ export async function POST(req: NextRequest) {
         )
         .select('github')
         .maybeSingle();
-      // A returned row means this is the first time we've logged this
-      // payment — safe to send. null means it was already logged
-      // (e.g. by the webhook safety-net route) — skip re-sending.
+
       if (logged) {
         const { subject, html } = subscriptionConfirmedEmail(name, newPeriodEnd);
         sendEmail(email, subject, html).catch(() => {});
