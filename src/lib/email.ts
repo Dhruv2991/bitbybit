@@ -200,6 +200,25 @@ export function weeklyChallengeEmail(name: string, title: string) {
     `),
   };
 }
+// Add this function to src/lib/email.ts, alongside subscribeNudgeEmail etc.
+
+export function inactivityNudgeEmail(name: string, daysInactive: number) {
+  return {
+    subject: "We miss you at Bit by Bit 👋",
+    html: wrap(`
+      <p style="font-size:15px;">Hey ${name},</p>
+      <p style="font-size:14px;color:#aaa;line-height:1.6;">
+        It's been ${daysInactive} days since you last solved a problem —
+        your account, streak, and points are all still here. Come back and
+        solve one to pick up where you left off.
+      </p>
+      <a href="${SITE_URL}/#problems" style="display:inline-block;margin-top:16px;background:#00e87a;color:#000;
+        padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:13px;">
+        Solve a problem →
+      </a>
+    `),
+  };
+}
 
 export function subscribeNudgeEmail(name: string) {
   return {
