@@ -57,6 +57,8 @@ async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization') || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  // TEMP DEBUG — remove after confirming, do not leave in production
+  console.log('[debug] token length:', token?.length, 'env length:', process.env.CRON_SECRET?.length, 'match:', token === process.env.CRON_SECRET);
   if (!token || !process.env.CRON_SECRET || token !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
