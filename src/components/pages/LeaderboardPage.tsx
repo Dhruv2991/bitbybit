@@ -160,9 +160,19 @@ export default function LeaderboardPage() {
           .slice(0, 100);
         setChallengeRows(rows);
       } else {
+        // Calendar-aligned cutoffs, not rolling windows:
+        // "weekly" = since this Monday 00:00, "monthly" = since the 1st of this month 00:00.
         const cutoff = new Date();
-        if (tab === "weekly") cutoff.setDate(cutoff.getDate() - 7);
-        if (tab === "monthly") cutoff.setMonth(cutoff.getMonth() - 1);
+        if (tab === "weekly") {
+          const day = cutoff.getDay(); // 0 = Sun, 1 = Mon, ...
+          const diffToMonday = day === 0 ? 6 : day - 1;
+          cutoff.setDate(cutoff.getDate() - diffToMonday);
+          cutoff.setHours(0, 0, 0, 0);
+        }
+        if (tab === "monthly") {
+          cutoff.setDate(1);
+          cutoff.setHours(0, 0, 0, 0);
+        }
 
         const [{ data: subs }, { data: arenaSubs }, { data: weeklySubs }] =
           await Promise.all([
@@ -551,8 +561,8 @@ export default function LeaderboardPage() {
         !loading &&
         filteredMembers.length > 0 && (
           <p className="text-[10px] text-[#ccc] font-mono text-center mt-6">
-            Showing approved submissions from the past{" "}
-            {tab === "weekly" ? "7" : "30"} days.
+            Showing approved submissions since{" "}
+            {tab === "weekly" ? "the start of this week (Monday)" : "the 1st of this month"}.
           </p>
         )}
     </div>
