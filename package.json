@@ -10,7 +10,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@google/genai": "^2.10.0",
     "@monaco-editor/react": "^4.6.0",
     "@supabase/ssr": "^0.3.0",
     "@supabase/supabase-js": "^2.43.1",

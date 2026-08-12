@@ -31,6 +31,7 @@ interface Stats {
   recent:         SolvedRow[];
   allDates:       string[];
   skillTags:      { tag: string; count: number }[];
+  aiAssists:      number;
   badges:         Badge[];
 }
 
@@ -46,7 +47,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
     // Same "best score per problem, across all three submission tables"
     // aggregation the leaderboard uses, so the numbers here always match
     // what's shown there — no separate source of truth to drift out of sync.
-    const [{ data: normalSubs }, { data: arenaSubs }, { data: weeklySubs }, { data: memberRow }, { data: allProblems }] =
+    const [{ data: normalSubs }, { data: arenaSubs }, { data: weeklySubs }, { data: memberRow }, { data: allProblems }, { data: aiRows }] =
       await Promise.all([
         db.from('submissions').select('problem_id, problem_title, points_awarded, tests_passed, tests_total, created_at')
           .eq('github', user.github).eq('status', 'approved'),
@@ -60,6 +61,8 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
         (db.from('members') as any).select('streak, last_solved_at').eq('github', user.github).maybeSingle(),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (db.from('problems') as any).select('id, tags'),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (db.from('ai_usage') as any).select('used').eq('github', user.github),
       ]);
 
     const rows: SolvedRow[] = [
@@ -153,6 +156,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       recent,
       allDates,
       skillTags,
+      aiAssists: (aiRows || []).reduce((sum: number, r: any) => sum + (r.used || 0), 0),
       badges,
     });
     setLoading(false);
@@ -217,7 +221,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className={`grid grid-cols-1 sm:grid-cols-3 ${stats.aiAssists > 0 ? 'md:grid-cols-4' : ''} gap-4 mb-6`}>
         <div className="card-hover p-5 text-center">
           <p className="text-3xl font-display font-bold text-[#00e87a] stat-glow">{stats.totalPoints}</p>
           <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide">Total points</p>
@@ -234,6 +238,12 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
             Day streak {!isActiveToday && stats.streak > 0 && '(solve today to keep it!)'}
           </p>
         </div>
+        {stats.aiAssists > 0 && (
+          <div className="card-hover p-5 text-center">
+            <p className="text-3xl font-display font-bold text-[#a78bfa]">🤖 {stats.aiAssists}</p>
+            <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide">AI assists used</p>
+          </div>
+        )}
       </div>
 
       {/* Badges */}
