@@ -5,6 +5,7 @@ import type { User } from '@/types/database';
 import { effectiveStreak } from '@/lib/streak';
 import { BADGES, computeUnlockedBadges, type Badge } from '@/lib/badges';
 import ContributionHeatmap from '@/components/profile/ContributionHeatmap';
+import SkillRadar from '@/components/profile/SkillRadar';
 
 interface ProfilePageProps {
   user:       User | null;
@@ -29,6 +30,7 @@ interface Stats {
   rank:           number | null;
   recent:         SolvedRow[];
   allDates:       string[];
+  skillTags:      { tag: string; count: number }[];
   badges:         Badge[];
 }
 
@@ -44,7 +46,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
     // Same "best score per problem, across all three submission tables"
     // aggregation the leaderboard uses, so the numbers here always match
     // what's shown there — no separate source of truth to drift out of sync.
-    const [{ data: normalSubs }, { data: arenaSubs }, { data: weeklySubs }, { data: memberRow }] =
+    const [{ data: normalSubs }, { data: arenaSubs }, { data: weeklySubs }, { data: memberRow }, { data: allProblems }] =
       await Promise.all([
         db.from('submissions').select('problem_id, problem_title, points_awarded, tests_passed, tests_total, created_at')
           .eq('github', user.github).eq('status', 'approved'),
@@ -56,6 +58,8 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
           .eq('github', user.github).eq('status', 'approved'),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (db.from('members') as any).select('streak, last_solved_at').eq('github', user.github).maybeSingle(),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (db.from('problems') as any).select('id, tags'),
       ]);
 
     const rows: SolvedRow[] = [
@@ -83,6 +87,20 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
     }
     const deduped = [...bestPerProblem.values()];
     const totalPoints = deduped.reduce((sum, r) => sum + r.points, 0);
+
+    // Tag breakdown for the skill radar — count solved problems per tag,
+    // using whatever tags each problem actually has (data-driven, no
+    // hardcoded category list, so it adapts as new problems/tags are added).
+    const tagMap = new Map<string, string[]>((allProblems || []).map((p: any) => [p.id, p.tags || []]));
+    const tagCounts = new Map<string, number>();
+    for (const r of deduped) {
+      const tags = tagMap.get(r.problem_id) || [];
+      for (const t of tags) tagCounts.set(t, (tagCounts.get(t) || 0) + 1);
+    }
+    const skillTags = [...tagCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([tag, count]) => ({ tag, count }));
     const recent = [...rows].sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime()).slice(0, 10);
     // Full, unsliced set of solve dates — used by the contribution
     // heatmap, which needs the whole history, not just the last 10.
@@ -134,6 +152,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       rank,
       recent,
       allDates,
+      skillTags,
       badges,
     });
     setLoading(false);
@@ -248,6 +267,9 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
 
       {/* Contribution heatmap */}
       <ContributionHeatmap dates={stats.allDates} />
+
+      {/* Skill radar */}
+      <SkillRadar skills={stats.skillTags} />
 
       {/* Recent activity */}
       <div className="card p-5">
