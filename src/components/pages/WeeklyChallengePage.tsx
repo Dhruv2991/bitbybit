@@ -214,6 +214,14 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
   const [submitting,     setSubmitting]     = useState(false);
   const [payErr,         setPayErr]         = useState('');
 
+  // Ticks every second so the countdown + decaying bonus bar update live
+  // instead of only refreshing on unrelated re-renders.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const db = getSupabaseClient();
 
   useEffect(() => {
@@ -516,6 +524,28 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                     )}
                     <span>🔓 Free with subscription</span>
                   </div>
+
+                  {isActive && isSubscribed && (
+                    <div className="mt-2">
+                      <div className="h-1.5 w-full bg-[#1a1a1a] rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-1000 ease-linear"
+                          style={{
+                            width: `${Math.max(0, Math.min(100, ((bonus - 0.2) / 0.8) * 100))}%`,
+                            background:
+                              bonus > 0.6
+                                ? "#00e87a"
+                                : bonus > 0.35
+                                ? "#f0b429"
+                                : "#ff5c5c",
+                          }}
+                        />
+                      </div>
+                      <p className="text-[9px] text-[#666] font-mono mt-1">
+                        Bonus drains from 100% → 20% over the week — solve sooner to lock in more.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Problems list */}

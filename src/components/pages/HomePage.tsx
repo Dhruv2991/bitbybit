@@ -77,27 +77,72 @@ function TerminalSnippet() {
   );
 }
 
-// Live activity ticker
+// Live activity ticker — pulls real recent solves from Supabase and
+// updates instantly via Realtime when a new one comes in, instead of
+// cycling canned placeholder strings.
 function ActivityTicker({ members }: { members: number }) {
-  const activities = [
-    '🔥 someone solved Two Sum in Python',
-    '⚡ new weekly challenge is LIVE',
-    `👥 ${members} coders active this week`,
-    '🏆 Arena contest ends in 2h 14m',
-    '✓ 47 test cases passed just now',
-  ];
+  const db = getSupabaseClient();
+  const fallback = `👥 ${members} coders active this week`;
+  const [items, setItems] = useState<string[]>([]);
   const [idx, setIdx] = useState(0);
   const [visible, setVisible] = useState(true);
+
   useEffect(() => {
+    let cancelled = false;
+
+    async function loadRecent() {
+      const [{ data: subs }, { data: weekly }, { data: arena }] = await Promise.all([
+        db.from('submissions').select('name, github, problem_title, created_at')
+          .eq('status', 'approved').order('created_at', { ascending: false }).limit(5),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (db.from('weekly_submissions') as any).select('name, github, problem_title, submitted_at')
+          .eq('status', 'approved').order('submitted_at', { ascending: false }).limit(5),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (db.from('arena_submissions') as any).select('name, github, problem_title, created_at')
+          .eq('status', 'reviewed').order('created_at', { ascending: false }).limit(5),
+      ]);
+
+      const combined = [
+        ...(subs || []).map((s: any) => ({ who: s.name || s.github, what: s.problem_title, when: s.created_at })),
+        ...(weekly || []).map((s: any) => ({ who: s.name || s.github, what: s.problem_title, when: s.submitted_at })),
+        ...(arena || []).map((s: any) => ({ who: s.name || s.github, what: s.problem_title, when: s.created_at })),
+      ]
+        .filter(r => r.who && r.what)
+        .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
+        .slice(0, 6)
+        .map(r => `🔥 ${r.who} just solved ${r.what}`);
+
+      if (!cancelled) setItems(combined.length > 0 ? combined : [fallback]);
+    }
+
+    loadRecent();
+
+    // Re-pull the moment any new approved solve lands, so the very
+    // latest real activity shows up without waiting for a page refresh.
+    const channel = db
+      .channel('home-activity-ticker')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, loadRecent)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_submissions' }, loadRecent)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'arena_submissions' }, loadRecent)
+      .subscribe();
+
+    return () => { cancelled = true; db.removeChannel(channel); };
+  }, [db]);
+
+  useEffect(() => {
+    if (items.length <= 1) return;
     const interval = setInterval(() => {
       setVisible(false);
       setTimeout(() => {
-        setIdx(i => (i + 1) % activities.length);
+        setIdx(i => (i + 1) % items.length);
         setVisible(true);
       }, 300);
     }, 3500);
     return () => clearInterval(interval);
-  }, []);
+  }, [items.length]);
+
+  const current = items[idx] || fallback;
+
   return (
     <div className="flex items-center gap-2.5 bg-[#0f0f0f] border border-[#1c1c1c] px-4 py-2 rounded-full max-w-xs overflow-hidden">
       <span className="live-dot shrink-0" />
@@ -105,7 +150,7 @@ function ActivityTicker({ members }: { members: number }) {
         className="text-[11px] font-mono text-[#666] truncate transition-opacity duration-300"
         style={{ opacity: visible ? 1 : 0 }}
       >
-        {activities[idx]}
+        {current}
       </span>
     </div>
   );

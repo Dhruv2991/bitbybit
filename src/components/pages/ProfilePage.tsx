@@ -4,6 +4,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import type { User } from '@/types/database';
 import { effectiveStreak } from '@/lib/streak';
 import { BADGES, computeUnlockedBadges, type Badge } from '@/lib/badges';
+import ContributionHeatmap from '@/components/profile/ContributionHeatmap';
 
 interface ProfilePageProps {
   user:       User | null;
@@ -27,6 +28,7 @@ interface Stats {
   lastSolvedAt:   string | null;
   rank:           number | null;
   recent:         SolvedRow[];
+  allDates:       string[];
   badges:         Badge[];
 }
 
@@ -82,6 +84,9 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
     const deduped = [...bestPerProblem.values()];
     const totalPoints = deduped.reduce((sum, r) => sum + r.points, 0);
     const recent = [...rows].sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime()).slice(0, 10);
+    // Full, unsliced set of solve dates — used by the contribution
+    // heatmap, which needs the whole history, not just the last 10.
+    const allDates = rows.map(r => r.when);
 
     // This mirrors the Leaderboard's "This Month" tab exactly (same
     // cutoff, same tables, same points sum, same top-100 cap) so the
@@ -128,6 +133,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       lastSolvedAt: memberRow?.last_solved_at || null,
       rank,
       recent,
+      allDates,
       badges,
     });
     setLoading(false);
@@ -239,6 +245,9 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
           })}
         </div>
       </div>
+
+      {/* Contribution heatmap */}
+      <ContributionHeatmap dates={stats.allDates} />
 
       {/* Recent activity */}
       <div className="card p-5">
