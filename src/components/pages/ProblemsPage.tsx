@@ -842,7 +842,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                     </div>
                     <div className="flex gap-1.5 flex-wrap">
                       {(p.tags || []).map(t => (
-                        <span key={t} className="text-[10px] text-[#999] bg-[#0f0f0f] px-1.5 py-0.5 rounded font-mono border border-[#1a1a1a]">{t}</span>
+                        <span key={t} className="text-[10px] text-[#5eb3ff] bg-[#5eb3ff12] px-1.5 py-0.5 rounded font-mono border border-[#5eb3ff28]">{t}</span>
                       ))}
                     </div>
                   </div>

@@ -1144,7 +1144,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         {(problem.tags || []).length > 0 && (
           <div className="flex flex-wrap gap-1.5 mb-5">
             {problem.tags.map(tag => (
-              <span key={tag} className="px-2 py-0.5 bg-[var(--card)] text-[var(--text3)] rounded-lg text-xs font-mono border border-[var(--border)]">{tag}</span>
+              <span key={tag} className="px-2 py-0.5 bg-[var(--info-dim)] text-[var(--info)] rounded-lg text-xs font-mono border border-[var(--info-dim)]">{tag}</span>
             ))}
           </div>
         )}

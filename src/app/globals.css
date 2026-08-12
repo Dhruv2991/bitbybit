@@ -25,6 +25,11 @@
     --grid-color: rgba(150,170,255,0.05);
     --sheen:      rgba(255,255,255,0.06);
     --noise-op:   0.035;
+    /* Informational accent — reserved for tags/links/neutral info so
+       green stays exclusively a "success/primary action" signal instead
+       of doing double duty for everything on the page. */
+    --info:       #5eb3ff;
+    --info-dim:   #5eb3ff1c;
   }
 
   [data-theme="light"] {
@@ -61,7 +66,31 @@
     /* Subtle dot grid background, tinted toward the accent for depth */
     background-image: radial-gradient(circle, rgba(150,170,255,0.05) 1px, transparent 1px);
     background-size: 28px 28px;
+    position: relative;
   }
+
+  /* Very faint CRT scanline texture — reinforces the terminal identity
+     as ambient atmosphere rather than a literal screenshot-of-a-terminal
+     gimmick. Kept at ~3% opacity so it reads as texture, not noise.
+     Disabled entirely in light mode and for reduced-motion users get
+     no animation (it's static either way, just a safety default). */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.025) 0px,
+      rgba(255,255,255,0.025) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    opacity: 0.5;
+  }
+
+  [data-theme="light"] body::before { display: none; }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display), 'Syne', sans-serif;
