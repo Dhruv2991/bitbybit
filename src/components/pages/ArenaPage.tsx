@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import dynamic                          from 'next/dynamic';
 import { getSupabaseClient }            from '@/lib/supabase';
 import ContestEntryButton               from '@/components/arena/ContestEntryButton';
@@ -1005,6 +1005,7 @@ function ContestResultsModal({ contest, onClose }: { contest: Contest; onClose: 
   const db = getSupabaseClient();
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<'final' | 'replay'>('final');
 
   useEffect(() => {
     let alive = true;
@@ -1032,17 +1033,43 @@ function ContestResultsModal({ contest, onClose }: { contest: Contest; onClose: 
       onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--bg2)] border border-[var(--border)] rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col"
+        className="bg-[var(--bg2)] border border-[var(--border)] rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
           <div>
             <h3 className="font-display font-bold text-[var(--text)] text-base">🏁 {contest.name}</h3>
-            <p className="text-[10px] text-[var(--text3)] font-mono mt-0.5">Final results</p>
+            <p className="text-[10px] text-[var(--text3)] font-mono mt-0.5">
+              {tab === 'final' ? 'Final results' : 'Rank replay'}
+            </p>
           </div>
           <button onClick={onClose} className="text-[var(--text3)] hover:text-[var(--text)] transition-colors text-lg">✕</button>
         </div>
 
-        <div className="overflow-y-auto px-4 py-4 space-y-2">
+        {/* Tabs */}
+        {!loading && rows.length > 1 && (
+          <div className="flex gap-2 px-4 pt-3">
+            <button
+              onClick={() => setTab('final')}
+              className={`text-[10px] font-mono px-3 py-1.5 rounded-lg border transition-all
+                ${tab === 'final'
+                  ? 'bg-[var(--acc)] text-black border-[var(--acc)] font-bold'
+                  : 'bg-[var(--surface2)] text-[var(--text3)] border-[var(--border)] hover:text-[var(--text)]'}`}
+            >
+              🏁 Final Results
+            </button>
+            <button
+              onClick={() => setTab('replay')}
+              className={`text-[10px] font-mono px-3 py-1.5 rounded-lg border transition-all
+                ${tab === 'replay'
+                  ? 'bg-[var(--acc)] text-black border-[var(--acc)] font-bold'
+                  : 'bg-[var(--surface2)] text-[var(--text3)] border-[var(--border)] hover:text-[var(--text)]'}`}
+            >
+              👻 Ghost Replay
+            </button>
+          </div>
+        )}
+
+        <div className="overflow-y-auto px-4 py-4 space-y-2 flex-1">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="spinner" />
@@ -1051,7 +1078,7 @@ function ContestResultsModal({ contest, onClose }: { contest: Contest; onClose: 
             <div className="text-center py-12 text-[var(--text2)] font-mono text-sm">
               No submissions were recorded for this contest.
             </div>
-          ) : (
+          ) : tab === 'final' ? (
             rows.map((r, i) => (
               <div key={`${r.github}-${i}`}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border
@@ -1078,8 +1105,105 @@ function ContestResultsModal({ contest, onClose }: { contest: Contest; onClose: 
                 </div>
               </div>
             ))
+          ) : (
+            <ContestReplay rows={rows} />
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// Ghost Replay — steps through every submission in chronological
+// order and reconstructs what the leaderboard looked like at each
+// moment, so you can watch ranks shuffle as the contest happened.
+// Uses only arena_submissions.created_at, already fetched above —
+// no new tables, no schema changes.
+// ════════════════════════════════════════════════════════════
+function ContestReplay({ rows }: { rows: any[] }) {
+  const timeline = useMemo(() => {
+    const chronological = [...rows]
+      .filter(r => r.created_at)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    // best-score-so-far per github, snapshotted after each event
+    const best = new Map<string, any>();
+    const steps: { at: string; standings: any[]; justMoved: string | null }[] = [];
+
+    for (const r of chronological) {
+      const existing = best.get(r.github);
+      if (!existing || (r.points_awarded ?? 0) > (existing.points_awarded ?? 0)) {
+        best.set(r.github, r);
+      }
+      const standings = [...best.values()].sort((a, b) => (b.points_awarded ?? 0) - (a.points_awarded ?? 0));
+      steps.push({ at: r.created_at, standings, justMoved: r.github });
+    }
+    return steps;
+  }, [rows]);
+
+  const [i, setI] = useState(0);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    if (!playing) return;
+    if (i >= timeline.length - 1) { setPlaying(false); return; }
+    const id = setTimeout(() => setI(n => n + 1), 900);
+    return () => clearTimeout(id);
+  }, [playing, i, timeline.length]);
+
+  if (timeline.length === 0) {
+    return <div className="text-center py-12 text-[var(--text2)] font-mono text-sm">Not enough data to replay.</div>;
+  }
+
+  const step = timeline[i];
+  const medals = ['🥇', '🥈', '🥉'];
+
+  return (
+    <div>
+      {/* Controls */}
+      <div className="flex items-center gap-3 mb-4">
+        <button
+          onClick={() => { if (i >= timeline.length - 1) setI(0); setPlaying(p => !p); }}
+          className="w-9 h-9 shrink-0 rounded-full bg-[var(--acc)] text-black flex items-center justify-center font-bold text-xs"
+        >
+          {playing ? '⏸' : '▶'}
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={timeline.length - 1}
+          value={i}
+          onChange={(e) => { setPlaying(false); setI(Number(e.target.value)); }}
+          className="flex-1 accent-[var(--acc)]"
+        />
+        <span className="text-[10px] font-mono text-[var(--text3)] shrink-0 w-10 text-right">
+          {i + 1}/{timeline.length}
+        </span>
+      </div>
+      <p className="text-[10px] font-mono text-[var(--text3)] mb-3">
+        {new Date(step.at).toLocaleTimeString()} — {step.justMoved} just submitted
+      </p>
+
+      {/* Standings snapshot at this point in time */}
+      <div className="space-y-1.5">
+        {step.standings.map((r, idx) => (
+          <div
+            key={r.github}
+            className={`flex items-center gap-3 px-3 py-2 rounded-xl border transition-all duration-300
+              ${r.github === step.justMoved ? 'bg-[rgba(var(--acc-rgb),0.078)] border-[rgba(var(--acc-rgb),0.2)]' : 'bg-[var(--surface2)] border-[var(--border)]'}`}
+          >
+            <div className="w-6 text-center shrink-0 font-mono text-xs text-[var(--text2)]">
+              {idx < 3 ? medals[idx] : `#${idx + 1}`}
+            </div>
+            <div className="flex-1 min-w-0 text-xs font-mono font-bold text-[var(--text)] truncate">
+              {r.name || r.github}
+            </div>
+            <div className="text-sm font-mono font-bold text-[var(--purple)] shrink-0">
+              {(r.points_awarded ?? 0).toLocaleString()} pts
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
