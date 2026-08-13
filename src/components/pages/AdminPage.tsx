@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import { isActiveSubscription } from "@/lib/subscription";
-import { effectiveStreak } from "@/lib/streak";
+import { effectiveStreak, calendarDaysBetween } from "@/lib/streak";
 import type {
   User,
   Submission,
@@ -1542,7 +1542,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     if (ex) {
       const last = ex.last_solved_at ? new Date(ex.last_solved_at) : null;
       const daysSinceLast = last
-        ? Math.floor((now.getTime() - last.getTime()) / 86_400_000)
+        ? calendarDaysBetween(last, now)
         : 999;
       const newStreak = countAsSolved
         ? daysSinceLast === 0

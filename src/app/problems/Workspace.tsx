@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic                                       from 'next/dynamic';
 import { getSupabaseClient }                         from '@/lib/supabase';
+import { calendarDaysBetween }                       from '@/lib/streak';
 import LangTabs                                      from '@/components/editor/LangTabs';
 import TestResults                                   from '@/components/editor/TestResults';
 import type { SupportedLang, Problem, User }         from '@/types/database';
@@ -104,7 +105,7 @@ export async function syncMemberProgress(
 
   if (ex) {
     const last = ex.last_solved_at ? new Date(ex.last_solved_at) : null;
-    const daysSinceLast = last ? Math.floor((now.getTime() - last.getTime()) / 86_400_000) : 999;
+    const daysSinceLast = last ? calendarDaysBetween(last, now) : 999;
     const newStreak =
       daysSinceLast === 0 ? (ex.streak || 1) :
       daysSinceLast === 1 ? (ex.streak || 0) + 1 : 1;

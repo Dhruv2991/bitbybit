@@ -4,7 +4,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 import type { Member } from "@/types/database";
 import { effectiveStreak } from "@/lib/streak";
 
-type Tab = "overall" | "weekly" | "monthly" | "challenge";
+type Tab = "overall" | "weekly" | "monthly" | "challenge" | "streak";
 
 interface EnrichedMember extends Member {
   rank_change?: number;
@@ -98,6 +98,33 @@ export default function LeaderboardPage() {
             } as EnrichedMember;
           });
         setMembers(ranked);
+      } else if (tab === "streak") {
+        // Ranked purely by current streak, not points — a separate
+        // competitive axis that rewards consistency over raw skill.
+        // effectiveStreak() self-corrects lapsed streaks so this never
+        // shows someone as "on fire" days after they actually stopped.
+        const { data: membersData } = await db
+          .from("members")
+          .select("github, name, streak, last_solved_at, created_at, problems_solved, total_points");
+
+        const ranked = (membersData || [])
+          .map((m: any) => ({
+            id: m.github,
+            github: m.github,
+            name: m.name,
+            total_points: m.total_points || 0,
+            problems_solved: m.problems_solved || 0,
+            streak: effectiveStreak(m.streak, m.last_solved_at),
+            last_solved_at: m.last_solved_at || null,
+            created_at: m.created_at || "",
+          }))
+          .filter((m: EnrichedMember) => m.streak > 0)
+          .sort((a: EnrichedMember, b: EnrichedMember) => {
+            if (b.streak !== a.streak) return b.streak - a.streak;
+            return new Date(b.last_solved_at || 0).getTime() - new Date(a.last_solved_at || 0).getTime();
+          })
+          .slice(0, 100);
+        setMembers(ranked as EnrichedMember[]);
       } else if (tab === "challenge") {
         // Load the most recent active/ended weekly challenge leaderboard
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -305,6 +332,7 @@ export default function LeaderboardPage() {
     { id: "overall", label: "All Time" },
     { id: "weekly", label: "This Week" },
     { id: "monthly", label: "This Month" },
+    { id: "streak", label: "🔥 Streaks" },
     { id: "challenge", label: "🏅 Weekly Challenge" },
   ];
 
@@ -325,6 +353,7 @@ export default function LeaderboardPage() {
     i,
     isChallenge,
     streak,
+    pointsLabel = "pts",
   }: {
     github: string;
     name: string;
@@ -333,6 +362,7 @@ export default function LeaderboardPage() {
     i: number;
     isChallenge?: boolean;
     streak?: number;
+    pointsLabel?: string;
   }) {
     const isTop3 = i < 3 && !search;
     return (
@@ -410,7 +440,7 @@ export default function LeaderboardPage() {
             >
               {points.toLocaleString()}
             </span>
-            <span className="text-[9px] text-[#ccc] font-mono">pts</span>
+            <span className="text-[9px] text-[#ccc] font-mono">{pointsLabel}</span>
           </div>
         </div>
       </div>
@@ -524,10 +554,12 @@ export default function LeaderboardPage() {
         )
       ) : filteredMembers.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="text-4xl opacity-30">🏆</div>
+          <div className="text-4xl opacity-30">{tab === "streak" ? "🔥" : "🏆"}</div>
           <div className="text-[#999] font-mono text-sm">
             {search
               ? "No members match your search."
+              : tab === "streak"
+              ? "Nobody has an active streak right now — solve today to start one!"
               : "No members yet — be the first to solve a problem!"}
           </div>
         </div>
@@ -539,25 +571,33 @@ export default function LeaderboardPage() {
           >
             <div>Rank</div>
             <div>Member</div>
-            <div className="text-center">Solved</div>
-            <div className="text-right">Points</div>
+            <div className="text-center">{tab === "streak" ? "Solved" : "Solved"}</div>
+            <div className="text-right">{tab === "streak" ? "Streak" : "Points"}</div>
           </div>
           {filteredMembers.map((m, i) => (
             <Row
               key={m.id}
               github={m.github}
               name={m.name || m.github}
-              points={m.total_points}
+              points={tab === "streak" ? m.streak : m.total_points}
               solved={m.problems_solved}
               i={i}
-              streak={m.streak}
+              streak={tab === "streak" ? undefined : m.streak}
+              pointsLabel={tab === "streak" ? (m.streak === 1 ? "day" : "days") : "pts"}
             />
           ))}
         </div>
       )}
 
+      {tab === "streak" && !loading && filteredMembers.length > 0 && (
+        <p className="text-[10px] text-[#ccc] font-mono text-center mt-6">
+          Ranked by current streak. A streak lapses if a day is missed — check back tomorrow to see who's still on fire.
+        </p>
+      )}
+
       {tab !== "overall" &&
         tab !== "challenge" &&
+        tab !== "streak" &&
         !loading &&
         filteredMembers.length > 0 && (
           <p className="text-[10px] text-[#ccc] font-mono text-center mt-6">

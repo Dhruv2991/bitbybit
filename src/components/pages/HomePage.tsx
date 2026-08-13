@@ -92,25 +92,58 @@ function ActivityTicker({ members }: { members: number }) {
 
     async function loadRecent() {
       const [{ data: subs }, { data: weekly }, { data: arena }] = await Promise.all([
-        db.from('submissions').select('name, github, problem_title, created_at')
+        db.from('submissions').select('name, github, problem_id, problem_title, created_at')
           .eq('status', 'approved').order('created_at', { ascending: false }).limit(5),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (db.from('weekly_submissions') as any).select('name, github, problem_title, submitted_at')
+        (db.from('weekly_submissions') as any).select('name, github, problem_id, problem_title, submitted_at')
           .eq('status', 'approved').order('submitted_at', { ascending: false }).limit(5),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (db.from('arena_submissions') as any).select('name, github, problem_title, created_at')
+        (db.from('arena_submissions') as any).select('name, github, problem_id, problem_title, created_at')
           .eq('status', 'reviewed').order('created_at', { ascending: false }).limit(5),
       ]);
 
-      const combined = [
-        ...(subs || []).map((s: any) => ({ who: s.name || s.github, what: s.problem_title, when: s.created_at })),
-        ...(weekly || []).map((s: any) => ({ who: s.name || s.github, what: s.problem_title, when: s.submitted_at })),
-        ...(arena || []).map((s: any) => ({ who: s.name || s.github, what: s.problem_title, when: s.created_at })),
+      const combinedRaw = [
+        ...(subs || []).map((s: any) => ({ who: s.name || s.github, github: s.github, problemId: s.problem_id, what: s.problem_title, when: s.created_at })),
+        ...(weekly || []).map((s: any) => ({ who: s.name || s.github, github: s.github, problemId: s.problem_id, what: s.problem_title, when: s.submitted_at })),
+        ...(arena || []).map((s: any) => ({ who: s.name || s.github, github: s.github, problemId: s.problem_id, what: s.problem_title, when: s.created_at })),
       ]
         .filter(r => r.who && r.what)
         .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
-        .slice(0, 6)
-        .map(r => `🔥 ${r.who} just solved ${r.what}`);
+        .slice(0, 6);
+
+      // "Blood First" check — for just these 6 recent items, was each
+      // one the very first approved solve of that problem anywhere on
+      // the platform? Scoped to a tiny set of problem_ids so this stays
+      // cheap even as total submissions grow.
+      const ids = [...new Set(combinedRaw.map(r => r.problemId).filter(Boolean))];
+      const firstSolvers = new Map<string, string>();
+      if (ids.length > 0) {
+        const [{ data: s2 }, { data: w2 }, { data: a2 }] = await Promise.all([
+          db.from('submissions').select('github, problem_id, created_at').eq('status', 'approved').in('problem_id', ids),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (db.from('weekly_submissions') as any).select('github, problem_id, submitted_at').eq('status', 'approved').in('problem_id', ids),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (db.from('arena_submissions') as any).select('github, problem_id, created_at').eq('status', 'reviewed').in('problem_id', ids),
+        ]);
+        const all = [
+          ...(s2 || []).map((r: any) => ({ github: r.github, pid: r.problem_id, when: r.created_at })),
+          ...(w2 || []).map((r: any) => ({ github: r.github, pid: r.problem_id, when: r.submitted_at })),
+          ...(a2 || []).map((r: any) => ({ github: r.github, pid: r.problem_id, when: r.created_at })),
+        ];
+        const earliest = new Map<string, { github: string; when: number }>();
+        for (const r of all) {
+          const t = new Date(r.when).getTime();
+          const cur = earliest.get(r.pid);
+          if (!cur || t < cur.when) earliest.set(r.pid, { github: r.github, when: t });
+        }
+        earliest.forEach((v, k) => firstSolvers.set(k, v.github));
+      }
+
+      const combined = combinedRaw.map(r =>
+        firstSolvers.get(r.problemId) === r.github
+          ? `🩸 ${r.who} got Blood First on ${r.what}`
+          : `🔥 ${r.who} just solved ${r.what}`
+      );
 
       if (!cancelled) setItems(combined.length > 0 ? combined : [fallback]);
     }
@@ -208,6 +241,14 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
 
   const [dailyProblem, setDailyProblem] = useState<any>(null);
   const [dailySolvedToday, setDailySolvedToday] = useState(false);
+  const [dailySolverCount, setDailySolverCount] = useState<number | null>(null);
+  // Ticks every minute so the "resets in Xh Ym" countdown stays live
+  // without needing a full page refresh.
+  const [, tickMinute] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tickMinute(n => n + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const db = getSupabaseClient();
@@ -232,6 +273,23 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
           const solvedToday = (subs || []).some((s: any) => new Date(s.created_at) >= startOfDay);
           setDailySolvedToday(solvedToday);
         }
+
+        // Social proof — how many distinct people have solved today's
+        // pick so far. Cheap query: only rows for this one problem_id,
+        // filtered client-side to today (submissions table is small
+        // enough at current scale; revisit with a date filter server-side
+        // if this table grows much larger).
+        try {
+          const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+          const { data: allSubs } = await db.from('submissions')
+            .select('github, created_at').eq('problem_id', problem.id).eq('status', 'approved');
+          const solvers = new Set(
+            (allSubs || [])
+              .filter((s: any) => new Date(s.created_at) >= startOfDay)
+              .map((s: any) => s.github)
+          );
+          setDailySolverCount(solvers.size);
+        } catch {}
       } catch {}
     })();
   }, [user?.github]);
@@ -240,6 +298,16 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
     if (!dailyProblem) return;
     try { sessionStorage.setItem('bb_open_problem_id', dailyProblem.id); } catch {}
     onNavigate('problems');
+  }
+
+  function timeUntilNextDaily(): string {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    const ms = midnight.getTime() - now.getTime();
+    const h = Math.floor(ms / 3_600_000);
+    const m = Math.floor((ms % 3_600_000) / 60_000);
+    return `${h}h ${m}m`;
   }
 
   const features = [
@@ -408,8 +476,14 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
                     ✓ Solved today
                   </span>
                 )}
+                <span className="text-[10px] font-mono text-[#666]">· resets in {timeUntilNextDaily()}</span>
               </div>
               <div className="font-display font-bold text-[#e2e2e2] text-sm truncate">{dailyProblem.title}</div>
+              {dailySolverCount !== null && dailySolverCount > 0 && (
+                <div className="text-[10px] font-mono text-[#888] mt-0.5">
+                  🔥 {dailySolverCount} {dailySolverCount === 1 ? 'person has' : 'people have'} solved this today
+                </div>
+              )}
             </div>
             <span className={`text-xs font-mono font-bold shrink-0 px-2 py-1 rounded-lg
               ${dailyProblem.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :

@@ -236,17 +236,12 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       return next;
     });
 
-    // Show a shareable card the first time this problem is fully solved
-    if (!wasAlreadySolved && details && details.total > 0 && details.passed === details.total) {
-      const problem = problems.find(p => p.id === problemId);
-      setShareCard({
-        title: problem?.title ?? 'Problem',
-        lang: details.lang,
-        passed: details.passed,
-        total: details.total,
-        points: details.pointsAwarded,
-      });
-    }
+    // Note: previously auto-opened a shareable solve card here on every
+    // first full solve — removed. It was a full-screen modal firing at
+    // the exact same moment as the inline difficulty-vote prompt in
+    // Workspace.tsx, and it visually covered that prompt, making votes
+    // seem broken/invisible. The ShareButton in the page header still
+    // lets people generate a card manually if they want one.
 
     // If this is a weekly problem and user is logged in, write to weekly_submissions
     const challenge = weeklyChallengeMap.get(problemId);

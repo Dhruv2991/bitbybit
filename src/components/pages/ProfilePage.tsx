@@ -20,6 +20,7 @@ interface SolvedRow {
   total:         number;
   when:          string;
   source:        'problems' | 'weekly' | 'arena';
+  isBloodFirst?: boolean; // true if this user was the first person ever to solve this problem
 }
 
 interface Stats {
@@ -32,6 +33,7 @@ interface Stats {
   allDates:       string[];
   skillTags:      { tag: string; count: number }[];
   aiAssists:      number;
+  bloodFirstCount: number;
   badges:         Badge[];
 }
 
@@ -109,6 +111,49 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
     // heatmap, which needs the whole history, not just the last 10.
     const allDates = rows.map(r => r.when);
 
+    // "Blood First" — was this user the very first person, platform-wide,
+    // to solve each given problem? Computed by pulling every approved
+    // solve for the problems this user has solved, across all three
+    // tables, and finding the earliest github per problem_id. Scoped to
+    // just the user's solved problem_ids (not the whole platform's
+    // history) to keep the query small as the site grows.
+    const solvedIds = [...new Set(deduped.map(r => r.problem_id))];
+    let bloodFirstCount = 0;
+    if (solvedIds.length > 0) {
+      const [{ data: gSubs }, { data: gArena }, { data: gWeekly }] = await Promise.all([
+        db.from('submissions').select('github, problem_id, created_at')
+          .eq('status', 'approved').in('problem_id', solvedIds),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (db.from('arena_submissions') as any).select('github, problem_id, created_at')
+          .eq('status', 'reviewed').in('problem_id', solvedIds),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (db.from('weekly_submissions') as any).select('github, problem_id, submitted_at')
+          .eq('status', 'approved').in('problem_id', solvedIds),
+      ]);
+      const globalRows = [
+        ...(gSubs || []).map((r: any) => ({ github: r.github, problem_id: r.problem_id, when: r.created_at })),
+        ...(gArena || []).map((r: any) => ({ github: r.github, problem_id: r.problem_id, when: r.created_at })),
+        ...(gWeekly || []).map((r: any) => ({ github: r.github, problem_id: r.problem_id, when: r.submitted_at })),
+      ];
+      const earliestPerProblem = new Map<string, { github: string; when: string }>();
+      for (const r of globalRows) {
+        if (!r.github || !r.when) continue;
+        const existing = earliestPerProblem.get(r.problem_id);
+        if (!existing || new Date(r.when).getTime() < new Date(existing.when).getTime()) {
+          earliestPerProblem.set(r.problem_id, { github: r.github, when: r.when });
+        }
+      }
+      for (const r of deduped) {
+        if (earliestPerProblem.get(r.problem_id)?.github === user.github) {
+          r.isBloodFirst = true;
+          bloodFirstCount++;
+        }
+      }
+      for (const r of recent) {
+        if (earliestPerProblem.get(r.problem_id)?.github === user.github) r.isBloodFirst = true;
+      }
+    }
+
     // This mirrors the Leaderboard's "This Month" tab exactly (same
     // cutoff, same tables, same points sum, same top-100 cap) so the
     // number shown here always matches what that tab would show. If the
@@ -157,6 +202,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       allDates,
       skillTags,
       aiAssists: (aiRows || []).reduce((sum: number, r: any) => sum + (r.used || 0), 0),
+      bloodFirstCount,
       badges,
     });
     setLoading(false);
@@ -221,7 +267,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       </div>
 
       {/* Stat cards */}
-      <div className={`grid grid-cols-1 sm:grid-cols-3 ${stats.aiAssists > 0 ? 'md:grid-cols-4' : ''} gap-4 mb-6`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-3 ${(stats.aiAssists > 0 || stats.bloodFirstCount > 0) ? 'md:grid-cols-5' : ''} gap-4 mb-6`}>
         <div className="card-hover p-5 text-center">
           <p className="text-3xl font-display font-bold text-[#00e87a] stat-glow">{stats.totalPoints}</p>
           <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide">Total points</p>
@@ -242,6 +288,14 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
           <div className="card-hover p-5 text-center">
             <p className="text-3xl font-display font-bold text-[#a78bfa]">🤖 {stats.aiAssists}</p>
             <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide">AI assists used</p>
+          </div>
+        )}
+        {stats.bloodFirstCount > 0 && (
+          <div className="card-hover p-5 text-center">
+            <p className="text-3xl font-display font-bold text-[#ff4d6d]">🩸 {stats.bloodFirstCount}</p>
+            <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide" title="First person platform-wide to solve these problems">
+              Blood First
+            </p>
           </div>
         )}
       </div>
@@ -296,7 +350,12 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
             {stats.recent.map((r, i) => (
               <div key={i} className="flex items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-mono text-[#e0e0e0] truncate">{r.problem_title}</p>
+                  <p className="text-sm font-mono text-[#e0e0e0] truncate flex items-center gap-1.5">
+                    {r.problem_title}
+                    {r.isBloodFirst && (
+                      <span title="You were the first person platform-wide to solve this" className="shrink-0">🩸</span>
+                    )}
+                  </p>
                   <p className="text-[10px] font-mono text-[#666] mt-0.5">
                     {r.source === 'arena' ? '🏆 Arena' : r.source === 'weekly' ? '🏅 Weekly' : '{ } Problems'}
                     {' · '}
