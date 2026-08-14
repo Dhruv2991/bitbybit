@@ -486,12 +486,13 @@ export default function App() {
 
       {/* Navbar */}
       <header
-        className="sticky top-0 z-50 border-b border-[rgba(255,255,255,0.07)]"
+        className="sticky top-0 z-50 border-b"
         style={{
-          background: 'linear-gradient(180deg, rgba(10,11,14,0.85), rgba(10,11,14,0.7))',
+          borderColor: 'var(--nav-border)',
+          background: 'linear-gradient(180deg, var(--nav-bg-top), var(--nav-bg-bottom))',
           backdropFilter: 'blur(20px) saturate(150%)',
           WebkitBackdropFilter: 'blur(20px) saturate(150%)',
-          boxShadow: '0 1px 0 rgba(255,255,255,0.05), 0 8px 32px rgba(0,0,0,0.25)',
+          boxShadow: 'var(--nav-shadow)',
         }}
       >
         <div className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 flex items-center justify-between h-14">
@@ -518,7 +519,7 @@ export default function App() {
                 className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-sm transition-colors duration-200
                   ${page === item.id
                     ? "text-[#00e87a] font-bold"
-                    : "text-[#666] hover:text-[#e0e0e0]"}`}>
+                    : "text-[var(--muted)] hover:text-[var(--text)]"}`}>
                 <span className="text-xs opacity-70">{item.icon}</span>
                 {item.label}
               </button>
@@ -530,7 +531,7 @@ export default function App() {
                 className={`relative z-10 px-3.5 py-1.5 rounded-xl font-mono text-sm transition-colors duration-200
                   ${page === "admin"
                     ? "text-[#a78bfa] font-bold"
-                    : "text-[#777] hover:text-[#a78bfa]"}`}>
+                    : "text-[var(--muted)] hover:text-[#a78bfa]"}`}>
                 Admin
               </button>
             )}
@@ -540,18 +541,18 @@ export default function App() {
           <div className="hidden md:flex items-center gap-1">
             {/* Search trigger — icon-only, same treatment as the icons beside it */}
             <button onClick={() => setSearchOpen(true)} title="Search (⌘K)"
-              className="p-2 text-[#777] hover:text-[#e0e0e0] transition-colors rounded-xl hover:bg-[#ffffff08]">
+              className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors rounded-xl hover:bg-[var(--hover-overlay)]">
               <span className="text-base">🔍</span>
             </button>
             {/* Theme toggle */}
             <button onClick={toggleTheme} title="Toggle theme"
-              className="p-2 text-[#777] hover:text-[#e0e0e0] transition-colors rounded-xl hover:bg-[#ffffff08]">
+              className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors rounded-xl hover:bg-[var(--hover-overlay)]">
               <span className="text-base">{theme === 'dark' ? '☀️' : '🌙'}</span>
             </button>
             {/* 🔔 Desktop bell */}
             <div className="relative" ref={notifRef}>
               <button onClick={() => setNotifOpen(o => !o)}
-                className="relative p-2 text-[#777] hover:text-[#e0e0e0] transition-colors rounded-xl hover:bg-[#ffffff08]">
+                className="relative p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors rounded-xl hover:bg-[var(--hover-overlay)]">
                 <span className="text-base">🔔</span>
                 {liveItems.length > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#00e87a] animate-pulse" />
@@ -559,36 +560,36 @@ export default function App() {
               </button>
               {bellDropdown}
             </div>
-            <div className="w-px h-5 bg-[#1a1a1a] mx-1" />
+            <div className="w-px h-5 bg-[var(--card)] mx-1" />
             {!authChecked ? (
-              <div className="w-24 h-8 rounded-xl bg-[#111] animate-pulse" />
+              <div className="w-24 h-8 rounded-xl bg-[var(--card)] animate-pulse" />
             ) : user ? (
               <div className="relative" ref={profileRef}>
                 <button
                   onClick={() => setProfileOpen(o => !o)}
                   aria-haspopup="menu"
                   aria-expanded={profileOpen}
-                  className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl hover:bg-[#ffffff08] transition-colors">
+                  className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl hover:bg-[var(--hover-overlay)] transition-colors">
                   <img
                     src={`https://github.com/${user.github}.png?size=32`}
                     alt={user.name}
                     className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a2a]"
                     onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                   />
-                  <span className="text-xs font-mono text-[#888]">{user.name}</span>
+                  <span className="text-xs font-mono text-[var(--muted)]">{user.name}</span>
                   {userStreak > 0 && (
                     <span title={`${userStreak}-day streak`}
                       className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#f0b429] bg-[#f0b42912] border border-[#f0b42925] rounded-full px-1.5 py-0.5">
                       🔥{userStreak}
                     </span>
                   )}
-                  <span className={`text-[10px] text-[#555] transition-transform ${profileOpen ? "rotate-180" : ""}`}>▾</span>
+                  <span className={`text-[10px] text-[var(--muted)] transition-transform ${profileOpen ? "rotate-180" : ""}`}>▾</span>
                 </button>
 
                 {profileOpen && (
                   <div role="menu"
-                    className="absolute right-0 top-11 w-56 bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down">
-                    <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center gap-2.5">
+                    className="absolute right-0 top-11 w-56 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down">
+                    <div className="px-4 py-3 border-b border-[var(--border)] flex items-center gap-2.5">
                       <img
                         src={`https://github.com/${user.github}.png?size=32`}
                         alt={user.name}
@@ -596,20 +597,20 @@ export default function App() {
                         onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                       />
                       <div className="min-w-0">
-                        <p className="text-sm font-mono text-[#e0e0e0] truncate">{user.name}</p>
-                        <p className="text-[10px] font-mono text-[#666] truncate">@{user.github}</p>
+                        <p className="text-sm font-mono text-[var(--text)] truncate">{user.name}</p>
+                        <p className="text-[10px] font-mono text-[var(--muted)] truncate">@{user.github}</p>
                       </div>
                     </div>
                     <button role="menuitem" onClick={() => { setProfileOpen(false); navigate("profile"); }}
-                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#ffffff06] transition-colors flex items-center gap-2.5">
+                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-overlay)] transition-colors flex items-center gap-2.5">
                       <span className="text-sm">👤</span> My profile
                     </button>
                     <button role="menuitem" onClick={switchAccount}
-                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[#aaa] hover:text-[#e0e0e0] hover:bg-[#ffffff06] transition-colors flex items-center gap-2.5">
+                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-overlay)] transition-colors flex items-center gap-2.5">
                       <span className="text-sm">🔁</span> Switch account
                     </button>
                     <button role="menuitem" onClick={() => { setProfileOpen(false); signOut(); }}
-                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[#aaa] hover:text-[#ff4d4d] hover:bg-[#ff4d4d0a] transition-colors flex items-center gap-2.5 border-t border-[#1a1a1a]">
+                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[var(--muted)] hover:text-[#ff4d4d] hover:bg-[#ff4d4d0a] transition-colors flex items-center gap-2.5 border-t border-[var(--border)]">
                       <span className="text-sm">⏻</span> Sign out
                     </button>
                   </div>
@@ -627,13 +628,13 @@ export default function App() {
           {/* Mobile — bell + hamburger */}
           <div className="md:hidden flex items-center gap-1">
             <button onClick={() => setSearchOpen(true)} title="Search"
-              className="p-2 text-[#555] hover:text-[#e0e0e0] transition-colors">
+              className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
               <span className="text-base">🔍</span>
             </button>
             {/* 🔔 Mobile bell */}
             <div className="relative" ref={notifRefMob}>
               <button onClick={() => setNotifOpen(o => !o)}
-                className="relative p-2 text-[#555] hover:text-[#e0e0e0] transition-colors">
+                className="relative p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
                 <span className="text-base">🔔</span>
                 {liveItems.length > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#00e87a] animate-pulse" />
@@ -643,7 +644,7 @@ export default function App() {
             </div>
             <button type="button" aria-label="Toggle menu"
               onClick={() => setMobileMenuOpen(o => !o)}
-              className="p-2 text-[#555] hover:text-[#e0e0e0] transition-colors">
+              className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
               <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all duration-200 ${mobileMenuOpen ? "rotate-45 translate-y-2" : ""}`} />
               <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all duration-200 ${mobileMenuOpen ? "opacity-0" : ""}`} />
               <div className={`w-5 h-0.5 bg-current transition-all duration-200 ${mobileMenuOpen ? "-rotate-45 -translate-y-2" : ""}`} />
@@ -653,11 +654,11 @@ export default function App() {
 
         {/* Mobile menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[#1a1a1a] bg-[#0a0a0a]/98 backdrop-blur pb-3">
+          <div className="md:hidden border-t border-[var(--border)] bg-[var(--card)]/98 backdrop-blur pb-3">
             {NAV_ITEMS.map(item => (
               <button key={item.id} onClick={() => navigate(item.id)}
                 className={`w-full text-left px-5 py-3 font-mono text-sm transition-all flex items-center gap-3 relative
-                  ${page === item.id ? "text-[#00e87a] bg-[#00e87a06]" : "text-[#777] hover:text-[#e0e0e0]"}`}>
+                  ${page === item.id ? "text-[#00e87a] bg-[#00e87a06]" : "text-[var(--muted)] hover:text-[var(--text)]"}`}>
                 {page === item.id && <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-[#00e87a] rounded-full" />}
                 <span className="w-5 text-base">{item.icon}</span>
                 {item.label}
@@ -666,28 +667,28 @@ export default function App() {
             {user?.is_admin && (
               <button onClick={() => navigate("admin")}
                 className={`w-full text-left px-5 py-3 font-mono text-sm flex items-center gap-3
-                  ${page === "admin" ? "text-[#a78bfa]" : "text-[#555] hover:text-[#a78bfa]"}`}>
+                  ${page === "admin" ? "text-[#a78bfa]" : "text-[var(--muted)] hover:text-[#a78bfa]"}`}>
                 <span className="w-5">⚙</span> Admin
               </button>
             )}
             <button onClick={() => navigate("about")}
               className={`w-full text-left px-5 py-3 font-mono text-sm flex items-center gap-3
-                ${page === "about" ? "text-[#00e87a]" : "text-[#555] hover:text-[#e0e0e0]"}`}>
+                ${page === "about" ? "text-[#00e87a]" : "text-[var(--muted)] hover:text-[var(--text)]"}`}>
               <span className="w-5">ℹ</span> About
             </button>
             <button onClick={toggleTheme}
-              className="w-full text-left px-5 py-3 font-mono text-sm flex items-center gap-3 text-[#555] hover:text-[#e0e0e0]">
+              className="w-full text-left px-5 py-3 font-mono text-sm flex items-center gap-3 text-[var(--muted)] hover:text-[var(--text)]">
               <span className="w-5">{theme === 'dark' ? '☀️' : '🌙'}</span>
               {theme === 'dark' ? 'Light mode' : 'Dark mode'}
             </button>
-            <div className="mt-2 border-t border-[#1a1a1a] pt-2 px-4">
+            <div className="mt-2 border-t border-[var(--border)] pt-2 px-4">
               {!authChecked ? null : user ? (
                 <div className="py-2">
                   <div className="flex items-center gap-2 mb-2.5">
                     <img src={`https://github.com/${user.github}.png?size=28`} alt={user.name}
                       className="w-7 h-7 rounded-full object-cover"
                       onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                    <span className="text-sm font-mono text-[#e0e0e0] truncate max-w-[160px]">{user.name}</span>
+                    <span className="text-sm font-mono text-[var(--text)] truncate max-w-[160px]">{user.name}</span>
                     {userStreak > 0 && (
                       <span title={`${userStreak}-day streak`}
                         className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#f0b429] bg-[#f0b42912] border border-[#f0b42925] rounded-full px-1.5 py-0.5 shrink-0">
@@ -696,16 +697,16 @@ export default function App() {
                     )}
                   </div>
                   <button onClick={() => { setMobileMenuOpen(false); navigate("profile"); }}
-                    className="w-full text-center py-2 mb-2 rounded-xl font-mono text-xs border border-[#222] text-[#aaa] hover:text-[#e0e0e0] hover:border-[#2a2a2a] transition-colors">
+                    className="w-full text-center py-2 mb-2 rounded-xl font-mono text-xs border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--border)] transition-colors">
                     👤 My profile
                   </button>
                   <div className="flex items-center gap-2">
                     <button onClick={() => { setMobileMenuOpen(false); switchAccount(); }}
-                      className="flex-1 text-center py-2 rounded-xl font-mono text-xs border border-[#222] text-[#aaa] hover:text-[#e0e0e0] hover:border-[#2a2a2a] transition-colors">
+                      className="flex-1 text-center py-2 rounded-xl font-mono text-xs border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--border)] transition-colors">
                       🔁 Switch account
                     </button>
                     <button onClick={() => { setMobileMenuOpen(false); signOut(); }}
-                      className="flex-1 text-center py-2 rounded-xl font-mono text-xs border border-[#222] text-[#aaa] hover:text-[#ff4d4d] hover:border-[#ff4d4d30] transition-colors">
+                      className="flex-1 text-center py-2 rounded-xl font-mono text-xs border border-[var(--border)] text-[var(--muted)] hover:text-[#ff4d4d] hover:border-[#ff4d4d30] transition-colors">
                       ⏻ Sign out
                     </button>
                   </div>
@@ -726,11 +727,11 @@ export default function App() {
           Doubles as the "signature element" tying the terminal identity
           used elsewhere (workspace, hero snippet) into every page, not
           just the homepage. */}
-      <div className="border-b border-[#131313] bg-[#060606]">
+      <div className="border-b" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
         <div className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 h-8 flex items-center gap-1.5 text-[11px] font-mono">
           <span className="text-[#00e87a]">$</span>
-          <span className="text-[#555]">cd</span>
-          <span className="text-[#777]">
+          <span style={{ color: 'var(--muted2)' }}>cd</span>
+          <span style={{ color: 'var(--text2)' }}>
             ~/{NAV_ITEMS.find(i => i.id === page)?.label.toLowerCase() || page}
           </span>
           <span className="w-1.5 h-3 bg-[#00e87a] cursor-blink inline-block ml-0.5" />
