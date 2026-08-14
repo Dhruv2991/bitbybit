@@ -387,8 +387,9 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
         </div>
 
         {/* Headline */}
-        <h1 className="relative font-display font-extrabold text-4xl md:text-6xl lg:text-7xl text-[#e2e2e2]
-          mb-5 leading-[1.05] tracking-tight px-4 animate-fade-up delay-75">
+        <h1 className="relative font-display font-extrabold text-[#e2e2e2]
+          mb-5 leading-[1.05] tracking-tight px-4 animate-fade-up delay-75"
+          style={{ fontSize: 'var(--fs-hero)' }}>
           Build Sharper.<br />
           <span className="text-[#00e87a] glow-text">Code Bit By Bit.</span>
         </h1>

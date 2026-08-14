@@ -485,8 +485,16 @@ export default function App() {
       </div>
 
       {/* Navbar */}
-      <header className="sticky top-0 z-50 bg-[#080808]/90 backdrop-blur-xl border-b border-[#161616]" style={{boxShadow: "0 1px 0 rgba(255,255,255,0.03)"}}>
-        <div className="max-w-6xl mx-auto px-4 md:px-6 flex items-center justify-between h-14">
+      <header
+        className="sticky top-0 z-50 border-b border-[rgba(255,255,255,0.07)]"
+        style={{
+          background: 'linear-gradient(180deg, rgba(10,11,14,0.85), rgba(10,11,14,0.7))',
+          backdropFilter: 'blur(20px) saturate(150%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(150%)',
+          boxShadow: '0 1px 0 rgba(255,255,255,0.05), 0 8px 32px rgba(0,0,0,0.25)',
+        }}
+      >
+        <div className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 flex items-center justify-between h-14">
 
           {/* Logo */}
           <button className="flex items-center gap-2.5 shrink-0 group" onClick={() => navigate("home")}>
@@ -713,8 +721,24 @@ export default function App() {
         )}
       </header>
 
+      {/* Terminal-style breadcrumb — shows exactly where you are, in the
+          site's own vocabulary, instead of a generic breadcrumb trail.
+          Doubles as the "signature element" tying the terminal identity
+          used elsewhere (workspace, hero snippet) into every page, not
+          just the homepage. */}
+      <div className="border-b border-[#131313] bg-[#060606]">
+        <div className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 h-8 flex items-center gap-1.5 text-[11px] font-mono">
+          <span className="text-[#00e87a]">$</span>
+          <span className="text-[#555]">cd</span>
+          <span className="text-[#777]">
+            ~/{NAV_ITEMS.find(i => i.id === page)?.label.toLowerCase() || page}
+          </span>
+          <span className="w-1.5 h-3 bg-[#00e87a] cursor-blink inline-block ml-0.5" />
+        </div>
+      </div>
+
       {/* Page content */}
-      <main className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-10">
+      <main className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 py-6 md:py-10">
         {page === "home"        && <HomePage        user={user} onNavigate={navigate} />}
         {page === "problems"    && <ProblemsPage    user={user} onNavigate={navigate} />}
         {page === "leaderboard" && <LeaderboardPage />}
@@ -729,8 +753,8 @@ export default function App() {
       </main>
 
       {/* Footer — copyright + about link */}
-      <footer className="border-t border-[#161616] py-5 px-6">
-        <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-3">
+      <footer className="border-t border-[#161616] py-5 px-4 sm:px-8 lg:px-16 xl:px-24">
+        <div className="w-full flex items-center justify-between flex-wrap gap-3">
           <span className="text-[11px] font-mono text-[#555]">
             © {new Date().getFullYear()} Dhruv G Nayak · TeamCodeLocked · BMS College of Engineering
           </span>
