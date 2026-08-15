@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Problem, User } from '@/types/database';
@@ -55,6 +56,8 @@ function ShareButton() {
 }
 
 export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [problems,       setProblems]       = useState<Problem[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [filter,         setFilter]         = useState<string>('all');
@@ -327,6 +330,38 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     return () => { alive = false; };
   }, [user?.github, problems]);
 
+  // Keep ?p=<id> in the URL in sync with whichever problem is open, so a
+  // link copied while viewing a problem takes anyone straight to it.
+  function openProblem(p: Problem) {
+    setSelected(p);
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    params.set('p', p.id);
+    router.replace(`/problems?${params.toString()}`, { scroll: false });
+  }
+
+  function closeProblem() {
+    setSelected(null);
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    params.delete('p');
+    const qs = params.toString();
+    router.replace(qs ? `/problems?${qs}` : '/problems', { scroll: false });
+  }
+
+  // On first load (or once problems finish fetching), open whatever
+  // problem the URL points to — this is what makes a shared /problems?p=…
+  // link land directly on that problem instead of just the list.
+  const appliedUrlProblem = useRef(false);
+  useEffect(() => {
+    if (appliedUrlProblem.current) return;
+    if (problems.length === 0) return;
+    const id = searchParams.get('p');
+    if (!id) { appliedUrlProblem.current = true; return; }
+    const match = problems.find(p => p.id === id);
+    if (match) setSelected(match);
+    appliedUrlProblem.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [problems]);
+
   function handleRowClick(p: Problem) {
     const isWeekly      = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
     const isUnlocked    = unlockedIds.has(p.id);
@@ -334,7 +369,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     const isPaidEnded   = paidEndedIds.has(p.id);
     if (isWeekly && !isUnlocked) {
       if (isPaidEnded) {
-        setSelected(p);
+        openProblem(p);
         return;
       } else if (isPaidWaiting) {
         setNotStartedToast('Challenge hasn\'t started yet — come back when it does!');
@@ -347,7 +382,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       onNavigate('weekly');
       return;
     }
-    setSelected(p);
+    openProblem(p);
   }
 
   async function loadSubmissions() {
@@ -434,7 +469,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       <Workspace
         problem={selected}
         user={user}
-        onClose={() => setSelected(null)}
+        onClose={closeProblem}
         onSolved={handleSolved}
         isWeekly={isSelectedWeekly && isSubscribed && challengeActive}
         practiceMode={isPracticeMode}
