@@ -11,10 +11,20 @@
 //   - User writes real typed functions (no json/Value/interface{} wrappers)
 //   - Output is serialized with each language's stdlib only
 //
-// FIX: argument types are inferred ONCE PER ARGUMENT POSITION across
+// FIX #1: argument types are inferred ONCE PER ARGUMENT POSITION across
 // ALL test cases in the batch (not per-case), so an empty array `[]`
 // in one case can't silently declare the wrong type (e.g. vector<int>
 // instead of vector<vector<int>>) and break the whole compiled batch.
+//
+// FIX #2: each C++ test case's generated code is now wrapped in its own
+// `{ }` block scope. Previously all cases were flattened directly into
+// main()'s top-level scope, so any case using cppSerializer's vector-
+// printing branch (which declares `auto __r__ = ...;`) would collide
+// with every other vector-returning case's own `__r__` declaration —
+// "conflicting declaration 'auto __r__'" compile errors. Scoping each
+// case in braces gives every case's locals (including __r__ and the
+// __aN_M__ argument variables) their own lifetime, eliminating the
+// collision entirely.
 // ════════════════════════════════════════════════════════════
 
 export interface TestResult {
@@ -204,7 +214,7 @@ function rustType(value: any): string {
   return "i32";
 }
 
-// ── NEW: infer a type per argument POSITION across ALL cases ─
+// ── Infer a type per argument POSITION across ALL cases ───────
 //
 // Empty arrays carry no element-type information, so a single
 // empty-array test case must never be allowed to decide the type
@@ -254,49 +264,49 @@ function inferArgTypesAcrossCases(
 function cppSerializer(resultExpr: string, returnType: string): string {
   if (returnType.includes("vector<vector")) {
     return [
-      `    auto __r__ = ${resultExpr};`,
-      '    cout << "[";',
-      "    for (size_t __i__ = 0; __i__ < __r__.size(); ++__i__) {",
-      '        if (__i__) cout << ",";',
+      `        auto __r__ = ${resultExpr};`,
       '        cout << "[";',
-      "        for (size_t __j__ = 0; __j__ < __r__[__i__].size(); ++__j__) {",
-      '            if (__j__) cout << ",";',
-      "            cout << __r__[__i__][__j__];",
+      "        for (size_t __i__ = 0; __i__ < __r__.size(); ++__i__) {",
+      '            if (__i__) cout << ",";',
+      '            cout << "[";',
+      "            for (size_t __j__ = 0; __j__ < __r__[__i__].size(); ++__j__) {",
+      '                if (__j__) cout << ",";',
+      "                cout << __r__[__i__][__j__];",
+      "            }",
+      '            cout << "]";',
       "        }",
-      '        cout << "]";',
-      "    }",
-      '    cout << "]" << endl;',
+      '        cout << "]" << endl;',
     ].join("\n");
   }
   if (returnType.includes("vector<string")) {
     return [
-      `    auto __r__ = ${resultExpr};`,
-      '    cout << "[";',
-      "    for (size_t __i__ = 0; __i__ < __r__.size(); ++__i__) {",
-      '        if (__i__) cout << ",";',
-      '        cout << "\\"" << __r__[__i__] << "\\"";',
-      "    }",
-      '    cout << "]" << endl;',
+      `        auto __r__ = ${resultExpr};`,
+      '        cout << "[";',
+      "        for (size_t __i__ = 0; __i__ < __r__.size(); ++__i__) {",
+      '            if (__i__) cout << ",";',
+      '            cout << "\\"" << __r__[__i__] << "\\"";',
+      "        }",
+      '        cout << "]" << endl;',
     ].join("\n");
   }
   if (returnType.includes("vector")) {
     return [
-      `    auto __r__ = ${resultExpr};`,
-      '    cout << "[";',
-      "    for (size_t __i__ = 0; __i__ < __r__.size(); ++__i__) {",
-      '        if (__i__) cout << ",";',
-      "        cout << __r__[__i__];",
-      "    }",
-      '    cout << "]" << endl;',
+      `        auto __r__ = ${resultExpr};`,
+      '        cout << "[";',
+      "        for (size_t __i__ = 0; __i__ < __r__.size(); ++__i__) {",
+      '            if (__i__) cout << ",";',
+      "            cout << __r__[__i__];",
+      "        }",
+      '        cout << "]" << endl;',
     ].join("\n");
   }
   if (returnType === "string" || returnType === "std::string") {
-    return `    cout << "\\"" << (${resultExpr}) << "\\"" << endl;`;
+    return `        cout << "\\"" << (${resultExpr}) << "\\"" << endl;`;
   }
   if (returnType === "bool") {
-    return `    cout << ((${resultExpr}) ? "true" : "false") << endl;`;
+    return `        cout << ((${resultExpr}) ? "true" : "false") << endl;`;
   }
-  return `    cout << (${resultExpr}) << endl;`;
+  return `        cout << (${resultExpr}) << endl;`;
 }
 
 function detectCppReturnType(code: string): string {
@@ -350,16 +360,20 @@ function buildBatchedProgram(
           .map((arg, i) => {
             const type    = argTypes[i] ?? cppType(arg);
             const literal = toNativeLiteral(arg, "cpp");
-            return `    ${type} __a${idx}_${i}__ = ${literal};`;
+            return `        ${type} __a${idx}_${i}__ = ${literal};`;
           })
           .join("\n");
         const callArgs   = args.map((_, i) => `__a${idx}_${i}__`).join(", ");
         const printBlock = cppSerializer(`${fn}(${callArgs})`, returnType);
+        // FIX: each case wrapped in its own { } block so locals like
+        // __r__ and __aN_M__ don't collide with other cases' locals
+        // in the same main() scope.
         return [
-          `    // case ${idx}`,
+          `    { // case ${idx}`,
           decls,
           printBlock,
-          `    cout << "${SENTINEL}" << endl;`,
+          `        cout << "${SENTINEL}" << endl;`,
+          `    }`,
         ].join("\n");
       });
 
@@ -434,20 +448,27 @@ function buildBatchedProgram(
       // Infer each argument position's type ONCE across all cases.
       const argTypes = inferArgTypesAcrossCases(parsedArgs, goType, "[]int");
 
+      // Go also flattens variable declarations (`var __aN_M__ ...`) into
+      // one shared function scope, but since every variable name already
+      // includes the unique case index `idx`, there's no name collision
+      // risk here the way C++'s fixed `__r__` name created. Left as-is,
+      // but wrapped in braces too for consistency and future-proofing.
       const caseBlocks = parsedArgs.map((args, idx) => {
         const decls = args
           .map((arg, i) => {
             const type    = argTypes[i] ?? goType(arg);
             const literal = toNativeLiteral(arg, "go");
-            return `    var __a${idx}_${i}__ ${type} = ${literal}`;
+            return `        var __a${idx}_${i}__ ${type} = ${literal}`;
           })
           .join("\n");
         const callArgs = args.map((_, i) => `__a${idx}_${i}__`).join(", ");
         return [
-          `    // case ${idx}`,
+          `    { // case ${idx}`,
           decls,
-          `    { __out__, _ := json.Marshal(${fn}(${callArgs})); fmt.Println(string(__out__)) }`,
-          `    fmt.Println("${SENTINEL}")`,
+          `        __out__, _ := json.Marshal(${fn}(${callArgs}))`,
+          `        fmt.Println(string(__out__))`,
+          `        fmt.Println("${SENTINEL}")`,
+          `    }`,
         ].join("\n");
       });
 
@@ -476,20 +497,26 @@ function buildBatchedProgram(
       // Infer each argument position's type ONCE across all cases.
       const argTypes = inferArgTypesAcrossCases(parsedArgs, rustType, "Vec<i32>");
 
+      // Rust's `let` bindings are already uniquely named per case (via idx),
+      // and Rust scoping/shadowing rules don't hard-error the way C++'s flat
+      // `auto __r__` redeclaration did — but wrapped in braces anyway for
+      // consistency and to guarantee each case's locals are dropped/cleaned
+      // up immediately after that case runs.
       const caseBlocks = parsedArgs.map((args, idx) => {
         const decls = args
           .map((arg, i) => {
             const type    = argTypes[i] ?? rustType(arg);
             const literal = toNativeLiteral(arg, "rust");
-            return `    let __a${idx}_${i}__: ${type} = ${literal};`;
+            return `        let __a${idx}_${i}__: ${type} = ${literal};`;
           })
           .join("\n");
         const callArgs = args.map((_, i) => `__a${idx}_${i}__`).join(", ");
         return [
-          `    // case ${idx}`,
+          `    { // case ${idx}`,
           decls,
-          `    println!(${printFmt}, ${fn}(${callArgs}));`,
-          `    println!("${SENTINEL}");`,
+          `        println!(${printFmt}, ${fn}(${callArgs}));`,
+          `        println!("${SENTINEL}");`,
+          `    }`,
         ].join("\n");
       });
 
