@@ -29,10 +29,23 @@ async function notifySubscribers(
   kind: "contest_live" | "weekly_challenge",
   refId: string,
   title: string,
-): Promise<{ sent: number; failed: number; skipped: number; total: number; message?: string; lastError?: string } | { error: string } | null> {
+): Promise<
+  | {
+      sent: number;
+      failed: number;
+      skipped: number;
+      total: number;
+      message?: string;
+      lastError?: string;
+    }
+  | { error: string }
+  | null
+> {
   try {
     const db = getSupabaseClient();
-    const { data: { session } } = await db.auth.getSession();
+    const {
+      data: { session },
+    } = await db.auth.getSession();
     const token = session?.access_token;
     if (!token) return null;
     // The server sends emails one-by-one — for more than a handful of
@@ -46,7 +59,10 @@ async function notifySubscribers(
     try {
       res = await fetch("/api/notify/broadcast", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ kind, refId, title }),
         signal: controller.signal,
       });
@@ -58,7 +74,10 @@ async function notifySubscribers(
     return body;
   } catch (err: any) {
     if (err?.name === "AbortError") {
-      return { error: "Timed out — likely still running server-side (check function logs); large recipient lists can exceed the function time limit" };
+      return {
+        error:
+          "Timed out — likely still running server-side (check function logs); large recipient lists can exceed the function time limit",
+      };
     }
     return null;
   }
@@ -66,12 +85,19 @@ async function notifySubscribers(
 
 // Turns a notifySubscribers() result into a single toast message,
 // distinguishing "nothing to send" from real send failures.
-function notifyResultToast(res: Awaited<ReturnType<typeof notifySubscribers>>): string {
+function notifyResultToast(
+  res: Awaited<ReturnType<typeof notifySubscribers>>,
+): string {
   if (!res) return "Notify failed — check email config (see server logs)";
   if ("error" in res) return `Notify failed — ${res.error}`;
-  if (res.total === 0) return res.message || "No active subscribers with an email on file";
-  if (res.sent > 0) return res.failed > 0 ? `Notified ${res.sent} subscribers (${res.failed} failed: ${res.lastError || "unknown error"})` : `Notified ${res.sent} subscribers`;
-  if (res.skipped === res.total) return `Already notified everyone for this (skipped ${res.skipped})`;
+  if (res.total === 0)
+    return res.message || "No active subscribers with an email on file";
+  if (res.sent > 0)
+    return res.failed > 0
+      ? `Notified ${res.sent} subscribers (${res.failed} failed: ${res.lastError || "unknown error"})`
+      : `Notified ${res.sent} subscribers`;
+  if (res.skipped === res.total)
+    return `Already notified everyone for this (skipped ${res.skipped})`;
   return `Notify sent to 0 of ${res.total} — ${res.lastError || "check email config"}`;
 }
 
@@ -250,11 +276,11 @@ function ProblemForm({
     param_types: initial.param_types || [],
     return_type: initial.return_type || "bool",
   });
-  const [saving,           setSaving]           = useState(false);
-  const [err,              setErr]              = useState("");
-  const [generatingTests,  setGeneratingTests]  = useState(false);
-  const [improvingDesc,    setImprovingDesc]    = useState(false);
-  const [aiTestErr,        setAiTestErr]        = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [generatingTests, setGeneratingTests] = useState(false);
+  const [improvingDesc, setImprovingDesc] = useState(false);
+  const [aiTestErr, setAiTestErr] = useState("");
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -280,8 +306,14 @@ function ProblemForm({
   }
 
   async function handleGenerateTests() {
-    if (!form.title.trim()) { setAiTestErr("Add a title first."); return; }
-    if (!form.description.trim()) { setAiTestErr("Add a description first."); return; }
+    if (!form.title.trim()) {
+      setAiTestErr("Add a title first.");
+      return;
+    }
+    if (!form.description.trim()) {
+      setAiTestErr("Add a description first.");
+      return;
+    }
     setGeneratingTests(true);
     setAiTestErr("");
     try {
@@ -294,7 +326,9 @@ function ProblemForm({
         form.test_cases,
       );
       if (!generated.length) {
-        setAiTestErr("AI couldn't generate test cases. Check your description and try again.");
+        setAiTestErr(
+          "AI couldn't generate test cases. Check your description and try again.",
+        );
       } else {
         set("test_cases", [...form.test_cases, ...generated]);
       }
@@ -305,7 +339,10 @@ function ProblemForm({
   }
 
   async function handleImproveDescription() {
-    if (!form.description.trim()) { setErr("Add a rough description first."); return; }
+    if (!form.description.trim()) {
+      setErr("Add a rough description first.");
+      return;
+    }
     setImprovingDesc(true);
     try {
       const { improveDescription } = await import("@/lib/gemini");
@@ -316,7 +353,11 @@ function ProblemForm({
         form.return_type,
         form.example,
       );
-      if (improved && !improved.startsWith('⚠️') && !improved.startsWith('AI error')) {
+      if (
+        improved &&
+        !improved.startsWith("⚠️") &&
+        !improved.startsWith("AI error")
+      ) {
         set("description", improved);
       }
     } catch {}
@@ -449,9 +490,14 @@ function ProblemForm({
               bg-[#a78bfa10] border border-[#a78bfa25] text-[#a78bfa]
               hover:bg-[#a78bfa18] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
-            {improvingDesc
-              ? <><span className="w-2.5 h-2.5 border border-[#a78bfa] border-t-transparent rounded-full animate-spin inline-block mr-1" />Improving…</>
-              : "✦ AI Improve"}
+            {improvingDesc ? (
+              <>
+                <span className="w-2.5 h-2.5 border border-[#a78bfa] border-t-transparent rounded-full animate-spin inline-block mr-1" />
+                Improving…
+              </>
+            ) : (
+              "✦ AI Improve"
+            )}
           </button>
         </div>
         <textarea
@@ -508,9 +554,17 @@ function ProblemForm({
           >
             <option value="bool">bool</option>
             <option value="int">int</option>
+            <option value="long">long</option>
+            <option value="double">double</option>
             <option value="string">string</option>
             <option value="int[]">int[]</option>
+            <option value="long[]">long[]</option>
+            <option value="double[]">double[]</option>
             <option value="string[]">string[]</option>
+            <option value="bool[]">bool[]</option>
+            <option value="int[][]">int[][]</option>
+            <option value="long[][]">long[][]</option>
+            <option value="string[][]">string[][]</option>
           </select>
         </div>
         <textarea
@@ -523,24 +577,34 @@ function ProblemForm({
       </div>
       <div>
         <label className="block text-xs text-[#bbb] font-mono mb-2 uppercase tracking-wider">
-          Hints <span className="text-[#555] normal-case">(optional — up to 3, revealed one at a time)</span>
+          Hints{" "}
+          <span className="text-[#555] normal-case">
+            (optional — up to 3, revealed one at a time)
+          </span>
         </label>
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex items-center gap-2">
-              <span className="text-[10px] font-mono text-[#555] w-12 shrink-0">Hint {i + 1}</span>
+              <span className="text-[10px] font-mono text-[#555] w-12 shrink-0">
+                Hint {i + 1}
+              </span>
               <input
                 value={(form.hints || [])[i] || ""}
                 onChange={(e) => {
                   const next = [...(form.hints || ["", "", ""])];
                   while (next.length < 3) next.push("");
                   next[i] = e.target.value;
-                  set("hints", next.filter((_, idx) => idx <= i || next[idx]));
+                  set(
+                    "hints",
+                    next.filter((_, idx) => idx <= i || next[idx]),
+                  );
                 }}
                 placeholder={
-                  i === 0 ? "e.g. Think about what data structure allows O(1) lookups" :
-                  i === 1 ? "e.g. What if you stored the complement of each number?" :
-                             "e.g. A single pass through the array is sufficient"
+                  i === 0
+                    ? "e.g. Think about what data structure allows O(1) lookups"
+                    : i === 1
+                      ? "e.g. What if you stored the complement of each number?"
+                      : "e.g. A single pass through the array is sufficient"
                 }
                 className="flex-1 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm font-mono text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a40]"
               />
@@ -548,7 +612,8 @@ function ProblemForm({
           ))}
         </div>
         <p className="text-[10px] text-[#555] font-mono mt-1.5">
-          Users unlock hints one-by-one with a 30s cooldown. Leave blank to disable hints for this problem.
+          Users unlock hints one-by-one with a 30s cooldown. Leave blank to
+          disable hints for this problem.
         </p>
       </div>
       <div>
@@ -563,13 +628,20 @@ function ProblemForm({
               bg-[#00e87a10] border border-[#00e87a25] text-[#00e87a]
               hover:bg-[#00e87a18] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
-            {generatingTests
-              ? <><span className="w-2.5 h-2.5 border border-[#00e87a] border-t-transparent rounded-full animate-spin inline-block mr-1" />Generating…</>
-              : "✦ AI Generate"}
+            {generatingTests ? (
+              <>
+                <span className="w-2.5 h-2.5 border border-[#00e87a] border-t-transparent rounded-full animate-spin inline-block mr-1" />
+                Generating…
+              </>
+            ) : (
+              "✦ AI Generate"
+            )}
           </button>
         </div>
         {aiTestErr && (
-          <p className="text-[10px] text-[#ff4d4d] font-mono mb-2">{aiTestErr}</p>
+          <p className="text-[10px] text-[#ff4d4d] font-mono mb-2">
+            {aiTestErr}
+          </p>
         )}
         <TestCaseEditor
           cases={form.test_cases}
@@ -937,15 +1009,27 @@ function ActionModal({
   const isPointsInput = isApprove || modal.type === "edit-points";
 
   useEffect(() => {
-    if (modal.type === "approve-sub" || modal.type === "approve-weekly" || modal.type === "edit-points")
+    if (
+      modal.type === "approve-sub" ||
+      modal.type === "approve-weekly" ||
+      modal.type === "edit-points"
+    )
       setValue(String(modal.suggestedPoints ?? 100));
     if (modal.type === "approve-arena") {
       const sub = modal.arenaSubRef!;
       // Use the already-calculated points_awarded from submission time
       // which correctly factors in: testRatio × timeFactor × strikePenalty
-      const suggested = sub.points_awarded > 0
-        ? sub.points_awarded
-        : Math.max(10, Math.floor((modal.basePoints ?? 100) * Math.max(0.7, 1 - (sub.strikes || 0) * 0.1) * (sub.strike_penalty_factor || 1)));
+      const suggested =
+        sub.points_awarded > 0
+          ? sub.points_awarded
+          : Math.max(
+              10,
+              Math.floor(
+                (modal.basePoints ?? 100) *
+                  Math.max(0.7, 1 - (sub.strikes || 0) * 0.1) *
+                  (sub.strike_penalty_factor || 1),
+              ),
+            );
       setValue(String(suggested));
     }
     if (
@@ -973,20 +1057,20 @@ function ActionModal({
       : modal.type === "edit-points"
         ? `Edit points — @${modal.github}`
         : modal.type === "reject-sub"
-        ? `Reject submission — @${modal.github}`
-        : modal.type === "approve-arena"
-          ? `Approve arena entry — @${modal.github}`
-          : modal.type === "reject-arena"
-            ? `Disqualify entry — @${modal.github}`
-            : modal.type === "approve-weekly"
-              ? `Approve weekly submission — @${modal.github}`
-              : modal.type === "reject-weekly"
-                ? `Reject weekly submission — @${modal.github}`
-                : modal.type === "reject-reg"
-                  ? `Reject registration — @${modal.github}`
-                  : modal.type === "confirm-delete"
-                    ? "Confirm Delete"
-                    : "";
+          ? `Reject submission — @${modal.github}`
+          : modal.type === "approve-arena"
+            ? `Approve arena entry — @${modal.github}`
+            : modal.type === "reject-arena"
+              ? `Disqualify entry — @${modal.github}`
+              : modal.type === "approve-weekly"
+                ? `Approve weekly submission — @${modal.github}`
+                : modal.type === "reject-weekly"
+                  ? `Reject weekly submission — @${modal.github}`
+                  : modal.type === "reject-reg"
+                    ? `Reject registration — @${modal.github}`
+                    : modal.type === "confirm-delete"
+                      ? "Confirm Delete"
+                      : "";
 
   return (
     <div
@@ -1008,20 +1092,24 @@ function ActionModal({
         )}
         {modal.type === "edit-points" && (
           <p className="text-xs text-[#aaa] font-mono mb-4">
-            This submission was auto-graded from test results. Changing
-            the value here updates the user&apos;s total points by the
-            difference.
+            This submission was auto-graded from test results. Changing the
+            value here updates the user&apos;s total points by the difference.
           </p>
         )}
         {modal.type === "approve-arena" && modal.arenaSubRef && (
           <div className="mb-3 p-2.5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono space-y-1">
             <div className="flex justify-between">
               <span className="text-[#999]">Tests passed</span>
-              <span className={modal.arenaSubRef.tests_total > 0
-                ? modal.arenaSubRef.tests_passed === modal.arenaSubRef.tests_total
-                  ? "text-[#00e87a] font-bold"
-                  : "text-[#f0b429] font-bold"
-                : "text-[#555]"}>
+              <span
+                className={
+                  modal.arenaSubRef.tests_total > 0
+                    ? modal.arenaSubRef.tests_passed ===
+                      modal.arenaSubRef.tests_total
+                      ? "text-[#00e87a] font-bold"
+                      : "text-[#f0b429] font-bold"
+                    : "text-[#555]"
+                }
+              >
                 {modal.arenaSubRef.tests_total > 0
                   ? `${modal.arenaSubRef.tests_passed}/${modal.arenaSubRef.tests_total}`
                   : "not run"}
@@ -1029,7 +1117,9 @@ function ActionModal({
             </div>
             <div className="flex justify-between">
               <span className="text-[#999]">Strikes</span>
-              <span className="text-[#f0b429]">{modal.arenaSubRef.strikes}</span>
+              <span className="text-[#f0b429]">
+                {modal.arenaSubRef.strikes}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-[#999]">Time + strike factor</span>
@@ -1043,7 +1133,9 @@ function ActionModal({
             </div>
             <div className="flex justify-between border-t border-[#1f1f1f] pt-1 mt-1">
               <span className="text-[#999]">Calculated pts</span>
-              <span className="text-[#00e87a] font-bold">{modal.arenaSubRef.points_awarded}</span>
+              <span className="text-[#00e87a] font-bold">
+                {modal.arenaSubRef.points_awarded}
+              </span>
             </div>
           </div>
         )}
@@ -1126,17 +1218,27 @@ export default function AdminPage({ user }: AdminPageProps) {
   async function backfillEmails() {
     setBackfillingEmails(true);
     try {
-      const { data: { session } } = await db.auth.getSession();
+      const {
+        data: { session },
+      } = await db.auth.getSession();
       const token = session?.access_token;
-      if (!token) { showToast("Sign in required"); setBackfillingEmails(false); return; }
+      if (!token) {
+        showToast("Sign in required");
+        setBackfillingEmails(false);
+        return;
+      }
       const res = await fetch("/api/admin/backfill-emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
       const body = await res.json().catch(() => null);
-      if (!res.ok) showToast(`Backfill failed — ${body?.error || "unknown error"}`);
+      if (!res.ok)
+        showToast(`Backfill failed — ${body?.error || "unknown error"}`);
       else if (body?.message) showToast(body.message);
-      else showToast(`Backfilled ${body.membersUpdated} members, ${body.subscribersUpdated} subscribers (scanned ${body.scanned} auth users)`);
+      else
+        showToast(
+          `Backfilled ${body.membersUpdated} members, ${body.subscribersUpdated} subscribers (scanned ${body.scanned} auth users)`,
+        );
     } catch {
       showToast("Backfill failed — network error");
     }
@@ -1157,10 +1259,12 @@ export default function AdminPage({ user }: AdminPageProps) {
   const [editingProblem, setEditingProblem] = useState<Problem | null>(null);
   const [showContestForm, setShowContestForm] = useState(false);
   const [editingContest, setEditingContest] = useState<Contest | null>(null);
-  const [plagResults,    setPlagResults]    = useState<Record<string, any>>({});
-  const [plagChecking,   setPlagChecking]   = useState<string | null>(null);
-  const [expandedCode,   setExpandedCode]   = useState<string | null>(null);
-  const [subFilter,      setSubFilter]      = useState<"pending" | "approved" | "rejected" | "all">("pending");
+  const [plagResults, setPlagResults] = useState<Record<string, any>>({});
+  const [plagChecking, setPlagChecking] = useState<string | null>(null);
+  const [expandedCode, setExpandedCode] = useState<string | null>(null);
+  const [subFilter, setSubFilter] = useState<
+    "pending" | "approved" | "rejected" | "all"
+  >("pending");
   const [subVisibleCount, setSubVisibleCount] = useState(20);
 
   const [modal, setModal] = useState<ModalState>({
@@ -1404,7 +1508,9 @@ export default function AdminPage({ user }: AdminPageProps) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: mem } = await (db.from("members") as any)
-      .select("total_points").eq("github", sub.github).maybeSingle();
+      .select("total_points")
+      .eq("github", sub.github)
+      .maybeSingle();
     if (mem) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (db.from("members") as any)
@@ -1413,9 +1519,13 @@ export default function AdminPage({ user }: AdminPageProps) {
     }
 
     setSubs((prev) =>
-      prev.map((s) => (s.id === sub.id ? { ...s, points_awarded: newPoints } : s)),
+      prev.map((s) =>
+        s.id === sub.id ? { ...s, points_awarded: newPoints } : s,
+      ),
     );
-    showToast(`💾 Points updated for @${sub.github}: ${sub.points_awarded || 0} → ${newPoints}`);
+    showToast(
+      `💾 Points updated for @${sub.github}: ${sub.points_awarded || 0} → ${newPoints}`,
+    );
   }
 
   async function checkPlagiarism(sub: Submission) {
@@ -1436,9 +1546,17 @@ export default function AdminPage({ user }: AdminPageProps) {
         sub.lang,
         (others || []).filter((o: any) => o.code),
       );
-      setPlagResults(prev => ({ ...prev, [sub.id]: result }));
+      setPlagResults((prev) => ({ ...prev, [sub.id]: result }));
     } catch {
-      setPlagResults(prev => ({ ...prev, [sub.id]: { score: 0, verdict: "clean", matches: [], explanation: "Check failed." } }));
+      setPlagResults((prev) => ({
+        ...prev,
+        [sub.id]: {
+          score: 0,
+          verdict: "clean",
+          matches: [],
+          explanation: "Check failed.",
+        },
+      }));
     }
     setPlagChecking(null);
   }
@@ -1541,9 +1659,7 @@ export default function AdminPage({ user }: AdminPageProps) {
 
     if (ex) {
       const last = ex.last_solved_at ? new Date(ex.last_solved_at) : null;
-      const daysSinceLast = last
-        ? calendarDaysBetween(last, now)
-        : 999;
+      const daysSinceLast = last ? calendarDaysBetween(last, now) : 999;
       const newStreak = countAsSolved
         ? daysSinceLast === 0
           ? ex.streak || 1
@@ -1657,7 +1773,9 @@ export default function AdminPage({ user }: AdminPageProps) {
     setEditingContest(null);
   }
 
-  const [notifyingContestId, setNotifyingContestId] = useState<string | null>(null);
+  const [notifyingContestId, setNotifyingContestId] = useState<string | null>(
+    null,
+  );
   async function notifyContest(c: Contest) {
     setNotifyingContestId(c.id);
     try {
@@ -1678,8 +1796,9 @@ export default function AdminPage({ user }: AdminPageProps) {
     showToast(`Contest set to ${status}`);
 
     if (status === "live" && contest) {
-      notifySubscribers("contest_live", id, contest.name)
-        .then((res) => showToast(notifyResultToast(res)));
+      notifySubscribers("contest_live", id, contest.name).then((res) =>
+        showToast(notifyResultToast(res)),
+      );
     }
   }
 
@@ -1739,8 +1858,8 @@ export default function AdminPage({ user }: AdminPageProps) {
       label: "🏟 Contests",
       badge: regs.filter((r) => r.status === "pending").length,
     },
-    { id: "feedback",    label: "💬 Feedback" },
-    { id: "weekly",      label: "🏅 Weekly" },
+    { id: "feedback", label: "💬 Feedback" },
+    { id: "weekly", label: "🏅 Weekly" },
     { id: "subscribers", label: "⭐ Subscribers" },
     { id: "ai-generate", label: "✦ AI Generate" },
     { id: "announcements", label: "📣 Announcements" },
@@ -1893,19 +2012,29 @@ export default function AdminPage({ user }: AdminPageProps) {
                 {/* Status filter — defaults to Pending so approved/rejected
                     history doesn't clutter the view once volume grows */}
                 <div className="flex flex-wrap gap-1 bg-[#0d0d0d] border border-[#1f1f1f] rounded-xl p-1 w-fit mb-5">
-                  {([
-                    { id: "pending",  label: `Pending (${subs.filter(s => s.status === "pending").length})` },
-                    { id: "approved", label: "Approved" },
-                    { id: "rejected", label: "Rejected" },
-                    { id: "all",      label: "All" },
-                  ] as const).map((f) => (
+                  {(
+                    [
+                      {
+                        id: "pending",
+                        label: `Pending (${subs.filter((s) => s.status === "pending").length})`,
+                      },
+                      { id: "approved", label: "Approved" },
+                      { id: "rejected", label: "Rejected" },
+                      { id: "all", label: "All" },
+                    ] as const
+                  ).map((f) => (
                     <button
                       key={f.id}
-                      onClick={() => { setSubFilter(f.id); setSubVisibleCount(20); }}
+                      onClick={() => {
+                        setSubFilter(f.id);
+                        setSubVisibleCount(20);
+                      }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-150
-                        ${subFilter === f.id
-                          ? "bg-[#00e87a10] text-[#00e87a] font-bold border border-[#00e87a20]"
-                          : "text-[#666] hover:text-[#e0e0e0] hover:bg-[#ffffff06] border border-transparent"}`}
+                        ${
+                          subFilter === f.id
+                            ? "bg-[#00e87a10] text-[#00e87a] font-bold border border-[#00e87a20]"
+                            : "text-[#666] hover:text-[#e0e0e0] hover:bg-[#ffffff06] border border-transparent"
+                        }`}
                     >
                       {f.label}
                     </button>
@@ -1913,159 +2042,206 @@ export default function AdminPage({ user }: AdminPageProps) {
                 </div>
 
                 {(() => {
-                  const filtered = subFilter === "all" ? subs : subs.filter((s) => s.status === subFilter);
+                  const filtered =
+                    subFilter === "all"
+                      ? subs
+                      : subs.filter((s) => s.status === subFilter);
                   const visible = filtered.slice(0, subVisibleCount);
                   return (
                     <>
-                <div className="space-y-3">
-                  {filtered.length === 0 && (
-                    <div className="text-center py-16 text-[#999] font-mono">
-                      No {subFilter !== "all" ? subFilter : ""} submissions.
-                    </div>
-                  )}
-                  {visible.map((s) => (
-                    <div
-                      key={s.id}
-                      className={`card p-4 transition-all ${s.status === "pending" ? "border-[#f0b42930]" : ""}`}
-                    >
-                      <div className="flex items-start justify-between gap-3 flex-wrap">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-mono font-bold text-[#e0e0e0]">
-                            {s.problem_title}
+                      <div className="space-y-3">
+                        {filtered.length === 0 && (
+                          <div className="text-center py-16 text-[#999] font-mono">
+                            No {subFilter !== "all" ? subFilter : ""}{" "}
+                            submissions.
                           </div>
-                          <div className="text-xs text-[#bbb] font-mono mt-0.5">
-                            @{s.github} · {s.lang} ·{" "}
-                            {new Date(s.created_at).toLocaleString()}
-                          </div>
-                          {s.approach && (
-                            <div className="text-xs text-[#ccc] mt-1.5 font-mono bg-[#0a0a0a] rounded px-2 py-1 max-w-lg">
-                              <span className="text-[#999]">Approach: </span>
-                              {s.approach}
-                            </div>
-                          )}
-                          {s.tests_total > 0 && (
-                            <div className="text-xs text-[#bbb] mt-1 font-mono">
-                              Tests: {s.tests_passed}/{s.tests_total} ·
-                              potential {s.points_awarded} pts
-                            </div>
-                          )}
-                          {s.reject_reason && (
-                            <div className="text-xs text-[#ff4d4d] mt-1 font-mono">
-                              Reason: {s.reject_reason}
-                            </div>
-                          )}
-                          {s.code && (
-                            <div>
-                              <CodeViewer code={s.code} lang={s.lang} />
-                              {/* Plagiarism check */}
-                              <div className="mt-2">
-                                {!plagResults[s.id] ? (
-                                  <button
-                                    onClick={() => checkPlagiarism(s)}
-                                    disabled={plagChecking === s.id}
-                                    className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-lg
+                        )}
+                        {visible.map((s) => (
+                          <div
+                            key={s.id}
+                            className={`card p-4 transition-all ${s.status === "pending" ? "border-[#f0b42930]" : ""}`}
+                          >
+                            <div className="flex items-start justify-between gap-3 flex-wrap">
+                              <div className="min-w-0 flex-1">
+                                <div className="font-mono font-bold text-[#e0e0e0]">
+                                  {s.problem_title}
+                                </div>
+                                <div className="text-xs text-[#bbb] font-mono mt-0.5">
+                                  @{s.github} · {s.lang} ·{" "}
+                                  {new Date(s.created_at).toLocaleString()}
+                                </div>
+                                {s.approach && (
+                                  <div className="text-xs text-[#ccc] mt-1.5 font-mono bg-[#0a0a0a] rounded px-2 py-1 max-w-lg">
+                                    <span className="text-[#999]">
+                                      Approach:{" "}
+                                    </span>
+                                    {s.approach}
+                                  </div>
+                                )}
+                                {s.tests_total > 0 && (
+                                  <div className="text-xs text-[#bbb] mt-1 font-mono">
+                                    Tests: {s.tests_passed}/{s.tests_total} ·
+                                    potential {s.points_awarded} pts
+                                  </div>
+                                )}
+                                {s.reject_reason && (
+                                  <div className="text-xs text-[#ff4d4d] mt-1 font-mono">
+                                    Reason: {s.reject_reason}
+                                  </div>
+                                )}
+                                {s.code && (
+                                  <div>
+                                    <CodeViewer code={s.code} lang={s.lang} />
+                                    {/* Plagiarism check */}
+                                    <div className="mt-2">
+                                      {!plagResults[s.id] ? (
+                                        <button
+                                          onClick={() => checkPlagiarism(s)}
+                                          disabled={plagChecking === s.id}
+                                          className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-lg
                                       bg-[#f0b42910] border border-[#f0b42920] text-[#f0b429]
                                       hover:bg-[#f0b42918] disabled:opacity-50 transition-all"
-                                  >
-                                    {plagChecking === s.id ? (
-                                      <><span className="w-2.5 h-2.5 border border-[#f0b429] border-t-transparent rounded-full animate-spin inline-block" /> Checking…</>
-                                    ) : '✦ Check Plagiarism'}
-                                  </button>
-                                ) : (
-                                  <div className={`rounded-xl p-3 border text-[10px] font-mono space-y-1.5
-                                    ${plagResults[s.id].verdict === 'likely_plagiarised' ? 'bg-[#ff4d4d08] border-[#ff4d4d25]' :
-                                      plagResults[s.id].verdict === 'suspicious'         ? 'bg-[#f0b42908] border-[#f0b42925]' :
-                                                                                           'bg-[#00e87a08] border-[#00e87a20]'}`}>
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2">
-                                        <span className={
-                                          plagResults[s.id].verdict === 'likely_plagiarised' ? 'text-[#ff4d4d]' :
-                                          plagResults[s.id].verdict === 'suspicious'         ? 'text-[#f0b429]' : 'text-[#00e87a]'
-                                        }>
-                                          {plagResults[s.id].verdict === 'likely_plagiarised' ? '⚠ Likely plagiarised' :
-                                           plagResults[s.id].verdict === 'suspicious'         ? '⚠ Suspicious' : '✓ Looks original'}
-                                        </span>
-                                        <span className="text-[#555]">
-                                          Similarity: {plagResults[s.id].score}%
-                                        </span>
-                                      </div>
-                                      <button
-                                        onClick={() => checkPlagiarism(s)}
-                                        disabled={plagChecking === s.id}
-                                        className="text-[#444] hover:text-[#f0b429] transition-colors"
-                                      >
-                                        ↻
-                                      </button>
+                                        >
+                                          {plagChecking === s.id ? (
+                                            <>
+                                              <span className="w-2.5 h-2.5 border border-[#f0b429] border-t-transparent rounded-full animate-spin inline-block" />{" "}
+                                              Checking…
+                                            </>
+                                          ) : (
+                                            "✦ Check Plagiarism"
+                                          )}
+                                        </button>
+                                      ) : (
+                                        <div
+                                          className={`rounded-xl p-3 border text-[10px] font-mono space-y-1.5
+                                    ${
+                                      plagResults[s.id].verdict ===
+                                      "likely_plagiarised"
+                                        ? "bg-[#ff4d4d08] border-[#ff4d4d25]"
+                                        : plagResults[s.id].verdict ===
+                                            "suspicious"
+                                          ? "bg-[#f0b42908] border-[#f0b42925]"
+                                          : "bg-[#00e87a08] border-[#00e87a20]"
+                                    }`}
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                              <span
+                                                className={
+                                                  plagResults[s.id].verdict ===
+                                                  "likely_plagiarised"
+                                                    ? "text-[#ff4d4d]"
+                                                    : plagResults[s.id]
+                                                          .verdict ===
+                                                        "suspicious"
+                                                      ? "text-[#f0b429]"
+                                                      : "text-[#00e87a]"
+                                                }
+                                              >
+                                                {plagResults[s.id].verdict ===
+                                                "likely_plagiarised"
+                                                  ? "⚠ Likely plagiarised"
+                                                  : plagResults[s.id]
+                                                        .verdict ===
+                                                      "suspicious"
+                                                    ? "⚠ Suspicious"
+                                                    : "✓ Looks original"}
+                                              </span>
+                                              <span className="text-[#555]">
+                                                Similarity:{" "}
+                                                {plagResults[s.id].score}%
+                                              </span>
+                                            </div>
+                                            <button
+                                              onClick={() => checkPlagiarism(s)}
+                                              disabled={plagChecking === s.id}
+                                              className="text-[#444] hover:text-[#f0b429] transition-colors"
+                                            >
+                                              ↻
+                                            </button>
+                                          </div>
+                                          {plagResults[s.id].explanation && (
+                                            <p className="text-[#888] leading-relaxed">
+                                              {plagResults[s.id].explanation}
+                                            </p>
+                                          )}
+                                          {plagResults[s.id].matches?.length >
+                                            0 && (
+                                            <ul className="space-y-0.5 pl-2">
+                                              {plagResults[s.id].matches.map(
+                                                (m: string, i: number) => (
+                                                  <li
+                                                    key={i}
+                                                    className="text-[#666] before:content-['•'] before:mr-1.5"
+                                                  >
+                                                    {m}
+                                                  </li>
+                                                ),
+                                              )}
+                                            </ul>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
-                                    {plagResults[s.id].explanation && (
-                                      <p className="text-[#888] leading-relaxed">{plagResults[s.id].explanation}</p>
-                                    )}
-                                    {plagResults[s.id].matches?.length > 0 && (
-                                      <ul className="space-y-0.5 pl-2">
-                                        {plagResults[s.id].matches.map((m: string, i: number) => (
-                                          <li key={i} className="text-[#666] before:content-['•'] before:mr-1.5">{m}</li>
-                                        ))}
-                                      </ul>
-                                    )}
                                   </div>
                                 )}
                               </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span
+                                  className={`text-xs font-mono px-2 py-0.5 rounded font-bold ${s.status === "approved" ? "bg-[#00e87a15] text-[#00e87a]" : s.status === "rejected" ? "bg-[#ff4d4d15] text-[#ff4d4d]" : "bg-[#f0b42915] text-[#f0b429]"}`}
+                                >
+                                  {s.status}
+                                </span>
+                                {s.status === "pending" && (
+                                  <>
+                                    <button
+                                      onClick={() =>
+                                        approveSubmission(
+                                          s.id,
+                                          s.github,
+                                          s.points_awarded || 100,
+                                        )
+                                      }
+                                      className="px-3 py-1.5 bg-[#00e87a] text-black text-xs font-mono font-bold rounded-lg hover:bg-[#00ff88] transition-all"
+                                    >
+                                      ✓ Approve
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        rejectSubmission(s.id, s.github)
+                                      }
+                                      className="px-3 py-1.5 bg-[#ff4d4d20] text-[#ff4d4d] text-xs font-mono rounded-lg hover:bg-[#ff4d4d30] transition-all"
+                                    >
+                                      ✗ Reject
+                                    </button>
+                                  </>
+                                )}
+                                {s.status === "approved" && (
+                                  <button
+                                    onClick={() => editSubmissionPoints(s)}
+                                    title="Auto-graded from test results — adjust if needed"
+                                    className="px-3 py-1.5 bg-[#a78bfa15] text-[#a78bfa] text-xs font-mono font-bold rounded-lg border border-[#a78bfa25] hover:bg-[#a78bfa25] transition-all"
+                                  >
+                                    ✎ Edit points
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span
-                            className={`text-xs font-mono px-2 py-0.5 rounded font-bold ${s.status === "approved" ? "bg-[#00e87a15] text-[#00e87a]" : s.status === "rejected" ? "bg-[#ff4d4d15] text-[#ff4d4d]" : "bg-[#f0b42915] text-[#f0b429]"}`}
-                          >
-                            {s.status}
-                          </span>
-                          {s.status === "pending" && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  approveSubmission(
-                                    s.id,
-                                    s.github,
-                                    s.points_awarded || 100,
-                                  )
-                                }
-                                className="px-3 py-1.5 bg-[#00e87a] text-black text-xs font-mono font-bold rounded-lg hover:bg-[#00ff88] transition-all"
-                              >
-                                ✓ Approve
-                              </button>
-                              <button
-                                onClick={() => rejectSubmission(s.id, s.github)}
-                                className="px-3 py-1.5 bg-[#ff4d4d20] text-[#ff4d4d] text-xs font-mono rounded-lg hover:bg-[#ff4d4d30] transition-all"
-                              >
-                                ✗ Reject
-                              </button>
-                            </>
-                          )}
-                          {s.status === "approved" && (
-                            <button
-                              onClick={() => editSubmissionPoints(s)}
-                              title="Auto-graded from test results — adjust if needed"
-                              className="px-3 py-1.5 bg-[#a78bfa15] text-[#a78bfa] text-xs font-mono font-bold rounded-lg border border-[#a78bfa25] hover:bg-[#a78bfa25] transition-all"
-                            >
-                              ✎ Edit points
-                            </button>
-                          )}
-                        </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ))}
-                </div>
-                {filtered.length > subVisibleCount && (
-                  <div className="flex justify-center mt-5">
-                    <button
-                      onClick={() => setSubVisibleCount((n) => n + 20)}
-                      className="px-4 py-2 bg-[#1a1a1a] text-[#aaa] text-xs font-mono rounded-xl hover:text-[#e0e0e0] hover:bg-[#222] transition-all"
-                    >
-                      Load {Math.min(20, filtered.length - subVisibleCount)} more
-                      ({filtered.length - subVisibleCount} remaining)
-                    </button>
-                  </div>
-                )}
+                      {filtered.length > subVisibleCount && (
+                        <div className="flex justify-center mt-5">
+                          <button
+                            onClick={() => setSubVisibleCount((n) => n + 20)}
+                            className="px-4 py-2 bg-[#1a1a1a] text-[#aaa] text-xs font-mono rounded-xl hover:text-[#e0e0e0] hover:bg-[#222] transition-all"
+                          >
+                            Load{" "}
+                            {Math.min(20, filtered.length - subVisibleCount)}{" "}
+                            more ({filtered.length - subVisibleCount} remaining)
+                          </button>
+                        </div>
+                      )}
                     </>
                   );
                 })()}
@@ -2117,11 +2293,15 @@ export default function AdminPage({ user }: AdminPageProps) {
                     </div>
                     <div className="mb-4 p-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg text-xs font-mono text-[#bbb] space-y-1">
                       <div>
-                        <span className="text-[#e0e0e0] font-bold">Points formula: </span>
-                        base × (tests_passed / tests_total) × time_factor × (1 − strikes×0.1)
+                        <span className="text-[#e0e0e0] font-bold">
+                          Points formula:{" "}
+                        </span>
+                        base × (tests_passed / tests_total) × time_factor × (1 −
+                        strikes×0.1)
                       </div>
                       <div className="text-[#555]">
-                        Auto-submitted (time expired) = 0 tests run → 0 pts by default. Review code manually and override if deserved.
+                        Auto-submitted (time expired) = 0 tests run → 0 pts by
+                        default. Review code manually and override if deserved.
                       </div>
                     </div>
                     {arenaSubs.length === 0 && (
@@ -2191,13 +2371,26 @@ export default function AdminPage({ user }: AdminPageProps) {
                                     );
                                     // Sort submissions by problem order in contest
                                     const contestProbIds = contest
-                                      ? (contest.problem_ids?.length ? contest.problem_ids : contest.problem_id ? [contest.problem_id] : [])
+                                      ? contest.problem_ids?.length
+                                        ? contest.problem_ids
+                                        : contest.problem_id
+                                          ? [contest.problem_id]
+                                          : []
                                       : [];
-                                    const sortedSubs = [...userSubs].sort((a, b) => {
-                                      const ai = contestProbIds.indexOf(a.problem_id || '');
-                                      const bi = contestProbIds.indexOf(b.problem_id || '');
-                                      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-                                    });
+                                    const sortedSubs = [...userSubs].sort(
+                                      (a, b) => {
+                                        const ai = contestProbIds.indexOf(
+                                          a.problem_id || "",
+                                        );
+                                        const bi = contestProbIds.indexOf(
+                                          b.problem_id || "",
+                                        );
+                                        return (
+                                          (ai === -1 ? 999 : ai) -
+                                          (bi === -1 ? 999 : bi)
+                                        );
+                                      },
+                                    );
                                     return (
                                       <div key={github} className="px-5 py-4">
                                         {/* User header */}
@@ -2206,24 +2399,34 @@ export default function AdminPage({ user }: AdminPageProps) {
                                             src={`https://github.com/${github}.png?size=28`}
                                             alt={github}
                                             className="w-7 h-7 rounded-full ring-1 ring-[#2a2a2a] shrink-0"
-                                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                            onError={(e) => {
+                                              (
+                                                e.target as HTMLImageElement
+                                              ).style.display = "none";
+                                            }}
                                           />
                                           <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                              <span className="font-mono font-bold text-[#e0e0e0] text-sm">@{github}</span>
+                                              <span className="font-mono font-bold text-[#e0e0e0] text-sm">
+                                                @{github}
+                                              </span>
                                               <span className="text-[10px] text-[#555] font-mono">
-                                                {sortedSubs.length}/{contestProbIds.length || '?'} problems submitted
+                                                {sortedSubs.length}/
+                                                {contestProbIds.length || "?"}{" "}
+                                                problems submitted
                                               </span>
                                               {totalAwarded > 0 && (
                                                 <span className="ml-auto text-xs font-mono text-[#00e87a] font-bold">
                                                   {totalAwarded} pts total
                                                 </span>
                                               )}
-                                              {pendingUserSubs.length > 0 && totalAwarded === 0 && (
-                                                <span className="ml-auto text-[10px] font-mono text-[#f0b429]">
-                                                  {pendingUserSubs.length} pending
-                                                </span>
-                                              )}
+                                              {pendingUserSubs.length > 0 &&
+                                                totalAwarded === 0 && (
+                                                  <span className="ml-auto text-[10px] font-mono text-[#f0b429]">
+                                                    {pendingUserSubs.length}{" "}
+                                                    pending
+                                                  </span>
+                                                )}
                                             </div>
                                           </div>
                                         </div>
@@ -2234,18 +2437,28 @@ export default function AdminPage({ user }: AdminPageProps) {
                                             // Fix: look up in both problem_ids and legacy problem_id
                                             const probId = a.problem_id || null;
                                             const prob = probId
-                                              ? probs.find((p) => p.id === probId)
+                                              ? probs.find(
+                                                  (p) => p.id === probId,
+                                                )
                                               : null;
                                             const basePts = prob?.points || 200;
-                                            const problemNum = contestProbIds.indexOf(a.problem_id || '') + 1;
+                                            const problemNum =
+                                              contestProbIds.indexOf(
+                                                a.problem_id || "",
+                                              ) + 1;
                                             const codeKey = `${a.id}_code`;
                                             return (
                                               <div
                                                 key={a.id}
                                                 className={`bg-[#0d0d0d] border rounded-xl p-3 transition-all
-                                                  ${a.status === "submitted"    ? "border-[#f0b42930]" :
-                                                    a.status === "disqualified" ? "border-[#ff4d4d20]" :
-                                                                                  "border-[#1a1a1a]"}`}
+                                                  ${
+                                                    a.status === "submitted"
+                                                      ? "border-[#f0b42930]"
+                                                      : a.status ===
+                                                          "disqualified"
+                                                        ? "border-[#ff4d4d20]"
+                                                        : "border-[#1a1a1a]"
+                                                  }`}
                                               >
                                                 <div className="flex items-start justify-between gap-3 flex-wrap">
                                                   <div className="min-w-0 flex-1">
@@ -2257,16 +2470,20 @@ export default function AdminPage({ user }: AdminPageProps) {
                                                         </span>
                                                       )}
                                                       <span className="text-sm font-mono text-[#e0e0e0] font-medium">
-                                                        {prob?.title || a.problem_title || "Unknown Problem"}
+                                                        {prob?.title ||
+                                                          a.problem_title ||
+                                                          "Unknown Problem"}
                                                       </span>
                                                       <span className="text-[10px] text-[#555] font-mono">
                                                         {basePts} pts base
                                                       </span>
-                                                      {a.tests_total === 0 && a.status === "submitted" && (
-                                                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#444] text-[#999]">
-                                                          ⏱ auto-submitted
-                                                        </span>
-                                                      )}
+                                                      {a.tests_total === 0 &&
+                                                        a.status ===
+                                                          "submitted" && (
+                                                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#444] text-[#999]">
+                                                            ⏱ auto-submitted
+                                                          </span>
+                                                        )}
                                                       {a.strikes > 0 && (
                                                         <span className="text-[10px] font-mono bg-[#ff4d4d15] text-[#ff4d4d] px-1.5 py-0.5 rounded">
                                                           ⚠ {a.strikes} strikes
@@ -2276,109 +2493,217 @@ export default function AdminPage({ user }: AdminPageProps) {
 
                                                     {/* Meta */}
                                                     <div className="text-[10px] text-[#666] font-mono">
-                                                      {a.lang} · {new Date(a.created_at).toLocaleString()}
+                                                      {a.lang} ·{" "}
+                                                      {new Date(
+                                                        a.created_at,
+                                                      ).toLocaleString()}
                                                       {a.tests_total > 0 && (
-                                                        <span className={`ml-2 font-bold ${a.tests_passed === a.tests_total ? 'text-[#00e87a]' : 'text-[#f0b429]'}`}>
-                                                          {a.tests_passed}/{a.tests_total} tests
+                                                        <span
+                                                          className={`ml-2 font-bold ${a.tests_passed === a.tests_total ? "text-[#00e87a]" : "text-[#f0b429]"}`}
+                                                        >
+                                                          {a.tests_passed}/
+                                                          {a.tests_total} tests
                                                         </span>
                                                       )}
                                                       {a.tests_total === 0 && (
-                                                        <span className="ml-2 text-[#444]">no tests run</span>
-                                                      )}
-                                                      {a.strike_penalty_factor && a.strike_penalty_factor !== 1 && (
-                                                        <span className="ml-2 text-[#a78bfa]">
-                                                          ×{a.strike_penalty_factor.toFixed(2)} factor
+                                                        <span className="ml-2 text-[#444]">
+                                                          no tests run
                                                         </span>
                                                       )}
+                                                      {a.strike_penalty_factor &&
+                                                        a.strike_penalty_factor !==
+                                                          1 && (
+                                                          <span className="ml-2 text-[#a78bfa]">
+                                                            ×
+                                                            {a.strike_penalty_factor.toFixed(
+                                                              2,
+                                                            )}{" "}
+                                                            factor
+                                                          </span>
+                                                        )}
                                                     </div>
 
-                                                    {a.points_awarded > 0 && a.status === "reviewed" && (
-                                                      <div className="text-xs text-[#00e87a] font-mono mt-0.5 font-bold">
-                                                        ✓ Awarded: {a.points_awarded} pts
-                                                      </div>
-                                                    )}
+                                                    {a.points_awarded > 0 &&
+                                                      a.status ===
+                                                        "reviewed" && (
+                                                        <div className="text-xs text-[#00e87a] font-mono mt-0.5 font-bold">
+                                                          ✓ Awarded:{" "}
+                                                          {a.points_awarded} pts
+                                                        </div>
+                                                      )}
 
                                                     {/* Collapsible code */}
-                                                    {a.code && a.code !== '-- No code submitted --' && a.code !== '-- Time expired before submission --' ? (
+                                                    {a.code &&
+                                                    a.code !==
+                                                      "-- No code submitted --" &&
+                                                    a.code !==
+                                                      "-- Time expired before submission --" ? (
                                                       <div className="mt-2">
                                                         <button
-                                                          onClick={() => setExpandedCode(expandedCode === codeKey ? null : codeKey)}
+                                                          onClick={() =>
+                                                            setExpandedCode(
+                                                              expandedCode ===
+                                                                codeKey
+                                                                ? null
+                                                                : codeKey,
+                                                            )
+                                                          }
                                                           className="text-[10px] font-mono text-[#555] hover:text-[#a78bfa] transition-colors"
                                                         >
-                                                          {expandedCode === codeKey ? "▲ hide code" : "▼ view code"}
+                                                          {expandedCode ===
+                                                          codeKey
+                                                            ? "▲ hide code"
+                                                            : "▼ view code"}
                                                         </button>
-                                                        {expandedCode === codeKey && (
-                                                          <CodeViewer code={a.code} lang={a.lang} />
+                                                        {expandedCode ===
+                                                          codeKey && (
+                                                          <CodeViewer
+                                                            code={a.code}
+                                                            lang={a.lang}
+                                                          />
                                                         )}
                                                       </div>
                                                     ) : (
                                                       <div className="text-[10px] font-mono text-[#444] mt-1 italic">
-                                                        {a.code || 'No code submitted'}
+                                                        {a.code ||
+                                                          "No code submitted"}
                                                       </div>
                                                     )}
                                                   </div>
 
                                                   {/* Actions */}
                                                   <div className="flex items-center gap-2 shrink-0">
-                                                    <span className={`text-xs font-mono px-2 py-0.5 rounded font-bold
-                                                      ${a.status === "reviewed"     ? "bg-[#00e87a15] text-[#00e87a]" :
-                                                        a.status === "disqualified" ? "bg-[#ff4d4d15] text-[#ff4d4d]" :
-                                                                                      "bg-[#f0b42915] text-[#f0b429]"}`}>
+                                                    <span
+                                                      className={`text-xs font-mono px-2 py-0.5 rounded font-bold
+                                                      ${
+                                                        a.status === "reviewed"
+                                                          ? "bg-[#00e87a15] text-[#00e87a]"
+                                                          : a.status ===
+                                                              "disqualified"
+                                                            ? "bg-[#ff4d4d15] text-[#ff4d4d]"
+                                                            : "bg-[#f0b42915] text-[#f0b429]"
+                                                      }`}
+                                                    >
                                                       {a.status}
                                                     </span>
-                                                    {a.status === "submitted" && (
+                                                    {a.status ===
+                                                      "submitted" && (
                                                       <>
                                                         <button
-                                                          onClick={() => approveArenaSubmission(a, basePts)}
+                                                          onClick={() =>
+                                                            approveArenaSubmission(
+                                                              a,
+                                                              basePts,
+                                                            )
+                                                          }
                                                           className="px-3 py-1.5 bg-[#00e87a] text-black text-xs font-mono font-bold rounded-lg hover:bg-[#00ff88] transition-all"
                                                         >
                                                           ✓ Approve
                                                         </button>
                                                         <button
-                                                          onClick={() => rejectArenaSubmission(a.id, a.github)}
+                                                          onClick={() =>
+                                                            rejectArenaSubmission(
+                                                              a.id,
+                                                              a.github,
+                                                            )
+                                                          }
                                                           className="px-3 py-1.5 bg-[#ff4d4d20] text-[#ff4d4d] text-xs font-mono rounded-lg hover:bg-[#ff4d4d30] transition-all"
                                                         >
                                                           ✗ Reject
                                                         </button>
                                                       </>
                                                     )}
-                                                    {a.status === "reviewed" && (
-                                                      expandedCode === `${a.id}_editpts` ? (
+                                                    {a.status === "reviewed" &&
+                                                      (expandedCode ===
+                                                      `${a.id}_editpts` ? (
                                                         <div className="flex items-center gap-1.5">
                                                           <input
                                                             type="number"
-                                                            defaultValue={a.points_awarded}
+                                                            defaultValue={
+                                                              a.points_awarded
+                                                            }
                                                             className="w-16 bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-2 py-1 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
-                                                            onKeyDown={async (e) => {
-                                                              if (e.key === 'Enter') {
-                                                                const pts = Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0);
-                                                                await (db.from('arena_submissions') as any)
-                                                                  .update({ points_awarded: pts })
-                                                                  .eq('id', a.id);
+                                                            onKeyDown={async (
+                                                              e,
+                                                            ) => {
+                                                              if (
+                                                                e.key ===
+                                                                "Enter"
+                                                              ) {
+                                                                const pts =
+                                                                  Math.max(
+                                                                    0,
+                                                                    parseInt(
+                                                                      (
+                                                                        e.target as HTMLInputElement
+                                                                      ).value,
+                                                                    ) || 0,
+                                                                  );
+                                                                await (
+                                                                  db.from(
+                                                                    "arena_submissions",
+                                                                  ) as any
+                                                                )
+                                                                  .update({
+                                                                    points_awarded:
+                                                                      pts,
+                                                                  })
+                                                                  .eq(
+                                                                    "id",
+                                                                    a.id,
+                                                                  );
                                                                 // Update local state so UI reflects change without full reload
-                                                                setArenaSubs(prev => prev.map(s =>
-                                                                  s.id === a.id ? { ...s, points_awarded: pts } : s
-                                                                ));
-                                                                setExpandedCode(null);
+                                                                setArenaSubs(
+                                                                  (prev) =>
+                                                                    prev.map(
+                                                                      (s) =>
+                                                                        s.id ===
+                                                                        a.id
+                                                                          ? {
+                                                                              ...s,
+                                                                              points_awarded:
+                                                                                pts,
+                                                                            }
+                                                                          : s,
+                                                                    ),
+                                                                );
+                                                                setExpandedCode(
+                                                                  null,
+                                                                );
                                                               }
-                                                              if (e.key === 'Escape') setExpandedCode(null);
+                                                              if (
+                                                                e.key ===
+                                                                "Escape"
+                                                              )
+                                                                setExpandedCode(
+                                                                  null,
+                                                                );
                                                             }}
                                                             autoFocus
                                                           />
                                                           <button
-                                                            onClick={() => setExpandedCode(null)}
+                                                            onClick={() =>
+                                                              setExpandedCode(
+                                                                null,
+                                                              )
+                                                            }
                                                             className="text-[10px] font-mono text-[#555] hover:text-[#999]"
-                                                          >✕</button>
+                                                          >
+                                                            ✕
+                                                          </button>
                                                         </div>
                                                       ) : (
                                                         <button
-                                                          onClick={() => setExpandedCode(`${a.id}_editpts`)}
+                                                          onClick={() =>
+                                                            setExpandedCode(
+                                                              `${a.id}_editpts`,
+                                                            )
+                                                          }
                                                           className="text-[10px] font-mono text-[#555] hover:text-[#a78bfa] transition-colors"
                                                         >
                                                           ✎ edit pts
                                                         </button>
-                                                      )
-                                                    )}
+                                                      ))}
                                                   </div>
                                                 </div>
                                               </div>
@@ -2386,25 +2711,39 @@ export default function AdminPage({ user }: AdminPageProps) {
                                           })}
 
                                           {/* Show missing problems — submitted but no record */}
-                                          {contestProbIds.filter(pid => !sortedSubs.find(s => s.problem_id === pid)).map(pid => {
-                                            const prob = probs.find(p => p.id === pid);
-                                            const problemNum = contestProbIds.indexOf(pid) + 1;
-                                            return (
-                                              <div key={pid} className="bg-[#0a0a0a] border border-[#1a1a1a] border-dashed rounded-xl p-3 opacity-50">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#ffffff10] text-[#666]">
-                                                    P{problemNum}
-                                                  </span>
-                                                  <span className="text-xs font-mono text-[#555]">
-                                                    {prob?.title || `Problem ${problemNum}`}
-                                                  </span>
-                                                  <span className="text-[10px] font-mono text-[#444] ml-auto">
-                                                    Not submitted
-                                                  </span>
+                                          {contestProbIds
+                                            .filter(
+                                              (pid) =>
+                                                !sortedSubs.find(
+                                                  (s) => s.problem_id === pid,
+                                                ),
+                                            )
+                                            .map((pid) => {
+                                              const prob = probs.find(
+                                                (p) => p.id === pid,
+                                              );
+                                              const problemNum =
+                                                contestProbIds.indexOf(pid) + 1;
+                                              return (
+                                                <div
+                                                  key={pid}
+                                                  className="bg-[#0a0a0a] border border-[#1a1a1a] border-dashed rounded-xl p-3 opacity-50"
+                                                >
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-[#ffffff10] text-[#666]">
+                                                      P{problemNum}
+                                                    </span>
+                                                    <span className="text-xs font-mono text-[#555]">
+                                                      {prob?.title ||
+                                                        `Problem ${problemNum}`}
+                                                    </span>
+                                                    <span className="text-[10px] font-mono text-[#444] ml-auto">
+                                                      Not submitted
+                                                    </span>
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            );
-                                          })}
+                                              );
+                                            })}
                                         </div>
                                       </div>
                                     );
@@ -2567,7 +2906,8 @@ export default function AdminPage({ user }: AdminPageProps) {
                           {m.total_points} XP
                         </div>
                         <div className="text-xs text-[#999] font-mono">
-                          {m.problems_solved} solved · {effectiveStreak(m.streak, m.last_solved_at)}🔥
+                          {m.problems_solved} solved ·{" "}
+                          {effectiveStreak(m.streak, m.last_solved_at)}🔥
                         </div>
                       </div>
                     </div>
@@ -2668,7 +3008,9 @@ export default function AdminPage({ user }: AdminPageProps) {
                             disabled={notifyingContestId === c.id}
                             className="px-3 py-1 bg-[#00e87a10] text-[#00e87a] hover:bg-[#00e87a20] text-xs font-mono rounded-lg transition-all disabled:opacity-50"
                           >
-                            {notifyingContestId === c.id ? "Sending…" : "📧 Notify"}
+                            {notifyingContestId === c.id
+                              ? "Sending…"
+                              : "📧 Notify"}
                           </button>
                           <button
                             onClick={() => deleteContest(c.id)}
@@ -2678,37 +3020,42 @@ export default function AdminPage({ user }: AdminPageProps) {
                           </button>
                         </div>
                       </div>
-                      {regs.filter((r) => r.contest_id === c.id).length > 0 && (() => {
-                        const contestRegs = regs.filter((r) => r.contest_id === c.id);
-                        const confirmedCount = contestRegs.filter((r) => r.status === "confirmed").length;
-                        return (
-                          <div className="pt-3 border-t border-[#1a1a1a]">
-                            <div className="text-[10px] text-[#999] font-mono mb-1.5 uppercase">
-                              Registrations ({confirmedCount}/70 seats)
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {contestRegs.map((r) => (
-                                <span
-                                  key={r.id}
-                                  className={`group text-[10px] font-mono pl-2 pr-1 py-0.5 rounded flex items-center gap-1
+                      {regs.filter((r) => r.contest_id === c.id).length > 0 &&
+                        (() => {
+                          const contestRegs = regs.filter(
+                            (r) => r.contest_id === c.id,
+                          );
+                          const confirmedCount = contestRegs.filter(
+                            (r) => r.status === "confirmed",
+                          ).length;
+                          return (
+                            <div className="pt-3 border-t border-[#1a1a1a]">
+                              <div className="text-[10px] text-[#999] font-mono mb-1.5 uppercase">
+                                Registrations ({confirmedCount}/70 seats)
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {contestRegs.map((r) => (
+                                  <span
+                                    key={r.id}
+                                    className={`group text-[10px] font-mono pl-2 pr-1 py-0.5 rounded flex items-center gap-1
                                     ${r.status === "confirmed" ? "bg-[#00e87a15] text-[#00e87a]" : "bg-[#ff4d4d15] text-[#ff4d4d]"}`}
-                                >
-                                  @{r.github}
-                                  {r.status === "confirmed" && (
-                                    <button
-                                      onClick={() => rejectReg(r.id)}
-                                      title="Remove registrant"
-                                      className="opacity-50 hover:opacity-100 hover:text-[#ff4d4d] transition-all px-1"
-                                    >
-                                      ✕
-                                    </button>
-                                  )}
-                                </span>
-                              ))}
+                                  >
+                                    @{r.github}
+                                    {r.status === "confirmed" && (
+                                      <button
+                                        onClick={() => rejectReg(r.id)}
+                                        title="Remove registrant"
+                                        className="opacity-50 hover:opacity-100 hover:text-[#ff4d4d] transition-all px-1"
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })()}
+                          );
+                        })()}
                     </div>
                   ))}
                 </div>
@@ -2718,8 +3065,8 @@ export default function AdminPage({ user }: AdminPageProps) {
         )}
 
         {/* ════════ WEEKLY CHALLENGE SECTION ════════ */}
-        {section === "feedback"    && <FeedbackAdminSection />}
-        {section === "weekly"      && <WeeklyAdminSection user={user} />}
+        {section === "feedback" && <FeedbackAdminSection />}
+        {section === "weekly" && <WeeklyAdminSection user={user} />}
         {section === "subscribers" && <SubscriberAdminSection />}
         {section === "ai-generate" && <AiGenerateSection />}
         {section === "announcements" && <AnnouncementAdminSection />}
@@ -2773,9 +3120,17 @@ function WeeklyAdminSection({ user }: { user: User }) {
   const [selectedSubs, setSelectedSubs] = useState<Set<string>>(new Set());
   const [bulkApproving, setBulkApproving] = useState(false);
   const [expandedCode, setExpandedCode] = useState<string | null>(null);
-  const [weeklyPlagResults, setWeeklyPlagResults] = useState<Record<string, any>>({});
-  const [weeklyPlagChecking, setWeeklyPlagChecking] = useState<string | null>(null);
-  const [modal, setModal] = useState<ModalState>({ type: null, id: "", github: "" });
+  const [weeklyPlagResults, setWeeklyPlagResults] = useState<
+    Record<string, any>
+  >({});
+  const [weeklyPlagChecking, setWeeklyPlagChecking] = useState<string | null>(
+    null,
+  );
+  const [modal, setModal] = useState<ModalState>({
+    type: null,
+    id: "",
+    github: "",
+  });
   const modalResolve = useRef<((v: string | null) => void) | null>(null);
 
   function openModal(
@@ -2803,19 +3158,18 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
   async function load() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [{ data: ch }, { data: probs }, { data: subs }] =
-      await Promise.all([
-        (db.from("weekly_challenges") as any)
-          .select("*")
-          .order("created_at", { ascending: false }),
-        db
-          .from("problems")
-          .select("id, title, difficulty, points")
-          .order("title"),
-        (db.from("weekly_submissions") as any)
-          .select("*")
-          .order("submitted_at", { ascending: false }),
-      ]);
+    const [{ data: ch }, { data: probs }, { data: subs }] = await Promise.all([
+      (db.from("weekly_challenges") as any)
+        .select("*")
+        .order("created_at", { ascending: false }),
+      db
+        .from("problems")
+        .select("id, title, difficulty, points")
+        .order("title"),
+      (db.from("weekly_submissions") as any)
+        .select("*")
+        .order("submitted_at", { ascending: false }),
+    ]);
     setChallenges((ch || []) as WeeklyChallenge[]);
     setProblems((probs || []) as Problem[]);
     setSubmissions(subs || []);
@@ -2883,7 +3237,9 @@ function WeeklyAdminSection({ user }: { user: User }) {
         showToast("Updated ✓");
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: created, error } = await (db.from("weekly_challenges") as any)
+        const { data: created, error } = await (
+          db.from("weekly_challenges") as any
+        )
           .insert(payload)
           .select("id")
           .single();
@@ -2892,8 +3248,9 @@ function WeeklyAdminSection({ user }: { user: User }) {
         // Access is automatic for all confirmed subscribers — nothing
         // else to do for access. Still email them that it's up.
         showToast("Created ✓ — notifying subscribers…");
-        notifySubscribers("weekly_challenge", created.id, payload.title)
-          .then(res => showToast(notifyResultToast(res)));
+        notifySubscribers("weekly_challenge", created.id, payload.title).then(
+          (res) => showToast(notifyResultToast(res)),
+        );
       }
       setForm(null);
       setEditId(null);
@@ -2941,11 +3298,15 @@ function WeeklyAdminSection({ user }: { user: User }) {
     if (sub.status === "approved" && delta !== 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: mem } = await (db.from("members") as any)
-        .select("total_points").eq("github", sub.github).maybeSingle();
+        .select("total_points")
+        .eq("github", sub.github)
+        .maybeSingle();
       if (mem) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (db.from("members") as any)
-          .update({ total_points: Math.max(0, (mem.total_points || 0) + delta) })
+          .update({
+            total_points: Math.max(0, (mem.total_points || 0) + delta),
+          })
           .eq("github", sub.github);
       }
     }
@@ -2990,15 +3351,13 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
     // ===== UPDATE MEMBERS TABLE =====
 
-    const { data: member } = await (db
-      .from("members") as any)
+    const { data: member } = await (db.from("members") as any)
       .select("*")
       .eq("github", sub.github)
       .maybeSingle();
 
     if (member) {
-      await (db
-        .from("members") as any)
+      await (db.from("members") as any)
         .update({
           total_points: (member.total_points || 0) + finalPts,
           problems_solved: (member.problems_solved || 0) + 1,
@@ -3022,7 +3381,11 @@ function WeeklyAdminSection({ user }: { user: User }) {
   }
 
   async function rejectWeeklySubmission(sub: any) {
-    const reason = await openModal({ type: "reject-weekly", id: sub.id, github: sub.github });
+    const reason = await openModal({
+      type: "reject-weekly",
+      id: sub.id,
+      github: sub.github,
+    });
     if (reason === null) return;
 
     const { error } = await (db.from("weekly_submissions") as any)
@@ -3075,9 +3438,17 @@ function WeeklyAdminSection({ user }: { user: User }) {
         sub.lang,
         (others || []).filter((o: any) => o.code),
       );
-      setWeeklyPlagResults(prev => ({ ...prev, [sub.id]: result }));
+      setWeeklyPlagResults((prev) => ({ ...prev, [sub.id]: result }));
     } catch {
-      setWeeklyPlagResults(prev => ({ ...prev, [sub.id]: { score: 0, verdict: "clean", matches: [], explanation: "Check failed." } }));
+      setWeeklyPlagResults((prev) => ({
+        ...prev,
+        [sub.id]: {
+          score: 0,
+          verdict: "clean",
+          matches: [],
+          explanation: "Check failed.",
+        },
+      }));
     }
     setWeeklyPlagChecking(null);
   }
@@ -3222,9 +3593,11 @@ function WeeklyAdminSection({ user }: { user: User }) {
               <div className="flex items-start gap-2 px-3 py-2.5 bg-[#00e87a08] border border-[#00e87a20] rounded-xl">
                 <span className="text-[#00e87a] text-sm">⭐</span>
                 <p className="text-[10px] text-[#999] font-mono leading-relaxed">
-                  <span className="text-[#00e87a] font-bold">Access is automatic for subscribers.</span>{" "}
-                  Anyone with an active monthly subscription gets this challenge instantly — no
-                  per-challenge payment or setup needed.
+                  <span className="text-[#00e87a] font-bold">
+                    Access is automatic for subscribers.
+                  </span>{" "}
+                  Anyone with an active monthly subscription gets this challenge
+                  instantly — no per-challenge payment or setup needed.
                 </p>
               </div>
             </div>
@@ -3355,83 +3728,129 @@ function WeeklyAdminSection({ user }: { user: User }) {
                 <div className="border-t border-[#1a1a1a] px-5 py-4">
                   {/* Submissions — payments tab removed (using subscriber model) */}
                   {(() => {
-                      const chSubs = submissions.filter(
-                        (s) => s.weekly_challenge_id === ch.id,
-                      );
-                      if (chSubs.length === 0) {
-                        return (
-                          <p className="text-xs text-[#ccc] font-mono">
-                            No submissions yet.
-                          </p>
-                        );
-                      }
-
-                      // Keep only the latest submission per person per problem (safety dedup)
-                      const latestPerKey = new Map<string, any>();
-                      for (const s of chSubs) {
-                        const key = `${s.github}::${s.problem_id}`;
-                        const existing = latestPerKey.get(key);
-                        if (!existing || new Date(s.submitted_at) > new Date(existing.submitted_at)) {
-                          latestPerKey.set(key, s);
-                        }
-                      }
-                      // Group by github handle, preserving order of first appearance
-                      const byUser = new Map<string, any[]>();
-                      for (const s of Array.from(latestPerKey.values())) {
-                        if (!byUser.has(s.github)) byUser.set(s.github, []);
-                        byUser.get(s.github)!.push(s);
-                      }
-
-                      const pendingSubsList = Array.from(latestPerKey.values()).filter((s: any) => s.status === "pending");
-                      const allPendingSelected = pendingSubsList.length > 0 && pendingSubsList.every((s: any) => selectedSubs.has(s.id));
-                      const somePendingSelected = pendingSubsList.some((s: any) => selectedSubs.has(s.id));
-
+                    const chSubs = submissions.filter(
+                      (s) => s.weekly_challenge_id === ch.id,
+                    );
+                    if (chSubs.length === 0) {
                       return (
-                        <div className="space-y-4">
-                          {/* Bulk action bar */}
-                          {somePendingSelected && (
-                            <div className="flex items-center justify-between px-4 py-3 bg-[#00e87a08] border border-[#00e87a20] rounded-2xl">
-                              <span className="text-xs font-mono text-[#00e87a]">
-                                {Array.from(selectedSubs).filter(id => pendingSubsList.some((s: any) => s.id === id)).length} submission{Array.from(selectedSubs).filter(id => pendingSubsList.some((s: any) => s.id === id)).length !== 1 ? "s" : ""} selected
-                              </span>
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => setSelectedSubs(new Set())}
-                                  className="text-[10px] font-mono text-[#666] bg-[#1a1a1a] px-3 py-1.5 rounded-lg hover:text-[#aaa]"
-                                >
-                                  Clear
-                                </button>
-                                <button
-                                  onClick={() => bulkApproveSelected(pendingSubsList)}
-                                  disabled={bulkApproving}
-                                  className="text-[10px] font-mono text-black bg-[#00e87a] px-3 py-1.5 rounded-lg font-bold hover:bg-[#00ff88] disabled:opacity-50 flex items-center gap-1.5"
-                                >
-                                  {bulkApproving ? (
-                                    <><span className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin inline-block" /> Approving…</>
-                                  ) : "✓ Approve All Selected"}
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                        <p className="text-xs text-[#ccc] font-mono">
+                          No submissions yet.
+                        </p>
+                      );
+                    }
 
-                          {Array.from(byUser.entries()).map(([github, userSubs]) => {
-                            const totalPts = userSubs.reduce((sum: number, s: any) => sum + (s.points_awarded || 0), 0);
-                            const pendingCount = userSubs.filter((s: any) => s.status === "pending").length;
+                    // Keep only the latest submission per person per problem (safety dedup)
+                    const latestPerKey = new Map<string, any>();
+                    for (const s of chSubs) {
+                      const key = `${s.github}::${s.problem_id}`;
+                      const existing = latestPerKey.get(key);
+                      if (
+                        !existing ||
+                        new Date(s.submitted_at) >
+                          new Date(existing.submitted_at)
+                      ) {
+                        latestPerKey.set(key, s);
+                      }
+                    }
+                    // Group by github handle, preserving order of first appearance
+                    const byUser = new Map<string, any[]>();
+                    for (const s of Array.from(latestPerKey.values())) {
+                      if (!byUser.has(s.github)) byUser.set(s.github, []);
+                      byUser.get(s.github)!.push(s);
+                    }
+
+                    const pendingSubsList = Array.from(
+                      latestPerKey.values(),
+                    ).filter((s: any) => s.status === "pending");
+                    const allPendingSelected =
+                      pendingSubsList.length > 0 &&
+                      pendingSubsList.every((s: any) => selectedSubs.has(s.id));
+                    const somePendingSelected = pendingSubsList.some((s: any) =>
+                      selectedSubs.has(s.id),
+                    );
+
+                    return (
+                      <div className="space-y-4">
+                        {/* Bulk action bar */}
+                        {somePendingSelected && (
+                          <div className="flex items-center justify-between px-4 py-3 bg-[#00e87a08] border border-[#00e87a20] rounded-2xl">
+                            <span className="text-xs font-mono text-[#00e87a]">
+                              {
+                                Array.from(selectedSubs).filter((id) =>
+                                  pendingSubsList.some((s: any) => s.id === id),
+                                ).length
+                              }{" "}
+                              submission
+                              {Array.from(selectedSubs).filter((id) =>
+                                pendingSubsList.some((s: any) => s.id === id),
+                              ).length !== 1
+                                ? "s"
+                                : ""}{" "}
+                              selected
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setSelectedSubs(new Set())}
+                                className="text-[10px] font-mono text-[#666] bg-[#1a1a1a] px-3 py-1.5 rounded-lg hover:text-[#aaa]"
+                              >
+                                Clear
+                              </button>
+                              <button
+                                onClick={() =>
+                                  bulkApproveSelected(pendingSubsList)
+                                }
+                                disabled={bulkApproving}
+                                className="text-[10px] font-mono text-black bg-[#00e87a] px-3 py-1.5 rounded-lg font-bold hover:bg-[#00ff88] disabled:opacity-50 flex items-center gap-1.5"
+                              >
+                                {bulkApproving ? (
+                                  <>
+                                    <span className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin inline-block" />{" "}
+                                    Approving…
+                                  </>
+                                ) : (
+                                  "✓ Approve All Selected"
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {Array.from(byUser.entries()).map(
+                          ([github, userSubs]) => {
+                            const totalPts = userSubs.reduce(
+                              (sum: number, s: any) =>
+                                sum + (s.points_awarded || 0),
+                              0,
+                            );
+                            const pendingCount = userSubs.filter(
+                              (s: any) => s.status === "pending",
+                            ).length;
                             const firstSub = userSubs[0];
 
                             return (
-                              <div key={github} className="border border-[#1f1f1f] rounded-2xl overflow-hidden">
+                              <div
+                                key={github}
+                                className="border border-[#1f1f1f] rounded-2xl overflow-hidden"
+                              >
                                 {/* Person header */}
                                 <div className="flex items-center justify-between px-4 py-3 bg-[#111] border-b border-[#1a1a1a]">
                                   <div className="flex items-center gap-2.5">
                                     <img
                                       src={`https://github.com/${github}.png?size=28`}
                                       className="w-7 h-7 rounded-full shrink-0 ring-1 ring-[#2a2a2a]"
-                                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                      onError={(e) => {
+                                        (
+                                          e.target as HTMLImageElement
+                                        ).style.display = "none";
+                                      }}
                                     />
                                     <div>
-                                      <span className="text-xs font-mono font-bold text-[#e0e0e0]">{firstSub.name}</span>
-                                      <span className="text-[10px] font-mono text-[#555] ml-1.5">@{github}</span>
+                                      <span className="text-xs font-mono font-bold text-[#e0e0e0]">
+                                        {firstSub.name}
+                                      </span>
+                                      <span className="text-[10px] font-mono text-[#555] ml-1.5">
+                                        @{github}
+                                      </span>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -3441,7 +3860,8 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                       </span>
                                     )}
                                     <span className="text-[10px] font-mono bg-[#a78bfa20] text-[#a78bfa] px-2 py-0.5 rounded-lg">
-                                      {userSubs.length} problem{userSubs.length !== 1 ? "s" : ""}
+                                      {userSubs.length} problem
+                                      {userSubs.length !== 1 ? "s" : ""}
                                     </span>
                                     <span className="text-xs font-mono font-bold text-[#00e87a]">
                                       {totalPts} pts
@@ -3457,12 +3877,26 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                       {pendingCount > 0 && (
                                         <input
                                           type="checkbox"
-                                          checked={userSubs.filter((s: any) => s.status === "pending").every((s: any) => selectedSubs.has(s.id))}
+                                          checked={userSubs
+                                            .filter(
+                                              (s: any) =>
+                                                s.status === "pending",
+                                            )
+                                            .every((s: any) =>
+                                              selectedSubs.has(s.id),
+                                            )}
                                           onChange={(e) => {
-                                            const pending = userSubs.filter((s: any) => s.status === "pending");
-                                            setSelectedSubs(prev => {
+                                            const pending = userSubs.filter(
+                                              (s: any) =>
+                                                s.status === "pending",
+                                            );
+                                            setSelectedSubs((prev) => {
                                               const next = new Set(prev);
-                                              pending.forEach((s: any) => e.target.checked ? next.add(s.id) : next.delete(s.id));
+                                              pending.forEach((s: any) =>
+                                                e.target.checked
+                                                  ? next.add(s.id)
+                                                  : next.delete(s.id),
+                                              );
                                               return next;
                                             });
                                           }}
@@ -3480,16 +3914,19 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                   </div>
 
                                   {userSubs.map((s: any) => {
-                                    const isEditing = editingPts[s.id] !== undefined;
+                                    const isEditing =
+                                      editingPts[s.id] !== undefined;
                                     const daysSince = Math.floor(
-                                      (Date.now() - new Date(s.submitted_at).getTime()) / 86400000,
+                                      (Date.now() -
+                                        new Date(s.submitted_at).getTime()) /
+                                        86400000,
                                     );
                                     const statusColor =
                                       s.status === "approved"
                                         ? "text-[#00e87a]"
                                         : s.status === "rejected"
-                                        ? "text-[#ff4d4d]"
-                                        : "text-[#f0b429]";
+                                          ? "text-[#ff4d4d]"
+                                          : "text-[#f0b429]";
 
                                     return (
                                       <div
@@ -3504,9 +3941,11 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                               type="checkbox"
                                               checked={selectedSubs.has(s.id)}
                                               onChange={(e) => {
-                                                setSelectedSubs(prev => {
+                                                setSelectedSubs((prev) => {
                                                   const next = new Set(prev);
-                                                  e.target.checked ? next.add(s.id) : next.delete(s.id);
+                                                  e.target.checked
+                                                    ? next.add(s.id)
+                                                    : next.delete(s.id);
                                                   return next;
                                                 });
                                               }}
@@ -3520,68 +3959,158 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                             <span className="text-xs font-mono text-[#e0e0e0] truncate">
                                               {s.problem_title}
                                             </span>
-                                            <span className={`text-[9px] font-mono uppercase ${statusColor} shrink-0`}>
+                                            <span
+                                              className={`text-[9px] font-mono uppercase ${statusColor} shrink-0`}
+                                            >
                                               {s.status}
                                             </span>
                                             {s.code && (
                                               <button
-                                                onClick={() => setExpandedCode(expandedCode === s.id ? null : s.id)}
+                                                onClick={() =>
+                                                  setExpandedCode(
+                                                    expandedCode === s.id
+                                                      ? null
+                                                      : s.id,
+                                                  )
+                                                }
                                                 className="text-[9px] font-mono text-[#555] hover:text-[#a78bfa] transition-colors shrink-0"
                                               >
-                                                {expandedCode === s.id ? "▲ hide code" : "▼ view code"}
+                                                {expandedCode === s.id
+                                                  ? "▲ hide code"
+                                                  : "▼ view code"}
                                               </button>
                                             )}
                                           </div>
                                           {/* Code viewer + plagiarism — expanded */}
                                           {expandedCode === s.id && s.code && (
                                             <div className="mt-2 col-span-full">
-                                              <CodeViewer code={s.code} lang={s.lang} />
+                                              <CodeViewer
+                                                code={s.code}
+                                                lang={s.lang}
+                                              />
                                               {/* Plagiarism check */}
                                               <div className="mt-2">
                                                 {!weeklyPlagResults[s.id] ? (
                                                   <button
-                                                    onClick={() => checkWeeklyPlagiarism(s)}
-                                                    disabled={weeklyPlagChecking === s.id}
+                                                    onClick={() =>
+                                                      checkWeeklyPlagiarism(s)
+                                                    }
+                                                    disabled={
+                                                      weeklyPlagChecking ===
+                                                      s.id
+                                                    }
                                                     className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1.5 rounded-lg
                                                       bg-[#f0b42910] border border-[#f0b42920] text-[#f0b429]
                                                       hover:bg-[#f0b42918] disabled:opacity-50 transition-all"
                                                   >
-                                                    {weeklyPlagChecking === s.id
-                                                      ? <><span className="w-2.5 h-2.5 border border-[#f0b429] border-t-transparent rounded-full animate-spin inline-block" /> Checking…</>
-                                                      : "✦ Check Plagiarism"}
+                                                    {weeklyPlagChecking ===
+                                                    s.id ? (
+                                                      <>
+                                                        <span className="w-2.5 h-2.5 border border-[#f0b429] border-t-transparent rounded-full animate-spin inline-block" />{" "}
+                                                        Checking…
+                                                      </>
+                                                    ) : (
+                                                      "✦ Check Plagiarism"
+                                                    )}
                                                   </button>
                                                 ) : (
-                                                  <div className={`rounded-xl p-3 border text-[10px] font-mono space-y-1.5
-                                                    ${weeklyPlagResults[s.id].verdict === "likely_plagiarised" ? "bg-[#ff4d4d08] border-[#ff4d4d25]" :
-                                                      weeklyPlagResults[s.id].verdict === "suspicious"        ? "bg-[#f0b42908] border-[#f0b42925]" :
-                                                                                                                "bg-[#00e87a08] border-[#00e87a20]"}`}>
+                                                  <div
+                                                    className={`rounded-xl p-3 border text-[10px] font-mono space-y-1.5
+                                                    ${
+                                                      weeklyPlagResults[s.id]
+                                                        .verdict ===
+                                                      "likely_plagiarised"
+                                                        ? "bg-[#ff4d4d08] border-[#ff4d4d25]"
+                                                        : weeklyPlagResults[
+                                                              s.id
+                                                            ].verdict ===
+                                                            "suspicious"
+                                                          ? "bg-[#f0b42908] border-[#f0b42925]"
+                                                          : "bg-[#00e87a08] border-[#00e87a20]"
+                                                    }`}
+                                                  >
                                                     <div className="flex items-center justify-between">
                                                       <div className="flex items-center gap-2">
-                                                        <span className={
-                                                          weeklyPlagResults[s.id].verdict === "likely_plagiarised" ? "text-[#ff4d4d]" :
-                                                          weeklyPlagResults[s.id].verdict === "suspicious"        ? "text-[#f0b429]" : "text-[#00e87a]"
-                                                        }>
-                                                          {weeklyPlagResults[s.id].verdict === "likely_plagiarised" ? "⚠ Likely plagiarised" :
-                                                           weeklyPlagResults[s.id].verdict === "suspicious"        ? "⚠ Suspicious" : "✓ Looks original"}
+                                                        <span
+                                                          className={
+                                                            weeklyPlagResults[
+                                                              s.id
+                                                            ].verdict ===
+                                                            "likely_plagiarised"
+                                                              ? "text-[#ff4d4d]"
+                                                              : weeklyPlagResults[
+                                                                    s.id
+                                                                  ].verdict ===
+                                                                  "suspicious"
+                                                                ? "text-[#f0b429]"
+                                                                : "text-[#00e87a]"
+                                                          }
+                                                        >
+                                                          {weeklyPlagResults[
+                                                            s.id
+                                                          ].verdict ===
+                                                          "likely_plagiarised"
+                                                            ? "⚠ Likely plagiarised"
+                                                            : weeklyPlagResults[
+                                                                  s.id
+                                                                ].verdict ===
+                                                                "suspicious"
+                                                              ? "⚠ Suspicious"
+                                                              : "✓ Looks original"}
                                                         </span>
                                                         <span className="text-[#555]">
-                                                          Similarity: {weeklyPlagResults[s.id].score}%
+                                                          Similarity:{" "}
+                                                          {
+                                                            weeklyPlagResults[
+                                                              s.id
+                                                            ].score
+                                                          }
+                                                          %
                                                         </span>
                                                       </div>
                                                       <button
-                                                        onClick={() => checkWeeklyPlagiarism(s)}
-                                                        disabled={weeklyPlagChecking === s.id}
+                                                        onClick={() =>
+                                                          checkWeeklyPlagiarism(
+                                                            s,
+                                                          )
+                                                        }
+                                                        disabled={
+                                                          weeklyPlagChecking ===
+                                                          s.id
+                                                        }
                                                         className="text-[#444] hover:text-[#f0b429] transition-colors"
-                                                      >↻</button>
+                                                      >
+                                                        ↻
+                                                      </button>
                                                     </div>
-                                                    {weeklyPlagResults[s.id].explanation && (
-                                                      <p className="text-[#888] leading-relaxed">{weeklyPlagResults[s.id].explanation}</p>
+                                                    {weeklyPlagResults[s.id]
+                                                      .explanation && (
+                                                      <p className="text-[#888] leading-relaxed">
+                                                        {
+                                                          weeklyPlagResults[
+                                                            s.id
+                                                          ].explanation
+                                                        }
+                                                      </p>
                                                     )}
-                                                    {weeklyPlagResults[s.id].matches?.length > 0 && (
+                                                    {weeklyPlagResults[s.id]
+                                                      .matches?.length > 0 && (
                                                       <ul className="space-y-0.5 pl-2">
-                                                        {weeklyPlagResults[s.id].matches.map((m: string, i: number) => (
-                                                          <li key={i} className="text-[#666] before:content-['•'] before:mr-1.5">{m}</li>
-                                                        ))}
+                                                        {weeklyPlagResults[
+                                                          s.id
+                                                        ].matches.map(
+                                                          (
+                                                            m: string,
+                                                            i: number,
+                                                          ) => (
+                                                            <li
+                                                              key={i}
+                                                              className="text-[#666] before:content-['•'] before:mr-1.5"
+                                                            >
+                                                              {m}
+                                                            </li>
+                                                          ),
+                                                        )}
                                                       </ul>
                                                     )}
                                                   </div>
@@ -3591,7 +4120,9 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                           )}
                                         </div>
 
-                                        <div className="text-[10px] font-mono text-[#aaa]">{s.lang}</div>
+                                        <div className="text-[10px] font-mono text-[#aaa]">
+                                          {s.lang}
+                                        </div>
 
                                         <div className="text-[10px] font-mono text-[#ccc]">
                                           {s.tests_passed}/{s.tests_total}
@@ -3609,12 +4140,23 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                               min="0"
                                               value={editingPts[s.id]}
                                               onChange={(e) =>
-                                                setEditingPts((prev) => ({ ...prev, [s.id]: e.target.value }))
+                                                setEditingPts((prev) => ({
+                                                  ...prev,
+                                                  [s.id]: e.target.value,
+                                                }))
                                               }
                                               onKeyDown={(e) => {
-                                                if (e.key === "Enter") updatePoints(s.id, editingPts[s.id]);
+                                                if (e.key === "Enter")
+                                                  updatePoints(
+                                                    s.id,
+                                                    editingPts[s.id],
+                                                  );
                                                 if (e.key === "Escape")
-                                                  setEditingPts((prev) => { const n = { ...prev }; delete n[s.id]; return n; });
+                                                  setEditingPts((prev) => {
+                                                    const n = { ...prev };
+                                                    delete n[s.id];
+                                                    return n;
+                                                  });
                                               }}
                                               className="w-16 bg-[#111] border border-[#00e87a40] rounded-lg px-2 py-1 text-xs font-mono text-[#00e87a] text-center focus:outline-none"
                                               autoFocus
@@ -3631,13 +4173,24 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                           {isEditing ? (
                                             <>
                                               <button
-                                                onClick={() => updatePoints(s, editingPts[s.id])}
+                                                onClick={() =>
+                                                  updatePoints(
+                                                    s,
+                                                    editingPts[s.id],
+                                                  )
+                                                }
                                                 className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
                                               >
                                                 Save
                                               </button>
                                               <button
-                                                onClick={() => setEditingPts((prev) => { const n = { ...prev }; delete n[s.id]; return n; })}
+                                                onClick={() =>
+                                                  setEditingPts((prev) => {
+                                                    const n = { ...prev };
+                                                    delete n[s.id];
+                                                    return n;
+                                                  })
+                                                }
                                                 className="text-[10px] font-mono text-[#aaa] bg-[#1a1a1a] px-2 py-1 rounded-lg hover:text-[#e0e0e0]"
                                               >
                                                 ✕
@@ -3648,13 +4201,17 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                               {s.status === "pending" && (
                                                 <>
                                                   <button
-                                                    onClick={() => approveWeeklySubmission(s)}
+                                                    onClick={() =>
+                                                      approveWeeklySubmission(s)
+                                                    }
                                                     className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a15] px-2 py-1 rounded-lg hover:bg-[#00e87a25]"
                                                   >
                                                     ✓
                                                   </button>
                                                   <button
-                                                    onClick={() => rejectWeeklySubmission(s)}
+                                                    onClick={() =>
+                                                      rejectWeeklySubmission(s)
+                                                    }
                                                     className="text-[10px] font-mono text-[#ff4d4d] bg-[#ff4d4d15] px-2 py-1 rounded-lg hover:bg-[#ff4d4d25]"
                                                   >
                                                     ✗
@@ -3662,7 +4219,14 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                                 </>
                                               )}
                                               <button
-                                                onClick={() => setEditingPts((prev) => ({ ...prev, [s.id]: String(s.points_awarded) }))}
+                                                onClick={() =>
+                                                  setEditingPts((prev) => ({
+                                                    ...prev,
+                                                    [s.id]: String(
+                                                      s.points_awarded,
+                                                    ),
+                                                  }))
+                                                }
                                                 className="text-[10px] font-mono text-[#a78bfa] bg-[#a78bfa15] px-2 py-1 rounded-lg hover:bg-[#a78bfa25]"
                                               >
                                                 pts
@@ -3676,10 +4240,11 @@ function WeeklyAdminSection({ user }: { user: User }) {
                                 </div>
                               </div>
                             );
-                          })}
-                        </div>
-                      );
-                    })()}
+                          },
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -3721,13 +4286,18 @@ function AnnouncementAdminSection() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function save(nextActive?: boolean) {
     setSaving(true);
     try {
       await Promise.all([
-        (db.from("app_config") as any).upsert({ key: "announcement_text", value: text }),
+        (db.from("app_config") as any).upsert({
+          key: "announcement_text",
+          value: text,
+        }),
         (db.from("app_config") as any).upsert({
           key: "announcement_active",
           value: String(nextActive ?? active),
@@ -3751,14 +4321,18 @@ function AnnouncementAdminSection() {
   return (
     <div className="space-y-5 animate-fade-up max-w-2xl">
       {toast && (
-        <div className="fixed top-6 right-6 z-50 bg-[#111] border border-[#00e87a30] text-[#00e87a]
-          font-mono text-xs px-4 py-2.5 rounded-xl shadow-lg">
+        <div
+          className="fixed top-6 right-6 z-50 bg-[#111] border border-[#00e87a30] text-[#00e87a]
+          font-mono text-xs px-4 py-2.5 rounded-xl shadow-lg"
+        >
           {toast}
         </div>
       )}
 
       <div>
-        <h2 className="font-display font-bold text-lg text-[#e2e2e2] mb-1">📣 Announcement Banner</h2>
+        <h2 className="font-display font-bold text-lg text-[#e2e2e2] mb-1">
+          📣 Announcement Banner
+        </h2>
         <p className="text-[#777] text-xs font-mono">
           Shown as a banner at the top of the homepage when active.
         </p>
@@ -3787,7 +4361,9 @@ function AnnouncementAdminSection() {
             onChange={(e) => setActive(e.target.checked)}
             className="w-4 h-4 accent-[#00e87a]"
           />
-          <span className="text-xs font-mono text-[#bbb]">Show banner on homepage</span>
+          <span className="text-xs font-mono text-[#bbb]">
+            Show banner on homepage
+          </span>
         </label>
 
         <button
@@ -3802,9 +4378,13 @@ function AnnouncementAdminSection() {
 
       {active && text.trim() && (
         <div>
-          <p className="text-[10px] font-mono uppercase tracking-wider text-[#666] mb-2">Preview</p>
-          <div className="px-4 py-3 bg-[#00e87a08] border border-[#00e87a20] rounded-2xl
-            flex items-center gap-2 text-sm font-mono text-[#00e87a]">
+          <p className="text-[10px] font-mono uppercase tracking-wider text-[#666] mb-2">
+            Preview
+          </p>
+          <div
+            className="px-4 py-3 bg-[#00e87a08] border border-[#00e87a20] rounded-2xl
+            flex items-center gap-2 text-sm font-mono text-[#00e87a]"
+          >
             <span>📣</span>
             <span>{text}</span>
           </div>
@@ -3822,10 +4402,12 @@ function FeedbackAdminSection() {
   const db = getSupabaseClient();
 
   const [feedback, setFeedback] = useState<ContestFeedback[]>([]);
-  const [loading,  setLoading]  = useState(true);
+  const [loading, setLoading] = useState(true);
   const [contestFilter, setContestFilter] = useState<string>("all");
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function load() {
     setLoading(true);
@@ -3839,15 +4421,26 @@ function FeedbackAdminSection() {
     setLoading(false);
   }
 
-  const contestNames = Array.from(new Set(feedback.map((f) => f.contest_name))).sort();
-  const visible = contestFilter === "all" ? feedback : feedback.filter((f) => f.contest_name === contestFilter);
+  const contestNames = Array.from(
+    new Set(feedback.map((f) => f.contest_name)),
+  ).sort();
+  const visible =
+    contestFilter === "all"
+      ? feedback
+      : feedback.filter((f) => f.contest_name === contestFilter);
 
   const rated = feedback.filter((f) => f.rating);
   const avgRating = rated.length
-    ? (rated.reduce((sum, f) => sum + (f.rating || 0), 0) / rated.length).toFixed(1)
+    ? (
+        rated.reduce((sum, f) => sum + (f.rating || 0), 0) / rated.length
+      ).toFixed(1)
     : "—";
-  const recommendYes = feedback.filter((f) => f.would_recommend === true).length;
-  const recommendNo  = feedback.filter((f) => f.would_recommend === false).length;
+  const recommendYes = feedback.filter(
+    (f) => f.would_recommend === true,
+  ).length;
+  const recommendNo = feedback.filter(
+    (f) => f.would_recommend === false,
+  ).length;
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -3861,7 +4454,9 @@ function FeedbackAdminSection() {
           >
             <option value="all">All contests</option>
             {contestNames.map((n) => (
-              <option key={n} value={n}>{n}</option>
+              <option key={n} value={n}>
+                {n}
+              </option>
             ))}
           </select>
         )}
@@ -3870,16 +4465,29 @@ function FeedbackAdminSection() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center">
-          <div className="text-2xl font-display font-bold text-[#f0b429]">{avgRating}{rated.length ? " ★" : ""}</div>
-          <div className="text-[10px] font-mono text-[#555] mt-1">Avg Rating ({rated.length})</div>
+          <div className="text-2xl font-display font-bold text-[#f0b429]">
+            {avgRating}
+            {rated.length ? " ★" : ""}
+          </div>
+          <div className="text-[10px] font-mono text-[#555] mt-1">
+            Avg Rating ({rated.length})
+          </div>
         </div>
         <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center">
-          <div className="text-2xl font-display font-bold text-[#00e87a]">{recommendYes}</div>
-          <div className="text-[10px] font-mono text-[#555] mt-1">Would Recommend</div>
+          <div className="text-2xl font-display font-bold text-[#00e87a]">
+            {recommendYes}
+          </div>
+          <div className="text-[10px] font-mono text-[#555] mt-1">
+            Would Recommend
+          </div>
         </div>
         <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center">
-          <div className="text-2xl font-display font-bold text-[#ff4d4d]">{recommendNo}</div>
-          <div className="text-[10px] font-mono text-[#555] mt-1">Would Not</div>
+          <div className="text-2xl font-display font-bold text-[#ff4d4d]">
+            {recommendNo}
+          </div>
+          <div className="text-[10px] font-mono text-[#555] mt-1">
+            Would Not
+          </div>
         </div>
       </div>
 
@@ -3888,11 +4496,16 @@ function FeedbackAdminSection() {
           <div className="spinner" /> Loading…
         </div>
       ) : visible.length === 0 ? (
-        <div className="text-center py-12 text-[#555] font-mono text-sm">No feedback submitted yet</div>
+        <div className="text-center py-12 text-[#555] font-mono text-sm">
+          No feedback submitted yet
+        </div>
       ) : (
         <div className="space-y-3">
           {visible.map((f) => (
-            <div key={f.id} className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4">
+            <div
+              key={f.id}
+              className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4"
+            >
               <div className="flex items-start justify-between gap-3 flex-wrap mb-2">
                 <div>
                   <div className="font-mono font-bold text-[#e0e0e0] text-sm">
@@ -3900,16 +4513,30 @@ function FeedbackAdminSection() {
                   </div>
                   <div className="text-[10px] font-mono text-[#666] mt-0.5">
                     {f.contest_name} ·{" "}
-                    <span className={f.outcome === "disqualified" ? "text-[#ff4d4d]" : "text-[#00e87a]"}>
-                      {f.outcome === "disqualified" ? "Disqualified" : "Submitted"}
+                    <span
+                      className={
+                        f.outcome === "disqualified"
+                          ? "text-[#ff4d4d]"
+                          : "text-[#00e87a]"
+                      }
+                    >
+                      {f.outcome === "disqualified"
+                        ? "Disqualified"
+                        : "Submitted"}
                     </span>{" "}
-                    · {new Date(f.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
+                    ·{" "}
+                    {new Date(f.created_at).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "2-digit",
+                    })}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   {f.rating != null && (
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg border text-[#f0b429] bg-[#f0b42910] border-[#f0b42920]">
-                      {"★".repeat(f.rating)}{"☆".repeat(5 - f.rating)}
+                      {"★".repeat(f.rating)}
+                      {"☆".repeat(5 - f.rating)}
                     </span>
                   )}
                   {f.difficulty && (
@@ -3918,7 +4545,9 @@ function FeedbackAdminSection() {
                     </span>
                   )}
                   {f.would_recommend != null && (
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${f.would_recommend ? "text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]" : "text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]"}`}>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${f.would_recommend ? "text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]" : "text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]"}`}
+                    >
                       {f.would_recommend ? "👍 Recommend" : "👎 Not really"}
                     </span>
                   )}
@@ -3944,11 +4573,16 @@ function SubscriberAdminSection() {
   async function resendConfirmation(sub: Subscriber) {
     setResendingGithub(sub.github);
     try {
-      const { data: { session } } = await db.auth.getSession();
+      const {
+        data: { session },
+      } = await db.auth.getSession();
       const token = session?.access_token;
       const res = await fetch("/api/notify/resend-confirmation", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ github: sub.github }),
       });
       const json = await res.json();
@@ -3961,14 +4595,20 @@ function SubscriberAdminSection() {
   }
 
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [toast,       setToast]       = useState("");
-  const [fee,         setFee]         = useState("");
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState("");
+  const [fee, setFee] = useState("");
   const [savingConfig, setSavingConfig] = useState(false);
-  const [modal, setModal] = useState<ModalState>({ type: null, id: "", github: "" });
+  const [modal, setModal] = useState<ModalState>({
+    type: null,
+    id: "",
+    github: "",
+  });
   const modalResolve = useRef<((v: string | null) => void) | null>(null);
 
-  function openModal(m: Omit<ModalState, "type"> & { type: NonNullable<ModalState["type"]> }): Promise<string | null> {
+  function openModal(
+    m: Omit<ModalState, "type"> & { type: NonNullable<ModalState["type"]> },
+  ): Promise<string | null> {
     return new Promise((resolve) => {
       modalResolve.current = resolve;
       setModal(m);
@@ -3990,14 +4630,20 @@ function SubscriberAdminSection() {
     setTimeout(() => setToast(""), 3000);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function load() {
     setLoading(true);
     try {
       const [{ data: subs }, { data: configs }] = await Promise.all([
-        (db.from("subscribers") as any).select("*").order("created_at", { ascending: false }),
-        (db.from("app_config") as any).select("*").in("key", ["subscription_fee"]),
+        (db.from("subscribers") as any)
+          .select("*")
+          .order("created_at", { ascending: false }),
+        (db.from("app_config") as any)
+          .select("*")
+          .in("key", ["subscription_fee"]),
       ]);
       setSubscribers((subs || []) as Subscriber[]);
       for (const c of configs || []) {
@@ -4013,9 +4659,15 @@ function SubscriberAdminSection() {
   // in edge cases (refund, chargeback, abuse), which is the only
   // status change still needed here.
   async function revokeAccess(sub: Subscriber) {
-    const reason = await openModal({ type: "reject-reg", id: sub.id, github: sub.github });
+    const reason = await openModal({
+      type: "reject-reg",
+      id: sub.id,
+      github: sub.github,
+    });
     if (reason === null) return;
-    await (db.from("subscribers") as any).update({ status: "rejected" }).eq("id", sub.id);
+    await (db.from("subscribers") as any)
+      .update({ status: "rejected" })
+      .eq("id", sub.id);
     showToast(`Access revoked for @${sub.github}`);
     load();
   }
@@ -4024,9 +4676,14 @@ function SubscriberAdminSection() {
     if (!fee) return;
     setSavingConfig(true);
     try {
-      await (db.from("app_config") as any).upsert({ key: "subscription_fee", value: fee });
+      await (db.from("app_config") as any).upsert({
+        key: "subscription_fee",
+        value: fee,
+      });
       showToast("✓ Config saved");
-    } catch { showToast("Save failed"); }
+    } catch {
+      showToast("Save failed");
+    }
     setSavingConfig(false);
   }
 
@@ -4034,28 +4691,47 @@ function SubscriberAdminSection() {
   async function nudgeNonSubscribers() {
     setNudging(true);
     try {
-      const { data: { session } } = await db.auth.getSession();
+      const {
+        data: { session },
+      } = await db.auth.getSession();
       const token = session?.access_token;
       const res = await fetch("/api/notify/subscribe-nudge", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed");
-      showToast(`Nudged ${json.sent} · skipped ${json.skipped} already this month`);
+      showToast(
+        `Nudged ${json.sent} · skipped ${json.skipped} already this month`,
+      );
     } catch (e: any) {
       showToast("Nudge failed: " + (e.message || "Unknown"));
     }
     setNudging(false);
   }
 
-  const active  = subscribers.filter(s => isActiveSubscription(s.status, s.current_period_end));
-  const expired = subscribers.filter(s => s.status === "confirmed" && !isActiveSubscription(s.status, s.current_period_end));
-  const revoked = subscribers.filter(s => s.status === "rejected");
+  const active = subscribers.filter((s) =>
+    isActiveSubscription(s.status, s.current_period_end),
+  );
+  const expired = subscribers.filter(
+    (s) =>
+      s.status === "confirmed" &&
+      !isActiveSubscription(s.status, s.current_period_end),
+  );
+  const revoked = subscribers.filter((s) => s.status === "rejected");
 
   return (
     <div className="space-y-6 animate-fade-up">
-      {modal.type && <ActionModal modal={modal} onConfirm={closeModal} onCancel={cancelModal} />}
+      {modal.type && (
+        <ActionModal
+          modal={modal}
+          onConfirm={closeModal}
+          onCancel={cancelModal}
+        />
+      )}
       {toast && (
         <div className="fixed top-20 right-6 z-50 bg-[#00e87a] text-black px-4 py-2.5 rounded-lg font-mono text-sm shadow-xl">
           {toast}
@@ -4064,7 +4740,9 @@ function SubscriberAdminSection() {
 
       {/* Config editor */}
       <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-5">
-        <h3 className="font-mono font-bold text-[#e0e0e0] text-sm mb-4">⚙️ Subscription Settings</h3>
+        <h3 className="font-mono font-bold text-[#e0e0e0] text-sm mb-4">
+          ⚙️ Subscription Settings
+        </h3>
         <div className="mb-4 max-w-xs">
           <label className="block text-[10px] text-[#666] font-mono uppercase tracking-wider mb-1.5">
             Monthly Fee (₹)
@@ -4072,7 +4750,7 @@ function SubscriberAdminSection() {
           <input
             type="number"
             value={fee}
-            onChange={e => setFee(e.target.value)}
+            onChange={(e) => setFee(e.target.value)}
             placeholder="e.g. 39"
             className="w-full bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3 py-2 text-sm font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
           />
@@ -4088,10 +4766,13 @@ function SubscriberAdminSection() {
 
       {/* Notifications */}
       <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-5">
-        <h3 className="font-mono font-bold text-[#e0e0e0] text-sm mb-1.5">📧 Notifications</h3>
+        <h3 className="font-mono font-bold text-[#e0e0e0] text-sm mb-1.5">
+          📧 Notifications
+        </h3>
         <p className="text-xs font-mono text-[#666] mb-4">
-          Email everyone who's logged in but isn't currently subscribed. Safe to click more
-          than once — each person only gets nudged once per calendar month.
+          Email everyone who's logged in but isn't currently subscribed. Safe to
+          click more than once — each person only gets nudged once per calendar
+          month.
         </p>
         <button
           onClick={nudgeNonSubscribers}
@@ -4105,13 +4786,20 @@ function SubscriberAdminSection() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Active",  value: active.length,  color: "text-[#00e87a]" },
-          { label: "Expired", value: expired.length,  color: "text-[#f0b429]" },
-          { label: "Revoked", value: revoked.length,  color: "text-[#ff4d4d]" },
-        ].map(s => (
-          <div key={s.label} className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center">
-            <div className={`text-2xl font-display font-bold ${s.color}`}>{s.value}</div>
-            <div className="text-[10px] font-mono text-[#555] mt-1">{s.label}</div>
+          { label: "Active", value: active.length, color: "text-[#00e87a]" },
+          { label: "Expired", value: expired.length, color: "text-[#f0b429]" },
+          { label: "Revoked", value: revoked.length, color: "text-[#ff4d4d]" },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-4 text-center"
+          >
+            <div className={`text-2xl font-display font-bold ${s.color}`}>
+              {s.value}
+            </div>
+            <div className="text-[10px] font-mono text-[#555] mt-1">
+              {s.label}
+            </div>
           </div>
         ))}
       </div>
@@ -4122,12 +4810,16 @@ function SubscriberAdminSection() {
           <div className="spinner" /> Loading…
         </div>
       ) : subscribers.length === 0 ? (
-        <div className="text-center py-12 text-[#555] font-mono text-sm">No subscribers yet</div>
+        <div className="text-center py-12 text-[#555] font-mono text-sm">
+          No subscribers yet
+        </div>
       ) : (
         <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden">
           {/* Header */}
-          <div className="hidden sm:grid grid-cols-[2rem_1fr_1fr_8rem_8rem_6rem] gap-3 px-4 py-2.5
-            border-b border-[#161616] text-[10px] text-[#555] font-mono uppercase tracking-widest">
+          <div
+            className="hidden sm:grid grid-cols-[2rem_1fr_1fr_8rem_8rem_6rem] gap-3 px-4 py-2.5
+            border-b border-[#161616] text-[10px] text-[#555] font-mono uppercase tracking-widest"
+          >
             <div />
             <div>User</div>
             <div>Payment ID</div>
@@ -4136,34 +4828,58 @@ function SubscriberAdminSection() {
             <div className="text-center">Actions</div>
           </div>
 
-          {subscribers.map(sub => {
-            const active = isActiveSubscription(sub.status, sub.current_period_end);
+          {subscribers.map((sub) => {
+            const active = isActiveSubscription(
+              sub.status,
+              sub.current_period_end,
+            );
             const statusColor =
-              sub.status === "rejected" ? "text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]" :
-              active                    ? "text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]" :
-                                           "text-[#f0b429] bg-[#f0b42910] border-[#f0b42920]";
+              sub.status === "rejected"
+                ? "text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]"
+                : active
+                  ? "text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]"
+                  : "text-[#f0b429] bg-[#f0b42910] border-[#f0b42920]";
             return (
-              <div key={sub.id}
+              <div
+                key={sub.id}
                 className="grid grid-cols-1 sm:grid-cols-[2rem_1fr_1fr_8rem_8rem_6rem] gap-3 items-center
-                  px-4 py-3 border-b border-[#141414] last:border-0 hover:bg-[#0d0d0d] transition-colors">
+                  px-4 py-3 border-b border-[#141414] last:border-0 hover:bg-[#0d0d0d] transition-colors"
+              >
                 <img
                   src={`https://github.com/${sub.github}.png?size=28`}
                   className="w-7 h-7 rounded-full ring-1 ring-[#2a2a2a] hidden sm:block"
-                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
                 />
                 <div className="min-w-0">
-                  <div className="text-xs font-mono font-bold text-[#e0e0e0] truncate">{sub.name}</div>
-                  <div className="text-[10px] font-mono text-[#555]">@{sub.github}</div>
+                  <div className="text-xs font-mono font-bold text-[#e0e0e0] truncate">
+                    {sub.name}
+                  </div>
+                  <div className="text-[10px] font-mono text-[#555]">
+                    @{sub.github}
+                  </div>
                 </div>
-                <div className="text-xs font-mono text-[#777] truncate">{sub.razorpay_payment_id || sub.txn_id}</div>
+                <div className="text-xs font-mono text-[#777] truncate">
+                  {sub.razorpay_payment_id || sub.txn_id}
+                </div>
                 <div>
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${statusColor}`}>
-                    {sub.status === "rejected" ? "✗ Revoked" : active ? "✓ Active" : "⏳ Expired"}
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${statusColor}`}
+                  >
+                    {sub.status === "rejected"
+                      ? "✗ Revoked"
+                      : active
+                        ? "✓ Active"
+                        : "⏳ Expired"}
                   </span>
                 </div>
                 <div className="text-[10px] font-mono text-[#555]">
                   {sub.current_period_end
-                    ? new Date(sub.current_period_end).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })
+                    ? new Date(sub.current_period_end).toLocaleDateString(
+                        "en-IN",
+                        { day: "numeric", month: "short", year: "2-digit" },
+                      )
                     : "—"}
                 </div>
                 <div className="flex items-center gap-2 justify-center">
@@ -4173,7 +4889,11 @@ function SubscriberAdminSection() {
                         onClick={() => resendConfirmation(sub)}
                         disabled={resendingGithub === sub.github}
                         className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a10] border border-[#00e87a20] px-2 py-1 rounded-lg hover:bg-[#00e87a18] transition-all disabled:opacity-50"
-                        title={sub.email ? `Resend to ${sub.email}` : "No email on file"}
+                        title={
+                          sub.email
+                            ? `Resend to ${sub.email}`
+                            : "No email on file"
+                        }
                       >
                         {resendingGithub === sub.github ? "…" : "✉ Resend"}
                       </button>
@@ -4200,13 +4920,13 @@ function SubscriberAdminSection() {
 
 function AiGenerateSection() {
   const db = getSupabaseClient();
-  const [concept,    setConcept]    = useState("");
+  const [concept, setConcept] = useState("");
   const [generating, setGenerating] = useState(false);
-  const [generated,  setGenerated]  = useState<any>(null);
-  const [saving,     setSaving]     = useState(false);
-  const [saved,      setSaved]      = useState(false);
-  const [err,        setErr]        = useState("");
-  const [toast,      setToast]      = useState("");
+  const [generated, setGenerated] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [err, setErr] = useState("");
+  const [toast, setToast] = useState("");
 
   function showToast(msg: string) {
     setToast(msg);
@@ -4238,19 +4958,19 @@ function AiGenerateSection() {
     setSaving(true);
     try {
       const { error } = await (db.from("problems") as any).insert({
-        title:         generated.title,
-        description:   generated.description,
-        difficulty:    generated.difficulty,
-        points:        generated.points,
-        tags:          generated.tags || [],
-        example:       generated.example || "",
-        param_types:   generated.param_types || [],
-        return_type:   generated.return_type || "bool",
-        hints:         generated.hints || [],
-        test_cases:    generated.test_cases || [],
-        starter_code:  "",
+        title: generated.title,
+        description: generated.description,
+        difficulty: generated.difficulty,
+        points: generated.points,
+        tags: generated.tags || [],
+        example: generated.example || "",
+        param_types: generated.param_types || [],
+        return_type: generated.return_type || "bool",
+        hints: generated.hints || [],
+        test_cases: generated.test_cases || [],
+        starter_code: "",
         submission_count: 0,
-        visibility:    "public",
+        visibility: "public",
       });
       if (error) throw error;
       setSaved(true);
@@ -4274,9 +4994,12 @@ function AiGenerateSection() {
         <div className="flex items-center gap-3 mb-4">
           <span className="text-2xl">✦</span>
           <div>
-            <h3 className="font-mono font-bold text-[#e0e0e0] text-sm">AI Problem Generator</h3>
+            <h3 className="font-mono font-bold text-[#e0e0e0] text-sm">
+              AI Problem Generator
+            </h3>
             <p className="text-[10px] font-mono text-[#555]">
-              Describe a concept → AI generates a complete problem with test cases, hints, and starter code
+              Describe a concept → AI generates a complete problem with test
+              cases, hints, and starter code
             </p>
           </div>
         </div>
@@ -4284,8 +5007,8 @@ function AiGenerateSection() {
         <div className="flex gap-2">
           <input
             value={concept}
-            onChange={e => setConcept(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleGenerate()}
+            onChange={(e) => setConcept(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
             placeholder="e.g. two sum using hashmap, binary search on rotated array, valid parentheses with stack…"
             className="flex-1 bg-[#0f0f0f] border border-[#1f1f1f] rounded-xl px-3.5 py-2.5 text-sm font-mono
               text-[#e0e0e0] placeholder-[#333] focus:outline-none focus:border-[#00e87a30] transition-colors"
@@ -4296,13 +5019,20 @@ function AiGenerateSection() {
             className="px-4 py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
               hover:bg-[#00ff88] disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-2 shrink-0"
           >
-            {generating
-              ? <><span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />Generating…</>
-              : "✦ Generate"}
+            {generating ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                Generating…
+              </>
+            ) : (
+              "✦ Generate"
+            )}
           </button>
         </div>
 
-        {err && <p className="text-[10px] text-[#ff4d4d] font-mono mt-2">{err}</p>}
+        {err && (
+          <p className="text-[10px] text-[#ff4d4d] font-mono mt-2">{err}</p>
+        )}
       </div>
 
       {/* Generated problem preview */}
@@ -4311,14 +5041,24 @@ function AiGenerateSection() {
           {/* Preview header */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-[#161616] bg-[#0d0d0d]">
             <div className="flex items-center gap-3">
-              <span className="text-xs font-mono font-bold text-[#e0e0e0]">{generated.title}</span>
-              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg
-                ${generated.difficulty === "Easy"   ? "text-[#00e87a] bg-[#00e87a12]" :
-                  generated.difficulty === "Medium" ? "text-[#f0b429] bg-[#f0b42912]" :
-                                                      "text-[#ff4d4d] bg-[#ff4d4d12]"}`}>
+              <span className="text-xs font-mono font-bold text-[#e0e0e0]">
+                {generated.title}
+              </span>
+              <span
+                className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg
+                ${
+                  generated.difficulty === "Easy"
+                    ? "text-[#00e87a] bg-[#00e87a12]"
+                    : generated.difficulty === "Medium"
+                      ? "text-[#f0b429] bg-[#f0b42912]"
+                      : "text-[#ff4d4d] bg-[#ff4d4d12]"
+                }`}
+              >
                 {generated.difficulty}
               </span>
-              <span className="text-[10px] font-mono text-[#a78bfa]">{generated.points} pts</span>
+              <span className="text-[10px] font-mono text-[#a78bfa]">
+                {generated.points} pts
+              </span>
             </div>
             <div className="flex gap-2">
               <button
@@ -4350,7 +5090,10 @@ function AiGenerateSection() {
             {(generated.tags || []).length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {generated.tags.map((tag: string) => (
-                  <span key={tag} className="px-2 py-0.5 bg-[#141414] text-[#777] text-[10px] font-mono rounded border border-[#1c1c1c]">
+                  <span
+                    key={tag}
+                    className="px-2 py-0.5 bg-[#141414] text-[#777] text-[10px] font-mono rounded border border-[#1c1c1c]"
+                  >
                     {tag}
                   </span>
                 ))}
@@ -4359,15 +5102,23 @@ function AiGenerateSection() {
 
             {/* Description preview */}
             <div>
-              <div className="text-[10px] font-mono text-[#555] uppercase tracking-widest mb-2">Description</div>
-              <div className="text-xs font-mono text-[#bbb] leading-relaxed bg-[#060606] rounded-xl p-3 border border-[#141414]"
-                dangerouslySetInnerHTML={{ __html: generated.description || "" }} />
+              <div className="text-[10px] font-mono text-[#555] uppercase tracking-widest mb-2">
+                Description
+              </div>
+              <div
+                className="text-xs font-mono text-[#bbb] leading-relaxed bg-[#060606] rounded-xl p-3 border border-[#141414]"
+                dangerouslySetInnerHTML={{
+                  __html: generated.description || "",
+                }}
+              />
             </div>
 
             {/* Example */}
             {generated.example && (
               <div>
-                <div className="text-[10px] font-mono text-[#555] uppercase tracking-widest mb-2">Example</div>
+                <div className="text-[10px] font-mono text-[#555] uppercase tracking-widest mb-2">
+                  Example
+                </div>
                 <pre className="text-xs font-mono text-[#00e87a] bg-[#060606] rounded-xl p-3 border border-[#141414] whitespace-pre-wrap">
                   {generated.example}
                 </pre>
@@ -4382,7 +5133,10 @@ function AiGenerateSection() {
                 </div>
                 <div className="space-y-1.5">
                   {generated.test_cases.map((tc: any, i: number) => (
-                    <div key={i} className="flex items-center gap-2 text-[10px] font-mono bg-[#060606] rounded-lg px-3 py-2 border border-[#141414]">
+                    <div
+                      key={i}
+                      className="flex items-center gap-2 text-[10px] font-mono bg-[#060606] rounded-lg px-3 py-2 border border-[#141414]"
+                    >
                       <span className="text-[#555]">#{i + 1}</span>
                       <span className="text-[#777]">input:</span>
                       <code className="text-[#ccc] flex-1">{tc.input}</code>
@@ -4397,20 +5151,30 @@ function AiGenerateSection() {
             {/* Hints */}
             {(generated.hints || []).filter(Boolean).length > 0 && (
               <div>
-                <div className="text-[10px] font-mono text-[#555] uppercase tracking-widest mb-2">Hints</div>
+                <div className="text-[10px] font-mono text-[#555] uppercase tracking-widest mb-2">
+                  Hints
+                </div>
                 <div className="space-y-1.5">
-                  {generated.hints.filter(Boolean).map((hint: string, i: number) => (
-                    <div key={i} className="flex gap-2 text-[10px] font-mono bg-[#060606] rounded-lg px-3 py-2 border border-[#141414]">
-                      <span className="text-[#f0b429] shrink-0">#{i + 1}</span>
-                      <span className="text-[#bbb]">{hint}</span>
-                    </div>
-                  ))}
+                  {generated.hints
+                    .filter(Boolean)
+                    .map((hint: string, i: number) => (
+                      <div
+                        key={i}
+                        className="flex gap-2 text-[10px] font-mono bg-[#060606] rounded-lg px-3 py-2 border border-[#141414]"
+                      >
+                        <span className="text-[#f0b429] shrink-0">
+                          #{i + 1}
+                        </span>
+                        <span className="text-[#bbb]">{hint}</span>
+                      </div>
+                    ))}
                 </div>
               </div>
             )}
 
             <p className="text-[10px] text-[#444] font-mono">
-              ⚠ Review AI-generated content before saving. Test cases may need manual verification.
+              ⚠ Review AI-generated content before saving. Test cases may need
+              manual verification.
             </p>
           </div>
         </div>
