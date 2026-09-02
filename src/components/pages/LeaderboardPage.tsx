@@ -49,6 +49,10 @@ export default function LeaderboardPage() {
   const [challengeTitle, setChallengeTitle] = useState("");
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("overall");
+  // 0 = current calendar month, -1 = last month, -2 = the month before
+  // that, etc. Only meaningful when tab === "monthly" — lets people
+  // browse past months instead of only ever seeing the current one.
+  const [monthOffset, setMonthOffset] = useState(0);
   const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
@@ -188,8 +192,11 @@ export default function LeaderboardPage() {
         setChallengeRows(rows);
       } else {
         // Calendar-aligned cutoffs, not rolling windows:
-        // "weekly" = since this Monday 00:00, "monthly" = since the 1st of this month 00:00.
+        // "weekly" = since this Monday 00:00, "monthly" = the selected
+        // calendar month (defaults to current, but monthOffset lets you
+        // page back through past months).
         const cutoff = new Date();
+        let upperBound: Date | null = null;
         if (tab === "weekly") {
           const day = cutoff.getDay(); // 0 = Sun, 1 = Mon, ...
           const diffToMonday = day === 0 ? 6 : day - 1;
@@ -199,47 +206,56 @@ export default function LeaderboardPage() {
         if (tab === "monthly") {
           cutoff.setDate(1);
           cutoff.setHours(0, 0, 0, 0);
+          cutoff.setMonth(cutoff.getMonth() + monthOffset);
+          upperBound = new Date(cutoff);
+          upperBound.setMonth(upperBound.getMonth() + 1);
+        }
+
+        let subsQuery = db
+          .from("submissions")
+          .select("github, name, points_awarded, problem_id")
+          .eq("status", "approved")
+          .gte("created_at", cutoff.toISOString());
+        let arenaQuery = db
+          .from("arena_submissions")
+          .select("github, name, points_awarded, problem_id")
+          .eq("status", "reviewed")
+          .gte("created_at", cutoff.toISOString());
+        let weeklySubsQuery = db
+          .from("weekly_submissions")
+          .select("github, name, points_awarded, problem_id")
+          .eq("status", "approved")
+          .gte("submitted_at", cutoff.toISOString());
+        if (upperBound) {
+          subsQuery = subsQuery.lt("created_at", upperBound.toISOString());
+          arenaQuery = arenaQuery.lt("created_at", upperBound.toISOString());
+          weeklySubsQuery = weeklySubsQuery.lt("submitted_at", upperBound.toISOString());
         }
 
         const [{ data: subs }, { data: arenaSubs }, { data: weeklySubs }] =
           await Promise.all([
-            db
-              .from("submissions")
-              .select("github, name, points_awarded, problem_id")
-              .eq("status", "approved")
-              .gte("created_at", cutoff.toISOString())
-              .returns<
-                {
-                  github: string;
-                  name: string;
-                  points_awarded: number;
-                  problem_id: string;
-                }[]
-              >(),
-            db
-              .from("arena_submissions")
-              .select("github, name, points_awarded, problem_id")
-              .eq("status", "reviewed")
-              .gte("created_at", cutoff.toISOString())
-              .returns<
-                {
-                  github: string;
-                  name: string;
-                  points_awarded: number;
-                  problem_id: string;
-                }[]
-              >(),
-            db
-              .from("weekly_submissions")
-              .select("github, name, points_awarded, problem_id")
-              .eq("status", "approved")
-              .gte("submitted_at", cutoff.toISOString())
-              .returns<
-                {
-                  github: string;
-                  name: string;
-                  points_awarded: number;
-                  problem_id: string;
+            subsQuery.returns<
+              {
+                github: string;
+                name: string;
+                points_awarded: number;
+                problem_id: string;
+              }[]
+            >(),
+            arenaQuery.returns<
+              {
+                github: string;
+                name: string;
+                points_awarded: number;
+                problem_id: string;
+              }[]
+            >(),
+            weeklySubsQuery.returns<
+              {
+                github: string;
+                name: string;
+                points_awarded: number;
+                problem_id: string;
                 }[]
               >(),
           ]);
@@ -287,7 +303,7 @@ export default function LeaderboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab]);
+  }, [tab, monthOffset]);
 
   useEffect(() => {
     load();
@@ -331,7 +347,17 @@ export default function LeaderboardPage() {
   const tabs: { id: Tab; label: string }[] = [
     { id: "overall", label: "All Time" },
     { id: "weekly", label: "This Week" },
-    { id: "monthly", label: "This Month" },
+    {
+      id: "monthly",
+      label: monthOffset === 0
+        ? "This Month"
+        : (() => {
+            const d = new Date();
+            d.setDate(1);
+            d.setMonth(d.getMonth() + monthOffset);
+            return d.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+          })(),
+    },
     { id: "streak", label: "🔥 Streaks" },
     { id: "challenge", label: "🏅 Weekly Challenge" },
   ];
@@ -480,6 +506,49 @@ export default function LeaderboardPage() {
         </div>
       </div>
 
+      {/* Month navigator — only relevant on the "This Month" tab.
+          monthOffset 0 = current month; going back is always allowed,
+          going forward is capped at the current month (no future data
+          to show). */}
+      {tab === "monthly" && (
+        <div className="flex items-center justify-center gap-3 mb-5">
+          <button
+            onClick={() => setMonthOffset(o => o - 1)}
+            className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#1f1f1f]
+              text-[#888] hover:text-[#e0e0e0] hover:border-[#2a2a2a] transition-all text-sm font-mono"
+            title="Previous month"
+          >
+            ‹
+          </button>
+          <span className="text-xs font-mono text-[#e0e0e0] font-bold min-w-[9rem] text-center">
+            {(() => {
+              const d = new Date();
+              d.setDate(1);
+              d.setMonth(d.getMonth() + monthOffset);
+              return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+            })()}
+          </span>
+          <button
+            onClick={() => setMonthOffset(o => Math.min(0, o + 1))}
+            disabled={monthOffset >= 0}
+            className="w-7 h-7 flex items-center justify-center rounded-lg border border-[#1f1f1f]
+              text-[#888] hover:text-[#e0e0e0] hover:border-[#2a2a2a] transition-all text-sm font-mono
+              disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-[#888] disabled:hover:border-[#1f1f1f]"
+            title="Next month"
+          >
+            ›
+          </button>
+          {monthOffset !== 0 && (
+            <button
+              onClick={() => setMonthOffset(0)}
+              className="text-[10px] font-mono text-[#00e87a] hover:underline ml-1"
+            >
+              Jump to current
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Weekly Challenge banner */}
       {tab === "challenge" && challengeTitle && (
         <div className="mb-5 px-4 py-3 bg-[#f0b42908] border border-[#f0b42920] rounded-2xl flex items-center gap-2" style={{boxShadow:"0 0 20px rgba(240,180,41,0.04)"}}>
@@ -601,8 +670,14 @@ export default function LeaderboardPage() {
         !loading &&
         filteredMembers.length > 0 && (
           <p className="text-[10px] text-[#ccc] font-mono text-center mt-6">
-            Showing approved submissions since{" "}
-            {tab === "weekly" ? "the start of this week (Monday)" : "the 1st of this month"}.
+            {tab === "weekly"
+              ? "Showing approved submissions since the start of this week (Monday)."
+              : `Showing approved submissions for ${(() => {
+                  const d = new Date();
+                  d.setDate(1);
+                  d.setMonth(d.getMonth() + monthOffset);
+                  return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+                })()}.`}
           </p>
         )}
     </div>
