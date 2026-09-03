@@ -15,7 +15,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const GROQ_API_KEY  = process.env.NEXT_PUBLIC_GROQ_KEY ?? '';
-const GROQ_MODEL    = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = 'qwen/qwen3.8-27b';
 const GROQ_TIMEOUT  = 8000; // ms — fall back to Ollama after this
 
 const OLLAMA_BASE   = process.env.NEXT_PUBLIC_OLLAMA_URL   ?? 'http://localhost:11434';
