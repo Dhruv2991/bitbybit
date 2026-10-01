@@ -5,30 +5,8 @@
 // ════════════════════════════════════════════════════════════
 
 import { useRef, useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
-import type { OnMount, BeforeMount } from '@monaco-editor/react';
+import Editor, { type OnMount, type BeforeMount } from '@monaco-editor/react';
 import type { SupportedLang } from '@/types/database';
-
-const Editor = dynamic(
-  () => import('@monaco-editor/react').then(mod => mod.default),
-  {
-    ssr: false,
-    loading: () => (
-      <div style={{
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#555',
-        fontSize: '13px',
-        fontFamily: '"JetBrains Mono", monospace',
-        background: '#0f0f0f',
-      }}>
-        Loading editor...
-      </div>
-    ),
-  }
-);
 
 const MONACO_LANG_MAP: Record<SupportedLang, string> = {
   python:     'python',
@@ -60,7 +38,6 @@ export default function CodeEditor({
   onRun,
   onSubmit,
 }: CodeEditorProps) {
-
   const [monacoTheme, setMonacoTheme] = useState<'bitbybit-dark' | 'bitbybit-light'>('bitbybit-dark');
 
   // Monaco actions are registered once on mount, so the callbacks they
@@ -142,35 +119,49 @@ export default function CodeEditor({
 
   const handleMount: OnMount = (editor, monaco) => {
     editor.addAction({
-      id:    'format-code',
-      label: 'Format Code',
-      keybindings: [(2048 | 49)], // Ctrl/Cmd+S
-      run: (ed) => { ed.getAction('editor.action.formatDocument')?.run(); },
+      id:          'format-code',
+      label:       'Format Code',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
+      run:         (ed) => { ed.getAction('editor.action.formatDocument')?.run(); },
     });
     editor.addAction({
-      id:    'run-tests',
-      label: 'Run Tests',
+      id:          'run-tests',
+      label:       'Run Tests',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-      run: () => { onRunRef.current?.(); },
+      run:         () => { onRunRef.current?.(); },
     });
     editor.addAction({
-      id:    'submit-solution',
-      label: 'Submit Solution',
+      id:          'submit-solution',
+      label:       'Submit Solution',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter],
-      run: () => { onSubmitRef.current?.(); },
+      run:         () => { onSubmitRef.current?.(); },
     });
   };
 
   return (
-    <div className="rounded-lg overflow-hidden border border-[#1f1f1f]">
+    <div className="rounded-lg overflow-hidden border border-[var(--border2)] bg-[#0f0f0f]">
       <Editor
         height={height}
-        language={MONACO_LANG_MAP[language]}
+        language={MONACO_LANG_MAP[language] || 'python'}
         value={value}
         theme={monacoTheme}
         beforeMount={handleBeforeMount}
         onMount={handleMount}
-        onChange={(v) => onChange(v || '')}
+        onChange={(v) => onChange(v ?? '')}
+        loading={
+          <div style={{
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#555',
+            fontSize: '13px',
+            fontFamily: '"JetBrains Mono", monospace',
+            background: '#0f0f0f',
+          }}>
+            Loading editor...
+          </div>
+        }
         options={{
           readOnly,
           fontSize:                   14,

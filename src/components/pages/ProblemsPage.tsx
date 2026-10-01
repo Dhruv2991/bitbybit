@@ -341,14 +341,14 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   // link copied while viewing a problem takes anyone straight to it.
   function openProblem(p: Problem) {
     setSelected(p);
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    const params = new URLSearchParams(searchParams.toString());
     params.set('p', p.id);
     router.replace(`/problems?${params.toString()}`, { scroll: false });
   }
 
   function closeProblem() {
     setSelected(null);
-    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    const params = new URLSearchParams(searchParams.toString());
     params.delete('p');
     const qs = params.toString();
     router.replace(qs ? `/problems?${qs}` : '/problems', { scroll: false });
