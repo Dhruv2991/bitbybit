@@ -152,7 +152,50 @@
   ::-webkit-scrollbar-thumb { background: #333b4d; border-radius: 99px; }
   ::-webkit-scrollbar-thumb:hover { background: #444e66; }
 
-  .monaco-editor .margin { background: #12151d !important; }
+  /* ── Monaco Editor Overrides & Resets ────────────────────────── */
+  .monaco-editor,
+  .monaco-editor .overflow-guard,
+  .monaco-editor .monaco-scrollable-element {
+    background-color: transparent !important;
+  }
+
+  /* Prevent stray white background/border/outline on hidden inputarea textarea */
+  .monaco-editor .inputarea,
+  .monaco-editor .inputarea.ime-input,
+  .monaco-editor textarea.inputarea {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    color: transparent !important;
+    caret-color: transparent !important;
+    resize: none !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    opacity: 0 !important;
+  }
+
+  .monaco-editor .margin {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
+  /* Cursor visibility */
+  .monaco-editor .cursors-layer .cursor {
+    background-color: #00e87a !important;
+    border-color: #00e87a !important;
+    color: #00e87a !important;
+  }
+
+  /* Text selection highlight */
+  .monaco-editor .selected-text {
+    background-color: rgba(0, 232, 122, 0.35) !important;
+  }
+
+  .monaco-editor .focused .selected-text {
+    background-color: rgba(0, 232, 122, 0.45) !important;
+  }
 }
 
 @layer components {
