@@ -34,7 +34,7 @@ async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
   if (!github) return null;
 
   const db = createServerSupabaseClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line
   const { data: admin } = await (db.from('admins') as any).select('github').eq('github', github).maybeSingle();
   return admin ? github : null;
 }
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     if (!github) return NextResponse.json({ error: 'Missing github' }, { status: 400 });
 
     const db = createServerSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { data: sub } = await (db.from('subscribers') as any)
       .select('github, name, email, status, current_period_end, razorpay_payment_id')
       .eq('github', github)
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     // Record/refresh the log entry so future automatic sends for this
     // exact payment_id (if any) know a confirmation already went out.
     const refId = sub.razorpay_payment_id || `manual-${sub.github}`;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from('email_log') as any)
       .upsert(
         { github: sub.github, email: sub.email, kind: 'subscription_confirmed', ref_id: refId },

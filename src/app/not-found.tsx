@@ -14,7 +14,7 @@ export default function NotFound() {
           bash: page: command not found
         </p>
         <p className="font-mono text-xs text-[#4a5268] mb-8">
-          Whatever you're looking for isn't at this address.
+          Whatever you&apos;re looking for isn&apos;t at this address.
         </p>
         <Link href="/" className="btn-primary inline-block">
           $ cd ~

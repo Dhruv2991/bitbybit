@@ -84,7 +84,14 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   const [recLoading,  setRecLoading]  = useState(false);
 
   useEffect(() => {
-    try { setSolved(JSON.parse(localStorage.getItem('bb_solved') || '[]')); } catch {}
+    if (!user?.github) {
+      setSolved([]);
+    } else {
+      try {
+        const cached = localStorage.getItem('bb_solved');
+        if (cached) setSolved(JSON.parse(cached));
+      } catch {}
+    }
 
     const db = getSupabaseClient();
 
@@ -146,7 +153,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
 
         // Load weekly challenge problem IDs — include ended ones too so
         // paid users can still get "practice mode" access after end
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const { data: challenges } = await (db.from('weekly_challenges') as any)
           .select('id, problem_ids, starts_at, ends_at, status')
           .order('created_at', { ascending: false });
@@ -260,7 +267,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         const bonus = 1.0 - frac * 0.8;
         const basePts = details?.pointsAwarded ?? problem?.points ?? 100;
         const finalPoints = Math.round(basePts * (1 + bonus));
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         await (db.from('weekly_submissions') as any).upsert(
           {
             weekly_challenge_id: challenge.id,
@@ -772,8 +779,41 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         )
       ) : loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="spinner" />
-          <span className="text-[#999] text-xs font-mono">Loading problems…</span>
+          <div className="md:hidden space-y-2 w-full animate-pulse">
+            {[1, 2, 3, 4, 5, 6].map(k => (
+              <div key={k} className="px-4 py-3.5 bg-[#0a0a0a] border border-[#161616] rounded-xl flex items-center gap-3">
+                <div className="w-5 h-4 bg-[#1a1a1a] rounded" />
+                <div className="flex-1 space-y-2">
+                  <div className="w-2/3 h-4 bg-[#1f1f1f] rounded" />
+                  <div className="flex gap-2">
+                    <div className="w-12 h-3 bg-[#161616] rounded" />
+                    <div className="w-10 h-3 bg-[#161616] rounded" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block w-full bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden animate-pulse" style={{boxShadow:"0 0 0 1px rgba(255,255,255,0.02)"}}>
+            <div className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-3 border-b border-[#161616] text-[10px] text-[#666] font-mono uppercase tracking-widest bg-[#0a0a0a]">
+              <div>#</div>
+              <div>Title</div>
+              <div>Difficulty</div>
+              <div>Points</div>
+              <div>Attempts</div>
+              <div>Status</div>
+            </div>
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(k => (
+              <div key={k} className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-4 border-b border-[#161616] last:border-0 items-center">
+                <div className="w-4 h-4 bg-[#1a1a1a] rounded" />
+                <div className="w-2/5 h-4 bg-[#1f1f1f] rounded" />
+                <div className="w-14 h-5 bg-[#161616] rounded-lg" />
+                <div className="w-10 h-4 bg-[#161616] rounded" />
+                <div className="w-12 h-4 bg-[#161616] rounded" />
+                <div className="w-16 h-5 bg-[#161616] rounded-lg" />
+              </div>
+            ))}
+          </div>
+
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">

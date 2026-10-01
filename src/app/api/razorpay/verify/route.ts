@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch existing subscriber row
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { data: existingSub } = await (db.from('subscribers') as any)
       .select('status, current_period_end, razorpay_payment_id')
       .eq('github', github)
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
       hasPriorPayment,
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { error } = await (db.from('subscribers') as any).upsert(
       {
         github, name, email,
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (email) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { data: logged } = await (db.from('email_log') as any)
         .upsert(
           { github, email, kind: 'subscription_confirmed', ref_id: razorpay_payment_id },

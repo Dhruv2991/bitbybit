@@ -59,12 +59,12 @@ export default function LeaderboardPage() {
     setLoading(true);
     try {
       if (tab === "overall") {
-        // Aggregate from all three tables for true all-time points
+        // Aggregate from all three tables for true all-time points (with safe bounds)
         const [{ data: normalSubs }, { data: arenaSubs }, { data: weeklySubs }, { data: membersData }] = await Promise.all([
-          db.from("submissions").select("github, name, points_awarded, problem_id").eq("status", "approved"),
-          db.from("arena_submissions").select("github, name, points_awarded, problem_id").eq("status", "reviewed"),
-          (db.from("weekly_submissions") as any).select("github, name, points_awarded, problem_id").eq("status", "approved"),
-          db.from("members").select("github, name, streak, last_solved_at, created_at, problems_solved"),
+          db.from("submissions").select("github, name, points_awarded, problem_id").eq("status", "approved").limit(5000),
+          db.from("arena_submissions").select("github, name, points_awarded, problem_id").eq("status", "reviewed").limit(5000),
+          (db.from("weekly_submissions") as any).select("github, name, points_awarded, problem_id").eq("status", "approved").limit(5000),
+          db.from("members").select("github, name, streak, last_solved_at, created_at, problems_solved").limit(1000),
         ]);
 
         // Deduplicate: per user per problem, keep only the highest points_awarded
@@ -109,7 +109,8 @@ export default function LeaderboardPage() {
         // shows someone as "on fire" days after they actually stopped.
         const { data: membersData } = await db
           .from("members")
-          .select("github, name, streak, last_solved_at, created_at, problems_solved, total_points");
+          .select("github, name, streak, last_solved_at, created_at, problems_solved, total_points")
+          .limit(1000);
 
         const ranked = (membersData || [])
           .map((m: any) => ({
@@ -131,7 +132,7 @@ export default function LeaderboardPage() {
         setMembers(ranked as EnrichedMember[]);
       } else if (tab === "challenge") {
         // Load the most recent active/ended weekly challenge leaderboard
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const { data: challenges } = await (db.from("weekly_challenges") as any)
           .select("id, title, status")
           .in("status", ["active", "ended"])
@@ -148,7 +149,7 @@ export default function LeaderboardPage() {
         const ch = challenges[0];
         setChallengeTitle(ch.title);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const { data: subs } = await (db.from("weekly_submissions") as any)
           .select(
             `
@@ -160,7 +161,8 @@ export default function LeaderboardPage() {
 `,
           )
           .eq("weekly_challenge_id", ch.id)
-          .eq("status", "approved");
+          .eq("status", "approved")
+          .limit(5000);
 
         const map = new Map<
           string,
@@ -215,17 +217,20 @@ export default function LeaderboardPage() {
           .from("submissions")
           .select("github, name, points_awarded, problem_id")
           .eq("status", "approved")
-          .gte("created_at", cutoff.toISOString());
+          .gte("created_at", cutoff.toISOString())
+          .limit(5000);
         let arenaQuery = db
           .from("arena_submissions")
           .select("github, name, points_awarded, problem_id")
           .eq("status", "reviewed")
-          .gte("created_at", cutoff.toISOString());
+          .gte("created_at", cutoff.toISOString())
+          .limit(5000);
         let weeklySubsQuery = db
           .from("weekly_submissions")
           .select("github, name, points_awarded, problem_id")
           .eq("status", "approved")
-          .gte("submitted_at", cutoff.toISOString());
+          .gte("submitted_at", cutoff.toISOString())
+          .limit(5000);
         if (upperBound) {
           subsQuery = subsQuery.lt("created_at", upperBound.toISOString());
           arenaQuery = arenaQuery.lt("created_at", upperBound.toISOString());

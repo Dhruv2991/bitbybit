@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     // Must be an active (non-expired) subscriber — this is the ONLY
     // gate for contest entry, since no payment is collected for it.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { data: sub } = await (db.from('subscribers') as any)
       .select('status, current_period_end')
       .eq('github', github)
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { data: contest } = await (db.from('contests') as any)
       .select('id, name, status')
       .eq('id', contestId)
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Registration is closed for this contest' }, { status: 400 });
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { data: existing } = await (db.from('contest_registrations') as any)
       .select('id, status')
       .eq('contest_id', contestId)
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     // Cap contest capacity at 70 confirmed registrations.
     const CONTEST_CAPACITY = 70;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { count: confirmedCount } = await (db.from('contest_registrations') as any)
       .select('id', { count: 'exact', head: true })
       .eq('contest_id', contestId)
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { error } = await (db.from('contest_registrations') as any).upsert(
       {
         contest_id:   contestId,

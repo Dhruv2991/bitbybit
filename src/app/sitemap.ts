@@ -1,18 +1,27 @@
 import type { MetadataRoute } from 'next';
 
-// NOTE: BitByBit is currently a single-route SPA — Problems, Leaderboard,
-// About, etc. are all client-side view state on "/", not separate URLs.
-// So this sitemap genuinely only has one real entry today. If those
-// sections ever move to real routes (e.g. /problems, /leaderboard), add
-// them here so they show up correctly instead of just growing this file
-// with URLs that don't actually exist.
+const BASE_URL = 'https://bitbybit-9h8e.vercel.app';
+
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [
-    {
-      url: 'https://bitbybit-9h8e.vercel.app',
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 1,
-    },
+  const routes = [
+    { path: '',            changeFrequency: 'daily' as const,   priority: 1.0 },
+    { path: '/problems',    changeFrequency: 'daily' as const,   priority: 0.9 },
+    { path: '/leaderboard', changeFrequency: 'daily' as const,   priority: 0.8 },
+    { path: '/arena',       changeFrequency: 'daily' as const,   priority: 0.8 },
+    { path: '/weekly',      changeFrequency: 'weekly' as const,  priority: 0.8 },
+    { path: '/subscribe',   changeFrequency: 'weekly' as const,  priority: 0.7 },
+    { path: '/about',       changeFrequency: 'monthly' as const, priority: 0.5 },
+    { path: '/privacy',     changeFrequency: 'monthly' as const, priority: 0.3 },
+    { path: '/terms',       changeFrequency: 'monthly' as const, priority: 0.3 },
+    { path: '/refunds',     changeFrequency: 'monthly' as const, priority: 0.3 },
   ];
+
+  const now = new Date();
+
+  return routes.map((r) => ({
+    url: `${BASE_URL}${r.path}`,
+    lastModified: now,
+    changeFrequency: r.changeFrequency,
+    priority: r.priority,
+  }));
 }

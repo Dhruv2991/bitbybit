@@ -49,7 +49,7 @@ async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
   if (!github) return null;
 
   const db = createServerSupabaseClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line
   const { data: admin } = await (db.from('admins') as any).select('github').eq('github', github).maybeSingle();
   return admin ? github : null;
 }
@@ -86,7 +86,7 @@ async function pruneOldRows() {
       : table === 'ai_usage' ? 'date'
       : 'sent_at';
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { error, count } = await (db.from(table) as any)
       .delete({ count: 'exact' })
       .lt(dateCol, cutoff);
@@ -103,9 +103,9 @@ async function sendInactivityNudges() {
   const cutoff = new Date(Date.now() - INACTIVITY_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
   const [{ data: members }, { data: alreadyLogged }] = await Promise.all([
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     (db.from('members') as any).select('github, name, email, last_solved_at, joined_at'),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     (db.from('email_log') as any).select('github').eq('kind', 'inactivity_nudge').eq('ref_id', monthKey),
   ]);
 
@@ -125,7 +125,7 @@ async function sendInactivityNudges() {
     const ok = await sendEmail(m.email, subject, html);
     if (ok) {
       sent++;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       await (db.from('email_log') as any)
         .upsert({ github: m.github, email: m.email, kind: 'inactivity_nudge', ref_id: monthKey }, { onConflict: 'github,kind,ref_id' });
     } else {

@@ -1,11 +1,13 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
-import type { User } from '@/types/database';
+import type { User, Certificate } from '@/types/database';
 import { effectiveStreak } from '@/lib/streak';
 import { BADGES, computeUnlockedBadges, type Badge } from '@/lib/badges';
 import ContributionHeatmap from '@/components/profile/ContributionHeatmap';
 import SkillRadar from '@/components/profile/SkillRadar';
+import CertificatePreview from '@/components/certificates/CertificatePreview';
+import { Award, Download, Eye, ExternalLink, ShieldCheck, X } from 'lucide-react';
 
 interface ProfilePageProps {
   user:       User | null;
@@ -35,12 +37,45 @@ interface Stats {
   aiAssists:      number;
   bloodFirstCount: number;
   badges:         Badge[];
+  certificates:   Certificate[];
 }
 
 export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
   const db = getSupabaseClient();
   const [stats, setStats]     = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewingCertificate, setViewingCertificate] = useState<Certificate | null>(null);
+  const [downloadingCertId, setDownloadingCertId] = useState<string | null>(null);
+
+  const handleDownload = async (certificateId: string) => {
+    setDownloadingCertId(certificateId);
+    try {
+      const { data: { session } } = await db.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        alert("Session expired. Please sign in again.");
+        return;
+      }
+      const res = await fetch("/api/certificates/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ certificateId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.downloadUrl) {
+        alert(data.error || "Failed to download certificate");
+      } else {
+        window.open(data.downloadUrl, "_blank");
+      }
+    } catch {
+      alert("Network error during download");
+    } finally {
+      setDownloadingCertId(null);
+    }
+  };
 
   const load = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -49,22 +84,24 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
     // Same "best score per problem, across all three submission tables"
     // aggregation the leaderboard uses, so the numbers here always match
     // what's shown there — no separate source of truth to drift out of sync.
-    const [{ data: normalSubs }, { data: arenaSubs }, { data: weeklySubs }, { data: memberRow }, { data: allProblems }, { data: aiRows }] =
+    const [{ data: normalSubs }, { data: arenaSubs }, { data: weeklySubs }, { data: memberRow }, { data: allProblems }, { data: aiRows }, { data: certRows }] =
       await Promise.all([
         db.from('submissions').select('problem_id, problem_title, points_awarded, tests_passed, tests_total, created_at')
           .eq('github', user.github).eq('status', 'approved'),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         (db.from('arena_submissions') as any).select('problem_id, problem_title, points_awarded, tests_passed, tests_total, created_at')
           .eq('github', user.github).eq('status', 'reviewed'),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         (db.from('weekly_submissions') as any).select('problem_id, problem_title, points_awarded, tests_passed, tests_total, submitted_at')
           .eq('github', user.github).eq('status', 'approved'),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         (db.from('members') as any).select('streak, last_solved_at').eq('github', user.github).maybeSingle(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         (db.from('problems') as any).select('id, tags'),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         (db.from('ai_usage') as any).select('used').eq('github', user.github),
+        // eslint-disable-next-line
+        (db.from('certificates') as any).select('*').eq('github', user.github).order('created_at', { ascending: false }),
       ]);
 
     const rows: SolvedRow[] = [
@@ -123,10 +160,10 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       const [{ data: gSubs }, { data: gArena }, { data: gWeekly }] = await Promise.all([
         db.from('submissions').select('github, problem_id, created_at')
           .eq('status', 'approved').in('problem_id', solvedIds),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         (db.from('arena_submissions') as any).select('github, problem_id, created_at')
           .eq('status', 'reviewed').in('problem_id', solvedIds),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         (db.from('weekly_submissions') as any).select('github, problem_id, submitted_at')
           .eq('status', 'approved').in('problem_id', solvedIds),
       ]);
@@ -165,10 +202,10 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
     const [{ data: monthSubs }, { data: monthArena }, { data: monthWeekly }] = await Promise.all([
       db.from('submissions').select('github, points_awarded')
         .eq('status', 'approved').gte('created_at', cutoff.toISOString()),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       (db.from('arena_submissions') as any).select('github, points_awarded')
         .eq('status', 'reviewed').gte('created_at', cutoff.toISOString()),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       (db.from('weekly_submissions') as any).select('github, points_awarded')
         .eq('status', 'approved').gte('submitted_at', cutoff.toISOString()),
     ]);
@@ -204,6 +241,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       aiAssists: (aiRows || []).reduce((sum: number, r: any) => sum + (r.used || 0), 0),
       bloodFirstCount,
       badges,
+      certificates: (certRows as Certificate[]) || [],
     });
     setLoading(false);
   }, [db, user]);
@@ -219,6 +257,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_submissions', filter: `github=eq.${user.github}` }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'arena_submissions', filter: `github=eq.${user.github}` }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `github=eq.${user.github}` }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'certificates', filter: `github=eq.${user.github}` }, load)
       .subscribe();
     return () => { db.removeChannel(channel); };
   }, [db, user, load]);
@@ -245,9 +284,9 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
     : false;
 
   return (
-    <div className="max-w-3xl mx-auto animate-fade-up">
+    <div className="max-w-3xl mx-auto animate-fade-up space-y-6">
       {/* Header */}
-      <div className="card-glow p-6 mb-6 flex items-center gap-4 flex-wrap">
+      <div className="card-glow p-6 flex items-center gap-4 flex-wrap">
         <img
           src={`https://github.com/${user.github}.png?size=80`}
           alt={user.name}
@@ -267,7 +306,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       </div>
 
       {/* Stat cards */}
-      <div className={`grid grid-cols-1 sm:grid-cols-3 ${(stats.aiAssists > 0 || stats.bloodFirstCount > 0) ? 'md:grid-cols-5' : ''} gap-4 mb-6`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-3 ${(stats.aiAssists > 0 || stats.bloodFirstCount > 0) ? 'md:grid-cols-5' : ''} gap-4`}>
         <div className="card-hover p-5 text-center">
           <p className="text-3xl font-display font-bold text-[#00e87a] stat-glow">{stats.totalPoints}</p>
           <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide">Total points</p>
@@ -300,8 +339,77 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
         )}
       </div>
 
+      {/* ── MY CERTIFICATES SECTION ── */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display font-bold text-sm text-[#e0e0e0] flex items-center gap-2">
+            <Award className="w-4 h-4 text-[#00e87a]" /> My Certificates
+            <span className="text-[#666] font-mono font-normal">({stats.certificates.length})</span>
+          </h2>
+        </div>
+
+        {stats.certificates.length === 0 ? (
+          <div className="text-center py-8 text-[#666] font-mono text-xs">
+            No certificates issued yet. Participate in weekly contests and arena challenges to earn certificates!
+          </div>
+        ) : (
+          <div className="divide-y divide-[#1a1a1a]">
+            {stats.certificates.map((cert) => {
+              const isRevoked = cert.status === 'revoked';
+              return (
+                <div key={cert.id} className="py-4 flex items-center justify-between gap-4 flex-wrap">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm font-display text-[#e0e0e0] truncate">
+                        {cert.title || 'Certificate of Achievement'}
+                      </span>
+                      {isRevoked ? (
+                        <span className="text-[10px] font-mono font-bold text-red-400 bg-red-950/40 border border-red-800/40 rounded px-1.5 py-0.5">
+                          Revoked
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-mono font-bold text-[#00e87a] bg-[#00e87a15] border border-[#00e87a30] rounded px-1.5 py-0.5">
+                          Verified
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-mono text-[#888] mt-0.5">{cert.event_name}</p>
+                    <div className="flex items-center gap-3 text-[10px] font-mono text-[#555] mt-1">
+                      <span>
+                        Issued: {new Date(cert.issued_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </span>
+                      <span>•</span>
+                      <span className="text-[#00e87a]/80 font-bold">{cert.certificate_id}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setViewingCertificate(cert)}
+                      className="btn-ghost text-xs py-1.5 px-3 flex items-center gap-1.5 font-mono"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> View
+                    </button>
+                    {!isRevoked && (
+                      <button
+                        onClick={() => handleDownload(cert.certificate_id)}
+                        disabled={downloadingCertId === cert.certificate_id}
+                        className="btn-solid text-xs py-1.5 px-3 flex items-center gap-1.5 font-mono shadow-[0_0_12px_rgba(0,232,122,0.2)]"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        {downloadingCertId === cert.certificate_id ? 'Downloading...' : 'Download'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Badges */}
-      <div className="card p-5 mb-6">
+      <div className="card p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display font-bold text-sm text-[#e0e0e0]">
             Badges <span className="text-[#666] font-mono font-normal">({stats.badges.length}/{BADGES.length})</span>
@@ -369,6 +477,69 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
           </div>
         )}
       </div>
+
+      {/* Certificate Viewer Modal */}
+      {viewingCertificate && (
+        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-[#111] border border-[#2a2a2a] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+            <div className="px-6 py-4 border-b border-[#222] flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-[#00e87a]" />
+                <h3 className="font-display font-bold text-base text-[#e0e0e0]">
+                  {viewingCertificate.certificate_id}
+                </h3>
+              </div>
+              <button
+                onClick={() => setViewingCertificate(null)}
+                className="p-1 rounded-lg text-[#666] hover:text-[#fff] hover:bg-[#222]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="card p-3 bg-[#0a0a0a] border-[#222]">
+                <CertificatePreview
+                  recipientName={viewingCertificate.recipient_name}
+                  title={viewingCertificate.title}
+                  achievementText={viewingCertificate.achievement_text}
+                  eventName={viewingCertificate.event_name}
+                  organizationText={viewingCertificate.organization_text}
+                  activityPointsText={viewingCertificate.activity_points_text}
+                  coordinators={viewingCertificate.coordinator_names || []}
+                  dateStr={new Date(viewingCertificate.issued_at).toLocaleDateString("en-US", {
+                    month: "long",
+                    year: "numeric",
+                  })}
+                  certificateId={viewingCertificate.certificate_id}
+                  status={viewingCertificate.status}
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <a
+                  href={`/certificate/${viewingCertificate.certificate_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-mono text-[#00e87a] hover:underline flex items-center gap-1"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Public Verification Link
+                </a>
+                {viewingCertificate.status !== 'revoked' && (
+                  <button
+                    onClick={() => handleDownload(viewingCertificate.certificate_id)}
+                    disabled={downloadingCertId === viewingCertificate.certificate_id}
+                    className="btn-solid py-2 px-4 text-xs font-mono flex items-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    {downloadingCertId === viewingCertificate.certificate_id ? 'Downloading...' : 'Download PDF'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

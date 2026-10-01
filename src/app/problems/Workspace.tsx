@@ -99,7 +99,7 @@ export async function syncMemberProgress(
   isFirstSolve: boolean,
 ) {
   const now = new Date();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line
   const { data: ex } = await (db.from('members') as any)
     .select('*').eq('github', github).maybeSingle();
 
@@ -109,7 +109,7 @@ export async function syncMemberProgress(
     const newStreak =
       daysSinceLast === 0 ? (ex.streak || 1) :
       daysSinceLast === 1 ? (ex.streak || 0) + 1 : 1;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from('members') as any).update({
       total_points:    (ex.total_points || 0) + pointsDelta,
       problems_solved: (ex.problems_solved || 0) + (isFirstSolve ? 1 : 0),
@@ -117,7 +117,7 @@ export async function syncMemberProgress(
       last_solved_at:  now.toISOString(),
     }).eq('github', github);
   } else {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from('members') as any).insert([{
       github, name,
       total_points:    pointsDelta,
@@ -607,7 +607,8 @@ type ToastType = 'ok' | 'err' | 'info' | 'warn';
 interface Toast { msg: string; type: ToastType; id: number; }
 
 export default function Workspace({ problem, user, onClose, onArenaSubmit, onArenaCodeChange, onSolved, isWeekly, practiceMode, contestId }: WorkspaceProps) {
-  const db = getSupabaseClient();
+  const dbRef = useRef(getSupabaseClient());
+  const db = dbRef.current;
 
   const [lang,          setLang]          = useState<SupportedLang>('python');
   const [code,          setCode]          = useState(() => {
@@ -629,6 +630,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   const [toasts,        setToasts]        = useState<Toast[]>([]);
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; resolve: (v: boolean) => void } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [copiedCode,    setCopiedCode]    = useState(false);
   const [mobileTab,     setMobileTab]     = useState<'problem' | 'editor'>('problem');
   const [hintsRevealed, setHintsRevealed] = useState(0);
   const [hintCooldown,  setHintCooldown]  = useState(false);
@@ -683,7 +685,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     return () => clearInterval(id);
   }, [hintCooldownSecs]);
 
-  // ── Keyboard shortcuts: Ctrl/Cmd+Enter = run, Ctrl/Cmd+Shift+Enter = submit, ? = shortcuts modal ──
+  // ── Keyboard shortcuts: Ctrl/Cmd+Enter = run, Ctrl/Cmd+Shift+Enter = submit, ? = shortcuts modal, Escape = close ──
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const mod = e.ctrlKey || e.metaKey;
@@ -702,14 +704,22 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
       if (e.key === '?' && !inTextInput) {
         e.preventDefault();
         setShortcutsOpen(o => !o);
+        return;
       }
-      if (e.key === 'Escape' && shortcutsOpen) {
-        setShortcutsOpen(false);
+      if (e.key === 'Escape') {
+        if (shortcutsOpen) {
+          setShortcutsOpen(false);
+        } else if (confirmDialog) {
+          confirmDialog.resolve(false);
+          setConfirmDialog(null);
+        } else if (!inTextInput) {
+          onClose();
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [running, submitting, submitBlocked, shortcutsOpen]);
+  }, [running, submitting, submitBlocked, shortcutsOpen, confirmDialog, onClose]);
 
   // ── Set AI user + sync limits from Supabase on problem open ──────────────
   useEffect(() => {
@@ -1294,6 +1304,22 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-mono text-[var(--text3)] uppercase tracking-widest">Choose Language</span>
             <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(code);
+                    setCopiedCode(true);
+                    setTimeout(() => setCopiedCode(false), 2000);
+                    showToast('Code copied to clipboard', 'ok');
+                  } catch {
+                    showToast('Failed to copy code', 'err');
+                  }
+                }}
+                title="Copy code to clipboard"
+                className="text-[10px] font-mono px-2 py-0.5 rounded-lg border border-[var(--border2)] text-[var(--text3)] hover:text-[var(--text)] hover:border-[var(--acc)] transition-colors flex items-center gap-1"
+              >
+                {copiedCode ? '✓ Copied!' : '📋 Copy'}
+              </button>
               {code !== STARTER_CODE[lang](problem) && (
                 <>
                   <span className="text-[10px] font-mono text-[var(--text3)] px-2 py-0.5 rounded-lg border border-[var(--border2)] bg-[var(--card3)]">draft saved</span>
@@ -1373,14 +1399,20 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         {/* Approach field + validator */}
         {!onArenaSubmit && !isWeekly && !practiceMode && (
           <div className="card p-4">
-            <label className="block text-[10px] text-[var(--text3)] font-mono mb-2 uppercase tracking-widest">
-              Your approach or GitHub PR link *
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-[10px] text-[var(--text3)] font-mono uppercase tracking-widest">
+                Approach or GitHub PR link <span className="text-[var(--danger)] font-bold">* (required)</span>
+              </label>
+              <span className="text-[10px] font-mono text-[var(--muted)]">Required to submit</span>
+            </div>
             <textarea value={approach} onChange={e => { setApproach(e.target.value); setApproachResult(null); }}
-              placeholder="Describe your approach before writing code — e.g. I'll use a hashmap to store each number's complement…" rows={3}
+              placeholder="Describe your approach before writing code — e.g. I'll use a hashmap to store each number's complement… (required to submit)" rows={3}
               className="w-full bg-[var(--bg2)] border border-[var(--card)] rounded-xl px-3.5 py-2.5
                 text-[var(--text)] text-sm font-mono placeholder-[var(--border2)] resize-none
                 focus:outline-none focus:border-[rgba(var(--acc-rgb),0.188)] transition-colors" />
+            <p className="text-[11px] text-[var(--muted2)] font-mono mt-1 mb-2">
+              Describe your approach or link a GitHub PR (required to submit your solution).
+            </p>
             <ApproachPanel
               result={approachResult}
               loading={validatingApproach}

@@ -28,6 +28,7 @@ const PAGES: { id: PageId; label: string; icon: string; color: string; adminOnly
   { id: 'leaderboard', label: 'Leaderboard',      icon: '⚡',  color: '#f0b429' },
   { id: 'arena',       label: 'Arena',            icon: '🏆',  color: '#ff5c6c' },
   { id: 'weekly',      label: 'Weekly Challenge', icon: '🏅',  color: '#a78bfa' },
+  { id: 'subscribe',   label: 'Subscribe (Pro)',  icon: '⭐',  color: '#00e87a' },
   { id: 'profile',     label: 'My Profile',       icon: '👤',  color: '#33ffb0' },
   { id: 'about',       label: 'About',            icon: 'ℹ️',  color: '#8189a0' },
   { id: 'admin',       label: 'Admin',            icon: '⚙️',  color: '#a78bfa', adminOnly: true },

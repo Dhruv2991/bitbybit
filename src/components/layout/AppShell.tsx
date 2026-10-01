@@ -174,16 +174,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="hidden md:flex items-center gap-1">
-            <button onClick={() => setSearchOpen(true)} title="Search (⌘K)"
+            <button onClick={() => setSearchOpen(true)} title="Search (⌘K)" aria-label="Search"
               className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors rounded-xl hover:bg-[var(--hover-overlay)]">
               <span className="text-base">🔍</span>
             </button>
-            <button onClick={toggleTheme} title="Toggle theme"
+            <button onClick={toggleTheme} title="Toggle theme" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
               className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors rounded-xl hover:bg-[var(--hover-overlay)]">
               <span className="text-base">{theme === "dark" ? "☀️" : "🌙"}</span>
             </button>
             <div className="relative" ref={notifRef}>
-              <button onClick={() => setNotifOpen(o => !o)}
+              <button onClick={() => setNotifOpen(o => !o)} aria-label="Notifications"
                 className="relative p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors rounded-xl hover:bg-[var(--hover-overlay)]">
                 <span className="text-base">🔔</span>
                 {liveItems.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#00e87a] animate-pulse" />}
@@ -195,7 +195,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div className="w-24 h-8 rounded-xl bg-[var(--card)] animate-pulse" />
             ) : user ? (
               <div className="relative" ref={profileRef}>
-                <button onClick={() => setProfileOpen(o => !o)} aria-haspopup="menu" aria-expanded={profileOpen}
+                <button onClick={() => setProfileOpen(o => !o)} aria-haspopup="menu" aria-expanded={profileOpen} aria-label="User menu"
                   className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl hover:bg-[var(--hover-overlay)] transition-colors">
                   <img src={`https://github.com/${user.github}.png?size=32`} alt={user.name}
                     className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a2a]"
@@ -224,6 +224,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       className="w-full text-left px-4 py-2.5 text-xs font-mono text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-overlay)] transition-colors flex items-center gap-2.5">
                       <span className="text-sm">👤</span> My profile
                     </button>
+                    <button role="menuitem" onClick={() => { setProfileOpen(false); go("profile"); }}
+                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-overlay)] transition-colors flex items-center gap-2.5">
+                      <span className="text-sm">📜</span> My certificates
+                    </button>
                     <button role="menuitem" onClick={() => { setProfileOpen(false); switchAccount(); }}
                       className="w-full text-left px-4 py-2.5 text-xs font-mono text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-overlay)] transition-colors flex items-center gap-2.5">
                       <span className="text-sm">🔁</span> Switch account
@@ -244,11 +248,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="md:hidden flex items-center gap-1">
-            <button onClick={() => setSearchOpen(true)} title="Search" className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+            <button onClick={() => setSearchOpen(true)} title="Search" aria-label="Search" className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
               <span className="text-base">🔍</span>
             </button>
             <div className="relative" ref={notifRefMob}>
-              <button onClick={() => setNotifOpen(o => !o)} className="relative p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+              <button onClick={() => setNotifOpen(o => !o)} aria-label="Notifications" className="relative p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
                 <span className="text-base">🔔</span>
                 {liveItems.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#00e87a] animate-pulse" />}
               </button>

@@ -14,9 +14,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const GROQ_API_KEY  = process.env.NEXT_PUBLIC_GROQ_KEY ?? '';
-const GROQ_MODEL = 'qwen/qwen3.8-27b';
-const GROQ_TIMEOUT  = 8000; // ms — fall back to Ollama after this
+const AI_TIMEOUT    = 12000; // ms — fall back to Ollama after this
 
 const OLLAMA_BASE   = process.env.NEXT_PUBLIC_OLLAMA_URL   ?? 'http://localhost:11434';
 const OLLAMA_MODEL  = process.env.NEXT_PUBLIC_OLLAMA_MODEL ?? 'qwen2.5-coder:3b';
@@ -219,25 +217,27 @@ export function getUsageStatus(): UsageStatus {
   };
 }
 
-// ── Core: Groq ────────────────────────────────────────────────────────────────
+// ── Core: Server AI API (Groq) ────────────────────────────────────────────────
 
 interface Msg { role: 'system' | 'user'; content: string; }
 
 async function callGroq(messages: Msg[], maxTokens: number): Promise<string> {
-  if (!GROQ_API_KEY) throw new Error('NO_GROQ_KEY');
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), GROQ_TIMEOUT);
+  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT);
   try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await fetch('/api/ai', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
-      body: JSON.stringify({ model: GROQ_MODEL, messages, max_tokens: maxTokens, temperature: 0.2 }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, maxTokens, temperature: 0.2 }),
       signal: controller.signal,
     });
     if (res.status === 429) throw new Error('GROQ_RATE_LIMIT');
-    if (!res.ok) throw new Error(`Groq ${res.status}`);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `AI error ${res.status}`);
+    }
     const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() ?? '';
+    return data.text?.trim() ?? '';
   } finally { clearTimeout(timer); }
 }
 
@@ -261,14 +261,12 @@ async function callAI(userPrompt: string, maxTokens: number, systemPrompt?: stri
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
   messages.push({ role: 'user', content: userPrompt });
 
-  // 1. Try Groq
-  if (GROQ_API_KEY) {
-    try {
-      const result = await callGroq(messages, maxTokens);
-      if (result) return result;
-    } catch (e: any) {
-      console.warn('Groq failed, trying Ollama:', e.message);
-    }
+  // 1. Try server AI endpoint (Groq)
+  try {
+    const result = await callGroq(messages, maxTokens);
+    if (result) return result;
+  } catch (e: any) {
+    console.warn('AI endpoint failed, trying Ollama fallback:', e.message);
   }
 
   // 2. Fallback: Ollama

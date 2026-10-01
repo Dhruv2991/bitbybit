@@ -153,9 +153,48 @@ export interface ArenaSubmission {
   created_at: string;
 }
 
+export type CertificateStatus = 'issued' | 'revoked';
+export type EmailDeliveryStatus = 'pending' | 'sent' | 'failed';
+
+export interface CertificateCoordinator {
+  name: string;
+  title: string;
+  org: string;
+  signatureText?: string;
+}
+
+export interface Certificate {
+  id: string;
+  certificate_id: string;
+  member_id: string | null;
+  github: string;
+  recipient_name: string;
+  recipient_email: string;
+  certificate_type: string;
+  title: string;
+  achievement_text: string;
+  event_name: string;
+  organization_text: string;
+  activity_points_text: string | null;
+  coordinator_names: CertificateCoordinator[];
+  issued_at: string;
+  issued_by: string;
+  pdf_path: string;
+  status: CertificateStatus;
+  email_status: EmailDeliveryStatus;
+  email_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
+      certificates: {
+        Row: Certificate;
+        Insert: Omit<Certificate, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Certificate>;
+      };
 
       admins: {
         Row: {

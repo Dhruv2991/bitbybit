@@ -51,7 +51,7 @@ async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
   if (!github) return null;
 
   const db = createServerSupabaseClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line
   const { data: admin } = await (db.from('admins') as any).select('github').eq('github', github).maybeSingle();
   return admin ? github : null;
 }
@@ -87,11 +87,11 @@ async function runNudge() {
     const monthKey = new Date().toISOString().slice(0, 7); // e.g. '2026-08'
 
     const [{ data: members }, { data: subs }, { data: alreadyLogged }] = await Promise.all([
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       (db.from('members') as any).select('github, name, email'),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       (db.from('subscribers') as any).select('github, status, current_period_end'),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       (db.from('email_log') as any).select('github').eq('kind', 'subscribe_nudge').eq('ref_id', monthKey),
     ]);
 
@@ -116,7 +116,7 @@ async function runNudge() {
       const ok = await sendEmail(m.email, subject, html);
       if (ok) {
         sent++;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         await (db.from('email_log') as any)
           .upsert({ github: m.github, email: m.email, kind: 'subscribe_nudge', ref_id: monthKey }, { onConflict: 'github,kind,ref_id' });
       } else {

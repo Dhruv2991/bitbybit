@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     let amountInr: number;
     const notes: Record<string, string> = { type: purpose, github, name, email };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { data: config } = await (db.from('app_config') as any)
       .select('*')
       .eq('key', 'subscription_fee')

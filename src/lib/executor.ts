@@ -44,10 +44,11 @@ export interface RunResult {
 
 // Judge0 language IDs
 const JUDGE0_LANGUAGE_ID: Record<string, number> = {
-  cpp:  54,  // C++ (GCC 9.2.0)
-  java: 62,  // Java (OpenJDK 13.0.1)
-  rust: 73,  // Rust (1.40.0)
-  go:   60,  // Go (1.13.5)
+  cpp:    54,  // C++ (GCC 9.2.0)
+  java:   62,  // Java (OpenJDK 13.0.1)
+  rust:   73,  // Rust (1.40.0)
+  go:     60,  // Go (1.13.5)
+  python: 71,  // Python (3.8.1)
 };
 
 // Sentinel printed between test case outputs so we can split the stdout
@@ -56,6 +57,10 @@ const SENTINEL = "---CASE---";
 // ── Extract function name from user code ─────────────────────
 
 function extractFuncName(code: string, lang: string): string {
+  if (lang === "python") {
+    const m = code.match(/def\s+(\w+)\s*\(/);
+    return m?.[1] || "solution";
+  }
   if (lang === "java") {
     const m = code.match(
       /(?:public|private|protected|static|\s)+[\w<>\[\]]+\s+(\w+)\s*\(/,
@@ -529,6 +534,28 @@ function buildBatchedProgram(
       ].join("\n");
     }
 
+    case "python": {
+      const caseBlocks = parsedArgs.map((args, idx) => {
+        const argsJson = JSON.stringify(JSON.stringify(args));
+        return [
+          `# case ${idx}`,
+          `__args__ = json.loads(${argsJson})`,
+          `__res__ = ${fn}(*(__args__ if isinstance(__args__, list) else [__args__]))`,
+          `print(json.dumps(__res__, separators=(",", ":")))`,
+          `print("${SENTINEL}")`,
+        ].join("\n");
+      });
+
+      return [
+        "import json",
+        "",
+        userCode,
+        "",
+        "if __name__ == '__main__':",
+        caseBlocks.map(b => b.split("\n").map(l => `    ${l}`).join("\n")).join("\n"),
+      ].join("\n");
+    }
+
     default:
       return userCode;
   }
@@ -607,10 +634,11 @@ async function executeWithJudge0(
 // ── Wandbox language compiler map ────────────────────────────
 
 const WANDBOX_COMPILER: Record<string, string> = {
-  cpp:  "gcc-head",
-  java: "openjdk-jdk-22+36",
-  rust: "rust-1.82.0",
-  go:   "go-1.23.2",
+  cpp:    "gcc-head",
+  java:   "openjdk-jdk-22+36",
+  rust:   "rust-1.82.0",
+  go:     "go-1.23.2",
+  python: "cpython-3.12.0",
 };
 
 // ── Wandbox fallback execution ────────────────────────────────
@@ -622,23 +650,46 @@ async function executeWithWandbox(
   const compiler = WANDBOX_COMPILER[language];
   if (!compiler) throw new Error(`Wandbox: unsupported language: ${language}`);
 
-  const res = await fetch("https://wandbox.org/api/compile.json", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ compiler, code: fullCode }),
-    signal: AbortSignal.timeout(30000),
-  });
+  let lastErr: any;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch("https://wandbox.org/api/compile.json", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ compiler, code: fullCode }),
+        signal: AbortSignal.timeout(30000),
+      });
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Wandbox error ${res.status}: ${body}`);
+      if (!res.ok) {
+        const body = await res.text();
+        if (res.status >= 500 && attempt < 3) {
+          await new Promise((r) => setTimeout(r, attempt * 500));
+          continue;
+        }
+        throw new Error(`Wandbox error ${res.status}: ${body}`);
+      }
+
+      const data = await res.json();
+      return {
+        stdout: data.program_output ?? "",
+        stderr: (data.compiler_error ?? "") + (data.program_error ?? ""),
+      };
+    } catch (err: any) {
+      lastErr = err;
+      if (
+        attempt < 3 &&
+        (err.name === "AbortError" ||
+          err.name === "TypeError" ||
+          err.message?.includes("fetch failed") ||
+          err.message?.includes("timeout"))
+      ) {
+        await new Promise((r) => setTimeout(r, attempt * 500));
+        continue;
+      }
+      throw err;
+    }
   }
-
-  const data = await res.json();
-  return {
-    stdout: data.program_output ?? "",
-    stderr: (data.compiler_error ?? "") + (data.program_error ?? ""),
-  };
+  throw lastErr || new Error("Wandbox execution failed after retries");
 }
 
 // ── Public API ───────────────────────────────────────────────

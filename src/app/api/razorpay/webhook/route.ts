@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
       const db = createServerSupabaseClient();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { data: sub } = await (db.from('subscribers') as any)
         .select('id, github, name, email, status')
         .eq('razorpay_payment_id', paymentId)
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (sub.status !== 'rejected') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const { error } = await (db.from('subscribers') as any)
           .update({ status: 'rejected' })
           .eq('id', sub.id);
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (sub.email) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const { data: logged } = await (db.from('email_log') as any)
           .upsert(
             { github: sub.github, email: sub.email, kind: 'subscription_refunded', ref_id: paymentId },
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
           const result = await sendEmailDetailed(sub.email, subject, html);
           if (!result.ok) {
             console.error(`[razorpay/webhook] refund email to ${sub.email} FAILED:`, result.error);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line
             await (db.from('email_log') as any)
               .delete()
               .eq('github', sub.github).eq('kind', 'subscription_refunded').eq('ref_id', paymentId);
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     const db = createServerSupabaseClient();
 
     if (notes.type === 'subscription' && notes.github) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { data: existingSub } = await (db.from('subscribers') as any)
         .select('status, current_period_end, razorpay_payment_id')
         .eq('github', notes.github)
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
 
       const email = notes.email || null;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { error } = await (db.from('subscribers') as any).upsert(
         {
           github: notes.github,
@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
       if (error) console.error('[razorpay/webhook] subscribers upsert error:', error);
 
       if (email && !error) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const { data: logged } = await (db.from('email_log') as any)
           .upsert(
             { github: notes.github, email, kind: 'subscription_confirmed', ref_id: paymentId },
@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
           const result = await sendEmailDetailed(email, subject, html);
           if (!result.ok) {
             console.error(`[razorpay/webhook] confirmation email to ${email} FAILED:`, result.error);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            // eslint-disable-next-line
             await (db.from('email_log') as any)
               .delete()
               .eq('github', notes.github).eq('kind', 'subscription_confirmed').eq('ref_id', paymentId);

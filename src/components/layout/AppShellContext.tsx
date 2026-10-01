@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { getSupabaseClient, resolveAdminStatus } from "@/lib/supabase";
 import type { User } from "@/types/database";
 import { effectiveStreak } from "@/lib/streak";
+import { setAiUser } from "@/lib/gemini";
+import { isActiveSubscription } from "@/lib/subscription";
 
 export type PageId =
   | "home" | "problems" | "leaderboard" | "arena" | "weekly"
-  | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile";
+  | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe";
 
 export type ToastType = "ok" | "err" | "warn" | "info";
 export interface Toast { id: number; msg: string; type: ToastType; }
@@ -31,12 +33,13 @@ export const ROUTE_TO_PAGE: Record<string, PageId> = {
   "/terms": "terms",
   "/refunds": "refunds",
   "/profile": "profile",
+  "/subscribe": "subscribe",
 };
 
 export const PAGE_TO_ROUTE: Record<PageId, string> = {
   home: "/", problems: "/problems", leaderboard: "/leaderboard", arena: "/arena",
   weekly: "/weekly", admin: "/admin", about: "/about", privacy: "/privacy",
-  terms: "/terms", refunds: "/refunds", profile: "/profile",
+  terms: "/terms", refunds: "/refunds", profile: "/profile", subscribe: "/subscribe",
 };
 
 interface AppShellContextValue {
@@ -78,13 +81,40 @@ function readStoredUser(): User | null {
   } catch { return null; }
 }
 
-function clearAuthStorage() {
+function clearAuthStorage(github?: string) {
   if (typeof window === "undefined") return;
   try {
     localStorage.removeItem("bitbybit-auth");
-    Object.keys(localStorage).forEach(k => {
-      if (k.startsWith("bb_admin_")) localStorage.removeItem(k);
-    });
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      // Preserve global settings
+      if (k === "bb_theme") continue;
+
+      // Clear all auth, admin, solved, AI usage, drafts, and editorials
+      if (
+        k.startsWith("bb_admin_") ||
+        k.startsWith("bb_ai_") ||
+        k === "bb_solved" ||
+        k.startsWith("bb_draft__") ||
+        k.startsWith("bb_arena_draft__") ||
+        k.startsWith("bb_editorial_")
+      ) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+
+    // Also clear session sync flags from sessionStorage
+    const sessionKeysToRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const sk = sessionStorage.key(i);
+      if (sk && sk.startsWith("bb_member_synced_")) {
+        sessionKeysToRemove.push(sk);
+      }
+    }
+    sessionKeysToRemove.forEach(sk => sessionStorage.removeItem(sk));
   } catch {}
 }
 
@@ -199,13 +229,25 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
         setUser(u);
         resolving.current = false;
         if (u?.github) {
-          (db.from("members") as any).upsert({
-            github: u.github, name: u.name, total_points: 0, problems_solved: 0, streak: 0,
-          }, { onConflict: "github", ignoreDuplicates: true }).then(() => {});
+          const syncKey = `bb_member_synced_${u.github}`;
+          try {
+            if (!sessionStorage.getItem(syncKey)) {
+              (db.from("members") as any).upsert({
+                github: u.github, name: u.name, total_points: 0, problems_solved: 0, streak: 0,
+              }, { onConflict: "github", ignoreDuplicates: true }).then(() => {
+                try { sessionStorage.setItem(syncKey, "1"); } catch {}
+              });
+            }
+          } catch {
+            (db.from("members") as any).upsert({
+              github: u.github, name: u.name, total_points: 0, problems_solved: 0, streak: 0,
+            }, { onConflict: "github", ignoreDuplicates: true }).then(() => {});
+          }
         }
         syncEmail(session);
       } else if (event === "SIGNED_OUT") {
-        clearAuthStorage();
+        const signingOutGithub = user?.github;
+        clearAuthStorage(signingOutGithub);
         setUser(null);
         router.push("/");
       }
@@ -227,16 +269,32 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let alive = true;
-    if (!user?.github) { setUserStreak(0); return; }
+    if (!user?.github) {
+      setUserStreak(0);
+      setAiUser("", false);
+      return;
+    }
     const db = getSupabaseClient();
     (async () => {
       try {
-        const { data }: any = await db.from("members").select("streak, last_solved_at").eq("github", user.github).maybeSingle();
-        if (alive) setUserStreak(effectiveStreak(data?.streak, data?.last_solved_at));
-      } catch { if (alive) setUserStreak(0); }
+        const [{ data: mData }, { data: subData }] = await Promise.all([
+          (db.from("members") as any).select("streak, last_solved_at").eq("github", user.github).maybeSingle(),
+          (db.from("subscribers") as any).select("status, current_period_end").eq("github", user.github).maybeSingle(),
+        ]);
+        if (alive) {
+          setUserStreak(effectiveStreak(mData?.streak, mData?.last_solved_at));
+          const isSub = !!user.is_admin || isActiveSubscription(subData?.status, subData?.current_period_end);
+          setAiUser(user.github, isSub);
+        }
+      } catch {
+        if (alive) {
+          setUserStreak(0);
+          setAiUser(user.github, !!user.is_admin);
+        }
+      }
     })();
     return () => { alive = false; };
-  }, [user?.github]);
+  }, [user?.github, user?.is_admin]);
 
   useEffect(() => {
     async function checkLive() {
@@ -277,8 +335,8 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     const github = user?.github;
+    clearAuthStorage(github || undefined);
     await getSupabaseClient().auth.signOut();
-    if (github) try { localStorage.removeItem(`bb_admin_${github}`); } catch {}
   }
 
   async function switchAccount() {

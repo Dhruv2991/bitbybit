@@ -94,10 +94,10 @@ function ActivityTicker({ members }: { members: number }) {
       const [{ data: subs }, { data: weekly }, { data: arena }] = await Promise.all([
         db.from('submissions').select('name, github, problem_id, problem_title, created_at')
           .eq('status', 'approved').order('created_at', { ascending: false }).limit(5),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         (db.from('weekly_submissions') as any).select('name, github, problem_id, problem_title, submitted_at')
           .eq('status', 'approved').order('submitted_at', { ascending: false }).limit(5),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         (db.from('arena_submissions') as any).select('name, github, problem_id, problem_title, created_at')
           .eq('status', 'reviewed').order('created_at', { ascending: false }).limit(5),
       ]);
@@ -120,9 +120,9 @@ function ActivityTicker({ members }: { members: number }) {
       if (ids.length > 0) {
         const [{ data: s2 }, { data: w2 }, { data: a2 }] = await Promise.all([
           db.from('submissions').select('github, problem_id, created_at').eq('status', 'approved').in('problem_id', ids),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line
           (db.from('weekly_submissions') as any).select('github, problem_id, submitted_at').eq('status', 'approved').in('problem_id', ids),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line
           (db.from('arena_submissions') as any).select('github, problem_id, created_at').eq('status', 'reviewed').in('problem_id', ids),
         ]);
         const all = [

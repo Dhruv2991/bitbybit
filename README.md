@@ -113,7 +113,7 @@ AI runs through Groq first, with a local Ollama server as a fallback.
 
 1. Get a free API key at https://console.groq.com and add it to `.env.local`:
    ```
-   NEXT_PUBLIC_GROQ_KEY=your-groq-key-here
+   GROQ_API_KEY=your-groq-key-here
    ```
 2. (Optional) Run a fallback model locally with Ollama for when Groq is rate-limited or unavailable:
    ```bash
@@ -143,7 +143,7 @@ If neither is configured, AI calls will fail gracefully with an "AI is unavailab
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anon key |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase service role key (server-side admin actions) |
-| `NEXT_PUBLIC_GROQ_KEY` | ⚠️ | Groq API key — primary AI provider |
+| `GROQ_API_KEY` | ⚠️ | Groq API key — primary AI provider (server-only) |
 | `NEXT_PUBLIC_OLLAMA_URL` | ❌ | Fallback Ollama server URL (defaults to `http://localhost:11434`) |
 | `NEXT_PUBLIC_OLLAMA_MODEL` | ❌ | Fallback Ollama model (defaults to `qwen2.5-coder:3b`) |
 | `JUDGE0_URL` | ❌ | Optional Judge0 executor URL |

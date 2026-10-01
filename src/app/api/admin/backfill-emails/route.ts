@@ -36,7 +36,7 @@ async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
   if (!github) return null;
 
   const db = createServerSupabaseClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line
   const { data: admin } = await (db.from('admins') as any).select('github').eq('github', github).maybeSingle();
   return admin ? github : null;
 }
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     const perPage = 1000;
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { data, error } = await (db.auth.admin as any).listUsers({ page, perPage });
       if (error) {
         console.error('[admin/backfill-emails] listUsers error:', error);
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     let membersUpdated = 0;
     let subscribersUpdated = 0;
     for (const r of rows) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { error: mErr, count } = await (db.from('members') as any)
         .update({ email: r.email, name: r.name })
         .eq('github', r.github)
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       if (mErr) console.error('[admin/backfill-emails] members update error for', r.github, mErr);
       else if (count) membersUpdated += count;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { error: sErr, count: sCount } = await(db.from('subscribers') as any)
         .update({ email: r.email, name: r.name })
         .eq('github', r.github)

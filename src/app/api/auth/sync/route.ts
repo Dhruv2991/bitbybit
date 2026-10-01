@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     // Ensure a members row exists, then set/refresh email + name.
     // Two steps (rather than one upsert) so an existing member's
     // points/streak/problems_solved are never reset by a login.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { error: upsertErr } = await (db.from('members') as any).upsert(
       { github, name, total_points: 0, problems_solved: 0, streak: 0 },
       { onConflict: 'github', ignoreDuplicates: true },
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
       console.error('[auth/sync] members upsert error:', upsertErr);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { error: memberErr } = await (db.from('members') as any)
       .update({ email, name })
       .eq('github', github);
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     // If they already have a subscribers row (e.g. from before this
     // fix shipped), keep its email in sync too. Don't create one —
     // that row is only created at actual payment time.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { error: subErr } = await (db.from('subscribers') as any)
       .update({ email, name })
       .eq('github', github);

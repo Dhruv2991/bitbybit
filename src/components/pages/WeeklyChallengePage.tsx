@@ -363,7 +363,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
     const total = details?.total ?? (problem.test_cases?.length || 0);
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { data: existingRows } = await (db.from("weekly_submissions") as any)
         .select("id, status, points_awarded")
         .eq("weekly_challenge_id", activeChallenge.id)
@@ -390,7 +390,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
         ? finalPoints - (prevRow?.points_awarded || 0)
         : 0;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       await (db.from("weekly_submissions") as any).upsert(
         {
           weekly_challenge_id: activeChallenge.id,
@@ -415,7 +415,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
       }
 
       // Refresh submissions
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { data } = await (db.from("weekly_submissions") as any)
         .select("*")
         .eq("github", user.github);

@@ -36,6 +36,20 @@ const ALLOWED_ATTR = [
   'start', 'type', // ol attributes
 ];
 
+let hookAdded = false;
+
+function ensureHooks(DOMPurify: any) {
+  if (hookAdded) return;
+  DOMPurify.addHook('afterSanitizeAttributes', (node: Element) => {
+    if (node.tagName === 'A') {
+      if (node.getAttribute('target') === '_blank' || !node.hasAttribute('rel')) {
+        node.setAttribute('rel', 'noopener noreferrer');
+      }
+    }
+  });
+  hookAdded = true;
+}
+
 /**
  * Returns a sanitized HTML string safe to pass to dangerouslySetInnerHTML.
  * Must only be called in a browser context (inside useEffect or event handlers).
@@ -49,8 +63,9 @@ export function sanitizeHtml(dirty: string): string {
   // Dynamic import is not needed here — DOMPurify is imported at module level
   // because this file is only ever imported by client components (Workspace is
   // 'use client' and uses next/dynamic with ssr:false).
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line
   const DOMPurify = require('dompurify');
+  ensureHooks(DOMPurify);
 
   return DOMPurify.sanitize(dirty, {
     ALLOWED_TAGS,

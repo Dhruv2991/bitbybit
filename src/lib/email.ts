@@ -131,16 +131,27 @@ export async function sendBatch(recipients: BatchRecipient[]): Promise<{ sent: n
   return { sent, failed, lastError };
 }
 
+function he(str: any): string {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ────────────────────────────────────────────────────────────
 // Templates (unchanged — same output regardless of provider)
 // ────────────────────────────────────────────────────────────
 
 export function subscriptionConfirmedEmail(name: string, periodEnd: string) {
-  const until = new Date(periodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  const safeName = he(name);
+  const until = he(new Date(periodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }));
   return {
     subject: "You're subscribed ✓",
     html: wrap(`
-      <p style="font-size:15px;">Hey ${name},</p>
+      <p style="font-size:15px;">Hey ${safeName},</p>
       <p style="font-size:14px;color:#aaa;line-height:1.6;">
         Your subscription is active. You've got full access to problems, weekly challenges,
         and free contest entry until <strong style="color:#00e87a;">${until}</strong>.
@@ -154,10 +165,11 @@ export function subscriptionConfirmedEmail(name: string, periodEnd: string) {
 }
 
 export function subscriptionRevokedEmail(name: string) {
+  const safeName = he(name);
   return {
     subject: 'Your subscription has been refunded',
     html: wrap(`
-      <p style="font-size:15px;">Hey ${name},</p>
+      <p style="font-size:15px;">Hey ${safeName},</p>
       <p style="font-size:14px;color:#aaa;line-height:1.6;">
         We've processed a refund for your subscription, and your access has been
         turned off accordingly. If you think this was a mistake, just reply to this
@@ -168,12 +180,14 @@ export function subscriptionRevokedEmail(name: string) {
 }
 
 export function contestLiveEmail(name: string, contestName: string) {
+  const safeName = he(name);
+  const safeContest = he(contestName);
   return {
     subject: `🏆 ${contestName} is live now`,
     html: wrap(`
-      <p style="font-size:15px;">Hey ${name},</p>
+      <p style="font-size:15px;">Hey ${safeName},</p>
       <p style="font-size:14px;color:#aaa;line-height:1.6;">
-        <strong style="color:#e0e0e0;">${contestName}</strong> just went live in the Arena.
+        <strong style="color:#e0e0e0;">${safeContest}</strong> just went live in the Arena.
         Free entry for subscribers — jump in before it wraps up.
       </p>
       <a href="${SITE_URL}/#arena" style="display:inline-block;margin-top:16px;background:#00e87a;color:#000;
@@ -185,12 +199,14 @@ export function contestLiveEmail(name: string, contestName: string) {
 }
 
 export function weeklyChallengeEmail(name: string, title: string) {
+  const safeName = he(name);
+  const safeTitle = he(title);
   return {
     subject: `🏅 New weekly challenge: ${title}`,
     html: wrap(`
-      <p style="font-size:15px;">Hey ${name},</p>
+      <p style="font-size:15px;">Hey ${safeName},</p>
       <p style="font-size:14px;color:#aaa;line-height:1.6;">
-        This week's challenge <strong style="color:#e0e0e0;">${title}</strong> is up.
+        This week's challenge <strong style="color:#e0e0e0;">${safeTitle}</strong> is up.
         Solve it before the week's out to climb the leaderboard.
       </p>
       <a href="${SITE_URL}/#weekly" style="display:inline-block;margin-top:16px;background:#00e87a;color:#000;
@@ -200,15 +216,16 @@ export function weeklyChallengeEmail(name: string, title: string) {
     `),
   };
 }
-// Add this function to src/lib/email.ts, alongside subscribeNudgeEmail etc.
 
 export function inactivityNudgeEmail(name: string, daysInactive: number) {
+  const safeName = he(name);
+  const safeDays = he(daysInactive);
   return {
     subject: "We miss you at Bit by Bit 👋",
     html: wrap(`
-      <p style="font-size:15px;">Hey ${name},</p>
+      <p style="font-size:15px;">Hey ${safeName},</p>
       <p style="font-size:14px;color:#aaa;line-height:1.6;">
-        It's been ${daysInactive} days since you last solved a problem —
+        It's been ${safeDays} days since you last solved a problem —
         your account, streak, and points are all still here. Come back and
         solve one to pick up where you left off.
       </p>
@@ -221,10 +238,11 @@ export function inactivityNudgeEmail(name: string, daysInactive: number) {
 }
 
 export function subscribeNudgeEmail(name: string) {
+  const safeName = he(name);
   return {
     subject: "You're missing out on this week's challenge",
     html: wrap(`
-      <p style="font-size:15px;">Hey ${name},</p>
+      <p style="font-size:15px;">Hey ${safeName},</p>
       <p style="font-size:14px;color:#aaa;line-height:1.6;">
         You signed in but haven't subscribed yet — subscribers get full problem access,
         weekly challenges, and free contest entry, all for ₹39/month.
@@ -236,3 +254,44 @@ export function subscribeNudgeEmail(name: string) {
     `),
   };
 }
+
+export function certificateIssuedEmail(
+  name: string,
+  certificateTitle: string,
+  eventName: string,
+  certificateId: string,
+  viewUrl?: string
+) {
+  const safeName = he(name);
+  const safeTitle = he(certificateTitle);
+  const safeEvent = he(eventName);
+  const safeCertId = he(certificateId);
+  const targetUrl = viewUrl || `${SITE_URL}/profile`;
+
+  return {
+    subject: 'Your Bit-by-Bit Certificate Has Been Issued',
+    html: wrap(`
+      <p style="font-size:16px;font-weight:bold;color:#fff;margin-bottom:8px;">Hello ${safeName},</p>
+      <p style="font-size:15px;color:#00e87a;font-weight:bold;margin-bottom:16px;">🎉 Congratulations!</p>
+      <p style="font-size:14px;color:#ccc;line-height:1.6;margin-bottom:16px;">
+        A certificate has been issued to you through Bit-by-Bit.
+      </p>
+      <div style="background:#161616;border:1px solid #282828;border-radius:12px;padding:16px;margin:16px 0;font-size:13px;line-height:1.8;">
+        <div style="color:#888;">Certificate:</div>
+        <div style="color:#00e87a;font-weight:bold;margin-bottom:8px;">${safeTitle}</div>
+        <div style="color:#888;">Event:</div>
+        <div style="color:#e0e0e0;font-weight:bold;margin-bottom:8px;">${safeEvent}</div>
+        <div style="color:#888;">Certificate ID:</div>
+        <div style="color:#f0b429;font-family:monospace;font-weight:bold;">${safeCertId}</div>
+      </div>
+      <p style="font-size:13px;color:#aaa;line-height:1.5;">
+        You can view and download your certificate anytime from your Bit-by-Bit profile.
+      </p>
+      <a href="${targetUrl}" style="display:inline-block;margin-top:20px;background:#00e87a;color:#000;
+        padding:12px 24px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:14px;box-shadow:0 0 16px rgba(0,232,122,0.3);">
+        View Certificate →
+      </a>
+    `),
+  };
+}
+

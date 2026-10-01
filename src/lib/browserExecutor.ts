@@ -112,6 +112,9 @@ async function runPython(code: string): Promise<{ stdout: string; stderr: string
     await pyodide.runPythonAsync(code);
   } catch (e: any) {
     stderr += e.message || String(e);
+  } finally {
+    pyodide.setStdout({ batched: () => {} });
+    pyodide.setStderr({ batched: () => {} });
   }
   return { stdout: stdout.trimEnd(), stderr: stderr.trimEnd() };
 }
@@ -185,7 +188,7 @@ export async function runInBrowser(
 
       results.push({
         input: tc.input, expected, actual, ok,
-        error: out.stderr || undefined,
+        error: !ok && out.stderr ? out.stderr : undefined,
         time:  `${ms}ms`,
       });
     } catch (e: any) {

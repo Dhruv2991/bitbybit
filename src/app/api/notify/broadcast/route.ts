@@ -44,7 +44,7 @@ async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
   if (!github) return null;
 
   const db = createServerSupabaseClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line
   const { data: admin } = await (db.from('admins') as any).select('github').eq('github', github).maybeSingle();
   return admin ? github : null;
 }
@@ -65,9 +65,9 @@ export async function POST(req: NextRequest) {
     const db = createServerSupabaseClient();
 
     const [{ data: subs }, { data: alreadyLogged }] = await Promise.all([
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       (db.from('subscribers') as any).select('github, name, email, status, current_period_end'),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       (db.from('email_log') as any).select('github').eq('kind', kind).eq('ref_id', refId),
     ]);
 
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
       const result = await sendEmailDetailed(s.email, subject, html);
       if (result.ok) {
         sent++;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         await (db.from('email_log') as any)
           .upsert({ github: s.github, email: s.email, kind, ref_id: refId }, { onConflict: 'github,kind,ref_id' });
       } else {

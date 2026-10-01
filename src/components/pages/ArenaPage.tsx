@@ -106,7 +106,7 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
           ? db.from('arena_submissions').select('contest_id, status').eq('github', user.github)
           : Promise.resolve({ data: [] }),
         user
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // eslint-disable-next-line
           ? (db.from('subscribers') as any).select('status, current_period_end').eq('github', user.github).maybeSingle()
           : Promise.resolve({ data: null }),
       ]);

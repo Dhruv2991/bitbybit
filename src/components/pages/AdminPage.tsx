@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import { isActiveSubscription } from "@/lib/subscription";
 import { effectiveStreak, calendarDaysBetween } from "@/lib/streak";
+import CertificatesTab from "@/components/admin/CertificatesTab";
 import type {
   User,
   Submission,
@@ -111,6 +112,7 @@ type Section =
   | "feedback"
   | "weekly"
   | "subscribers"
+  | "certificates"
   | "ai-generate"
   | "announcements";
 
@@ -737,7 +739,7 @@ function ContestForm({
       visibility: "arena",
       is_contest_problem: true,
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { data, error } = await (db.from("problems") as any)
       .insert([payload])
       .select()
@@ -1448,7 +1450,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     if (input === null) return;
     const points = Math.max(0, parseInt(input as string, 10) || 0);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from("submissions") as any)
       .update({ status: "approved", points_awarded: points })
       .eq("id", id);
@@ -1468,7 +1470,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     if (reason === null) return;
     const finalReason =
       (reason as string).trim() || "Does not meet requirements";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from("submissions") as any)
       .update({ status: "rejected", reject_reason: finalReason })
       .eq("id", id);
@@ -1501,18 +1503,18 @@ export default function AdminPage({ user }: AdminPageProps) {
     const delta = newPoints - (sub.points_awarded || 0);
     if (delta === 0) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from("submissions") as any)
       .update({ points_awarded: newPoints })
       .eq("id", sub.id);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { data: mem } = await (db.from("members") as any)
       .select("total_points")
       .eq("github", sub.github)
       .maybeSingle();
     if (mem) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       await (db.from("members") as any)
         .update({ total_points: Math.max(0, (mem.total_points || 0) + delta) })
         .eq("github", sub.github);
@@ -1586,7 +1588,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     if (finalStr === null) return;
     const finalPts = Math.max(0, parseInt(finalStr as string, 10) || 0);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from("arena_submissions") as any)
       .update({ status: "reviewed", points_awarded: finalPts })
       .eq("id", sub.id);
@@ -1617,7 +1619,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     if (reason === null) return;
     const finalReason =
       (reason as string).trim() || "Did not meet requirements";
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from("arena_submissions") as any)
       .update({ status: "disqualified", strike_penalty_factor: 0 })
       .eq("id", id);
@@ -1668,7 +1670,7 @@ export default function AdminPage({ user }: AdminPageProps) {
             : 1
         : ex.streak || 0; // arena: leave streak untouched
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       await (db.from("members") as any)
         .update({
           total_points: (ex.total_points || 0) + effectivePoints,
@@ -1707,7 +1709,7 @@ export default function AdminPage({ user }: AdminPageProps) {
   ) {
     if (editingProblem) {
       console.log("FORM DATA:", form);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { error } = await (db.from("problems") as any)
         .update(form)
         .eq("id", editingProblem.id);
@@ -1717,7 +1719,7 @@ export default function AdminPage({ user }: AdminPageProps) {
       );
       showToast("Problem updated ✓");
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { data, error } = await (db.from("problems") as any)
         .insert([form])
         .select()
@@ -1750,7 +1752,7 @@ export default function AdminPage({ user }: AdminPageProps) {
   // ── Contest CRUD ──────────────────────────────────────────
   async function saveContest(form: Omit<Contest, "id" | "created_at">) {
     if (editingContest) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { error } = await (db.from("contests") as any)
         .update(form)
         .eq("id", editingContest.id);
@@ -1760,7 +1762,7 @@ export default function AdminPage({ user }: AdminPageProps) {
       );
       showToast("Contest updated ✓");
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { data, error } = await (db.from("contests") as any)
         .insert([form])
         .select()
@@ -1787,7 +1789,7 @@ export default function AdminPage({ user }: AdminPageProps) {
   }
 
   async function setContestStatus(id: string, status: Contest["status"]) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from("contests") as any).update({ status }).eq("id", id);
     const contest = contests.find((c) => c.id === id);
     setContests((prev) =>
@@ -1823,7 +1825,7 @@ export default function AdminPage({ user }: AdminPageProps) {
       github: reg?.github || "",
     });
     if (reason === null) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from("contest_registrations") as any)
       .update({ status: "rejected" })
       .eq("id", id);
@@ -1861,6 +1863,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     { id: "feedback", label: "💬 Feedback" },
     { id: "weekly", label: "🏅 Weekly" },
     { id: "subscribers", label: "⭐ Subscribers" },
+    { id: "certificates", label: "📜 Certificates" },
     { id: "ai-generate", label: "✦ AI Generate" },
     { id: "announcements", label: "📣 Announcements" },
   ];
@@ -3068,6 +3071,9 @@ export default function AdminPage({ user }: AdminPageProps) {
         {section === "feedback" && <FeedbackAdminSection />}
         {section === "weekly" && <WeeklyAdminSection user={user} />}
         {section === "subscribers" && <SubscriberAdminSection />}
+        {section === "certificates" && (
+          <CertificatesTab members={members} showToast={showToast} />
+        )}
         {section === "ai-generate" && <AiGenerateSection />}
         {section === "announcements" && <AnnouncementAdminSection />}
       </div>
@@ -3157,7 +3163,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
   }, []);
 
   async function load() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const [{ data: ch }, { data: probs }, { data: subs }] = await Promise.all([
       (db.from("weekly_challenges") as any)
         .select("*")
@@ -3229,14 +3235,14 @@ function WeeklyAdminSection({ user }: { user: User }) {
         ends_at: new Date(form.ends_at).toISOString(),
       };
       if (editId) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const { error } = await (db.from("weekly_challenges") as any)
           .update(payload)
           .eq("id", editId);
         if (error) throw error;
         showToast("Updated ✓");
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         const { data: created, error } = await (
           db.from("weekly_challenges") as any
         )
@@ -3270,7 +3276,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
       confirmMsg: "Delete this weekly challenge? This cannot be undone.",
     });
     if (result === null) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     await (db.from("weekly_challenges") as any).delete().eq("id", id);
     load();
   }
@@ -3282,7 +3288,7 @@ function WeeklyAdminSection({ user }: { user: User }) {
       return;
     }
     const delta = pts - (sub.points_awarded || 0);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line
     const { error } = await (db.from("weekly_submissions") as any)
       .update({ points_awarded: pts })
       .eq("id", sub.id);
@@ -3296,13 +3302,13 @@ function WeeklyAdminSection({ user }: { user: User }) {
     // so editing them here has to apply just the difference, not the
     // full new value (which would double-count what was already added).
     if (sub.status === "approved" && delta !== 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { data: mem } = await (db.from("members") as any)
         .select("total_points")
         .eq("github", sub.github)
         .maybeSingle();
       if (mem) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         await (db.from("members") as any)
           .update({
             total_points: Math.max(0, (mem.total_points || 0) + delta),
@@ -4412,7 +4418,7 @@ function FeedbackAdminSection() {
   async function load() {
     setLoading(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line
       const { data } = await (db.from("contest_feedback") as any)
         .select("*")
         .order("created_at", { ascending: false });

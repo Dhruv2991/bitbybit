@@ -69,7 +69,7 @@ export const BADGES: Badge[] = [
     permanent: true, unlocked: s => s.totalPoints >= 20000,
   },
   {
-    id: 'point-master', icon: '🏆', label: 'Point Master',
+    id: 'point-grandmaster', icon: '👑', label: 'Point Grandmaster',
     description: 'Earn 50,000 total points',
     permanent: true, unlocked: s => s.totalPoints >= 50000,
   },
