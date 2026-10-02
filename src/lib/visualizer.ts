@@ -1,23 +1,25 @@
 // ════════════════════════════════════════════════════════════
 // src/lib/visualizer.ts
-// Line-by-line execution tracer powered by Pyodide.
+// Multi-language Line-by-Line Execution Tracer & Tiered Quota Manager.
 //
-// Key behaviour:
-//   - Users write only their function (LeetCode-style).
-//   - We detect the function name, inject a call with the
-//     first test-case's JSON arguments, then trace through
-//     the entire execution so every line inside the function
-//     body is stepped through.
-//   - The tracer uses Python's sys.settrace so no user code
-//     modifications are needed.
-//   - Line numbers in ExecStep are 1-based and refer to the
-//     user's own code (harness lines are pre-pended but the
-//     trace is filtered to only capture user-code lines).
-//
-// Quota:
-//   - 15 visualizer runs per day, stored in localStorage.
-//   - Resets at midnight local time.
+// Features:
+//   - Client-side execution: Python (Pyodide), JavaScript (Browser AST/Sandbox).
+//   - Compiled execution: C++, Java, Go, Rust (Judge0 with Wandbox fallback).
+//   - Tiered Daily Quotas:
+//       • Free Users:  5 runs / day
+//       • Pro Users:  50 runs / day
+//       • Automatic 24-hour / midnight calendar day reset.
 // ════════════════════════════════════════════════════════════
+
+import type { SupportedLang } from '@/types/database';
+import { parseExecutionStdout } from '@/lib/parseExecutionStdout';
+import {
+  traceJavaScript,
+  buildCppTraceProgram,
+  buildJavaTraceProgram,
+  buildGoTraceProgram,
+  buildRustTraceProgram,
+} from '@/lib/visualizerInstrumenter';
 
 export interface ExecStep {
   /** 1-based line number in the user's original code */
@@ -29,124 +31,160 @@ export interface ExecStep {
 }
 
 export interface TraceResult {
-  steps:  ExecStep[];
-  stdout: string;
-  stderr: string;
-  error?: string;
+  steps:   ExecStep[];
+  stdout:  string;
+  stderr:  string;
+  error?:  string;
 }
 
-// ── Daily quota helpers ───────────────────────────────────────
+// ── Daily Quota Limits & State ────────────────────────────────
 
-const QUOTA_KEY   = 'bb_viz_quota';
-const DAILY_LIMIT = 15;
+export const FREE_DAILY_LIMIT = 5;
+export const PRO_DAILY_LIMIT  = 50;
 
-interface QuotaRecord { date: string; used: number; }
+const QUOTA_KEY_PREFIX = 'bb_viz_quota_v2';
+
+interface QuotaRecord {
+  date: string;
+  used: number;
+}
 
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function getVisualizerQuota(): { used: number; limit: number; remaining: number } {
+function quotaKey(userGithub?: string): string {
+  return userGithub ? `${QUOTA_KEY_PREFIX}_${userGithub}` : `${QUOTA_KEY_PREFIX}_anon`;
+}
+
+export interface QuotaStatus {
+  used:      number;
+  limit:     number;
+  remaining: number;
+  isPro:     boolean;
+  resetsIn:  string;
+}
+
+export function msUntilMidnight(): string {
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setHours(24, 0, 0, 0);
+  const diffMs = midnight.getTime() - now.getTime();
+  const hrs = Math.floor(diffMs / 3600000);
+  const mins = Math.floor((diffMs % 3600000) / 60000);
+  return hrs > 0 ? `${hrs}h ${mins}m` : `${mins}m`;
+}
+
+export function getVisualizerQuota(
+  isSubscriber: boolean = false,
+  userGithub?: string
+): QuotaStatus {
+  const limit = isSubscriber ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
+  const today = todayStr();
+  const key   = quotaKey(userGithub);
+
   try {
-    const raw = localStorage.getItem(QUOTA_KEY);
+    const raw = localStorage.getItem(key);
     if (raw) {
-      const rec: QuotaRecord = JSON.parse(raw);
-      if (rec.date === todayStr()) {
-        return { used: rec.used, limit: DAILY_LIMIT, remaining: Math.max(0, DAILY_LIMIT - rec.used) };
+      const record: QuotaRecord = JSON.parse(raw);
+      if (record.date === today) {
+        const used = Math.min(record.used, limit);
+        return {
+          used,
+          limit,
+          remaining: Math.max(0, limit - used),
+          isPro: isSubscriber,
+          resetsIn: msUntilMidnight(),
+        };
       }
     }
   } catch {}
-  return { used: 0, limit: DAILY_LIMIT, remaining: DAILY_LIMIT };
+
+  return {
+    used: 0,
+    limit,
+    remaining: limit,
+    isPro: isSubscriber,
+    resetsIn: msUntilMidnight(),
+  };
 }
 
-function incrementQuota(): void {
+export function decrementVisualizerQuota(
+  isSubscriber: boolean = false,
+  userGithub?: string
+): QuotaStatus {
+  const limit = isSubscriber ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
+  const today = todayStr();
+  const key   = quotaKey(userGithub);
+
+  let used = 1;
   try {
-    const today = todayStr();
-    const raw   = localStorage.getItem(QUOTA_KEY);
-    let used    = 1;
+    const raw = localStorage.getItem(key);
     if (raw) {
-      const rec: QuotaRecord = JSON.parse(raw);
-      used = rec.date === today ? rec.used + 1 : 1;
+      const record: QuotaRecord = JSON.parse(raw);
+      used = record.date === today ? record.used + 1 : 1;
     }
-    localStorage.setItem(QUOTA_KEY, JSON.stringify({ date: today, used }));
+    localStorage.setItem(key, JSON.stringify({ date: today, used }));
   } catch {}
+
+  return {
+    used,
+    limit,
+    remaining: Math.max(0, limit - used),
+    isPro: isSubscriber,
+    resetsIn: msUntilMidnight(),
+  };
 }
 
-// ── Access gate ───────────────────────────────────────────────
+// ── Access Gate Checker ───────────────────────────────────────
 
 export type VisualizerGateResult =
-  | { ok: true }
-  | { ok: false; reason: 'not_subscriber' }
-  | { ok: false; reason: 'quota_exceeded'; used: number; limit: number };
+  | { ok: true; remaining: number; limit: number; isPro: boolean }
+  | { ok: false; reason: 'free_limit_reached' | 'pro_limit_reached'; used: number; limit: number };
 
 export function checkVisualizerAccess(
-  user: { is_subscriber?: boolean } | null,
+  user: { is_subscriber?: boolean; github?: string } | null
 ): VisualizerGateResult {
-  if (!user?.is_subscriber) {
-    return { ok: false, reason: 'not_subscriber' };
+  const isSubscriber = !!user?.is_subscriber;
+  const quota = getVisualizerQuota(isSubscriber, user?.github);
+
+  if (quota.remaining <= 0) {
+    return {
+      ok: false,
+      reason: isSubscriber ? 'pro_limit_reached' : 'free_limit_reached',
+      used: quota.used,
+      limit: quota.limit,
+    };
   }
-  const { used, limit } = getVisualizerQuota();
-  if (used >= limit) {
-    return { ok: false, reason: 'quota_exceeded', used, limit };
-  }
-  return { ok: true };
+
+  return {
+    ok: true,
+    remaining: quota.remaining,
+    limit: quota.limit,
+    isPro: isSubscriber,
+  };
 }
 
-// ── Extract function name from Python code ────────────────────
+// ── Python Tracing via Pyodide ────────────────────────────────
 
 function extractPythonFuncName(code: string): string | null {
   const m = code.match(/^def\s+(\w+)\s*\(/m);
   return m ? m[1] : null;
 }
 
-// ── Build the full traced harness ────────────────────────────
-//
-// Strategy:
-//   1. Pre-pend boilerplate (sys, io, tracer setup) — N_PREFIX lines.
-//   2. Embed user code via exec() so it lives at "<string>" filename.
-//   3. The tracer hook filters to filename == "<user>" (we compile
-//      user code with that filename) so ONLY user lines are captured.
-//   4. After user code is exec'd, inject a call:
-//        fn(*json.loads(inputJson))
-//      This makes the function body actually run.
-//   5. Line numbers reported are relative to the start of the user
-//      code block so they map 1:1 onto the editor.
-//
-// inputJson: JSON array of arguments, e.g. [[2,7,11,15], 9]
-// If inputJson is null/empty we still call the function with no args
-// (useful for functions that take no parameters or for basic scripts).
-
-function buildTracerHarness(userCode: string, inputJson: string | null): string {
-  const fnName     = extractPythonFuncName(userCode);
-  const argsJson   = JSON.stringify(inputJson ?? '[]');   // double-encode for safe embedding
-  const userJson   = JSON.stringify(userCode);            // safe embed of user code
-
-  // Build the call line: fn(*args) if a function was detected, otherwise nothing
-  // (the exec already ran the top-level code)
-  const callPart = fnName
-    ? `
-# ── Auto-injected call so the function body actually executes ──
-import json as __json__
-try:
-    __viz_args__ = __json__.loads(${argsJson})
-    if not isinstance(__viz_args__, list):
-        __viz_args__ = [__viz_args__]
-    ${fnName}(*__viz_args__)
-except Exception as __call_exc__:
-    __err__ = __err__ or __tb__.format_exc()
-`.trim()
-    : '# (no function detected — tracing top-level code)';
+function buildPythonTracerHarness(userCode: string, inputJson: string | null): string {
+  const fnName   = extractPythonFuncName(userCode);
+  const argsJson = JSON.stringify(inputJson ?? '[]');
+  const userJson = JSON.stringify(userCode);
 
   return `
 import sys as __sys__, json as __json__, io as __io__, traceback as __tb__
 
-# ── Capture stdout ────────────────────────────────────────────
 __trace_steps__ = []
 __real_stdout__ = __sys__.stdout
 __cap_stdout__  = __io__.StringIO()
 __sys__.stdout  = __cap_stdout__
 
-# ── Safe value repr (truncate huge structures) ────────────────
 def __safe_repr__(v):
     try:
         r = repr(v)
@@ -154,9 +192,6 @@ def __safe_repr__(v):
     except Exception:
         return '<unrepresentable>'
 
-# ── Tracer: only capture lines inside the user's code ─────────
-# We compile user code with filename '<user>' so we can filter
-# accurately — harness lines (filename '<string>') are ignored.
 def __tracer__(frame, event, arg):
     if event == 'line' and frame.f_code.co_filename == '<user>':
         snap = {}
@@ -172,7 +207,6 @@ def __tracer__(frame, event, arg):
 
 __sys__.settrace(__tracer__)
 
-# ── Step 1: define the user's function (exec with '<user>' filename) ──
 __err__ = ''
 __user_globals__ = {}
 try:
@@ -180,13 +214,12 @@ try:
 except Exception:
     __err__ = __tb__.format_exc()
 
-# ── Step 2: call the function so its body is traced ──────────
 if not __err__:
     try:
         __viz_args__ = __json__.loads(${argsJson})
         if not isinstance(__viz_args__, list):
             __viz_args__ = [__viz_args__]
-        ${fnName ? `__user_globals__['${fnName}'](*__viz_args__)` : 'pass  # no function detected'}
+        ${fnName ? `__user_globals__['${fnName}'](*__viz_args__)` : 'pass'}
     except Exception:
         __err__ = __err__ or __tb__.format_exc()
 
@@ -201,8 +234,6 @@ print(__json__.dumps({
 }))
 `.trim();
 }
-
-// ── Pyodide singleton ─────────────────────────────────────────
 
 let pyodideInstance: any = null;
 let pyodideLoading: Promise<any> | null = null;
@@ -227,20 +258,16 @@ async function getPyodide(): Promise<any> {
   return pyodideLoading;
 }
 
-// ── Main entrypoint ───────────────────────────────────────────
-
-export async function traceCode(
-  userCode:    string,
-  _language:   string,
-  /** JSON-array string of args for the first test case, e.g. '[[2,7,11,15],9]' */
-  inputJson:   string | null,
-  onProgress?: (msg: string) => void,
+async function tracePython(
+  userCode: string,
+  inputJson: string | null,
+  onProgress?: (msg: string) => void
 ): Promise<TraceResult> {
-  onProgress?.('Loading Python runtime…');
+  onProgress?.('Loading Python runtime (Pyodide)…');
   const pyodide = await getPyodide();
 
-  onProgress?.('Tracing execution…');
-  const harness = buildTracerHarness(userCode, inputJson);
+  onProgress?.('Executing step-by-step trace…');
+  const harness = buildPythonTracerHarness(userCode, inputJson);
 
   let rawOut = '';
   let rawErr = '';
@@ -264,7 +291,7 @@ export async function traceCode(
       steps:  [],
       stdout: rawOut.trimEnd(),
       stderr: rawErr.trimEnd(),
-      error:  'Tracer produced no output — your code may have a top-level syntax error.',
+      error:  'Tracer produced no output — verify your syntax.',
     };
   }
 
@@ -277,8 +304,6 @@ export async function traceCode(
       stdout: string;
       error:  string;
     };
-
-    incrementQuota();
 
     return {
       steps:  payload.steps,
@@ -294,4 +319,89 @@ export async function traceCode(
       error:  'Failed to parse trace payload.',
     };
   }
+}
+
+// ── Compiled Languages Server Trace Dispatcher ───────────────
+
+async function traceCompiledOnServer(
+  instrumentedCode: string,
+  language: SupportedLang,
+  onProgress?: (msg: string) => void
+): Promise<TraceResult> {
+  onProgress?.(`Dispatching ${language} trace to sandbox…`);
+
+  const res = await fetch('/api/visualize/trace', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: instrumentedCode, language }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error || 'Server trace compilation failed');
+  }
+
+  const { steps, cleanStdout } = parseExecutionStdout(data.stdout || '');
+
+  return {
+    steps,
+    stdout: cleanStdout,
+    stderr: data.stderr || '',
+    error:  data.stderr ? `Compiler/Runtime notes:\n${data.stderr}` : undefined,
+  };
+}
+
+// ── Main Multi-Language Entrypoint ────────────────────────────
+
+export async function traceCode(
+  userCode:    string,
+  language:    SupportedLang,
+  inputJson:   string | null,
+  onProgress?: (msg: string) => void,
+  user?:       { is_subscriber?: boolean; github?: string } | null
+): Promise<TraceResult> {
+  let result: TraceResult;
+
+  switch (language) {
+    case 'python':
+      result = await tracePython(userCode, inputJson, onProgress);
+      break;
+
+    case 'javascript':
+      onProgress?.('Tracing JavaScript in browser…');
+      result = await traceJavaScript(userCode, inputJson);
+      break;
+
+    case 'cpp': {
+      const code = buildCppTraceProgram(userCode, inputJson);
+      result = await traceCompiledOnServer(code, 'cpp', onProgress);
+      break;
+    }
+
+    case 'java': {
+      const code = buildJavaTraceProgram(userCode, inputJson);
+      result = await traceCompiledOnServer(code, 'java', onProgress);
+      break;
+    }
+
+    case 'go': {
+      const code = buildGoTraceProgram(userCode, inputJson);
+      result = await traceCompiledOnServer(code, 'go', onProgress);
+      break;
+    }
+
+    case 'rust': {
+      const code = buildRustTraceProgram(userCode, inputJson);
+      result = await traceCompiledOnServer(code, 'rust', onProgress);
+      break;
+    }
+
+    default:
+      throw new Error(`Unsupported language for visualizer: ${language}`);
+  }
+
+  // Decrement quota only upon successful trace processing
+  decrementVisualizerQuota(!!user?.is_subscriber, user?.github);
+
+  return result;
 }

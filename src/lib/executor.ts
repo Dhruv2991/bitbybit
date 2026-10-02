@@ -693,7 +693,23 @@ async function executeWithWandbox(
 }
 
 // ── Public API ───────────────────────────────────────────────
-//
+
+/**
+ * Execute raw source code directly via Judge0 (with Wandbox fallback).
+ * Used for compiled language logic visualizer traces and arbitrary single-file runs.
+ */
+export async function executeRawProgram(
+  fullCode: string,
+  language: string,
+): Promise<{ stdout: string; stderr: string }> {
+  try {
+    return await executeWithJudge0(fullCode, language);
+  } catch (e: any) {
+    console.warn('[executor] Judge0 raw execution failed, falling back to Wandbox:', e.message);
+    return await executeWithWandbox(fullCode, language);
+  }
+}
+
 // runAgainstTestCases makes exactly ONE Judge0 call for all
 // test cases combined, instead of one call per test case.
 // Falls back to Wandbox if Judge0 is unreachable.

@@ -1,7 +1,8 @@
 'use client';
 // ════════════════════════════════════════════════════════════
 // src/components/code-editor/CodeEditor.tsx
-// Monaco Editor wrapper with standard VS Code aesthetics
+// Monaco Editor wrapper with standard VS Code aesthetics &
+// visualizer active-line tracing support.
 // ════════════════════════════════════════════════════════════
 
 import { useRef, useEffect, useState } from 'react';
@@ -18,15 +19,16 @@ const MONACO_LANG_MAP: Record<SupportedLang, string> = {
 };
 
 interface CodeEditorProps {
-  value:     string;
-  language:  SupportedLang;
-  onChange:  (value: string) => void;
-  readOnly?: boolean;
-  height?:   string;
+  value:       string;
+  language:    SupportedLang;
+  onChange:    (value: string) => void;
+  readOnly?:   boolean;
+  height?:     string;
+  activeLine?: number | null;
   /** Ctrl/Cmd+Enter while focused in the editor */
-  onRun?:    () => void;
+  onRun?:      () => void;
   /** Ctrl/Cmd+Shift+Enter while focused in the editor */
-  onSubmit?: () => void;
+  onSubmit?:   () => void;
 }
 
 export default function CodeEditor({
@@ -35,10 +37,14 @@ export default function CodeEditor({
   onChange,
   readOnly = false,
   height = '420px',
+  activeLine = null,
   onRun,
   onSubmit,
 }: CodeEditorProps) {
   const [theme, setTheme] = useState<'vs-dark' | 'vs'>('vs-dark');
+  const editorRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
+  const decorationsRef = useRef<string[]>([]);
 
   const onRunRef    = useRef(onRun);
   const onSubmitRef = useRef(onSubmit);
@@ -57,6 +63,9 @@ export default function CodeEditor({
   }, []);
 
   const handleMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+
     editor.addAction({
       id:          'format-code',
       label:       'Format Code',
@@ -77,8 +86,37 @@ export default function CodeEditor({
     });
   };
 
+  // ── Sync Active Line Decoration with Monaco ─────────────────
+  useEffect(() => {
+    if (!editorRef.current || !monacoRef.current) return;
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+
+    if (activeLine && activeLine > 0) {
+      decorationsRef.current = editor.deltaDecorations(decorationsRef.current, [
+        {
+          range: new monaco.Range(activeLine, 1, activeLine, 1),
+          options: {
+            isWholeLine: true,
+            className: 'monaco-viz-active-line',
+            glyphMarginClassName: 'monaco-viz-glyph',
+          },
+        },
+      ]);
+      editor.revealLineInCenterIfOutsideViewport(activeLine);
+    } else {
+      decorationsRef.current = editor.deltaDecorations(decorationsRef.current, []);
+    }
+  }, [activeLine]);
+
   return (
-    <div className="rounded-xl overflow-hidden border border-[var(--border)] shadow-md bg-[#1e1e1e]">
+    <div className="rounded-xl overflow-hidden border border-[var(--border)] shadow-md bg-[#1e1e1e] relative">
+      <style jsx global>{`
+        .monaco-viz-active-line {
+          background: rgba(99, 102, 241, 0.22) !important;
+          border-left: 3px solid #818cf8 !important;
+        }
+      `}</style>
       <Editor
         height={height}
         language={MONACO_LANG_MAP[language] || 'python'}

@@ -140,10 +140,14 @@ export default function WelcomeHero({
 
             {/* Personalized Heading */}
             <h1 className="font-display font-semibold text-2xl sm:text-3xl lg:text-4xl text-zinc-100 tracking-tight leading-tight mb-2">
-              {displayName ? `${greeting}, ${displayName}.` : `${greeting} to BitByBit.`}
+              {displayName
+                ? `${greeting}, ${displayName}.`
+                : 'Master algorithmic\nproblem-solving.'}
             </h1>
             <p className="font-sans text-xs sm:text-sm text-zinc-400 leading-relaxed mb-6 max-w-xl">
-              Solve curated problems, compete in real-time proctored arenas, and build consistent algorithmic mastery bit by bit.
+              {displayName
+                ? 'Solve curated problems, compete in real-time proctored arenas, and build consistent algorithmic mastery — bit by bit.'
+                : 'Solve curated DSA problems, compete in real-time proctored arenas, and visualize your logic step-by-step with BitByBit Pro.'}
             </p>
 
             {/* Action buttons */}
@@ -152,16 +156,33 @@ export default function WelcomeHero({
                 onClick={() => onNavigate('problems')}
                 className="btn-primary text-xs sm:text-sm px-4 py-2 flex items-center gap-2"
               >
-                <span>Continue Practicing</span>
+                <span>{displayName ? 'Continue Practicing' : 'Start Practicing'}</span>
                 <span className="text-base leading-none">→</span>
               </button>
+
+              {/* Explore Pro — glowing accent CTA */}
               <button
-                onClick={() => onNavigate('weekly')}
-                className="btn-ghost text-xs sm:text-sm px-3.5 py-2 flex items-center gap-2"
+                id="hero-explore-pro-btn"
+                onClick={() => onNavigate('subscribe')}
+                className="group relative inline-flex items-center gap-2 px-3.5 py-2 rounded-xl font-mono text-xs font-semibold overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                style={{
+                  background: 'rgba(99,102,241,0.1)',
+                  border: '1px solid rgba(99,102,241,0.28)',
+                  color: '#818cf8',
+                  boxShadow: '0 0 16px rgba(99,102,241,0.14)',
+                }}
               >
-                <span>Weekly Challenges</span>
-                <span className="text-[10px] font-mono bg-indigo-500/15 text-indigo-400 px-1.5 py-0.5 rounded font-medium">New</span>
+                <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg>
+                Explore Pro
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-xl"
+                  style={{ background: 'rgba(99,102,241,0.06)' }}
+                />
               </button>
+
               <button
                 onClick={() => onNavigate('arena')}
                 className="px-3.5 py-2 rounded-lg font-mono text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent hover:border-zinc-700/60 transition-all"

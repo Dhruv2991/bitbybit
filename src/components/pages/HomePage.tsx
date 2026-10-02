@@ -13,6 +13,7 @@ import ContinueLearning from '@/components/home/ContinueLearning';
 import RecentActivity from '@/components/home/RecentActivity';
 import LeaderboardPreview from '@/components/home/LeaderboardPreview';
 import QuickActions from '@/components/home/QuickActions';
+import ProShowcase from '@/components/home/ProShowcase';
 
 interface HomePageProps {
   user: User | null;
@@ -429,7 +430,13 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
         onViewAllTopics={() => onNavigate('problems')}
       />
 
-      {/* 5. Recent Activity & Leaderboard Top 5 Grid */}
+      {/* 5. BitByBit Pro Showcase & Comparison */}
+      <ProShowcase
+        onNavigate={onNavigate}
+        isSubscriber={user?.is_subscriber}
+      />
+
+      {/* 6. Recent Activity & Leaderboard Top 5 Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-7">
           <RecentActivity
@@ -449,7 +456,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
         </div>
       </div>
 
-      {/* 6. Quick Action Product Tiles */}
+      {/* 7. Quick Action Product Tiles */}
       <QuickActions onNavigate={onNavigate} />
     </div>
   );

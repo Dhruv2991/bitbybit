@@ -33,8 +33,10 @@ import ProblemDiscussion from '@/components/discussion/ProblemDiscussion';
 import {
   traceCode,
   checkVisualizerAccess,
+  getVisualizerQuota,
   type ExecStep,
   type TraceResult,
+  type QuotaStatus,
 } from '@/lib/visualizer';
 import type { VisualizerGateResult } from '@/lib/visualizer';
 
@@ -670,6 +672,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
   // ── Logic Visualizer state ──────────────────────────────────────────────────
   const [isSubscriber, setIsSubscriber] = useState(false);
+  const [activeLine,   setActiveLine]   = useState<number | null>(null);
   const [vizOpen,      setVizOpen]      = useState(false);
   const [vizLoading,   setVizLoading]   = useState(false);
   const [vizSteps,     setVizSteps]     = useState<ExecStep[]>([]);
@@ -699,27 +702,24 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   // ── Logic Visualizer ────────────────────────────────────────────────────────
 
   async function handleVisualize() {
-    // Only Python is supported right now
-    if (lang !== 'python') {
-      showToast('Logic Visualizer only supports Python at the moment.', 'info');
-      return;
-    }
-    // Gate: must be a real subscriber (paid ₹39 in the Weekly tab)
-    const gate = checkVisualizerAccess({ is_subscriber: isSubscriber });
+    // Gate check: Free (5 runs/day) vs Pro (50 runs/day)
+    const gate = checkVisualizerAccess({ is_subscriber: isSubscriber, github: user?.github });
     if (!gate.ok) {
       setVizGate(gate);
       return;
     }
-    // Open drawer immediately so user sees loading state
+
+    // Open drawer immediately and reset previous state
     setVizOpen(true);
     setVizLoading(true);
     setVizSteps([]);
     setVizStdout('');
     setVizError(undefined);
     setVizProgress('');
+    setActiveLine(null);
+
     try {
-      // Pass the first test case's JSON args so the function body actually runs.
-      // problem.test_cases[0].input is a JSON array string like '[[2,7,11,15], 9]'
+      // Pass the first test case's JSON args so the function body actually runs
       const firstInput = problem.test_cases?.[0]?.input ?? null;
 
       const result: TraceResult = await traceCode(
@@ -727,12 +727,14 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         lang,
         firstInput,
         (msg) => setVizProgress(msg),
+        { is_subscriber: isSubscriber, github: user?.github }
       );
+
       setVizSteps(result.steps);
       setVizStdout(result.stdout);
       setVizError(result.error || undefined);
     } catch (e: any) {
-      setVizError(e.message || 'Visualizer error');
+      setVizError(e.message || 'Visualizer execution error');
     } finally {
       setVizLoading(false);
       setVizProgress('');
@@ -1407,6 +1409,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           language={lang}
           onChange={handleCodeChange}
           height="380px"
+          activeLine={activeLine}
           onRun={() => { if (!running) { setMobileTab('editor'); runTests(); } }}
           onSubmit={() => {
             const submitDisabled = submitting || submitBlocked || !user || (!!isWeekly && !testResult && !practiceMode) || (!!practiceMode && !testResult);
@@ -1429,33 +1432,38 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
             ) : '▶ Run Tests'}
           </button>
 
-          {/* Visualizer button — Python only, subscriber gated */}
-          {lang === 'python' && !onArenaSubmit && (
+          {/* Visualizer button — Multi-language, tiered daily quota */}
+          {!onArenaSubmit && (
             <button
               onClick={handleVisualize}
               disabled={vizLoading}
-              title={`Visualize execution step-by-step${!isSubscriber ? ' — Subscribers only (₹39/mo)' : ''}`}
-              className={`px-3 py-2.5 rounded-xl font-mono text-xs font-bold border transition-all duration-200
+              title={`Step-by-step logic visualizer (${getVisualizerQuota(isSubscriber, user?.github).remaining} runs left today)`}
+              className={`px-3.5 py-2.5 rounded-xl font-mono text-xs font-bold border transition-all duration-200
                 flex items-center gap-1.5 shrink-0
                 ${vizLoading
                   ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300 cursor-wait'
                   : isSubscriber
-                    ? 'bg-indigo-500/10 border-indigo-500/25 text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-400/40'
-                    : 'bg-zinc-900/60 border-zinc-700/50 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600'}`}
+                    ? 'bg-indigo-500/10 border-indigo-500/25 text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-400/40 shadow-xs'
+                    : 'bg-zinc-900 border-zinc-700/60 text-zinc-300 hover:text-white hover:border-zinc-500'}`}
             >
-              {vizLoading
-                ? <><span className="w-3 h-3 border-[1.5px] border-indigo-400 border-t-transparent rounded-full animate-spin" />{vizProgress || 'Loading…'}</>
-                : <>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
-                      <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
-                      <path d="M11 8v6M8 11h6"/>
-                    </svg>
-                    Visualize
-                    {!isSubscriber && (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/20">PRO</span>
-                    )}
-                  </>
-              }
+              {vizLoading ? (
+                <>
+                  <span className="w-3 h-3 border-[1.5px] border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                  {vizProgress || 'Tracing…'}
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5 text-indigo-400">
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="M21 21l-4.35-4.35" />
+                    <path d="M11 8v6M8 11h6" />
+                  </svg>
+                  <span>Visualize</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 font-bold">
+                    {getVisualizerQuota(isSubscriber, user?.github).remaining}
+                  </span>
+                </>
+              )}
             </button>
           )}
         </div>
@@ -1554,11 +1562,23 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           <LogicVisualizerDrawer
             steps={vizSteps}
             code={code}
+            language={lang}
             stdout={vizStdout}
             error={vizError}
             isLoading={vizLoading}
             testInput={problem.test_cases?.[0]?.input ?? null}
-            onClose={() => { setVizOpen(false); setVizLoading(false); }}
+            quota={getVisualizerQuota(isSubscriber, user?.github)}
+            onActiveLineChange={setActiveLine}
+            onClose={() => { setVizOpen(false); setVizLoading(false); setActiveLine(null); }}
+            onOpenUpgrade={() => {
+              const quota = getVisualizerQuota(isSubscriber, user?.github);
+              setVizGate({
+                ok: false,
+                reason: isSubscriber ? 'pro_limit_reached' : 'free_limit_reached',
+                used: quota.used,
+                limit: quota.limit,
+              });
+            }}
           />
         </div>
       )}
@@ -1568,9 +1588,12 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         <VisualizerGateModal
           reason={vizGate.reason}
           used={'used' in vizGate ? (vizGate as any).used : 0}
-          limit={'limit' in vizGate ? (vizGate as any).limit : 15}
+          limit={'limit' in vizGate ? (vizGate as any).limit : 5}
           onClose={() => setVizGate(null)}
-          onUpgrade={() => { setVizGate(null); /* navigate to subscription page */ }}
+          onUpgrade={() => {
+            setVizGate(null);
+            window.location.href = '/subscribe';
+          }}
         />
       )}
     </div>
