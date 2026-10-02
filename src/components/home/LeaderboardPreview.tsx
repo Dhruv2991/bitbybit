@@ -72,7 +72,7 @@ export default function LeaderboardPreview({
                   key={user.github}
                   className={`flex items-center justify-between p-2.5 rounded-xl font-mono text-xs transition-colors
                     ${isCurrentUser
-                      ? 'bg-indigo-500/10 border border-indigo-500/25 text-zinc-100 font-medium'
+                      ? 'bg-cyan-500/10 border border-cyan-500/25 text-zinc-100 font-medium'
                       : 'bg-zinc-950/30 border border-white/[0.04] hover:border-white/[0.1] text-zinc-400 hover:text-zinc-200'
                     }`}
                 >
@@ -92,14 +92,14 @@ export default function LeaderboardPreview({
                       {user.name}
                     </span>
                     {isCurrentUser && (
-                      <span className="text-[9px] font-medium text-indigo-400 bg-indigo-500/15 px-1.5 py-0.5 rounded-full border border-indigo-500/20">
+                      <span className="text-[9px] font-medium text-cyan-400 bg-cyan-500/15 px-1.5 py-0.5 rounded-full border border-cyan-500/20">
                         You
                       </span>
                     )}
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 text-right">
-                    <span className="text-xs font-medium text-indigo-400 tabular-nums">
+                    <span className="text-xs font-medium text-cyan-400 tabular-nums">
                       {user.points.toLocaleString()} pts
                     </span>
                   </div>
@@ -113,7 +113,7 @@ export default function LeaderboardPreview({
       <div className="pt-4 mt-4 border-t border-white/[0.04] flex items-center justify-between">
         {currentUserRank && currentUserRank > 5 ? (
           <span className="text-xs font-mono text-zinc-400">
-            Your Rank: <strong className="text-indigo-400 font-medium">#{currentUserRank}</strong>
+            Your Rank: <strong className="text-cyan-400 font-medium">#{currentUserRank}</strong>
           </span>
         ) : (
           <span className="text-[11px] font-mono text-zinc-500">
@@ -122,7 +122,7 @@ export default function LeaderboardPreview({
         )}
         <button
           onClick={onViewFullLeaderboard}
-          className="text-xs font-mono text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+          className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
         >
           View all →
         </button>

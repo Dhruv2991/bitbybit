@@ -188,7 +188,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       items: [
         { id: "home", label: "Dashboard", icon: IconHome },
         { id: "problems", label: "Problem Set", icon: IconProblems },
-        { id: "weekly", label: "Weekly DSA", icon: IconWeekly, badge: "New", badgeColor: "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" },
+        { id: "weekly", label: "Weekly DSA", icon: IconWeekly, badge: "New", badgeColor: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" },
       ],
     },
     {
@@ -271,7 +271,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col antialiased selection:bg-indigo-500/20 selection:text-indigo-300">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col antialiased selection:bg-cyan-500/20 selection:text-cyan-300">
       <AnimatedBackground />
       <GlobalSearch user={user} navigate={(id: string) => go(id as PageId)} open={searchOpen} onOpenChange={setSearchOpen} />
 
@@ -299,16 +299,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               className="flex items-center gap-3 overflow-hidden text-left focus:outline-none group"
               title="BitByBit Home"
             >
-              <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-700/90 p-1 flex items-center justify-center shrink-0 group-hover:border-indigo-500/60 shadow-md group-hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all">
+              <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-700/90 p-1 flex items-center justify-center shrink-0 group-hover:border-cyan-500/60 shadow-md group-hover:shadow-[0_0_15px_rgba(0,229,255,0.3)] transition-all">
                 <img src="/logo.png" alt="BitByBit" className="w-full h-full object-contain filter drop-shadow-sm" />
               </div>
               {!sidebarCollapsed && (
                 <div className="flex flex-col min-w-0 transition-opacity duration-200">
                   <div className="flex items-center gap-2">
-                    <span className="font-display font-bold text-[17px] tracking-tight text-white group-hover:text-indigo-300 transition-colors leading-tight">
+                    <span className="font-display font-bold text-[17px] tracking-tight text-white group-hover:text-cyan-300 transition-colors leading-tight">
                       BitByBit
                     </span>
-                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30 leading-none">
+                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-500/30 leading-none">
                       v3
                     </span>
                   </div>
@@ -354,12 +354,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       title={sidebarCollapsed ? item.label : undefined}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-mono text-sm transition-colors group relative
                         ${isActive
-                          ? "bg-indigo-500/10 text-indigo-300 font-medium border border-indigo-500/25 shadow-sm"
+                          ? "bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/25 shadow-sm"
                           : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border border-transparent"
                         }
                         ${sidebarCollapsed ? "justify-center px-0" : ""}`}
                     >
-                      <div className={`shrink-0 ${isActive ? "text-indigo-400" : "text-zinc-400 group-hover:text-zinc-200"}`}>
+                      <div className={`shrink-0 ${isActive ? "text-cyan-400" : "text-zinc-400 group-hover:text-zinc-200"}`}>
                         <Icon className="w-[18px] h-[18px]" />
                       </div>
                       {!sidebarCollapsed && (
@@ -478,7 +478,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <span className="font-display font-bold text-base tracking-tight text-white leading-tight">
                       BitByBit
                     </span>
-                    <span className="text-[9px] font-mono font-semibold uppercase bg-indigo-500/20 text-indigo-300 px-1 py-0.2 rounded border border-indigo-500/30 leading-none">
+                    <span className="text-[9px] font-mono font-semibold uppercase bg-cyan-500/20 text-cyan-300 px-1 py-0.2 rounded border border-cyan-500/30 leading-none">
                       v3
                     </span>
                   </div>
@@ -718,7 +718,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <span className="font-display font-bold text-[17px] tracking-tight text-white leading-tight">
                       BitByBit
                     </span>
-                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30 leading-none">
+                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-500/30 leading-none">
                       v3
                     </span>
                   </div>
@@ -754,7 +754,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         onClick={() => go(item.id)}
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-mono text-xs transition-colors
                           ${isActive
-                            ? "bg-zinc-800 text-zinc-100 font-medium border border-zinc-700/60"
+                            ? "bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/25"
                             : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
                           }`}
                       >
@@ -834,7 +834,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               key={item.id}
               onClick={() => go(item.id)}
               className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-lg transition-all relative font-mono text-[10px]
-                ${isActive ? "text-indigo-400 font-medium" : "text-zinc-400 hover:text-zinc-200"}`}
+                ${isActive ? "text-cyan-400 font-medium" : "text-zinc-400 hover:text-zinc-200"}`}
             >
               <div className="relative">
                 <Icon className="w-5 h-5" />

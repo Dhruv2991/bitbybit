@@ -14,7 +14,7 @@ export default function TestResults({ results, passed, total, loading }: TestRes
   if (loading) {
     return (
       <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl px-4 py-3 text-xs font-mono text-zinc-400 flex items-center gap-2.5">
-        <div className="w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
         <span>Running test suite…</span>
       </div>
     );

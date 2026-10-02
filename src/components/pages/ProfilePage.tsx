@@ -288,7 +288,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
     <div className="max-w-3xl mx-auto animate-fade-up space-y-6">
       {/* Header */}
       <SpotlightCard
-        spotlightColor="rgba(99, 102, 241, 0.08)"
+        spotlightColor="rgba(0, 229, 255, 0.08)"
         className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-6 flex items-center gap-4 flex-wrap shadow-sm"
       >
         <img
@@ -303,7 +303,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
         </div>
         <div className="ml-auto text-right">
           <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider font-semibold">Monthly rank</p>
-          <p className="text-2xl font-display font-medium text-indigo-400">
+          <p className="text-2xl font-display font-medium text-cyan-400">
             {stats.rank ? `#${stats.rank}` : '-'}
           </p>
         </div>
@@ -312,10 +312,10 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       {/* Stat cards */}
       <div className={`grid grid-cols-1 sm:grid-cols-3 ${(stats.aiAssists > 0 || stats.bloodFirstCount > 0) ? 'md:grid-cols-5' : ''} gap-3.5`}>
         <SpotlightCard
-          spotlightColor="rgba(99, 102, 241, 0.08)"
+          spotlightColor="rgba(0, 229, 255, 0.08)"
           className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-5 text-center"
         >
-          <p className="text-2xl font-sans font-semibold text-indigo-400">{stats.totalPoints}</p>
+          <p className="text-2xl font-sans font-semibold text-cyan-400">{stats.totalPoints}</p>
           <p className="text-xs font-sans text-zinc-400 mt-1 uppercase tracking-wider font-medium">Total points</p>
         </SpotlightCard>
         <SpotlightCard
@@ -360,12 +360,12 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
 
       {/* ── MY CERTIFICATES SECTION ── */}
       <SpotlightCard
-        spotlightColor="rgba(99, 102, 241, 0.06)"
+        spotlightColor="rgba(0, 229, 255, 0.06)"
         className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-6 shadow-sm"
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-display font-medium text-sm text-zinc-100 tracking-tight flex items-center gap-2">
-            <Award className="w-4 h-4 text-indigo-400" /> My Certificates
+            <Award className="w-4 h-4 text-cyan-400" /> My Certificates
             <span className="text-zinc-500 font-mono font-normal">({stats.certificates.length})</span>
           </h2>
         </div>
@@ -447,7 +447,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
               <div key={b.id} title={`${b.label} — ${b.description}${!b.permanent ? ' (current status, can change)' : ''}`}
                 className={`flex flex-col items-center text-center gap-1.5 p-3 rounded-xl border transition-all
                   ${unlocked
-                    ? 'bg-indigo-500/10 border-indigo-500/25'
+                    ? 'bg-cyan-500/10 border-cyan-500/25'
                     : 'bg-zinc-950/30 border-white/[0.04] opacity-40 grayscale'}`}>
                 <span className="text-2xl">{b.icon}</span>
                 <span className={`text-[10px] font-mono leading-tight ${unlocked ? 'text-zinc-200' : 'text-zinc-500'}`}>
@@ -477,7 +477,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
         {stats.recent.length === 0 ? (
           <div className="text-center py-10 text-zinc-500 font-mono text-sm">
             No submissions yet —{' '}
-            <button onClick={() => onNavigate('problems')} className="text-indigo-400 hover:underline">
+            <button onClick={() => onNavigate('problems')} className="text-cyan-400 hover:underline">
               solve your first problem
             </button>
           </div>
@@ -512,7 +512,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
           <div className="bg-zinc-900/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
             <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-indigo-400" />
+                <Award className="w-5 h-5 text-cyan-400" />
                 <h3 className="font-display font-medium text-base text-zinc-100 tracking-tight">
                   {viewingCertificate.certificate_id}
                 </h3>
@@ -549,7 +549,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
                   href={`/certificate/${viewingCertificate.certificate_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-mono text-indigo-400 hover:underline flex items-center gap-1"
+                  className="text-xs font-mono text-cyan-400 hover:underline flex items-center gap-1"
                 >
                   <ExternalLink className="w-3.5 h-3.5" /> Public Verification Link
                 </a>

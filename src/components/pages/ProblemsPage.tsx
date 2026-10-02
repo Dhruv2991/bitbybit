@@ -495,7 +495,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
             <p className="text-amber-400 font-semibold text-xs">Subscriber-only Problem</p>
             <p className="text-zinc-400 text-[11px] mt-0.5">
               <button onClick={() => { setLockedToast(false); onNavigate('weekly'); }}
-                className="text-indigo-400 underline underline-offset-2 hover:text-indigo-300">
+                className="text-cyan-400 underline underline-offset-2 hover:text-cyan-300">
                 Subscribe ⭐
               </button>
               {' '}to unlock all weekly challenges.
@@ -506,10 +506,10 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
 
       {/* Not-started toast — paid but waiting */}
       {notStartedToast && (
-        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-zinc-900 border border-indigo-500/30 rounded-xl font-mono text-sm shadow-xl max-w-xs animate-slide-down backdrop-blur-xl">
+        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-zinc-900 border border-cyan-500/30 rounded-xl font-mono text-sm shadow-xl max-w-xs animate-slide-down backdrop-blur-xl">
           <span className="text-lg">⏳</span>
           <div>
-            <p className="text-indigo-400 font-semibold text-xs">Not Started Yet</p>
+            <p className="text-cyan-400 font-semibold text-xs">Not Started Yet</p>
             <p className="text-zinc-400 text-[11px] mt-0.5">{notStartedToast}</p>
           </div>
         </div>
@@ -537,7 +537,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                   onClick={() => handleTabChange('problems')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all
                     ${pageView === 'problems'
-                      ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shadow-xs'
+                      ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-xs'
                       : 'text-zinc-400 hover:text-zinc-200'}`}
                 >
                   Problems
@@ -546,7 +546,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                   onClick={() => handleTabChange('submissions')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all
                     ${pageView === 'submissions'
-                      ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shadow-xs'
+                      ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-xs'
                       : 'text-zinc-400 hover:text-zinc-200'}`}
                 >
                   My Submissions
@@ -592,7 +592,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                       ? d === 'Easy'   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-medium'
                       : d === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 font-medium'
                       : d === 'Hard'   ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 font-medium'
-                      : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30 font-medium shadow-xs'
+                      : 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30 font-medium shadow-xs'
                       : 'bg-zinc-900/50 border-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700/80 shadow-xs'}`}>
                   {d === 'all' ? 'All' : d}
                   {count > 0 && (
@@ -613,7 +613,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               <button key={opt.id} onClick={() => setAccessFilter(opt.id)}
                 className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-150 whitespace-nowrap
                   ${accessFilter === opt.id
-                    ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shadow-xs'
+                    ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-xs'
                     : 'text-zinc-400 hover:text-zinc-200 border border-transparent'}`}>
                 {opt.label}
               </button>
@@ -642,18 +642,18 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       {pageView === 'problems' && (recLoading || recommended.length > 0) && (
         <div className="mb-6 px-5 py-4 bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm text-indigo-400">✦</span>
-            <span className="text-xs font-mono font-medium text-indigo-400 uppercase tracking-wider">Based on your activity</span>
+            <span className="text-sm text-cyan-400">✦</span>
+            <span className="text-xs font-mono font-medium text-cyan-400 uppercase tracking-wider">Based on your activity</span>
           </div>
           {recLoading ? (
             <div className="flex items-center gap-2 text-zinc-400 font-mono text-xs py-2">
-              <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /> Finding problems for you…
+              <div className="w-3 h-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" /> Finding problems for you…
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {recommended.map((p) => (
                 <button key={p.id} onClick={() => handleRowClick(p)}
-                  className="text-left p-3.5 bg-zinc-950/40 border border-white/[0.06] rounded-xl hover:border-indigo-500/30 hover:bg-zinc-900/40 transition-all">
+                  className="text-left p-3.5 bg-zinc-950/40 border border-white/[0.06] rounded-xl hover:border-cyan-500/30 hover:bg-zinc-900/40 transition-all">
                   <div className="text-xs font-mono font-medium text-zinc-200 truncate mb-1.5">{p.title}</div>
                   <span className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded-full border
                     ${p.difficulty === 'Easy' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
@@ -672,7 +672,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         /* ── My Submissions view ─────────────────────────────── */
         subsLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
             <span className="text-zinc-400 text-xs font-mono">Loading submissions…</span>
           </div>
         ) : submissions.length === 0 ? (
@@ -715,7 +715,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                       <td className="py-4 pl-6 pr-4">
                         <div className="text-zinc-200 font-mono text-sm font-medium flex items-center gap-2">
                           <span className="truncate">{s.problem_title}</span>
-                          {s.code && <span className="text-xs text-indigo-400 shrink-0 font-mono" title="View submitted code">{'</>'}</span>}
+                          {s.code && <span className="text-xs text-cyan-400 shrink-0 font-mono" title="View submitted code">{'</>'}</span>}
                         </div>
                         {s.status === 'rejected' && s.review_notes && (
                           <div className="text-xs text-rose-400/80 font-mono mt-0.5">{s.review_notes}</div>
@@ -727,7 +727,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                       <td className="py-4 px-4 whitespace-nowrap">
                         <span className={`text-xs font-mono px-2 py-0.5 rounded-full border ${
                           s.type === 'weekly'
-                            ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20'
+                            ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
                             : 'text-zinc-400 bg-white/[0.04] border-white/[0.06]'
                         }`}>
                           {s.type === 'weekly' ? 'Weekly' : 'Normal'}
@@ -738,7 +738,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                           {statusLabel}
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-right text-sm font-mono font-semibold text-indigo-400 whitespace-nowrap">
+                      <td className="py-4 px-4 text-right text-sm font-mono font-semibold text-cyan-400 whitespace-nowrap">
                         {s.status === 'approved' ? `${s.points_awarded}` : '—'}
                       </td>
                       <td className="py-4 pl-4 pr-6 text-right whitespace-nowrap">
@@ -837,7 +837,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                           <span className={`font-mono text-[15px] transition-colors ${
                             isLocked
                               ? 'text-zinc-400 group-hover:text-amber-400'
-                              : 'text-zinc-100 group-hover:text-indigo-300 font-medium'
+                              : 'text-zinc-100 group-hover:text-cyan-300 font-medium'
                           }`}>
                             {p.title}
                           </span>
@@ -847,7 +847,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                             </span>
                           )}
                           {isPaidEndedP && !isSolved && (
-                            <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20 font-medium">
+                            <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 font-medium">
                               🏁 Practice
                             </span>
                           )}
@@ -872,7 +872,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                         </span>
                       </td>
                       <td className="py-4 px-4 text-right whitespace-nowrap">
-                        <span className="text-indigo-400 text-sm font-mono font-semibold">
+                        <span className="text-cyan-400 text-sm font-mono font-semibold">
                           {p.points}
                         </span>
                       </td>
@@ -891,7 +891,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                             Unlock →
                           </span>
                         ) : isPaidEndedP ? (
-                          <span className="text-indigo-400 text-sm font-mono font-medium group-hover:text-indigo-300 transition-colors">
+                          <span className="text-cyan-400 text-sm font-mono font-medium group-hover:text-cyan-300 transition-colors">
                             Practice →
                           </span>
                         ) : (
@@ -967,7 +967,7 @@ function SubmittedCodeModal({ submission, onClose }: { submission: SubmissionRow
                 {date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })} · {date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
               </span>
               {submission.status === 'approved' && (
-                <span className="text-[10px] font-mono text-indigo-400 font-semibold">{submission.points_awarded} pts</span>
+                <span className="text-[10px] font-mono text-cyan-400 font-semibold">{submission.points_awarded} pts</span>
               )}
             </div>
           </div>
@@ -1025,13 +1025,13 @@ function ShareCardModal({ card, onClose }: { card: ShareCard; onClose: () => voi
     ctx.strokeRect(1, 1, W - 2, H - 2);
 
     // Subtle ambient accent
-    ctx.fillStyle = 'rgba(99,102,241,0.06)';
+    ctx.fillStyle = 'rgba(0,229,255,0.08)';
     ctx.beginPath();
     ctx.arc(W - 80, 80, 220, 0, Math.PI * 2);
     ctx.fill();
 
     // Brand
-    ctx.fillStyle = '#6366f1';
+    ctx.fillStyle = '#00E5FF';
     ctx.font = 'bold 26px monospace';
     ctx.fillText('BitByBit', 56, 76);
     ctx.fillStyle = '#a1a1aa';
@@ -1143,7 +1143,7 @@ function ShareCardModal({ card, onClose }: { card: ShareCard; onClose: () => voi
         </div>
         <div className="flex gap-2.5 px-4 pb-4">
           <button onClick={handleShare}
-            className="flex-1 py-2 bg-indigo-600 text-white font-mono font-medium text-xs rounded-lg hover:bg-indigo-500 transition-all shadow-sm">
+            className="flex-1 py-2 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 font-mono font-bold text-xs rounded-lg hover:opacity-90 shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all">
             📤 Share
           </button>
           <button onClick={handleDownload}

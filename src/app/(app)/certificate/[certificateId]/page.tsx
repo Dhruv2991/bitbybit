@@ -92,7 +92,7 @@ export default function CertificateVerificationPage() {
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-5 h-5 rounded-full border-2 border-zinc-700 border-t-indigo-500 animate-spin" />
+          <div className="w-5 h-5 rounded-full border-2 border-zinc-700 border-t-cyan-400 animate-spin" />
           <p className="font-mono text-xs text-zinc-400">Verifying certificate authenticity...</p>
         </div>
       ) : error || !cert ? (
@@ -138,13 +138,13 @@ export default function CertificateVerificationPage() {
 
             <div className="flex items-center gap-3 ml-auto">
               <span className="font-mono text-xs px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-200 shadow-xs">
-                ID: <strong className="text-indigo-400">{cert.certificate_id}</strong>
+                ID: <strong className="text-cyan-400">{cert.certificate_id}</strong>
               </span>
               {!isRevoked && (
                 <button
                   onClick={handleDownload}
                   disabled={downloading}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center gap-2 text-xs font-mono font-medium py-2 px-4 transition-colors shadow-sm"
+                  className="bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 rounded-lg flex items-center gap-2 text-xs font-mono font-bold py-2 px-4 hover:opacity-90 shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all"
                 >
                   <Download className="w-3.5 h-3.5" />
                   {downloading ? "Downloading..." : "Download PDF"}
@@ -175,7 +175,7 @@ export default function CertificateVerificationPage() {
           {/* Details Table */}
           <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 divide-y divide-zinc-800/80">
             <h2 className="font-semibold text-sm text-zinc-100 pb-3 flex items-center gap-2">
-              <Award className="w-4 h-4 text-indigo-400" /> Certificate Details
+              <Award className="w-4 h-4 text-cyan-400" /> Certificate Details
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 text-xs font-mono">
               <div>

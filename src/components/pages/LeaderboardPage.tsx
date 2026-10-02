@@ -448,7 +448,7 @@ export default function LeaderboardPage() {
               href={`https://github.com/${github}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:text-indigo-400 transition-colors"
+              className="hover:text-cyan-400 transition-colors"
               onClick={(e) => e.stopPropagation()}
             >
               @{github}
@@ -545,7 +545,7 @@ export default function LeaderboardPage() {
           {monthOffset !== 0 && (
             <button
               onClick={() => setMonthOffset(0)}
-              className="text-[11px] font-mono text-indigo-400 hover:underline ml-1"
+              className="text-[11px] font-mono text-cyan-400 hover:underline ml-1"
             >
               Jump to current
             </button>
@@ -586,7 +586,7 @@ export default function LeaderboardPage() {
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
           <span className="text-zinc-400 text-xs font-mono">
             Loading rankings…
           </span>

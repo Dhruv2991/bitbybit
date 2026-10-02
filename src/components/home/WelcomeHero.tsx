@@ -100,14 +100,14 @@ export default function WelcomeHero({
     <div className="relative mb-8">
       {/* Announcement banner if active */}
       {announcement && !dismissedAnnouncement && (
-        <div className="flex items-center gap-3 px-4 py-3 mb-6 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-xs font-mono text-indigo-300 backdrop-blur-md animate-fade-up">
+        <div className="flex items-center gap-3 px-4 py-3 mb-6 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-xs font-mono text-cyan-300 backdrop-blur-md animate-fade-up">
           <span className="shrink-0 text-base">📣</span>
           <span className="flex-1 leading-relaxed">{announcement}</span>
           {onDismissAnnouncement && (
             <button
               onClick={onDismissAnnouncement}
               aria-label="Dismiss announcement"
-              className="shrink-0 text-indigo-400/60 hover:text-indigo-300 transition-colors p-1"
+              className="shrink-0 text-cyan-400/60 hover:text-cyan-300 transition-colors p-1"
             >
               ✕
             </button>
@@ -119,8 +119,8 @@ export default function WelcomeHero({
       <div className="relative rounded-2xl p-6 sm:p-8 lg:p-10 overflow-hidden bg-zinc-900/60 border border-zinc-800/80 shadow-sm backdrop-blur-md">
         {/* Subtle background radial lighting */}
         <div
-          className="absolute -right-16 -top-16 w-80 h-80 rounded-full pointer-events-none opacity-10 blur-3xl"
-          style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.4) 0%, transparent 70%)' }}
+          className="absolute -right-16 -top-16 w-80 h-80 rounded-full pointer-events-none opacity-15 blur-3xl"
+          style={{ background: 'radial-gradient(circle, rgba(0,229,255,0.3) 0%, transparent 70%)' }}
         />
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -166,20 +166,20 @@ export default function WelcomeHero({
                 onClick={() => onNavigate('subscribe')}
                 className="group relative inline-flex items-center gap-2 px-3.5 py-2 rounded-xl font-mono text-xs font-semibold overflow-hidden transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
                 style={{
-                  background: 'rgba(99,102,241,0.1)',
-                  border: '1px solid rgba(99,102,241,0.28)',
-                  color: '#818cf8',
-                  boxShadow: '0 0 16px rgba(99,102,241,0.14)',
+                  background: 'rgba(0,229,255,0.1)',
+                  border: '1px solid rgba(0,229,255,0.3)',
+                  color: '#00E5FF',
+                  boxShadow: '0 0 16px rgba(0,229,255,0.2)',
                 }}
               >
-                <svg className="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg className="w-3 h-3 shrink-0 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                 </svg>
                 Explore Pro
                 <span
                   aria-hidden="true"
                   className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-xl"
-                  style={{ background: 'rgba(99,102,241,0.06)' }}
+                  style={{ background: 'rgba(0,229,255,0.08)' }}
                 />
               </button>
 
@@ -216,7 +216,7 @@ export default function WelcomeHero({
               </div>
               <button
                 onClick={() => onNavigate('problems')}
-                className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+                className="text-[11px] text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
               >
                 Solve today →
               </button>

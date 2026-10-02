@@ -127,7 +127,7 @@ export default function RecentActivity({
         <div className="pt-4 mt-4 border-t border-white/[0.04] text-right">
           <button
             onClick={onExploreProblems}
-            className="text-xs font-mono text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+            className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
           >
             Practice more →
           </button>

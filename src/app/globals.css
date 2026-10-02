@@ -12,12 +12,12 @@
     --border:     rgba(255, 255, 255, 0.05);
     --border2:    rgba(255, 255, 255, 0.08);
 
-    /* Clean Brand & Action Accents */
-    --acc:        #6366f1; /* indigo-500 */
-    --acc-hover:  #4f46e5; /* indigo-600 */
-    --acc-dim:    rgba(99, 102, 241, 0.12);
-    --acc-glow:   rgba(99, 102, 241, 0.18);
-    --acc-2:      #818cf8; /* indigo-400 */
+    /* Clean Brand & Action Accents (Electric Cyan #00E5FF) */
+    --acc:        #00E5FF; /* electric cyan */
+    --acc-hover:  #00b4d8; /* cyan-600 */
+    --acc-dim:    rgba(0, 229, 255, 0.12);
+    --acc-glow:   rgba(0, 229, 255, 0.25);
+    --acc-2:      #22d3ee; /* cyan-400 */
 
     /* Semantic Status & Difficulty Colors */
     --success:     #10b981; /* emerald-500 */
@@ -38,7 +38,7 @@
     --muted2:     #71717a; /* zinc-500 */
 
     /* Grid & Surface Details */
-    --grid-color: rgba(99, 102, 241, 0.04);
+    --grid-color: rgba(0, 229, 255, 0.04);
     --sheen:      rgba(255, 255, 255, 0.03);
 
     /* ── Sidebar & TopBar layout tokens ── */
@@ -48,9 +48,9 @@
     --sidebar-bg:          rgba(8, 9, 13, 0.75);
     --sidebar-border:      rgba(255, 255, 255, 0.05);
     --sidebar-hover:       rgba(255, 255, 255, 0.03);
-    --sidebar-active-bg:   rgba(99, 102, 241, 0.1);
-    --sidebar-active-border: rgba(99, 102, 241, 0.25);
-    --sidebar-active-text: #818cf8;
+    --sidebar-active-bg:   rgba(0, 229, 255, 0.1);
+    --sidebar-active-border: rgba(0, 229, 255, 0.25);
+    --sidebar-active-text: #00E5FF;
     --topbar-bg:           rgba(8, 9, 13, 0.7);
     --topbar-border:       rgba(255, 255, 255, 0.05);
 
@@ -100,7 +100,7 @@
 @layer utilities {
   .bg-dot-grid {
     background-size: 28px 28px;
-    background-image: radial-gradient(circle, rgba(99, 102, 241, 0.08) 1px, transparent 1px);
+    background-image: radial-gradient(circle, rgba(0, 229, 255, 0.08) 1px, transparent 1px);
   }
 }
 
@@ -109,8 +109,8 @@
   /* ── Action Buttons ──────────────────────────────────────── */
   .btn-primary {
     @apply relative inline-flex items-center justify-center font-mono font-medium text-[15px] px-5 py-2.5 rounded-xl
-           bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 active:from-indigo-600 active:to-indigo-700 text-white
-           border border-indigo-400/30 shadow-[0_0_20px_rgba(99,102,241,0.25)] active:scale-[0.98] transition-all duration-150;
+           bg-gradient-to-r from-cyan-400 to-cyan-500 hover:from-cyan-300 hover:to-cyan-400 active:from-cyan-500 active:to-cyan-600 text-zinc-950 font-semibold
+           border border-cyan-300/40 shadow-[0_0_20px_rgba(0,229,255,0.25)] active:scale-[0.98] transition-all duration-150;
   }
 
   .btn-secondary {
@@ -143,22 +143,22 @@
 
   .card-glow {
     @apply relative bg-zinc-900/40 backdrop-blur-xl border border-zinc-800/50 rounded-2xl overflow-hidden
-           hover:border-indigo-500/30 transition-all duration-200;
+           hover:border-cyan-500/30 transition-all duration-200;
     box-shadow: var(--shadow-sm);
   }
 
   /* ── Inputs ──────────────────────────────────────────────── */
   .spinner {
-    @apply w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin;
+    @apply w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin;
   }
   .spinner-sm {
-    @apply w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin inline-block;
+    @apply w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin inline-block;
   }
 
   .input-base {
     @apply bg-zinc-950/60 border border-zinc-800/80 rounded-xl px-3.5 py-2
       text-zinc-100 text-sm font-mono placeholder-zinc-500
-      focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 transition-colors;
+      focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-colors;
   }
 
   /* ── Status badges ───────────────────────────────────────── */
@@ -173,7 +173,7 @@
 
   /* ── Nav active indicator ────────────────────────────────── */
   .nav-active {
-    @apply text-indigo-300 bg-indigo-500/10 border border-indigo-500/25 font-medium backdrop-blur-sm;
+    @apply text-cyan-300 bg-cyan-500/10 border border-cyan-500/25 font-medium backdrop-blur-sm;
   }
 
   /* ── Table row highlight ─────────────────────────────────── */
@@ -226,8 +226,8 @@
 }
 
 @keyframes highlight {
-  0%   { background-color: rgba(99, 102, 241, 0.25); }
-  100% { background-color: rgba(99, 102, 241, 0.10); }
+  0%   { background-color: rgba(0, 229, 255, 0.25); }
+  100% { background-color: rgba(0, 229, 255, 0.10); }
 }
 
 .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }

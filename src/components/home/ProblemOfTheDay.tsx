@@ -88,7 +88,7 @@ export default function ProblemOfTheDay({
         </div>
 
         {/* Problem Title & Description Preview */}
-        <h2 className="font-semibold text-lg sm:text-xl text-zinc-100 mb-2 group-hover:text-indigo-300 transition-colors line-clamp-1">
+        <h2 className="font-semibold text-lg sm:text-xl text-zinc-100 mb-2 group-hover:text-cyan-300 transition-colors line-clamp-1">
           {problem.title}
         </h2>
 
@@ -108,7 +108,7 @@ export default function ProblemOfTheDay({
               </span>
             ))}
             {problem.points ? (
-              <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-medium border border-indigo-500/20">
+              <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-medium border border-cyan-500/20">
                 +{problem.points} pts
               </span>
             ) : null}

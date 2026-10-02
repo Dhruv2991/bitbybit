@@ -25,14 +25,14 @@ interface GlobalSearchProps {
 
 const PAGES: { id: PageId; label: string; icon: string; color: string; adminOnly?: boolean }[] = [
   { id: 'home',        label: 'Home',             icon: '⌂',   color: '#a1a1aa' },
-  { id: 'problems',    label: 'Problems',         icon: '{ }', color: '#10b981' },
+  { id: 'problems',    label: 'Problems',         icon: '{ }', color: '#00E5FF' },
   { id: 'leaderboard', label: 'Leaderboard',      icon: '⚡',  color: '#f59e0b' },
   { id: 'arena',       label: 'Arena',            icon: '🏆',  color: '#f43f5e' },
-  { id: 'weekly',      label: 'Weekly Challenge', icon: '🏅',  color: '#818cf8' },
-  { id: 'subscribe',   label: 'Subscribe (Pro)',  icon: '⭐',  color: '#6366f1' },
-  { id: 'profile',     label: 'My Profile',       icon: '👤',  color: '#10b981' },
+  { id: 'weekly',      label: 'Weekly Challenge', icon: '🏅',  color: '#00E5FF' },
+  { id: 'subscribe',   label: 'Subscribe (Pro)',  icon: '⭐',  color: '#00E5FF' },
+  { id: 'profile',     label: 'My Profile',       icon: '👤',  color: '#00E5FF' },
   { id: 'about',       label: 'About',            icon: 'ℹ️',  color: '#a1a1aa' },
-  { id: 'admin',       label: 'Admin',            icon: '⚙️',  color: '#818cf8', adminOnly: true },
+  { id: 'admin',       label: 'Admin',            icon: '⚙️',  color: '#00E5FF', adminOnly: true },
 ];
 
 function Highlight({ text, q }: { text: string; q: string }) {
@@ -42,7 +42,7 @@ function Highlight({ text, q }: { text: string; q: string }) {
   return (
     <>
       {text.slice(0, idx)}
-      <span className="text-indigo-400 bg-indigo-500/20 font-medium px-0.5 rounded">{text.slice(idx, idx + q.length)}</span>
+      <span className="text-cyan-400 bg-cyan-500/20 font-medium px-0.5 rounded">{text.slice(idx, idx + q.length)}</span>
       {text.slice(idx + q.length)}
     </>
   );

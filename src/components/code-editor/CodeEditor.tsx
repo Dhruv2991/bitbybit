@@ -113,8 +113,8 @@ export default function CodeEditor({
     <div className="rounded-xl overflow-hidden border border-[var(--border)] shadow-md bg-[#1e1e1e] relative">
       <style jsx global>{`
         .monaco-viz-active-line {
-          background: rgba(99, 102, 241, 0.22) !important;
-          border-left: 3px solid #818cf8 !important;
+          background: rgba(0, 229, 255, 0.15) !important;
+          border-left: 3px solid #00E5FF !important;
         }
       `}</style>
       <Editor

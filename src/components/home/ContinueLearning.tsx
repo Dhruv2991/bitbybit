@@ -56,7 +56,7 @@ export default function ContinueLearning({
         </div>
         <button
           onClick={onViewAllTopics}
-          className="text-xs font-mono text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+          className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
         >
           Explore all topics →
         </button>
@@ -72,7 +72,7 @@ export default function ContinueLearning({
               className="text-left w-full group"
             >
               <SpotlightCard
-                spotlightColor="rgba(99, 102, 241, 0.08)"
+                spotlightColor="rgba(0, 229, 255, 0.08)"
                 className="p-6 rounded-2xl bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] hover:border-white/[0.14] transition-all duration-200 flex flex-col justify-between h-full"
               >
                 <div>
@@ -85,7 +85,7 @@ export default function ContinueLearning({
                     </span>
                   </div>
 
-                  <h3 className="font-sans font-semibold text-[15px] text-zinc-100 mb-1 group-hover:text-indigo-300 transition-colors truncate">
+                  <h3 className="font-sans font-semibold text-[15px] text-zinc-100 mb-1 group-hover:text-cyan-300 transition-colors truncate">
                     {topic.name}
                   </h3>
                 </div>
@@ -97,7 +97,7 @@ export default function ContinueLearning({
                   </div>
                   <div className="w-full bg-zinc-950/60 h-2 rounded-full overflow-hidden border border-white/[0.04]">
                     <div
-                      className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                      className="h-full bg-cyan-500 rounded-full transition-all duration-500"
                       style={{ width: `${percent}%` }}
                     />
                   </div>

@@ -336,7 +336,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
-            <Award className="w-5 h-5 text-indigo-400" /> Certificates Management
+            <Award className="w-5 h-5 text-cyan-400" /> Certificates Management
           </h2>
           <p className="text-xs font-mono text-zinc-400 mt-0.5">
             Issue, track, download, and revoke verified achievement certificates.
@@ -345,7 +345,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
 
         <button
           onClick={() => setShowIssueModal(true)}
-          className="flex items-center gap-2 text-xs font-medium py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors shrink-0 shadow-sm"
+          className="flex items-center gap-2 text-xs font-mono font-bold py-2 px-4 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 rounded-lg hover:opacity-90 shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all shrink-0"
         >
           <Plus className="w-4 h-4" /> Issue Certificate
         </button>
@@ -361,7 +361,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search recipient, ID, event..."
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/80"
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-cyan-500/80"
           />
         </div>
 
@@ -371,7 +371,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
             aria-label="Filter by certificate status"
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500/80"
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-cyan-500/80"
           >
             <option value="all">All Statuses</option>
             <option value="issued">Active / Issued</option>
@@ -385,7 +385,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
             aria-label="Filter by certificate type"
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500/80"
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-cyan-500/80"
           >
             <option value="all">All Certificate Types</option>
             {CERTIFICATE_TYPES.map((t) => (
@@ -402,7 +402,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
             value={selectedMemberFilter}
             onChange={(e) => setSelectedMemberFilter(e.target.value)}
             aria-label="Filter by member"
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500/80"
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-cyan-500/80"
           >
             <option value="all">All Members</option>
             {members.map((m) => (
@@ -417,7 +417,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
       {/* Certificates Table */}
       {loading ? (
         <div className="flex items-center justify-center py-16 text-zinc-500 font-mono text-xs gap-2">
-          <div className="w-4 h-4 rounded-full border-2 border-zinc-700 border-t-indigo-500 animate-spin" /> Loading certificates...
+          <div className="w-4 h-4 rounded-full border-2 border-zinc-700 border-t-cyan-400 animate-spin" /> Loading certificates...
         </div>
       ) : filteredCertificates.length === 0 ? (
         <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-12 text-center">
@@ -457,7 +457,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       </td>
 
                       {/* Certificate ID */}
-                      <td className="px-4 py-3.5 font-medium text-indigo-400">
+                      <td className="px-4 py-3.5 font-medium text-cyan-400">
                         <a
                           href={`/certificate/${cert.certificate_id}`}
                           target="_blank"
@@ -531,7 +531,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                           <button
                             onClick={() => handleDownload(cert.certificate_id)}
                             title="Download PDF"
-                            className="p-1.5 rounded hover:bg-zinc-800 text-indigo-400 hover:text-indigo-300 transition-colors"
+                            className="p-1.5 rounded hover:bg-zinc-800 text-cyan-400 hover:text-cyan-300 transition-colors"
                           >
                             <Download className="w-4 h-4" />
                           </button>
@@ -565,7 +565,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-indigo-400" />
+                <Award className="w-5 h-5 text-cyan-400" />
                 <h3 className="font-semibold text-base text-zinc-100">Issue New Certificate</h3>
               </div>
               <button
@@ -591,13 +591,13 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       value={memberSearch}
                       onChange={(e) => setMemberSearch(e.target.value)}
                       placeholder="Search member by name or username..."
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-cyan-500"
                     />
                     <select
                       value={selectedGithub}
                       onChange={(e) => handleSelectMember(e.target.value)}
                       aria-label="Select member"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-500"
                       required
                     >
                       <option value="">-- Choose Member --</option>
@@ -622,7 +622,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       onChange={(e) => setRecipientName(e.target.value)}
                       placeholder="e.g. Dhruv G Nayak"
                       required
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-500"
                     />
                     <span className="text-[10px] text-zinc-500 font-mono">Edits apply to certificate only.</span>
                   </div>
@@ -636,7 +636,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       onChange={(e) => setRecipientEmail(e.target.value)}
                       placeholder="e.g. member@bmsce.ac.in"
                       required
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-500"
                     />
                   </div>
                 </div>
@@ -651,7 +651,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       value={certType}
                       onChange={(e) => handleTypeChange(e.target.value)}
                       aria-label="Certificate type"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-500"
                     >
                       {CERTIFICATE_TYPES.map((t) => (
                         <option key={t.id} value={t.label}>
@@ -670,7 +670,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       onChange={(e) => setCertTitle(e.target.value)}
                       placeholder="CERTIFICATE OF ACHIEVEMENT"
                       required
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-500"
                     />
                   </div>
                 </div>
@@ -686,7 +686,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                     onChange={(e) => setAchievementText(e.target.value)}
                     placeholder="e.g. securing 1st Place for the"
                     required
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
 
@@ -701,7 +701,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       onChange={(e) => setEventName(e.target.value)}
                       placeholder="e.g. Bit By Bit Weekly Contest"
                       required
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-500"
                     />
                   </div>
                   <div>
@@ -713,7 +713,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       value={dateStr}
                       onChange={(e) => setDateStr(e.target.value)}
                       placeholder="e.g. June 2026"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-500"
                     />
                   </div>
                 </div>
@@ -729,7 +729,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       value={organizationText}
                       onChange={(e) => setOrganizationText(e.target.value)}
                       placeholder="e.g. from teamcodelocked club"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-500"
                     />
                   </div>
                   <div>
@@ -741,7 +741,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       value={activityPointsText}
                       onChange={(e) => setActivityPointsText(e.target.value)}
                       placeholder="e.g. This certificate is eligible for claiming 1-2 activity points."
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-cyan-500"
                     />
                   </div>
                 </div>
@@ -782,11 +782,11 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                   <button
                     type="submit"
                     disabled={issuing}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2.5 text-xs font-mono font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                    className="flex-1 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 rounded-lg py-2.5 text-xs font-mono font-bold flex items-center justify-center gap-2 hover:opacity-90 shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all disabled:opacity-50"
                   >
                     {issuing ? (
                       <>
-                        <div className="w-3.5 h-3.5 rounded-full border-2 border-white/20 border-t-white animate-spin" /> Generating PDF & Sending Email...
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-zinc-950/20 border-t-zinc-950 animate-spin" /> Generating PDF & Sending Email...
                       </>
                     ) : (
                       <>
@@ -809,7 +809,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
               <div className="lg:col-span-7 p-6 bg-zinc-950 flex flex-col justify-center items-center overflow-y-auto">
                 <div className="w-full max-w-xl">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-mono text-indigo-400 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-[11px] font-mono text-cyan-400 font-semibold uppercase tracking-wider flex items-center gap-1.5">
                       <Eye className="w-3.5 h-3.5" /> Live Certificate Preview
                     </span>
                     <span className="text-[10px] font-mono text-zinc-500">Updates in real-time</span>
@@ -842,7 +842,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
             <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-indigo-400" />
+                <Award className="w-5 h-5 text-cyan-400" />
                 <h3 className="font-semibold text-base text-zinc-100">
                   Certificate {viewingCert.certificate_id}
                 </h3>
@@ -881,7 +881,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                 </div>
                 <button
                   onClick={() => handleDownload(viewingCert.certificate_id)}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 px-4 text-xs font-mono font-medium flex items-center gap-2 transition-colors"
+                  className="bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 rounded-lg py-2 px-4 text-xs font-mono font-bold flex items-center gap-2 hover:opacity-90 shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all"
                 >
                   <Download className="w-4 h-4" /> Download PDF
                 </button>

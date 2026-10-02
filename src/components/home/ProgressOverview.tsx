@@ -122,7 +122,7 @@ export default function ProgressOverview({
         </span>
         <button
           onClick={onExplore}
-          className="text-xs font-mono text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+          className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
         >
           View all →
         </button>

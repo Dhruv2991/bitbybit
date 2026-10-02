@@ -518,7 +518,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                       </span>
                     )}
                     {isActive && isSubscribed && (
-                      <span className="text-indigo-400">
+                      <span className="text-cyan-400">
                         ⚡ Current bonus: {fmtBonus(bonus)}
                       </span>
                     )}
@@ -529,7 +529,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                     <div className="mt-3">
                       <div className="h-1.5 w-full bg-zinc-950 rounded-full overflow-hidden border border-zinc-800/60">
                         <div
-                          className="h-full rounded-full transition-all duration-1000 ease-linear bg-indigo-500"
+                          className="h-full rounded-full transition-all duration-1000 ease-linear bg-cyan-400 shadow-[0_0_10px_rgba(0,229,255,0.4)]"
                           style={{
                             width: `${Math.max(0, Math.min(100, ((bonus - 0.2) / 0.8) * 100))}%`,
                           }}
@@ -605,7 +605,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                                 : "text-rose-400 bg-rose-500/10 border-rose-500/20"}`}>
                             {p.difficulty}
                           </span>
-                          <span className="text-xs font-mono text-indigo-400 font-semibold">
+                          <span className="text-xs font-mono text-cyan-400 font-semibold">
                             {p.points} pts
                           </span>
                           {solved && mySub && (
@@ -622,7 +622,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                             </span>
                           )}
                           {isSubscribed && isEnded && !solved && (
-                            <span className="text-[10px] font-mono text-indigo-400">
+                            <span className="text-[10px] font-mono text-cyan-400">
                               🏁 practice
                             </span>
                           )}
@@ -666,7 +666,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                         {!isUpcoming && (
                           <button
                             onClick={() => setShowLeader(showLeader === ch.id ? null : ch.id)}
-                            className="text-xs font-mono text-indigo-400 hover:text-indigo-300 transition-colors">
+                            className="text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors">
                             {showLeader === ch.id ? "Hide" : "View"} leaderboard ↕
                           </button>
                         )}
@@ -691,7 +691,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                       </p>
                       <button
                         onClick={() => onNavigate?.('subscribe')}
-                        className="px-4 py-2 bg-indigo-600 text-white font-mono font-medium text-xs rounded-xl hover:bg-indigo-500 transition-all shrink-0 shadow-sm"
+                        className="px-4 py-2 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 font-mono font-semibold text-xs rounded-xl hover:opacity-90 shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all shrink-0"
                       >
                         Subscribe ⭐
                       </button>
@@ -716,11 +716,11 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                           onClick={() => generateSummary(ch)}
                           disabled={loadingSummary === ch.id}
                           className="flex items-center gap-2 text-[10px] font-mono px-3 py-1.5
-                            bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded-lg
-                            hover:bg-indigo-500/15 disabled:opacity-50 transition-all"
+                            bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 rounded-lg
+                            hover:bg-cyan-500/15 disabled:opacity-50 transition-all"
                         >
                           {loadingSummary === ch.id ? (
-                            <><span className="w-2.5 h-2.5 border border-indigo-400 border-t-transparent rounded-full animate-spin inline-block" /> Generating summary…</>
+                            <><span className="w-2.5 h-2.5 border border-cyan-400 border-t-transparent rounded-full animate-spin inline-block" /> Generating summary…</>
                           ) : '✦ Generate AI Summary'}
                         </button>
                       )}
@@ -728,8 +728,8 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                       {summaries[ch.id] && (
                         <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-xl p-4 space-y-3">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-indigo-400 text-xs">✦</span>
-                            <span className="text-[10px] font-mono font-semibold text-indigo-400 uppercase tracking-widest">
+                            <span className="text-cyan-400 text-xs">✦</span>
+                            <span className="text-[10px] font-mono font-semibold text-cyan-400 uppercase tracking-widest">
                               Challenge Summary
                             </span>
                           </div>
@@ -757,7 +757,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                           <button
                             onClick={() => generateSummary(ch)}
                             disabled={loadingSummary === ch.id}
-                            className="text-[10px] font-mono text-zinc-500 hover:text-indigo-400 transition-colors mt-1"
+                            className="text-[10px] font-mono text-zinc-500 hover:text-cyan-400 transition-colors mt-1"
                           >
                             ↻ Regenerate
                           </button>
@@ -839,7 +839,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                 <button
                   onClick={submitPayment}
                   disabled={submitting || fee === null}
-                  className="px-5 py-2.5 bg-indigo-600 text-white font-mono font-medium text-sm rounded-xl hover:bg-indigo-500 disabled:opacity-40 transition-all shadow-sm"
+                  className="px-5 py-2.5 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 font-mono font-semibold text-sm rounded-xl hover:opacity-90 shadow-[0_0_20px_rgba(0,229,255,0.25)] disabled:opacity-40 transition-all"
                 >
                   {submitting ? 'Processing…' : `Renew — ₹${fee ?? '—'} →`}
                 </button>
@@ -864,7 +864,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                     <p className="text-xs font-sans text-zinc-400">Unlock all weekly challenges, Arena contests & AI features</p>
                   </div>
                   <div className="ml-auto text-right">
-                    <div className="text-2xl font-display font-bold text-indigo-400">
+                    <div className="text-2xl font-display font-bold text-cyan-400">
                       {fee !== null ? `₹${fee}` : '—'}
                     </div>
                     <div className="text-[10px] font-mono text-zinc-500">/ month</div>
@@ -887,8 +887,8 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                     <button
                       onClick={submitPayment}
                       disabled={submitting || fee === null}
-                      className="w-full py-2.5 bg-indigo-600 text-white font-mono font-medium text-sm rounded-xl
-                        hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+                      className="w-full py-2.5 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 font-mono font-bold text-sm rounded-xl
+                        hover:opacity-90 shadow-[0_0_20px_rgba(0,229,255,0.25)] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                     >
                       {submitting ? 'Processing…' : `Pay ₹${fee ?? '—'} for 30 days →`}
                     </button>
@@ -922,7 +922,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
             <button
               onClick={submitPayment}
               disabled={submitting || fee === null}
-              className="text-[11px] font-mono text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 rounded-lg hover:bg-indigo-500/15 disabled:opacity-40 transition-all"
+              className="text-[11px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-3 py-1.5 rounded-lg hover:bg-cyan-500/15 disabled:opacity-40 transition-all"
             >
               {submitting ? 'Processing…' : `Renew early — ₹${fee ?? '—'}`}
             </button>

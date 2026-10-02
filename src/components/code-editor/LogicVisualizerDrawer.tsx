@@ -41,7 +41,7 @@ const VALUE_COLORS: Record<ReturnType<typeof classifyValue>, string> = {
   str:   'text-amber-400',
   bool:  'text-purple-400',
   list:  'text-emerald-400',
-  dict:  'text-indigo-400',
+  dict:  'text-cyan-300',
   tuple: 'text-violet-400',
   none:  'text-zinc-500',
   other: 'text-zinc-300',
@@ -79,15 +79,15 @@ function VariableRow({ name, value, changed }: { name: string; value: string; ch
     <div
       className={`flex items-start gap-2.5 px-3 py-2 rounded-xl border transition-all duration-300 ${
         changed
-          ? 'bg-indigo-500/15 border-indigo-500/40 shadow-xs shadow-indigo-500/10'
+          ? 'bg-cyan-500/15 border-cyan-500/40 shadow-xs shadow-cyan-500/10'
           : 'bg-zinc-900/60 border-zinc-800/50'
       }`}
     >
-      {changed && <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0 mt-1.5 animate-pulse" />}
+      {changed && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0 mt-1.5 animate-pulse" />}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="font-mono text-[11px] font-bold text-zinc-100">{name}</span>
-          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700/50">
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-900/80 text-cyan-300 border border-cyan-500/20 font-medium">
             {badge}
           </span>
         </div>
@@ -230,13 +230,13 @@ export default function LogicVisualizerDrawer({
           <div className="flex items-center gap-2 shrink-0">
             <div
               className={`w-2 h-2 rounded-full ${
-                playing ? 'bg-emerald-400 animate-pulse' : total > 0 ? 'bg-indigo-400' : 'bg-zinc-600'
+                playing ? 'bg-emerald-400 animate-pulse' : total > 0 ? 'bg-cyan-400' : 'bg-zinc-600'
               }`}
             />
             <span className="font-mono text-xs font-bold uppercase tracking-wider text-zinc-200">
               Logic Visualizer
             </span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/25">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/25">
               {LANG_DISPLAY[language] || language}
             </span>
           </div>
@@ -261,11 +261,11 @@ export default function LogicVisualizerDrawer({
               title={`Refills in ${quota.resetsIn} at midnight`}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full font-mono text-[10.5px] font-medium border transition-all ${
                 quota.isPro
-                  ? 'bg-purple-500/10 text-purple-300 border-purple-500/25 hover:bg-purple-500/15'
-                  : 'bg-zinc-900 text-zinc-300 border-zinc-700/60 hover:border-zinc-500'
+                  ? 'bg-cyan-500/10 text-cyan-300 border-cyan-500/25 hover:bg-cyan-500/15'
+                  : 'bg-zinc-900/80 text-zinc-300 border-zinc-700/60 hover:border-cyan-500/40 hover:text-cyan-300'
               }`}
             >
-              <span className="text-amber-400">⚡</span>
+              <span className="text-cyan-400">⚡</span>
               <span>
                 {quota.remaining} / {quota.limit} {quota.isPro ? 'Pro' : 'free'} left
               </span>
@@ -287,7 +287,7 @@ export default function LogicVisualizerDrawer({
                   onClick={() => setSpeed(ms)}
                   className={`px-1.5 py-0.5 rounded transition-colors ${
                     speed === ms
-                      ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                       : 'text-zinc-500 hover:text-zinc-300'
                   }`}
                 >
@@ -311,7 +311,7 @@ export default function LogicVisualizerDrawer({
       {total > 0 && (
         <div className="h-0.5 bg-zinc-800/60 shrink-0">
           <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-200 ease-out"
+            className="h-full bg-gradient-to-r from-cyan-400 to-cyan-600 transition-all duration-200 ease-out"
             style={{ width: `${progressPct}%` }}
           />
         </div>
@@ -328,7 +328,7 @@ export default function LogicVisualizerDrawer({
             </span>
             {currentStep && (
               <span className="ml-auto font-mono text-[10.5px] text-zinc-400">
-                Line <span className="text-indigo-400 font-bold">{currentStep.line}</span>
+                Line <span className="text-cyan-400 font-bold">{currentStep.line}</span>
               </span>
             )}
           </div>
@@ -346,13 +346,13 @@ export default function LogicVisualizerDrawer({
                     key={idx}
                     className={`flex gap-2 px-2 py-0.5 rounded transition-all duration-150 ${
                       isActive
-                        ? 'bg-indigo-500/20 border-l-2 border-indigo-400 text-zinc-100 shadow-xs'
+                        ? 'bg-cyan-500/15 border-l-2 border-cyan-400 text-zinc-100 shadow-xs'
                         : 'border-l-2 border-transparent'
                     } ${wasStepped && !isActive ? 'opacity-70' : ''}`}
                   >
                     <span
                       className={`select-none shrink-0 w-6 text-right font-mono ${
-                        isActive ? 'text-indigo-400 font-bold' : 'text-zinc-700'
+                        isActive ? 'text-cyan-400 font-bold' : 'text-zinc-700'
                       }`}
                     >
                       {lineNo}
@@ -383,7 +383,7 @@ export default function LogicVisualizerDrawer({
                   tab.id === 'code' ? 'md:hidden' : ''
                 } ${
                   activeTab === tab.id
-                    ? 'bg-zinc-800 text-zinc-100 border border-zinc-700/60 shadow-xs'
+                    ? 'bg-zinc-800 text-cyan-300 border border-cyan-500/30 shadow-xs'
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
@@ -394,7 +394,7 @@ export default function LogicVisualizerDrawer({
 
             {total > 0 && (
               <span className="ml-auto font-mono text-[10.5px] text-zinc-400">
-                Step <span className="text-zinc-100 font-bold">{stepIdx + 1}</span> / {total}
+                Step <span className="text-cyan-300 font-bold">{stepIdx + 1}</span> / {total}
               </span>
             )}
           </div>
@@ -412,10 +412,10 @@ export default function LogicVisualizerDrawer({
                     <div
                       key={idx}
                       className={`flex gap-2 px-2 py-0.5 rounded transition-all ${
-                        isActive ? 'bg-indigo-500/20 border-l-2 border-indigo-400' : 'border-l-2 border-transparent'
+                        isActive ? 'bg-cyan-500/15 border-l-2 border-cyan-400' : 'border-l-2 border-transparent'
                       }`}
                     >
-                      <span className={`select-none shrink-0 w-5 text-right ${isActive ? 'text-indigo-400 font-bold' : 'text-zinc-700'}`}>
+                      <span className={`select-none shrink-0 w-5 text-right ${isActive ? 'text-cyan-400 font-bold' : 'text-zinc-700'}`}>
                         {lineNo}
                       </span>
                       <span className={`whitespace-pre-wrap break-all ${isActive ? 'text-zinc-100' : 'text-zinc-400'}`}>
@@ -471,7 +471,7 @@ export default function LogicVisualizerDrawer({
             {!isLoading && activeTab === 'stdout' && (
               <div>
                 {stdout ? (
-                  <pre className="font-mono text-xs text-emerald-400 leading-relaxed whitespace-pre-wrap bg-zinc-900/70 border border-zinc-800/60 rounded-xl p-3.5">
+                  <pre className="font-mono text-xs text-cyan-300 leading-relaxed whitespace-pre-wrap bg-zinc-900/70 border border-zinc-800/60 rounded-xl p-3.5">
                     {currentStep?.stdout || stdout}
                   </pre>
                 ) : (
@@ -516,7 +516,7 @@ export default function LogicVisualizerDrawer({
               onClick={() => setPlaying((p) => !p)}
               disabled={isLoading || total === 0}
               title={playing ? 'Pause (Space)' : 'Play (Space)'}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/25"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 active:bg-cyan-500 text-zinc-950 font-mono text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-cyan-500/25"
             >
               {playing ? <IconPause /> : <IconPlay />}
               <span>{playing ? 'Pause' : 'Play'}</span>
@@ -539,11 +539,11 @@ export default function LogicVisualizerDrawer({
               value={stepIdx}
               onChange={(e) => { setPlaying(false); setStepIdx(Number(e.target.value)); }}
               disabled={isLoading || total === 0}
-              className="hidden sm:block w-32 accent-indigo-500 disabled:opacity-30 cursor-pointer"
+              className="hidden sm:block w-32 accent-cyan-400 disabled:opacity-30 cursor-pointer"
             />
 
             <span className="font-mono text-[10.5px] text-zinc-400 tabular-nums">
-              Step {stepIdx + 1}/{total}
+              Step <span className="text-cyan-300 font-bold">{stepIdx + 1}</span>/{total}
             </span>
           </>
         )}

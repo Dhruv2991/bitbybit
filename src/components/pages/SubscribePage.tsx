@@ -96,7 +96,7 @@ export default function SubscribePage({ user }: Props) {
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center py-24 gap-3">
-      <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
       <span className="text-zinc-400 text-xs font-mono">Loading…</span>
     </div>
   );
@@ -111,15 +111,15 @@ export default function SubscribePage({ user }: Props) {
       </p>
       <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl px-5 py-4 text-left space-y-2 mb-6 shadow-sm">
         <div className="flex items-center gap-2 text-xs font-mono">
-          <span className="text-emerald-400">✓</span>
+          <span className="text-cyan-400">✓</span>
           <span className="text-zinc-300">All weekly challenge problems unlocked</span>
         </div>
         <div className="flex items-center gap-2 text-xs font-mono">
-          <span className="text-emerald-400">✓</span>
+          <span className="text-cyan-400">✓</span>
           <span className="text-zinc-300">Every future weekly challenge included</span>
         </div>
         <div className="flex items-center gap-2 text-xs font-mono">
-          <span className="text-emerald-400">✓</span>
+          <span className="text-cyan-400">✓</span>
           <span className="text-zinc-300">Free entry to every Arena contest</span>
         </div>
       </div>
@@ -127,8 +127,8 @@ export default function SubscribePage({ user }: Props) {
         <button
           onClick={handlePay}
           disabled={paying || fee === null}
-          className="px-5 py-2.5 bg-indigo-600 text-white font-mono font-medium text-sm rounded-xl
-            hover:bg-indigo-500 active:scale-[0.98] transition-all disabled:opacity-40 shadow-sm"
+          className="px-5 py-2.5 bg-cyan-400 text-zinc-950 font-mono font-bold text-sm rounded-xl
+            hover:bg-cyan-300 active:scale-[0.98] transition-all disabled:opacity-40 shadow-[0_0_20px_rgba(0,229,255,0.25)]"
         >
           {paying ? "Processing…" : `Renew early — ₹${fee ?? "—"}`}
         </button>
@@ -176,7 +176,7 @@ export default function SubscribePage({ user }: Props) {
           ["✓", "Weekly leaderboard participation"],
         ].map(([icon, text], i) => (
           <div key={i} className="flex items-start gap-3 text-xs font-mono">
-            <span className="text-emerald-400 shrink-0 mt-0.5">{icon}</span>
+            <span className="text-cyan-400 shrink-0 mt-0.5">{icon}</span>
             <span className="text-zinc-300">{text}</span>
           </div>
         ))}
@@ -186,7 +186,7 @@ export default function SubscribePage({ user }: Props) {
       <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden shadow-sm">
         {/* Price */}
         <div className="px-5 py-4 border-b border-zinc-800/80 text-center">
-          <div className="text-4xl font-display font-bold text-indigo-400 mb-1">
+          <div className="text-4xl font-display font-bold text-cyan-400 mb-1">
             {fee !== null ? `₹${fee}` : "—"}
           </div>
           <div className="text-xs font-mono text-zinc-400">per month · 30 days of access</div>
@@ -202,8 +202,8 @@ export default function SubscribePage({ user }: Props) {
               <button
                 onClick={handlePay}
                 disabled={paying || fee === null}
-                className="w-full py-2.5 bg-indigo-600 text-white font-mono font-medium text-sm rounded-xl
-                  hover:bg-indigo-500 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                className="w-full py-2.5 bg-cyan-400 text-zinc-950 font-mono font-bold text-sm rounded-xl
+                  hover:bg-cyan-300 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(0,229,255,0.25)]"
               >
                 {paying ? "Processing…" : isLapsed ? `Renew — ₹${fee ?? "—"} →` : `Pay ₹${fee ?? "—"} →`}
               </button>

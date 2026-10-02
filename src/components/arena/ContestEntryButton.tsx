@@ -64,7 +64,7 @@ export default function ContestEntryButton({
         </p>
         <button
           onClick={onNavigateSubscribe}
-          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-medium text-xs rounded-lg active:scale-[0.98] transition-colors"
+          className="w-full py-2.5 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 font-mono font-bold text-xs rounded-lg active:scale-[0.98] shadow-[0_0_15px_rgba(0,229,255,0.25)] hover:opacity-90 transition-all"
         >
           Subscribe to Enter &rarr;
         </button>
@@ -76,14 +76,14 @@ export default function ContestEntryButton({
     <button
       onClick={handleRegister}
       disabled={loading}
-      className={`w-full py-2.5 font-mono font-medium text-xs rounded-lg transition-colors active:scale-[0.98]
+      className={`w-full py-2.5 font-mono font-bold text-xs rounded-lg transition-all active:scale-[0.98]
         ${loading
-          ? 'bg-indigo-600/50 text-white/50 cursor-not-allowed'
-          : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-sm'}`}
+          ? 'bg-cyan-500/50 text-zinc-950/50 cursor-not-allowed'
+          : 'bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 hover:opacity-90 shadow-[0_0_20px_rgba(0,229,255,0.25)]'}`}
     >
       {loading ? (
         <span className="flex items-center justify-center gap-2">
-          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          <span className="w-3.5 h-3.5 border-2 border-zinc-950 border-t-transparent rounded-full animate-spin" />
           Registering…
         </span>
       ) : (

@@ -13,16 +13,16 @@ function AuroraBg() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
       <div
-        className="absolute -top-20 -left-20 w-64 h-64 rounded-full opacity-20 blur-3xl animate-pulse"
+        className="absolute -top-20 -left-20 w-64 h-64 rounded-full opacity-25 blur-3xl animate-pulse"
         style={{
-          background: 'radial-gradient(circle, rgba(99,102,241,0.55) 0%, rgba(168,85,247,0.3) 55%, transparent 75%)',
+          background: 'radial-gradient(circle, rgba(0,229,255,0.45) 0%, rgba(56,189,248,0.25) 55%, transparent 75%)',
           animationDuration: '4s',
         }}
       />
       <div
-        className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full opacity-15 blur-3xl"
+        className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full opacity-20 blur-3xl"
         style={{
-          background: 'radial-gradient(circle, rgba(56,189,248,0.4) 0%, rgba(99,102,241,0.2) 60%, transparent 80%)',
+          background: 'radial-gradient(circle, rgba(0,229,255,0.3) 0%, rgba(8,145,178,0.2) 60%, transparent 80%)',
           animation: 'pulse 6s ease-in-out infinite',
           animationDelay: '2s',
         }}
@@ -123,15 +123,15 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
   const perks: PerkCardProps[] = [
     {
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="1.7">
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#00E5FF" strokeWidth="1.7">
           <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18" />
         </svg>
       ),
       title: 'Line-by-Line Logic Visualizer',
       desc: 'Step through every execution tick — variables, call stack, and stdout — to understand exactly why your code fails.',
       badge: 'Interactive',
-      accentHex: '#a855f7',
-      spotlightColor: 'rgba(168,85,247,0.09)',
+      accentHex: '#00E5FF',
+      spotlightColor: 'rgba(0,229,255,0.09)',
     },
     {
       icon: (
@@ -160,7 +160,7 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
     },
     {
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="1.7">
+        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#00E5FF" strokeWidth="1.7">
           <path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
           <path d="m4.93 10.93 1.41 1.41M2 18h2M20 18h2m-1.93-7.07-1.41 1.41M22 22H2m6-4 4-10 4 10" />
         </svg>
@@ -168,8 +168,8 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
       title: 'Advanced AI Code Coach',
       desc: 'Higher daily limits for hints, code reviews, editorial generation, and approach validation — all powered by Groq LLM.',
       badge: 'AI Powered',
-      accentHex: '#6366f1',
-      spotlightColor: 'rgba(99,102,241,0.09)',
+      accentHex: '#00E5FF',
+      spotlightColor: 'rgba(0,229,255,0.09)',
     },
   ];
 
@@ -207,7 +207,7 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
       <div className="flex items-start sm:items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold tracking-widest uppercase bg-indigo-500/10 text-indigo-400 border border-indigo-500/25">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold tracking-widest uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
               ✦ BitByBit Pro
             </span>
             {isSubscriber && (
@@ -228,13 +228,13 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
           <button
             id="pro-upgrade-header-btn"
             onClick={() => onNavigate('subscribe')}
-            className="group relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono font-semibold text-[13px] text-white overflow-hidden shrink-0 hover:scale-[1.02] active:scale-[0.98] transition-transform duration-150"
+            className="group relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono font-bold text-[13px] text-zinc-950 overflow-hidden shrink-0 hover:scale-[1.02] active:scale-[0.98] transition-transform duration-150"
             style={{
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-              boxShadow: '0 0 24px rgba(99,102,241,0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+              background: 'linear-gradient(135deg, #00E5FF 0%, #0891b2 100%)',
+              boxShadow: '0 0 24px rgba(0,229,255,0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
             }}
           >
-            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="w-3.5 h-3.5 shrink-0 text-zinc-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
             Upgrade to Pro
@@ -242,7 +242,7 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
             <span
               aria-hidden="true"
               className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-              style={{ background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.12) 50%, transparent 65%)' }}
+              style={{ background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.2) 50%, transparent 65%)' }}
             />
           </button>
         )}
@@ -272,7 +272,7 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
 
         {/* Comparison table */}
         <div className="lg:col-span-3">
-          <SpotlightCard spotlightColor="rgba(99,102,241,0.06)" className="p-5 sm:p-6 rounded-2xl h-full">
+          <SpotlightCard spotlightColor="rgba(0,229,255,0.06)" className="p-5 sm:p-6 rounded-2xl h-full">
             {/* Table header */}
             <div className="grid grid-cols-[1fr_auto_auto] gap-4 pb-2.5 mb-1 border-b border-white/[0.06]">
               <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider font-semibold">Feature</span>
@@ -280,7 +280,7 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
                 <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider font-semibold">Free</span>
               </div>
               <div className="w-14 text-center">
-                <span className="text-[11px] font-mono text-indigo-400 uppercase tracking-wider font-semibold">Pro</span>
+                <span className="text-[11px] font-mono text-cyan-400 uppercase tracking-wider font-semibold">Pro</span>
               </div>
             </div>
             {features.map((f) => (
@@ -291,13 +291,13 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
 
         {/* Pricing CTA card */}
         <div className="lg:col-span-2">
-          <SpotlightCard spotlightColor="rgba(99,102,241,0.12)" className="p-5 sm:p-6 rounded-2xl h-full flex flex-col relative overflow-hidden">
+          <SpotlightCard spotlightColor="rgba(0,229,255,0.12)" className="p-5 sm:p-6 rounded-2xl h-full flex flex-col relative overflow-hidden">
             <AuroraBg />
 
             <div className="relative z-10 flex flex-col h-full">
               {/* Badge + price */}
               <div className="mb-5">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-mono text-indigo-400 font-semibold tracking-widest uppercase mb-4">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-mono text-cyan-400 font-semibold tracking-widest uppercase mb-4">
                   ✦ BitByBit Pro
                 </div>
                 <div className="flex items-end gap-1 mb-1">
@@ -335,14 +335,14 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
                     <button
                       id="pro-upgrade-cta"
                       onClick={() => onNavigate('subscribe')}
-                      className="group relative w-full py-3 rounded-xl font-mono font-semibold text-sm text-white overflow-hidden hover:scale-[1.015] active:scale-[0.98] transition-transform duration-150"
+                      className="group relative w-full py-3 rounded-xl font-mono font-bold text-sm text-zinc-950 overflow-hidden hover:scale-[1.015] active:scale-[0.98] transition-transform duration-150"
                       style={{
-                        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                        boxShadow: '0 0 30px rgba(99,102,241,0.32), inset 0 1px 0 rgba(255,255,255,0.1)',
+                        background: 'linear-gradient(135deg, #00E5FF 0%, #0891b2 100%)',
+                        boxShadow: '0 0 30px rgba(0,229,255,0.35), inset 0 1px 0 rgba(255,255,255,0.2)',
                       }}
                     >
                       <span className="relative z-10 flex items-center justify-center gap-2">
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg className="w-4 h-4 text-zinc-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                         </svg>
                         Get BitByBit Pro
@@ -350,7 +350,7 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
                       <span
                         aria-hidden="true"
                         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                        style={{ background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.1) 50%, transparent 65%)' }}
+                        style={{ background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.2) 50%, transparent 65%)' }}
                       />
                     </button>
                     <button

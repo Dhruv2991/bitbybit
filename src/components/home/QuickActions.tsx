@@ -13,14 +13,14 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
       title: 'Problem Set',
       description: 'Filter by difficulty, tag, and solve algorithmic challenges',
       icon: (
-        <svg className="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className="w-5 h-5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polyline points="16 18 22 12 16 6" />
           <polyline points="8 6 2 12 8 18" />
         </svg>
       ),
       badge: 'Core',
-      badgeColor: 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20',
-      spotlightColor: 'rgba(99, 102, 241, 0.08)',
+      badgeColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+      spotlightColor: 'rgba(0, 229, 255, 0.08)',
       action: () => onNavigate('problems'),
     },
     {
@@ -114,7 +114,7 @@ export default function QuickActions({ onNavigate }: QuickActionsProps) {
                   </span>
                 </div>
 
-                <h3 className="font-sans font-semibold text-[15px] text-zinc-100 mb-1.5 group-hover:text-indigo-300 transition-colors">
+                <h3 className="font-sans font-semibold text-[15px] text-zinc-100 mb-1.5 group-hover:text-cyan-300 transition-colors">
                   {act.title}
                 </h3>
                 <p className="text-xs text-zinc-400 leading-relaxed">

@@ -1441,25 +1441,25 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
               className={`px-3.5 py-2.5 rounded-xl font-mono text-xs font-bold border transition-all duration-200
                 flex items-center gap-1.5 shrink-0
                 ${vizLoading
-                  ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300 cursor-wait'
+                  ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-300 cursor-wait'
                   : isSubscriber
-                    ? 'bg-indigo-500/10 border-indigo-500/25 text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-400/40 shadow-xs'
+                    ? 'bg-cyan-500/10 border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400/40 shadow-xs'
                     : 'bg-zinc-900 border-zinc-700/60 text-zinc-300 hover:text-white hover:border-zinc-500'}`}
             >
               {vizLoading ? (
                 <>
-                  <span className="w-3 h-3 border-[1.5px] border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="w-3 h-3 border-[1.5px] border-cyan-400 border-t-transparent rounded-full animate-spin" />
                   {vizProgress || 'Tracing…'}
                 </>
               ) : (
                 <>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5 text-indigo-400">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5 text-cyan-400">
                     <circle cx="11" cy="11" r="8" />
                     <path d="M21 21l-4.35-4.35" />
                     <path d="M11 8v6M8 11h6" />
                   </svg>
                   <span>Visualize</span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20 font-bold">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/20 font-bold">
                     {getVisualizerQuota(isSubscriber, user?.github).remaining}
                   </span>
                 </>

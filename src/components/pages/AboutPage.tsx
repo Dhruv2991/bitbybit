@@ -18,8 +18,8 @@ export default function AboutPage({ onNavigate }: Props) {
 
       {/* Hero */}
       <div className="text-center mb-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 mb-5">
-          <span className="text-3xl font-mono font-bold text-indigo-400">{'{ }'}</span>
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 mb-5">
+          <span className="text-3xl font-mono font-bold text-cyan-400">{'{ }'}</span>
         </div>
         <h1 className="font-bold text-3xl md:text-4xl text-zinc-100 mb-3 tracking-tight">
           BitByBit
@@ -32,7 +32,7 @@ export default function AboutPage({ onNavigate }: Props) {
       {/* About the platform */}
       <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 mb-5">
         <h2 className="font-semibold text-zinc-100 text-base mb-3 flex items-center gap-2">
-          <span className="text-indigo-400">✦</span> What is BitByBit?
+          <span className="text-cyan-400">✦</span> What is BitByBit?
         </h2>
         <p className="text-zinc-400 font-mono text-xs leading-relaxed mb-3">
           BitByBit is an AI-powered coding practice and interview preparation platform featuring
@@ -50,7 +50,7 @@ export default function AboutPage({ onNavigate }: Props) {
       {/* Built by */}
       <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 mb-5">
         <h2 className="font-semibold text-zinc-100 text-base mb-4 flex items-center gap-2">
-          <span className="text-indigo-400">✦</span> Built by
+          <span className="text-cyan-400">✦</span> Built by
         </h2>
         <div className="flex items-center gap-4 mb-4">
           <a
@@ -65,7 +65,7 @@ export default function AboutPage({ onNavigate }: Props) {
               width={56}
               height={56}
               style={{ width: 56, height: 56 }}
-              className="rounded-full ring-2 ring-indigo-500/30 object-cover"
+              className="rounded-full ring-2 ring-cyan-500/30 object-cover"
               onError={e => { (e.target as HTMLImageElement).src = "https://avatars.githubusercontent.com/u/0"; }}
             />
           </a>
@@ -74,7 +74,7 @@ export default function AboutPage({ onNavigate }: Props) {
             <div className="text-zinc-500 font-mono text-[10px] mt-0.5">Dhruv2991</div>
             <a
               href="mailto:ddhruvgnayak@gmail.com"
-              className="text-indigo-400 font-mono text-[11px] hover:text-indigo-300 transition-colors mt-0.5 block"
+              className="text-cyan-400 font-mono text-[11px] hover:text-cyan-300 transition-colors mt-0.5 block"
             >
               ddhruvgnayak@gmail.com
             </a>
@@ -136,7 +136,7 @@ export default function AboutPage({ onNavigate }: Props) {
       {/* Payments & Subscription */}
       <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 mb-5">
         <h2 className="font-semibold text-zinc-100 text-base mb-3 flex items-center gap-2">
-          <span className="text-indigo-400">✦</span> Payments &amp; Subscription
+          <span className="text-cyan-400">✦</span> Payments &amp; Subscription
         </h2>
 
         <div className="space-y-2 text-zinc-400 font-mono text-xs leading-relaxed">
@@ -201,19 +201,19 @@ export default function AboutPage({ onNavigate }: Props) {
             <p className="text-zinc-500">
               For licensing inquiries, collaborations, or permissions:
               {" "}<a href="mailto:ddhruvgnayak@gmail.com"
-                className="text-indigo-400 hover:text-indigo-300 transition-colors">
+                className="text-cyan-400 hover:text-cyan-300 transition-colors">
                 ddhruvgnayak@gmail.com
               </a>
             </p>
           </div>
           <div className="flex items-center gap-4 mt-4 pt-4 border-t border-zinc-800/80">
-            <button onClick={() => onNavigate("privacy")} className="text-xs font-mono text-indigo-400 hover:text-indigo-300 transition-colors">
+            <button onClick={() => onNavigate("privacy")} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors">
               Privacy Policy
             </button>
-            <button onClick={() => onNavigate("terms")} className="text-xs font-mono text-indigo-400 hover:text-indigo-300 transition-colors">
+            <button onClick={() => onNavigate("terms")} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors">
               Terms &amp; Conditions
             </button>
-            <button onClick={() => onNavigate("refunds")} className="text-xs font-mono text-indigo-400 hover:text-indigo-300 transition-colors">
+            <button onClick={() => onNavigate("refunds")} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors">
               Refund Policy
             </button>
           </div>
@@ -223,11 +223,11 @@ export default function AboutPage({ onNavigate }: Props) {
       {/* Contact */}
       <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 mb-8">
         <h2 className="font-semibold text-zinc-100 text-base mb-4 flex items-center gap-2">
-          <span className="text-indigo-400">✦</span> Contact & Support
+          <span className="text-cyan-400">✦</span> Contact & Support
         </h2>
         <div className="space-y-3">
           {[
-            { label: "General enquiries", value: "ddhruvgnayak@gmail.com", href: "mailto:ddhruvgnayak@gmail.com", color: "#818cf8" },
+            { label: "General enquiries", value: "ddhruvgnayak@gmail.com", href: "mailto:ddhruvgnayak@gmail.com", color: "#00E5FF" },
             { label: "Instagram",         value: "@teamcodelocked",        href: "https://www.instagram.com/teamcodelocked/", color: "#f59e0b" },
             { label: "GitHub",            value: "@Dhruv2991",            href: "https://github.com/Dhruv2991", color: "#e4e4e7" },
           ].map(({ label, value, href, color }) => (

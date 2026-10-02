@@ -498,8 +498,8 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                   setShowFsOverlay(false);
                 }
               }}
-              className="px-8 py-3 bg-indigo-600 text-white font-mono font-medium text-sm rounded-xl
-                hover:bg-indigo-500 active:scale-95 transition-colors shadow-sm"
+              className="px-8 py-3 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 font-mono font-bold text-sm rounded-xl
+                hover:opacity-90 shadow-[0_0_20px_rgba(0,229,255,0.25)] active:scale-95 transition-all"
             >
               ↩ Re-enter Fullscreen
             </button>
@@ -521,7 +521,7 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
             <div className="flex items-center gap-3 shrink-0">
               {/* Countdown */}
               <div className={`font-mono text-xl md:text-2xl font-bold tabular-nums transition-all duration-500
-                ${timeLeft <= 60 ? 'text-[var(--danger)] animate-pulse' : 'text-indigo-400 font-semibold'}`}>
+                ${timeLeft <= 60 ? 'text-[var(--danger)] animate-pulse' : 'text-cyan-400 font-semibold'}`}>
                 {fmtTime(timeLeft)}
               </div>
 
@@ -718,8 +718,8 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                         <div className="text-center text-xs text-zinc-500 font-mono py-2.5">Contest ended</div>
                       )}
                       <button onClick={() => setResultsContest(ct)}
-                        className="w-full py-2 bg-zinc-900 border border-indigo-500/30 text-indigo-400
-                          font-mono text-xs rounded-xl hover:bg-indigo-500/10 transition-colors">
+                        className="w-full py-2 bg-zinc-900 border border-cyan-500/30 text-cyan-400
+                          font-mono text-xs rounded-xl hover:bg-cyan-500/10 transition-colors">
                         🏁 View Results
                       </button>
                     </div>
@@ -754,8 +754,8 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                           </div>
                         ) : (
                           <button onClick={() => startContest(ct)}
-                            className="w-full py-2.5 bg-indigo-600 text-white font-mono font-medium text-xs rounded-xl
-                              hover:bg-indigo-500 transition-colors active:scale-[0.98] shadow-sm">
+                            className="w-full py-2.5 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 font-mono font-bold text-xs rounded-xl
+                              hover:opacity-90 transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(0,229,255,0.25)]">
                             Enter Live Arena →
                           </button>
                         )

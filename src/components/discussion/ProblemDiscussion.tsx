@@ -156,7 +156,7 @@ function CommentInput({
         rows={3}
         className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5
           text-zinc-200 text-sm font-mono placeholder-zinc-500 resize-none
-          focus:outline-none focus:border-indigo-500 transition-colors"
+          focus:outline-none focus:border-cyan-500/80 transition-colors"
       />
 
       {/* Spoiler warning */}
@@ -215,8 +215,8 @@ function CommentInput({
             <button
               onClick={handleSubmit}
               disabled={!body.trim() || posting || checking}
-              className="px-4 py-1.5 bg-indigo-600 text-white text-xs font-mono font-medium rounded-lg
-                hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-1.5 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 text-xs font-mono font-bold rounded-lg
+                hover:opacity-90 shadow-[0_0_15px_rgba(0,229,255,0.25)] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
               {checking ? '✦ Checking…' : posting ? 'Posting…' : 'Post'}
             </button>
@@ -284,7 +284,7 @@ function CommentCard({
             {depth === 0 && user && (
               <button
                 onClick={() => setShowReplyBox(v => !v)}
-                className="text-[10px] font-mono text-zinc-400 hover:text-indigo-400 transition-colors"
+                className="text-[10px] font-mono text-zinc-400 hover:text-cyan-400 transition-colors"
               >
                 {showReplyBox ? 'Cancel' : '↩ Reply'}
               </button>
@@ -471,7 +471,7 @@ export default function ProblemDiscussion({ problemId, problemTitle, user }: Pro
       {/* Comments */}
       {loading ? (
         <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs py-4">
-          <div className="w-3.5 h-3.5 border-2 border-zinc-700 border-t-indigo-500 rounded-full animate-spin" />
+          <div className="w-3.5 h-3.5 border-2 border-zinc-700 border-t-cyan-400 rounded-full animate-spin" />
           Loading discussion…
         </div>
       ) : comments.length === 0 ? (

@@ -60,12 +60,12 @@ export default function SkillRadar({ skills }: Props) {
             {/* Data polygon */}
             <polygon
               points={points.map(p => `${p.x},${p.y}`).join(' ')}
-              fill="rgba(99, 102, 241, 0.15)"
-              stroke="#6366f1"
+              fill="rgba(0, 229, 255, 0.15)"
+              stroke="#00E5FF"
               strokeWidth={1.5}
             />
             {points.map((p, i) => (
-              <circle key={i} cx={p.x} cy={p.y} r={3} fill="#6366f1" />
+              <circle key={i} cx={p.x} cy={p.y} r={3} fill="#00E5FF" />
             ))}
             {/* Labels */}
             {points.map((p, i) => (

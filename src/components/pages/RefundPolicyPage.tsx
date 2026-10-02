@@ -71,7 +71,7 @@ export default function RefundPolicyPage({ onNavigate }: Props) {
       <div className="text-center">
         <button
           onClick={() => onNavigate("about")}
-          className="text-xs font-mono text-zinc-500 hover:text-indigo-400 transition-colors"
+          className="text-xs font-mono text-zinc-500 hover:text-cyan-400 transition-colors"
         >
           ← Back to About
         </button>
