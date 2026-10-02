@@ -53,18 +53,8 @@ export const viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${jetbrainsMono.variable} ${syne.variable}`} suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try {
-              var t = localStorage.getItem('bb_theme');
-              if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
-            } catch (e) {}`,
-          }}
-        />
-      </head>
-      <body className="bg-[#0b0d12] text-[#e0e0e0] min-h-screen antialiased">
+    <html lang="en" data-theme="dark" className={`dark ${jetbrainsMono.variable} ${syne.variable}`}>
+      <body className="bg-[var(--bg)] text-[var(--text)] min-h-screen antialiased">
         {children}
         <Analytics />
       </body>

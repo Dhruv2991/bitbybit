@@ -283,7 +283,10 @@ export interface User {
   name: string;
   github: string;
   is_admin: boolean;
+  /** Set by the subscription system; true if the user has an active subscription */
+  is_subscriber?: boolean;
 }
+
 
 // ════════════════════════════════════════════════════════════
 // Supported Languages

@@ -335,33 +335,33 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
       {/* Header & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="font-display font-bold text-xl text-[#e0e0e0] flex items-center gap-2">
-            <Award className="w-5 h-5 text-[#00e87a]" /> Certificates Management
+          <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
+            <Award className="w-5 h-5 text-indigo-400" /> Certificates Management
           </h2>
-          <p className="text-xs font-mono text-[#888] mt-0.5">
+          <p className="text-xs font-mono text-zinc-400 mt-0.5">
             Issue, track, download, and revoke verified achievement certificates.
           </p>
         </div>
 
         <button
           onClick={() => setShowIssueModal(true)}
-          className="btn-solid flex items-center gap-2 text-xs py-2 px-4 shadow-[0_0_15px_rgba(0,232,122,0.2)] shrink-0"
+          className="flex items-center gap-2 text-xs font-medium py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors shrink-0 shadow-sm"
         >
           <Plus className="w-4 h-4" /> Issue Certificate
         </button>
       </div>
 
       {/* Filters Bar */}
-      <div className="card p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
+      <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
         {/* Search */}
         <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#666]" />
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search recipient, ID, event..."
-            className="w-full bg-[#0a0a0a] border border-[#222] rounded-lg pl-8 pr-3 py-2 text-[#e0e0e0] placeholder-[#555] focus:outline-none focus:border-[#00e87a40]"
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500/80"
           />
         </div>
 
@@ -371,7 +371,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
             aria-label="Filter by certificate status"
-            className="w-full bg-[#0a0a0a] border border-[#222] rounded-lg px-3 py-2 text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500/80"
           >
             <option value="all">All Statuses</option>
             <option value="issued">Active / Issued</option>
@@ -385,7 +385,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
             aria-label="Filter by certificate type"
-            className="w-full bg-[#0a0a0a] border border-[#222] rounded-lg px-3 py-2 text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500/80"
           >
             <option value="all">All Certificate Types</option>
             {CERTIFICATE_TYPES.map((t) => (
@@ -402,7 +402,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
             value={selectedMemberFilter}
             onChange={(e) => setSelectedMemberFilter(e.target.value)}
             aria-label="Filter by member"
-            className="w-full bg-[#0a0a0a] border border-[#222] rounded-lg px-3 py-2 text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 focus:outline-none focus:border-indigo-500/80"
           >
             <option value="all">All Members</option>
             {members.map((m) => (
@@ -416,24 +416,24 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
 
       {/* Certificates Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-[#888] font-mono text-sm gap-2">
-          <div className="spinner" /> Loading certificates...
+        <div className="flex items-center justify-center py-16 text-zinc-500 font-mono text-xs gap-2">
+          <div className="w-4 h-4 rounded-full border-2 border-zinc-700 border-t-indigo-500 animate-spin" /> Loading certificates...
         </div>
       ) : filteredCertificates.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Award className="w-10 h-10 text-[#444] mx-auto mb-3" />
-          <p className="font-mono text-sm text-[#e0e0e0] font-bold">No certificates found</p>
-          <p className="font-mono text-xs text-[#666] mt-1">
+        <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl p-12 text-center">
+          <Award className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
+          <p className="font-mono text-sm text-zinc-200 font-semibold">No certificates found</p>
+          <p className="font-mono text-xs text-zinc-500 mt-1">
             {certificates.length === 0
               ? "No certificates have been issued yet. Click 'Issue Certificate' to create one."
               : "No certificates matched your filter criteria."}
           </p>
         </div>
       ) : (
-        <div className="card overflow-hidden border border-[#222]">
+        <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-[#111] text-[#777] uppercase border-b border-[#222]">
+              <thead className="bg-zinc-900/80 text-zinc-400 uppercase border-b border-zinc-800">
                 <tr>
                   <th className="px-4 py-3">Recipient</th>
                   <th className="px-4 py-3">Certificate ID</th>
@@ -444,20 +444,20 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1a1a1a]">
+              <tbody className="divide-y divide-zinc-800/60">
                 {filteredCertificates.map((cert) => {
                   const isRevoked = cert.status === "revoked";
                   return (
-                    <tr key={cert.id} className="hover:bg-[#141414] transition-colors">
+                    <tr key={cert.id} className="hover:bg-zinc-800/30 transition-colors">
                       {/* Recipient */}
                       <td className="px-4 py-3.5">
-                        <div className="font-bold text-[#e0e0e0]">{cert.recipient_name}</div>
-                        <div className="text-[10px] text-[#666]">@{cert.github}</div>
-                        <div className="text-[10px] text-[#555] truncate max-w-[150px]">{cert.recipient_email}</div>
+                        <div className="font-semibold text-zinc-200">{cert.recipient_name}</div>
+                        <div className="text-[10px] text-zinc-500">@{cert.github}</div>
+                        <div className="text-[10px] text-zinc-500 truncate max-w-[150px]">{cert.recipient_email}</div>
                       </td>
 
                       {/* Certificate ID */}
-                      <td className="px-4 py-3.5 font-bold text-[#00e87a]">
+                      <td className="px-4 py-3.5 font-medium text-indigo-400">
                         <a
                           href={`/certificate/${cert.certificate_id}`}
                           target="_blank"
@@ -470,12 +470,12 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
 
                       {/* Title & Event */}
                       <td className="px-4 py-3.5 max-w-[200px]">
-                        <div className="text-[#ccc] font-medium truncate">{cert.title}</div>
-                        <div className="text-[10px] text-[#888] truncate">{cert.event_name}</div>
+                        <div className="text-zinc-300 font-medium truncate">{cert.title}</div>
+                        <div className="text-[10px] text-zinc-500 truncate">{cert.event_name}</div>
                       </td>
 
                       {/* Issued Date */}
-                      <td className="px-4 py-3.5 text-[#999]">
+                      <td className="px-4 py-3.5 text-zinc-400">
                         {new Date(cert.issued_at).toLocaleDateString("en-US", {
                           day: "numeric",
                           month: "short",
@@ -486,11 +486,11 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       {/* Status */}
                       <td className="px-4 py-3.5">
                         {isRevoked ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-400 bg-red-950/30 border border-red-800/40 rounded px-2 py-0.5">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded px-2 py-0.5">
                             Revoked
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#00e87a] bg-[#00e87a15] border border-[#00e87a30] rounded px-2 py-0.5">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-0.5">
                             Issued
                           </span>
                         )}
@@ -499,21 +499,21 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       {/* Email Status */}
                       <td className="px-4 py-3.5">
                         {cert.email_status === "sent" ? (
-                          <span className="text-[10px] text-[#00e87a] flex items-center gap-1" title="Email sent via Brevo">
+                          <span className="text-[10px] text-emerald-400 flex items-center gap-1" title="Email sent via Brevo">
                             <CheckCircle className="w-3 h-3" /> Sent
                           </span>
                         ) : cert.email_status === "failed" ? (
                           <button
                             onClick={() => handleResendEmail(cert.certificate_id)}
                             disabled={resendingEmailId === cert.certificate_id}
-                            className="text-[10px] text-amber-400 bg-amber-950/30 border border-amber-800/40 rounded px-2 py-0.5 flex items-center gap-1 hover:bg-amber-900/40"
+                            className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-2 py-0.5 flex items-center gap-1 hover:bg-amber-500/20"
                             title={`Failed: ${cert.email_error || "Unknown error"}. Click to retry.`}
                           >
                             <AlertTriangle className="w-3 h-3" />
                             {resendingEmailId === cert.certificate_id ? "Sending..." : "Retry"}
                           </button>
                         ) : (
-                          <span className="text-[10px] text-[#777]">Pending</span>
+                          <span className="text-[10px] text-zinc-500">Pending</span>
                         )}
                       </td>
 
@@ -523,7 +523,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                           <button
                             onClick={() => setViewingCert(cert)}
                             title="View Certificate"
-                            className="p-1.5 rounded hover:bg-[#222] text-[#bbb] hover:text-[#fff]"
+                            className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -531,7 +531,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                           <button
                             onClick={() => handleDownload(cert.certificate_id)}
                             title="Download PDF"
-                            className="p-1.5 rounded hover:bg-[#222] text-[#00e87a] hover:text-[#00ff88]"
+                            className="p-1.5 rounded hover:bg-zinc-800 text-indigo-400 hover:text-indigo-300 transition-colors"
                           >
                             <Download className="w-4 h-4" />
                           </button>
@@ -540,7 +540,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                             <button
                               onClick={() => setRevokingCertId(cert.certificate_id)}
                               title="Revoke Certificate"
-                              className="p-1.5 rounded hover:bg-red-950/40 text-red-400 hover:text-red-300"
+                              className="p-1.5 rounded hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 transition-colors"
                             >
                               <Ban className="w-4 h-4" />
                             </button>
@@ -560,29 +560,29 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
       {/* ISSUE CERTIFICATE MODAL (WITH REALTIME LIVE PREVIEW)        */}
       {/* ════════════════════════════════════════════════════════════ */}
       {showIssueModal && (
-        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fade-in">
-          <div className="bg-[#111] border border-[#2a2a2a] rounded-2xl w-full max-w-6xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+        <div className="fixed inset-0 z-[200] bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fade-in">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-6xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden my-auto">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-[#222] flex items-center justify-between shrink-0">
+            <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-[#00e87a]" />
-                <h3 className="font-display font-bold text-base text-[#e0e0e0]">Issue New Certificate</h3>
+                <Award className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-semibold text-base text-zinc-100">Issue New Certificate</h3>
               </div>
               <button
                 onClick={() => setShowIssueModal(false)}
-                className="p-1 rounded-lg text-[#666] hover:text-[#fff] hover:bg-[#222]"
+                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Body: Split view (Form Left, Live Preview Right) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-y-auto divide-y lg:divide-y-0 lg:divide-x divide-[#222]">
+            <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-y-auto divide-y lg:divide-y-0 lg:divide-x divide-zinc-800">
               {/* Form Column */}
               <form onSubmit={handleIssueCertificate} className="lg:col-span-5 p-5 space-y-4 overflow-y-auto max-h-[75vh]">
                 {/* 1. Member Selector */}
                 <div>
-                  <label className="block text-[11px] font-mono text-[#999] uppercase mb-1">
+                  <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-1">
                     Select Member *
                   </label>
                   <div className="space-y-1.5">
@@ -591,13 +591,13 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       value={memberSearch}
                       onChange={(e) => setMemberSearch(e.target.value)}
                       placeholder="Search member by name or username..."
-                      className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-1.5 text-xs font-mono text-[#e0e0e0] placeholder-[#555] focus:outline-none focus:border-[#00e87a40]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
                     />
                     <select
                       value={selectedGithub}
                       onChange={(e) => handleSelectMember(e.target.value)}
                       aria-label="Select member"
-                      className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-2 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
                       required
                     >
                       <option value="">-- Choose Member --</option>
@@ -613,7 +613,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                 {/* 2. Recipient Name & Email */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-mono text-[#999] uppercase mb-1">
+                    <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-1">
                       Recipient Name *
                     </label>
                     <input
@@ -622,12 +622,12 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       onChange={(e) => setRecipientName(e.target.value)}
                       placeholder="e.g. Dhruv G Nayak"
                       required
-                      className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-1.5 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
                     />
-                    <span className="text-[10px] text-[#666] font-mono">Edits apply to certificate only.</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">Edits apply to certificate only.</span>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-mono text-[#999] uppercase mb-1">
+                    <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-1">
                       Recipient Email *
                     </label>
                     <input
@@ -636,7 +636,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       onChange={(e) => setRecipientEmail(e.target.value)}
                       placeholder="e.g. member@bmsce.ac.in"
                       required
-                      className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-1.5 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -644,14 +644,14 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                 {/* 3. Certificate Type & Title */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-mono text-[#999] uppercase mb-1">
+                    <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-1">
                       Certificate Type
                     </label>
                     <select
                       value={certType}
                       onChange={(e) => handleTypeChange(e.target.value)}
                       aria-label="Certificate type"
-                      className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-1.5 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
                     >
                       {CERTIFICATE_TYPES.map((t) => (
                         <option key={t.id} value={t.label}>
@@ -661,7 +661,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-mono text-[#999] uppercase mb-1">
+                    <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-1">
                       Certificate Title
                     </label>
                     <input
@@ -670,14 +670,14 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       onChange={(e) => setCertTitle(e.target.value)}
                       placeholder="CERTIFICATE OF ACHIEVEMENT"
                       required
-                      className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-1.5 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
 
                 {/* 4. Achievement & Event */}
                 <div>
-                  <label className="block text-[11px] font-mono text-[#999] uppercase mb-1">
+                  <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-1">
                     Recognition / Achievement Statement *
                   </label>
                   <input
@@ -686,13 +686,13 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                     onChange={(e) => setAchievementText(e.target.value)}
                     placeholder="e.g. securing 1st Place for the"
                     required
-                    className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-1.5 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-mono text-[#999] uppercase mb-1">
+                    <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-1">
                       Event / Contest Name *
                     </label>
                     <input
@@ -701,11 +701,11 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       onChange={(e) => setEventName(e.target.value)}
                       placeholder="e.g. Bit By Bit Weekly Contest"
                       required
-                      className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-1.5 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-mono text-[#999] uppercase mb-1">
+                    <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-1">
                       Date Display
                     </label>
                     <input
@@ -713,7 +713,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       value={dateStr}
                       onChange={(e) => setDateStr(e.target.value)}
                       placeholder="e.g. June 2026"
-                      className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-1.5 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
@@ -721,7 +721,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                 {/* 5. Organization Text & Activity Points */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-mono text-[#999] uppercase mb-1">
+                    <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-1">
                       Organization Text
                     </label>
                     <input
@@ -729,11 +729,11 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       value={organizationText}
                       onChange={(e) => setOrganizationText(e.target.value)}
                       placeholder="e.g. from teamcodelocked club"
-                      className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-1.5 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-mono text-[#999] uppercase mb-1">
+                    <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-1">
                       Activity Points Text
                     </label>
                     <input
@@ -741,35 +741,35 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       value={activityPointsText}
                       onChange={(e) => setActivityPointsText(e.target.value)}
                       placeholder="e.g. This certificate is eligible for claiming 1-2 activity points."
-                      className="w-full bg-[#080808] border border-[#252525] rounded-lg px-3 py-1.5 text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a40]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
                 </div>
 
                 {/* 6. Coordinators / Signatories */}
                 <div>
-                  <label className="block text-[11px] font-mono text-[#999] uppercase mb-2">
+                  <label className="block text-[11px] font-mono text-zinc-400 uppercase mb-2">
                     Coordinators / Signatories (3 Columns)
                   </label>
                   <div className="space-y-2">
                     {coordinators.map((coord, idx) => (
-                      <div key={idx} className="p-2.5 bg-[#080808] border border-[#222] rounded-lg grid grid-cols-2 gap-2 text-[11px] font-mono">
+                      <div key={idx} className="p-2.5 bg-zinc-900 border border-zinc-800 rounded-lg grid grid-cols-2 gap-2 text-[11px] font-mono">
                         <div>
-                          <span className="text-[#666] text-[10px]">Name:</span>
+                          <span className="text-zinc-500 text-[10px]">Name:</span>
                           <input
                             type="text"
                             value={coord.name}
                             onChange={(e) => updateCoordinator(idx, "name", e.target.value)}
-                            className="w-full bg-[#111] border border-[#333] rounded px-2 py-1 text-[#e0e0e0]"
+                            className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-zinc-200"
                           />
                         </div>
                         <div>
-                          <span className="text-[#666] text-[10px]">Title:</span>
+                          <span className="text-zinc-500 text-[10px]">Title:</span>
                           <input
                             type="text"
                             value={coord.title}
                             onChange={(e) => updateCoordinator(idx, "title", e.target.value)}
-                            className="w-full bg-[#111] border border-[#333] rounded px-2 py-1 text-[#e0e0e0]"
+                            className="w-full bg-zinc-950 border border-zinc-700 rounded px-2 py-1 text-zinc-200"
                           />
                         </div>
                       </div>
@@ -778,15 +778,15 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                 </div>
 
                 {/* Submit button */}
-                <div className="pt-3 border-t border-[#222] flex gap-3">
+                <div className="pt-3 border-t border-zinc-800 flex gap-3">
                   <button
                     type="submit"
                     disabled={issuing}
-                    className="flex-1 btn-solid py-2.5 text-xs font-mono font-bold flex items-center justify-center gap-2"
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2.5 text-xs font-mono font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                   >
                     {issuing ? (
                       <>
-                        <div className="spinner w-3.5 h-3.5" /> Generating PDF & Sending Email...
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-white/20 border-t-white animate-spin" /> Generating PDF & Sending Email...
                       </>
                     ) : (
                       <>
@@ -798,7 +798,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                     type="button"
                     onClick={() => setShowIssueModal(false)}
                     disabled={issuing}
-                    className="btn-ghost py-2.5 px-4 text-xs font-mono"
+                    className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-lg text-xs font-mono transition-colors"
                   >
                     Cancel
                   </button>
@@ -806,15 +806,15 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
               </form>
 
               {/* Live Certificate Preview Column */}
-              <div className="lg:col-span-7 p-6 bg-[#080808] flex flex-col justify-center items-center overflow-y-auto">
+              <div className="lg:col-span-7 p-6 bg-zinc-950 flex flex-col justify-center items-center overflow-y-auto">
                 <div className="w-full max-w-xl">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-mono text-[#00e87a] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="text-[11px] font-mono text-indigo-400 font-semibold uppercase tracking-wider flex items-center gap-1.5">
                       <Eye className="w-3.5 h-3.5" /> Live Certificate Preview
                     </span>
-                    <span className="text-[10px] font-mono text-[#666]">Updates in real-time</span>
+                    <span className="text-[10px] font-mono text-zinc-500">Updates in real-time</span>
                   </div>
-                  <div className="card p-2 sm:p-3 bg-[#0a0a0a] border-[#222] shadow-2xl">
+                  <div className="p-2 sm:p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl shadow-2xl">
                     <CertificatePreview
                       recipientName={recipientName || "Dhruv G Nayak"}
                       title={certTitle || "CERTIFICATE OF ACHIEVEMENT"}
@@ -838,25 +838,25 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
       {/* VIEW CERTIFICATE MODAL                                      */}
       {/* ════════════════════════════════════════════════════════════ */}
       {viewingCert && (
-        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-[#111] border border-[#2a2a2a] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
-            <div className="px-6 py-4 border-b border-[#222] flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-[200] bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+            <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-[#00e87a]" />
-                <h3 className="font-display font-bold text-base text-[#e0e0e0]">
+                <Award className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-semibold text-base text-zinc-100">
                   Certificate {viewingCert.certificate_id}
                 </h3>
               </div>
               <button
                 onClick={() => setViewingCert(null)}
-                className="p-1 rounded-lg text-[#666] hover:text-[#fff] hover:bg-[#222]"
+                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-4">
-              <div className="card p-3 bg-[#0a0a0a] border-[#222]">
+              <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl">
                 <CertificatePreview
                   recipientName={viewingCert.recipient_name}
                   title={viewingCert.title}
@@ -875,13 +875,13 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                <div className="text-xs font-mono text-[#888]">
-                  Recipient: <strong className="text-[#e0e0e0]">{viewingCert.recipient_name}</strong> (
+                <div className="text-xs font-mono text-zinc-400">
+                  Recipient: <strong className="text-zinc-200">{viewingCert.recipient_name}</strong> (
                   {viewingCert.recipient_email})
                 </div>
                 <button
                   onClick={() => handleDownload(viewingCert.certificate_id)}
-                  className="btn-solid py-2 px-4 text-xs font-mono flex items-center gap-2"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg py-2 px-4 text-xs font-mono font-medium flex items-center gap-2 transition-colors"
                 >
                   <Download className="w-4 h-4" /> Download PDF
                 </button>
@@ -895,15 +895,15 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
       {/* REVOKE CONFIRMATION MODAL                                   */}
       {/* ════════════════════════════════════════════════════════════ */}
       {revokingCertId && (
-        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-[#111] border border-red-900/40 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
-            <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 mx-auto">
+        <div className="fixed inset-0 z-[200] bg-zinc-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-zinc-950 border border-rose-500/20 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+            <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-400 mx-auto">
               <Ban className="w-6 h-6" />
             </div>
             <div className="text-center">
-              <h3 className="font-display font-bold text-lg text-[#e0e0e0]">Revoke Certificate?</h3>
-              <p className="text-xs font-mono text-[#888] mt-1">
-                Are you sure you want to revoke <strong className="text-red-400">{revokingCertId}</strong>?
+              <h3 className="font-semibold text-lg text-zinc-100">Revoke Certificate?</h3>
+              <p className="text-xs font-mono text-zinc-400 mt-1">
+                Are you sure you want to revoke <strong className="text-rose-400">{revokingCertId}</strong>?
                 This will mark the certificate as invalid on the verification page and in member views.
               </p>
             </div>
@@ -911,14 +911,14 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
               <button
                 onClick={() => handleRevokeCertificate(revokingCertId)}
                 disabled={revoking}
-                className="flex-1 bg-red-600 hover:bg-red-500 text-white font-mono font-bold text-xs py-2.5 rounded-lg transition-colors"
+                className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-mono font-medium text-xs py-2.5 rounded-lg transition-colors"
               >
                 {revoking ? "Revoking..." : "Confirm Revoke"}
               </button>
               <button
                 onClick={() => setRevokingCertId(null)}
                 disabled={revoking}
-                className="btn-ghost py-2.5 px-4 text-xs font-mono"
+                className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-lg text-xs font-mono transition-colors"
               >
                 Cancel
               </button>

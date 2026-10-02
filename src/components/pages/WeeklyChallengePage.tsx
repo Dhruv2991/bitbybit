@@ -468,57 +468,57 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
             return (
               <div
                 key={ch.id}
-                className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden transition-all duration-300 hover:border-[#1c1c1c]"
+                className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden shadow-sm"
               >
                 {/* Challenge header */}
-                <div className="px-5 py-4 border-b border-[#1a1a1a]">
+                <div className="px-5 py-4 border-b border-zinc-800/80">
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
-                      <h2 className="font-mono font-bold text-[#e2e2e2] text-base">
+                      <h2 className="font-display font-semibold text-zinc-100 text-base">
                         {ch.title}
                       </h2>
                       {ch.description && (
-                        <p className="text-xs text-[#777] font-mono mt-0.5">
+                        <p className="text-xs text-zinc-400 font-sans mt-0.5">
                           {ch.description}
                         </p>
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {isActive && (
-                        <span className="flex items-center gap-1 text-[10px] font-mono text-[#00e87a] bg-[#00e87a12] px-2 py-0.5 rounded-lg">
-                          <span className="live-dot" />{" "}LIVE
+                        <span className="flex items-center gap-1.5 text-[10px] font-mono font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> LIVE
                         </span>
                       )}
                       {isUpcoming && (
-                        <span className="text-[10px] font-mono text-[#f0b429] bg-[#f0b42912] px-2 py-0.5 rounded-lg">
+                        <span className="text-[10px] font-mono font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
                           UPCOMING
                         </span>
                       )}
                       {isEnded && (
-                        <span className="text-[10px] font-mono text-[#aaa] bg-[#1a1a1a] px-2 py-0.5 rounded-lg">
+                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-800/60 border border-zinc-700/60 px-2 py-0.5 rounded-full">
                           ENDED
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="mt-3 flex flex-wrap gap-4 text-[10px] font-mono text-[#999]">
+                  <div className="mt-3 flex flex-wrap gap-4 text-[11px] font-mono text-zinc-400">
                     <span>
-                      📅 {new Date(ch.starts_at).toLocaleString()} –{" "}
-                      {new Date(ch.ends_at).toLocaleString()}
+                      📅 {new Date(ch.starts_at).toLocaleDateString()} –{" "}
+                      {new Date(ch.ends_at).toLocaleDateString()}
                     </span>
                     {isUpcoming && (
-                      <span className="text-[#f0b429]">
+                      <span className="text-amber-400">
                         ⏳ Starts in {timeLeft(ch.starts_at)}
                       </span>
                     )}
                     {isActive && (
-                      <span className="text-[#f0b429]">
+                      <span className="text-amber-400">
                         ⏱ {timeLeft(ch.ends_at)}
                       </span>
                     )}
                     {isActive && isSubscribed && (
-                      <span className="text-[#a78bfa]">
+                      <span className="text-indigo-400">
                         ⚡ Current bonus: {fmtBonus(bonus)}
                       </span>
                     )}
@@ -526,23 +526,17 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                   </div>
 
                   {isActive && isSubscribed && (
-                    <div className="mt-2">
-                      <div className="h-1.5 w-full bg-[#1a1a1a] rounded-full overflow-hidden">
+                    <div className="mt-3">
+                      <div className="h-1.5 w-full bg-zinc-950 rounded-full overflow-hidden border border-zinc-800/60">
                         <div
-                          className="h-full rounded-full transition-all duration-1000 ease-linear"
+                          className="h-full rounded-full transition-all duration-1000 ease-linear bg-indigo-500"
                           style={{
                             width: `${Math.max(0, Math.min(100, ((bonus - 0.2) / 0.8) * 100))}%`,
-                            background:
-                              bonus > 0.6
-                                ? "#00e87a"
-                                : bonus > 0.35
-                                ? "#f0b429"
-                                : "#ff5c5c",
                           }}
                         />
                       </div>
-                      <p className="text-[9px] text-[#666] font-mono mt-1">
-                        Bonus drains from 100% → 20% over the week — solve sooner to lock in more.
+                      <p className="text-[10px] text-zinc-500 font-mono mt-1">
+                        Bonus decays from 100% → 20% over the week — solve sooner to lock in more.
                       </p>
                     </div>
                   )}
@@ -550,12 +544,12 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
 
                 {/* Problems list */}
                 <div className="px-5 py-4">
-                  <p className="text-[10px] text-[#666] font-mono uppercase tracking-widest mb-3">
+                  <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-3">
                     Problems ({chProblems.length})
                   </p>
                   <div className="space-y-2">
                     {chProblems.length === 0 && (
-                      <p className="text-xs text-[#888] font-mono">
+                      <p className="text-xs text-zinc-500 font-mono">
                         Problems not yet loaded.
                       </p>
                     )}
@@ -579,14 +573,14 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                           }}
                           className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all duration-150
                             ${isSubscribed && isActive
-                              ? "border-[#181818] hover:bg-[#0f0f0f] hover:border-[#00e87a15] cursor-pointer group"
+                              ? "border-zinc-800/80 bg-zinc-950/40 hover:bg-zinc-900/80 hover:border-zinc-700 cursor-pointer group"
                               : isSubscribed && isEnded
-                              ? "border-[#a78bfa20] hover:bg-[#a78bfa08] hover:border-[#a78bfa30] cursor-pointer group"
-                              : "border-[#161616] opacity-50 cursor-not-allowed select-none"
+                              ? "border-zinc-800/80 bg-zinc-950/40 hover:bg-zinc-900/60 hover:border-zinc-700 cursor-pointer group"
+                              : "border-zinc-800/40 bg-zinc-950/20 opacity-50 cursor-not-allowed select-none"
                             }`}
                         >
                           <span
-                            className={`text-sm ${solved ? "text-[#00e87a]" : "text-[#888]"}`}
+                            className={`text-sm ${solved ? "text-emerald-400" : "text-zinc-600"}`}
                           >
                             {solved ? "✓" : "◯"}
                           </span>
@@ -594,46 +588,46 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                             <span
                               className={`font-mono text-sm transition-colors truncate block
                             ${solved
-                                ? "text-[#00e87a]"
+                                ? "text-emerald-400"
                                 : isSubscribed && isActive
-                                  ? "text-[#e0e0e0] group-hover:text-[#00e87a]"
-                                  : "text-[#aaa]"
+                                  ? "text-zinc-200 group-hover:text-zinc-100"
+                                  : "text-zinc-500"
                               }`}
                             >
                               {p.title}
                             </span>
                           </div>
-                          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg
+                          <span className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded border
                             ${p.difficulty === "Easy"
-                              ? "text-[#00e87a] bg-[#00e87a12]"
+                              ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
                               : p.difficulty === "Medium"
-                                ? "text-[#f0b429] bg-[#f0b42912]"
-                                : "text-[#ff4d4d] bg-[#ff4d4d12]"}`}>
+                                ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+                                : "text-rose-400 bg-rose-500/10 border-rose-500/20"}`}>
                             {p.difficulty}
                           </span>
-                          <span className="text-xs font-mono text-[#a78bfa] font-bold">
+                          <span className="text-xs font-mono text-indigo-400 font-semibold">
                             {p.points} pts
                           </span>
                           {solved && mySub && (
-                            <span className="text-[10px] font-mono text-[#00e87a]">
+                            <span className="text-[10px] font-mono text-emerald-400 font-semibold">
                               +{mySub.points_awarded}
                             </span>
                           )}
                           {!isSubscribed && (
-                            <span className="text-[#999] text-xs">🔒</span>
+                            <span className="text-zinc-500 text-xs">🔒</span>
                           )}
                           {isSubscribed && isUpcoming && (
-                            <span className="text-[10px] font-mono text-[#f0b429]">
+                            <span className="text-[10px] font-mono text-amber-400">
                               starts soon
                             </span>
                           )}
                           {isSubscribed && isEnded && !solved && (
-                            <span className="text-[10px] font-mono text-[#a78bfa]">
+                            <span className="text-[10px] font-mono text-indigo-400">
                               🏁 practice
                             </span>
                           )}
                           {isSubscribed && isEnded && solved && (
-                            <span className="text-[10px] font-mono text-[#555]">
+                            <span className="text-[10px] font-mono text-zinc-500">
                               ended
                             </span>
                           )}
@@ -646,33 +640,33 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                 {/* Access section */}
                 <div className="px-5 pb-4">
                   {!user ? (
-                    <div className="text-center py-3 border border-[#1a1a1a] rounded-xl">
-                      <p className="text-xs font-mono text-[#999]">Sign in with GitHub to participate</p>
+                    <div className="text-center py-3 border border-zinc-800/80 rounded-xl bg-zinc-950/40">
+                      <p className="text-xs font-mono text-zinc-400">Sign in with GitHub to participate</p>
                     </div>
                   ) : isSubscribed ? (
                     <div className="flex items-center justify-between flex-wrap gap-3">
                       <div className="flex items-center gap-2 text-xs font-mono">
                         {isUpcoming ? (
-                          <span className="text-[#f0b429]">
+                          <span className="text-amber-400">
                             ✓ Subscribed — problems unlock on {new Date(ch.starts_at).toLocaleString()}
                           </span>
                         ) : isEnded ? (
-                          <span className="text-[#aaa]">✓ Challenge ended</span>
+                          <span className="text-zinc-400">✓ Challenge ended</span>
                         ) : (
-                          <span className="text-[#00e87a]">✓ Subscribed — solve all week!</span>
+                          <span className="text-emerald-400 font-medium">✓ Subscribed — solve all week!</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         {ch.whatsapp_link && (
                           <a href={ch.whatsapp_link} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] text-white font-mono text-xs font-bold rounded-lg hover:bg-[#22c55e] transition-all">
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white font-mono text-xs font-medium rounded-lg hover:bg-emerald-500 transition-all">
                             💬 WhatsApp Group
                           </a>
                         )}
                         {!isUpcoming && (
                           <button
                             onClick={() => setShowLeader(showLeader === ch.id ? null : ch.id)}
-                            className="text-xs font-mono text-[#a78bfa] hover:text-[#c4b5fd] transition-colors">
+                            className="text-xs font-mono text-indigo-400 hover:text-indigo-300 transition-colors">
                             {showLeader === ch.id ? "Hide" : "View"} leaderboard ↕
                           </button>
                         )}
@@ -680,24 +674,24 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                     </div>
                   ) : subStatus === "confirmed" ? (
                     <div className="flex items-center gap-3 flex-wrap">
-                      <p className="text-xs font-mono text-[#f0b429] flex-1">
+                      <p className="text-xs font-mono text-amber-400 flex-1">
                         ⏳ Your monthly access has expired — renew to continue
                       </p>
                       <button
                         onClick={() => onNavigate?.('subscribe')}
-                        className="px-4 py-2 bg-[#f0b429] text-black font-mono font-bold text-xs rounded-xl hover:bg-[#fbbf24] transition-all shrink-0"
+                        className="px-4 py-2 bg-amber-500 text-zinc-950 font-mono font-semibold text-xs rounded-xl hover:bg-amber-400 transition-all shrink-0"
                       >
                         Renew ⭐
                       </button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-3 flex-wrap">
-                      <p className="text-xs font-mono text-[#777] flex-1">
+                      <p className="text-xs font-mono text-zinc-400 flex-1">
                         Subscribe for monthly access to all weekly challenges
                       </p>
                       <button
                         onClick={() => onNavigate?.('subscribe')}
-                        className="px-4 py-2 bg-[#00e87a] text-black font-mono font-bold text-xs rounded-xl hover:bg-[#00ff88] transition-all shrink-0"
+                        className="px-4 py-2 bg-indigo-600 text-white font-mono font-medium text-xs rounded-xl hover:bg-indigo-500 transition-all shrink-0 shadow-sm"
                       >
                         Subscribe ⭐
                       </button>
@@ -706,8 +700,8 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
 
                   {/* Leaderboard */}
                   {isSubscribed && showLeader === ch.id && (
-                    <div className="mt-4 border-t border-[#1a1a1a] pt-4">
-                      <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-2">
+                    <div className="mt-4 border-t border-zinc-800/60 pt-4">
+                      <p className="text-[10px] text-zinc-400 font-mono uppercase tracking-widest mb-2">
                         Weekly Leaderboard
                       </p>
                       <WeeklyLeaderboard challengeId={ch.id} />
@@ -716,28 +710,26 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
 
                   {/* AI Summary — only for ended challenges */}
                   {isEnded && (
-                    <div className="mt-3 border-t border-[#141414] pt-3">
-                      {/* Toggle button */}
+                    <div className="mt-3 border-t border-zinc-800/60 pt-3">
                       {!summaries[ch.id] && (
                         <button
                           onClick={() => generateSummary(ch)}
                           disabled={loadingSummary === ch.id}
                           className="flex items-center gap-2 text-[10px] font-mono px-3 py-1.5
-                            bg-[#a78bfa10] border border-[#a78bfa20] text-[#a78bfa] rounded-lg
-                            hover:bg-[#a78bfa18] disabled:opacity-50 transition-all"
+                            bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 rounded-lg
+                            hover:bg-indigo-500/15 disabled:opacity-50 transition-all"
                         >
                           {loadingSummary === ch.id ? (
-                            <><span className="w-2.5 h-2.5 border border-[#a78bfa] border-t-transparent rounded-full animate-spin inline-block" /> Generating summary…</>
+                            <><span className="w-2.5 h-2.5 border border-indigo-400 border-t-transparent rounded-full animate-spin inline-block" /> Generating summary…</>
                           ) : '✦ Generate AI Summary'}
                         </button>
                       )}
 
-                      {/* Summary card */}
                       {summaries[ch.id] && (
-                        <div className="bg-[#0a0a0a] border border-[#a78bfa20] rounded-xl p-4 space-y-3">
+                        <div className="bg-zinc-950/60 border border-zinc-800/80 rounded-xl p-4 space-y-3">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[#a78bfa] text-xs">✦</span>
-                            <span className="text-[10px] font-mono font-bold text-[#a78bfa] uppercase tracking-widest">
+                            <span className="text-indigo-400 text-xs">✦</span>
+                            <span className="text-[10px] font-mono font-semibold text-indigo-400 uppercase tracking-widest">
                               Challenge Summary
                             </span>
                           </div>
@@ -752,10 +744,10 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                             <div key={label} className="flex gap-2.5 items-start">
                               <span className="text-sm shrink-0 mt-0.5">{icon}</span>
                               <div>
-                                <div className="text-[9px] font-mono text-[#555] uppercase tracking-widest mb-0.5">
+                                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-0.5">
                                   {label}
                                 </div>
-                                <p className="text-[11px] font-mono text-[#bbb] leading-relaxed">
+                                <p className="text-xs font-sans text-zinc-300 leading-relaxed">
                                   {text}
                                 </p>
                               </div>
@@ -765,7 +757,7 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
                           <button
                             onClick={() => generateSummary(ch)}
                             disabled={loadingSummary === ch.id}
-                            className="text-[9px] font-mono text-[#444] hover:text-[#a78bfa] transition-colors mt-1"
+                            className="text-[10px] font-mono text-zinc-500 hover:text-indigo-400 transition-colors mt-1"
                           >
                             ↻ Regenerate
                           </button>
@@ -786,9 +778,6 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
   });
   const otherChallenges = challenges.filter((ch) => ch.id !== liveChallenge?.id);
 
-  // Group everything that is not the live challenge by the month it
-  // starts in, most recent month first — keeps the page from turning
-  // into an endless stack of individual weekly cards.
   const monthGroups = new Map<string, WeeklyChallenge[]>();
   for (const ch of otherChallenges) {
     const d = new Date(ch.starts_at);
@@ -803,35 +792,35 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
     <div className="animate-fade-up max-w-3xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="font-display font-bold text-xl md:text-2xl mb-1 text-[#e2e2e2]">
-          Weekly Challenge <span className="text-[#f0b429]">🏅</span>
+        <h1 className="font-display font-semibold text-xl md:text-2xl mb-1 text-zinc-100">
+          Weekly Challenge <span className="text-amber-400">🏅</span>
         </h1>
-        <p className="text-[#777] text-xs font-mono">
+        <p className="text-zinc-400 text-xs font-mono">
           3 new problems every week · Subscribe once · Solve earlier for more points
         </p>
       </div>
 
       {/* Scoring info */}
-      <div className="mb-6 bg-[#080808] border border-[#161616] rounded-2xl p-4 flex flex-wrap gap-4">
+      <div className="mb-6 bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-4 flex flex-wrap gap-4 shadow-sm">
         <div className="flex-1 min-w-[140px]">
-          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
+          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">
             Scoring Formula
           </p>
-          <p className="text-xs text-[#e0e0e0] font-mono">
+          <p className="text-xs text-zinc-200 font-mono">
             Points = Base × Time Bonus
           </p>
         </div>
         <div className="flex-1 min-w-[140px]">
-          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
+          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">
             Day 1 bonus
           </p>
-          <p className="text-sm font-bold text-[#00e87a] font-mono">100%</p>
+          <p className="text-sm font-semibold text-emerald-400 font-mono">100%</p>
         </div>
         <div className="flex-1 min-w-[140px]">
-          <p className="text-[10px] text-[#bbb] font-mono uppercase tracking-widest mb-1">
+          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">
             Day 7 bonus
           </p>
-          <p className="text-sm font-bold text-[#f0b429] font-mono">20%</p>
+          <p className="text-sm font-semibold text-amber-400 font-mono">20%</p>
         </div>
       </div>
 
@@ -839,55 +828,52 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
       {!isSubscribed && (
         <div className="mb-6">
           {subStatus === 'confirmed' && periodEnd ? (
-            /* Subscribed before, but this month's period has lapsed */
-            <div className="bg-[#0a0a0a] border border-[#f0b42925] rounded-2xl p-6 text-center">
+            <div className="bg-zinc-900/50 border border-amber-500/25 rounded-2xl p-6 text-center">
               <div className="text-4xl mb-3">⏳</div>
-              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Your access expired</h2>
-              <p className="text-[#777] font-mono text-sm mb-4">
+              <h2 className="font-display font-semibold text-lg text-zinc-100 mb-2">Your access expired</h2>
+              <p className="text-zinc-400 font-mono text-sm mb-4">
                 Your monthly access ended on {new Date(periodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. Renew for ₹{fee ?? "—"} to keep going.
               </p>
-              {payErr && <p className="text-[10px] text-[#ff4d4d] font-mono mb-3">{payErr}</p>}
+              {payErr && <p className="text-xs text-rose-400 font-mono mb-3">{payErr}</p>}
               {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' ? (
                 <button
                   onClick={submitPayment}
                   disabled={submitting || fee === null}
-                  className="px-5 py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] disabled:opacity-40 transition-all"
+                  className="px-5 py-2.5 bg-indigo-600 text-white font-mono font-medium text-sm rounded-xl hover:bg-indigo-500 disabled:opacity-40 transition-all shadow-sm"
                 >
                   {submitting ? 'Processing…' : `Renew — ₹${fee ?? '—'} →`}
                 </button>
               ) : (
-                <p className="text-[10px] text-[#555] font-mono">Renewals are temporarily unavailable. Check back shortly.</p>
+                <p className="text-xs text-zinc-500 font-mono">Renewals are temporarily unavailable. Check back shortly.</p>
               )}
             </div>
           ) : !user ? (
-            /* Not signed in */
-            <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-6 text-center">
+            <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 text-center">
               <div className="text-4xl mb-3">🔒</div>
-              <h2 className="font-display font-bold text-lg text-[#e0e0e0] mb-2">Sign in to subscribe</h2>
-              <p className="text-[#777] font-mono text-sm">Sign in with GitHub to get monthly access to all weekly challenges.</p>
+              <h2 className="font-display font-semibold text-lg text-zinc-100 mb-2">Sign in to subscribe</h2>
+              <p className="text-zinc-400 font-mono text-sm">Sign in with GitHub to get monthly access to all weekly challenges.</p>
             </div>
           ) : (
-            /* Main paywall — first-time subscribe */
-            <div className="bg-[#0a0a0a] border border-[#00e87a20] rounded-2xl overflow-hidden">
+            <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden shadow-sm">
               {/* Hero */}
-              <div className="px-5 py-5 border-b border-[#161616]">
+              <div className="px-5 py-5 border-b border-zinc-800/80">
                 <div className="flex items-center gap-3 mb-3">
                   <span className="text-3xl">⭐</span>
                   <div>
-                    <h2 className="font-display font-bold text-lg text-[#e0e0e0]">Monthly Access</h2>
-                    <p className="text-[10px] font-mono text-[#555]">Unlock all weekly challenges, Arena contests & AI features</p>
+                    <h2 className="font-display font-semibold text-lg text-zinc-100">Monthly Access</h2>
+                    <p className="text-xs font-sans text-zinc-400">Unlock all weekly challenges, Arena contests & AI features</p>
                   </div>
                   <div className="ml-auto text-right">
-                    <div className="text-2xl font-display font-bold text-[#00e87a]">
+                    <div className="text-2xl font-display font-bold text-indigo-400">
                       {fee !== null ? `₹${fee}` : '—'}
                     </div>
-                    <div className="text-[9px] font-mono text-[#555]">/ month</div>
+                    <div className="text-[10px] font-mono text-zinc-500">/ month</div>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-3 text-[10px] font-mono">
+                <div className="flex flex-wrap gap-3 text-xs font-sans">
                   {['All current & future weekly problems', 'Free Arena contest entry', 'Time bonus scoring', 'Weekly leaderboard', 'AI features'].map(f => (
-                    <span key={f} className="flex items-center gap-1 text-[#bbb]">
-                      <span className="text-[#00e87a]">✓</span>{f}
+                    <span key={f} className="flex items-center gap-1.5 text-zinc-300">
+                      <span className="text-emerald-400">✓</span>{f}
                     </span>
                   ))}
                 </div>
@@ -895,27 +881,27 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
 
               {/* Payment */}
               <div className="px-5 py-5">
-                {payErr && <p className="text-[10px] text-[#ff4d4d] font-mono mb-3 text-center">{payErr}</p>}
+                {payErr && <p className="text-xs text-rose-400 font-mono mb-3 text-center">{payErr}</p>}
                 {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' ? (
                   <>
                     <button
                       onClick={submitPayment}
                       disabled={submitting || fee === null}
-                      className="w-full py-3 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
-                        hover:bg-[#00ff88] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      className="w-full py-2.5 bg-indigo-600 text-white font-mono font-medium text-sm rounded-xl
+                        hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
                     >
                       {submitting ? 'Processing…' : `Pay ₹${fee ?? '—'} for 30 days →`}
                     </button>
-                    <p className="text-[10px] text-[#444] font-mono text-center mt-3">
+                    <p className="text-[11px] text-zinc-500 font-mono text-center mt-3">
                       Secured by Razorpay · Access unlocks instantly · Renews manually every month, no auto-debit
                     </p>
                   </>
                 ) : (
                   <div className="text-center">
-                    <div className="w-full py-3 bg-[#1a1a1a] text-[#666] font-mono font-bold text-sm rounded-xl cursor-not-allowed">
+                    <div className="w-full py-2.5 bg-zinc-800 text-zinc-500 font-mono font-semibold text-sm rounded-xl cursor-not-allowed">
                       We'll be back soon
                     </div>
-                    <p className="text-[10px] text-[#555] font-mono mt-3">
+                    <p className="text-xs text-zinc-500 font-mono mt-3">
                       Subscriptions are temporarily unavailable while we finish setting things up. Check back shortly.
                     </p>
                   </div>
@@ -928,15 +914,15 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
 
       {/* Active subscriber — show renewal date */}
       {isSubscribed && periodEnd && (
-        <div className="mb-6 bg-[#00e87a08] border border-[#00e87a20] rounded-2xl px-4 py-3 flex items-center justify-between flex-wrap gap-2">
-          <span className="text-xs font-mono text-[#bbb]">
+        <div className="mb-6 bg-zinc-900/50 border border-zinc-800/80 rounded-2xl px-4 py-3 flex items-center justify-between flex-wrap gap-2 shadow-sm">
+          <span className="text-xs font-mono text-zinc-300">
             ✓ Active — access until {new Date(periodEnd).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
           </span>
           {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === 'true' && (
             <button
               onClick={submitPayment}
               disabled={submitting || fee === null}
-              className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a10] border border-[#00e87a20] px-3 py-1.5 rounded-lg hover:bg-[#00e87a18] disabled:opacity-40 transition-all"
+              className="text-[11px] font-mono text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 rounded-lg hover:bg-indigo-500/15 disabled:opacity-40 transition-all"
             >
               {submitting ? 'Processing…' : `Renew early — ₹${fee ?? '—'}`}
             </button>
@@ -944,19 +930,16 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
         </div>
       )}
 
-      {/* ── Challenge list — shown to everyone (subscribers get full access, others see preview) ── */}
+      {/* ── Challenge list ── */}
       {challenges.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="text-4xl opacity-20">📅</div>
-          <p className="text-[#999] font-mono text-sm">
+          <p className="text-zinc-400 font-mono text-sm">
             No active weekly challenge right now — check back soon!
           </p>
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Only the currently-live challenge sits outside, front and
-              center — everything else (upcoming + past) is tucked into
-              collapsible month groups below it. */}
           {liveChallenge && renderChallengeCard(liveChallenge)}
 
           {monthKeys.map((key) => {
@@ -966,21 +949,21 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
               .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
             const isOpen = expandedMonths[key] ?? (key === currentMonthKey);
             return (
-              <div key={key} className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden">
+              <div key={key} className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden shadow-sm">
                 <button
                   onClick={() => setExpandedMonths((prev) => ({ ...prev, [key]: !isOpen }))}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#0f0f0f] transition-colors"
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-zinc-900/80 transition-colors"
                 >
-                  <span className="font-mono font-bold text-[#e2e2e2] text-sm flex items-center gap-2">
+                  <span className="font-mono font-semibold text-zinc-200 text-sm flex items-center gap-2">
                     📅 {label}
-                    <span className="text-[10px] text-[#666] font-normal">
+                    <span className="text-[10px] text-zinc-500 font-normal">
                       ({group.length} challenge{group.length !== 1 ? 's' : ''})
                     </span>
                   </span>
-                  <span className={`text-[#666] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>▾</span>
+                  <span className={`text-zinc-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>▾</span>
                 </button>
                 {isOpen && (
-                  <div className="px-4 pb-4 space-y-4 border-t border-[#161616] pt-4">
+                  <div className="px-4 pb-4 space-y-4 border-t border-zinc-800/80 pt-4">
                     {group.map((ch) => renderChallengeCard(ch))}
                   </div>
                 )}

@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic                                       from 'next/dynamic';
 import { getSupabaseClient }                         from '@/lib/supabase';
 import { calendarDaysBetween }                       from '@/lib/streak';
-import LangTabs                                      from '@/components/editor/LangTabs';
-import TestResults                                   from '@/components/editor/TestResults';
+import LangTabs                                      from '@/components/code-editor/LangTabs';
+import TestResults                                   from '@/components/code-editor/TestResults';
 import type { SupportedLang, Problem, User }         from '@/types/database';
 import { STARTER_CODE }                              from '@/types/database';
 import {
@@ -30,8 +30,17 @@ import {
   type Editorial,
 } from '@/lib/gemini';
 import ProblemDiscussion from '@/components/discussion/ProblemDiscussion';
+import {
+  traceCode,
+  checkVisualizerAccess,
+  type ExecStep,
+  type TraceResult,
+} from '@/lib/visualizer';
+import type { VisualizerGateResult } from '@/lib/visualizer';
 
-const CodeEditor = dynamic(() => import('@/components/editor/CodeEditor'), { ssr: false });
+const CodeEditor = dynamic(() => import('@/components/code-editor/CodeEditor'), { ssr: false });
+const LogicVisualizerDrawer = dynamic(() => import('@/components/code-editor/LogicVisualizerDrawer'), { ssr: false });
+const VisualizerGateModal   = dynamic(() => import('@/components/code-editor/VisualizerGateModal'),   { ssr: false });
 
 // ── Draft persistence helpers ────────────────────────────────────────────────
 
@@ -659,6 +668,16 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   const [editorialTab,     setEditorialTab]     = useState<'python' | 'javascript'>('python');
   const [leftTab,          setLeftTab]          = useState<'problem' | 'editorial'>('problem');
 
+  // ── Logic Visualizer state ──────────────────────────────────────────────────
+  const [isSubscriber, setIsSubscriber] = useState(false);
+  const [vizOpen,      setVizOpen]      = useState(false);
+  const [vizLoading,   setVizLoading]   = useState(false);
+  const [vizSteps,     setVizSteps]     = useState<ExecStep[]>([]);
+  const [vizStdout,    setVizStdout]    = useState('');
+  const [vizError,     setVizError]     = useState<string | undefined>(undefined);
+  const [vizGate,      setVizGate]      = useState<VisualizerGateResult | null>(null);
+  const [vizProgress,  setVizProgress]  = useState('');
+
   async function handleGenerateEditorial() {
     if (editorial || editorialLoading) return;
     setEditorialLoading(true);
@@ -675,6 +694,49 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     }
     setUsage(getUsageStatus());
     setEditorialLoading(false);
+  }
+
+  // ── Logic Visualizer ────────────────────────────────────────────────────────
+
+  async function handleVisualize() {
+    // Only Python is supported right now
+    if (lang !== 'python') {
+      showToast('Logic Visualizer only supports Python at the moment.', 'info');
+      return;
+    }
+    // Gate: must be a real subscriber (paid ₹39 in the Weekly tab)
+    const gate = checkVisualizerAccess({ is_subscriber: isSubscriber });
+    if (!gate.ok) {
+      setVizGate(gate);
+      return;
+    }
+    // Open drawer immediately so user sees loading state
+    setVizOpen(true);
+    setVizLoading(true);
+    setVizSteps([]);
+    setVizStdout('');
+    setVizError(undefined);
+    setVizProgress('');
+    try {
+      // Pass the first test case's JSON args so the function body actually runs.
+      // problem.test_cases[0].input is a JSON array string like '[[2,7,11,15], 9]'
+      const firstInput = problem.test_cases?.[0]?.input ?? null;
+
+      const result: TraceResult = await traceCode(
+        code,
+        lang,
+        firstInput,
+        (msg) => setVizProgress(msg),
+      );
+      setVizSteps(result.steps);
+      setVizStdout(result.stdout);
+      setVizError(result.error || undefined);
+    } catch (e: any) {
+      setVizError(e.message || 'Visualizer error');
+    } finally {
+      setVizLoading(false);
+      setVizProgress('');
+    }
   }
 
 
@@ -724,17 +786,22 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   // ── Set AI user + sync limits from Supabase on problem open ──────────────
   useEffect(() => {
     if (!user?.github) return;
-    // Check subscriber status then register with AI module
+    // Check subscriber status from `subscribers` table (real ₹39 payers in the Weekly tab)
     (db.from('subscribers') as any)
       .select('status, current_period_end').eq('github', user.github).maybeSingle()
       .then(({ data }: any) => {
-        const isSub = isActiveSubscription(data?.status, data?.current_period_end);
+        // Admins also get subscriber-level access to all gated features
+        const isSub = !!user.is_admin || isActiveSubscription(data?.status, data?.current_period_end);
+        setIsSubscriber(isSub);
         setAiUser(user.github, isSub);
         refreshUsageFromServer()
           .then(() => setUsage(getUsageStatus()))
           .catch(() => {});
       })
-      .catch(() => { setAiUser(user.github, false); });
+      .catch(() => {
+        setIsSubscriber(!!user.is_admin);
+        setAiUser(user.github, false);
+      });
   }, [user?.github, problem.id]);
 
   function confirmAction(message: string): Promise<boolean> {
@@ -1347,19 +1414,51 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           }}
         />
 
-        <button onClick={() => { setMobileTab('editor'); runTests(); }} disabled={running}
-          title={`Run tests (${shortcutLabel('Enter')})`}
-          className="w-full py-2.5 bg-[var(--bg2)] border border-[var(--card)] hover:border-[rgba(var(--acc-rgb),0.125)]
-            text-[var(--acc)] font-mono text-sm font-bold rounded-xl transition-all duration-200 hover:bg-[rgba(var(--acc-rgb),0.02)]
-            disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-          {running ? (
-            <span className="flex items-center gap-2">
-              <span className="w-3.5 h-3.5 border-2 border-[var(--acc)] border-t-transparent rounded-full animate-spin" />
-              {runStatus || 'Running…'}
-              {progress && <span className="text-[rgba(var(--acc-rgb),0.251)] text-xs">{progress.done}/{progress.total}</span>}
-            </span>
-          ) : '▶ Run Test Cases'}
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => { setMobileTab('editor'); runTests(); }} disabled={running}
+            title={`Run tests (${shortcutLabel('Enter')})`}
+            className="flex-1 py-2.5 bg-[var(--bg2)] border border-[var(--card)] hover:border-[rgba(var(--acc-rgb),0.125)]
+              text-[var(--acc)] font-mono text-sm font-bold rounded-xl transition-all duration-200 hover:bg-[rgba(var(--acc-rgb),0.02)]
+              disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            {running ? (
+              <span className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 border-2 border-[var(--acc)] border-t-transparent rounded-full animate-spin" />
+                {runStatus || 'Running…'}
+                {progress && <span className="text-[rgba(var(--acc-rgb),0.251)] text-xs">{progress.done}/{progress.total}</span>}
+              </span>
+            ) : '▶ Run Tests'}
+          </button>
+
+          {/* Visualizer button — Python only, subscriber gated */}
+          {lang === 'python' && !onArenaSubmit && (
+            <button
+              onClick={handleVisualize}
+              disabled={vizLoading}
+              title={`Visualize execution step-by-step${!isSubscriber ? ' — Subscribers only (₹39/mo)' : ''}`}
+              className={`px-3 py-2.5 rounded-xl font-mono text-xs font-bold border transition-all duration-200
+                flex items-center gap-1.5 shrink-0
+                ${vizLoading
+                  ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300 cursor-wait'
+                  : isSubscriber
+                    ? 'bg-indigo-500/10 border-indigo-500/25 text-indigo-300 hover:bg-indigo-500/20 hover:border-indigo-400/40'
+                    : 'bg-zinc-900/60 border-zinc-700/50 text-zinc-500 hover:text-zinc-300 hover:border-zinc-600'}`}
+            >
+              {vizLoading
+                ? <><span className="w-3 h-3 border-[1.5px] border-indigo-400 border-t-transparent rounded-full animate-spin" />{vizProgress || 'Loading…'}</>
+                : <>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                      <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                      <path d="M11 8v6M8 11h6"/>
+                    </svg>
+                    Visualize
+                    {!isSubscriber && (
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/20">PRO</span>
+                    )}
+                  </>
+              }
+            </button>
+          )}
+        </div>
 
         {runError && (
           <div className="text-xs text-[var(--warn)] font-mono bg-[rgba(var(--warn-rgb),0.031)] border border-[rgba(var(--warn-rgb),0.094)] rounded-xl px-3.5 py-2.5">
@@ -1447,6 +1546,33 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
       {/* Discussion — shown for all problems, hidden in arena only */}
       {!onArenaSubmit && <ProblemDiscussion problemId={problem.id} problemTitle={problem.title} user={user} />}
+
+      {/* ── Logic Visualizer Drawer (slides up from bottom of editor column) ── */}
+      {vizOpen && (
+        <div className="fixed bottom-0 left-0 right-0 z-[300] h-[55vh] min-h-[380px] max-h-[70vh] shadow-2xl
+          animate-[slideUp_0.3s_cubic-bezier(0.16,1,0.3,1)]">
+          <LogicVisualizerDrawer
+            steps={vizSteps}
+            code={code}
+            stdout={vizStdout}
+            error={vizError}
+            isLoading={vizLoading}
+            testInput={problem.test_cases?.[0]?.input ?? null}
+            onClose={() => { setVizOpen(false); setVizLoading(false); }}
+          />
+        </div>
+      )}
+
+      {/* ── Visualizer Gate Modal ── */}
+      {vizGate && !vizGate.ok && (
+        <VisualizerGateModal
+          reason={vizGate.reason}
+          used={'used' in vizGate ? (vizGate as any).used : 0}
+          limit={'limit' in vizGate ? (vizGate as any).limit : 15}
+          onClose={() => setVizGate(null)}
+          onUpgrade={() => { setVizGate(null); /* navigate to subscription page */ }}
+        />
+      )}
     </div>
   );
 }

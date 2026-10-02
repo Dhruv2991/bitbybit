@@ -42,12 +42,12 @@ function ShareButton() {
           setTimeout(() => setCopied(false), 2000);
         });
       }}
-      className="flex items-center gap-2 px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a]
-        rounded-xl font-mono text-xs text-[#666] hover:text-[#e0e0e0] hover:border-[#252525]
-        transition-all duration-200"
+      className="flex items-center gap-2 px-3 py-2 bg-zinc-900/60 border border-zinc-800/80
+        rounded-xl font-mono text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-700
+        transition-all duration-150"
     >
       {copied ? (
-        <><span className="text-[#00e87a]">✓</span><span className="text-[#00e87a]">Link copied</span></>
+        <><span className="text-emerald-400">✓</span><span className="text-emerald-400">Link copied</span></>
       ) : (
         <><span>🔗</span><span>Share</span></>
       )}
@@ -489,13 +489,13 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
 
       {/* Locked toast — unpaid */}
       {lockedToast && (
-        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-[#0f0f0f] border border-[#f0b42930] rounded-2xl font-mono text-sm shadow-2xl max-w-xs animate-slide-down backdrop-blur-xl" style={{boxShadow:"0 8px 32px rgba(240,180,41,0.08)"}}>
+        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-zinc-900 border border-amber-500/30 rounded-xl font-mono text-sm shadow-xl max-w-xs animate-slide-down backdrop-blur-xl">
           <span className="text-lg">🔒</span>
           <div>
-            <p className="text-[#f0b429] font-bold text-xs">Subscriber-only Problem</p>
-            <p className="text-[#aaa] text-[10px] mt-0.5">
+            <p className="text-amber-400 font-semibold text-xs">Subscriber-only Problem</p>
+            <p className="text-zinc-400 text-[11px] mt-0.5">
               <button onClick={() => { setLockedToast(false); onNavigate('weekly'); }}
-                className="text-[#00e87a] underline underline-offset-2 hover:text-[#00ff88]">
+                className="text-indigo-400 underline underline-offset-2 hover:text-indigo-300">
                 Subscribe ⭐
               </button>
               {' '}to unlock all weekly challenges.
@@ -506,11 +506,11 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
 
       {/* Not-started toast — paid but waiting */}
       {notStartedToast && (
-        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-[#0f0f0f] border border-[#a78bfa30] rounded-2xl font-mono text-sm shadow-2xl max-w-xs animate-slide-down backdrop-blur-xl" style={{boxShadow:"0 8px 32px rgba(167,139,250,0.08)"}}>
+        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-zinc-900 border border-indigo-500/30 rounded-xl font-mono text-sm shadow-xl max-w-xs animate-slide-down backdrop-blur-xl">
           <span className="text-lg">⏳</span>
           <div>
-            <p className="text-[#a78bfa] font-bold text-xs">Not Started Yet</p>
-            <p className="text-[#aaa] text-[10px] mt-0.5">{notStartedToast}</p>
+            <p className="text-indigo-400 font-semibold text-xs">Not Started Yet</p>
+            <p className="text-zinc-400 text-[11px] mt-0.5">{notStartedToast}</p>
           </div>
         </div>
       )}
@@ -520,8 +520,8 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         {/* Title row */}
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div>
-            <h1 className="font-display font-bold text-xl md:text-2xl mb-0.5 text-[#e2e2e2]">Problems</h1>
-            <p className="text-[#666] text-xs font-mono">
+            <h1 className="font-display font-semibold text-xl md:text-2xl mb-0.5 text-slate-900 dark:text-zinc-100">Problems</h1>
+            <p className="text-slate-500 dark:text-zinc-400 text-xs font-mono">
               {pageView === 'problems'
                 ? filtered.length !== problems.length
                   ? `${filtered.length} of ${problems.length} problems`
@@ -532,22 +532,22 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           <div className="flex items-center gap-2">
             {/* Tab switcher — only for logged-in users */}
             {user && (
-              <div className="flex bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl p-1 gap-1">
+              <div className="flex bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-1 gap-1">
                 <button
                   onClick={() => handleTabChange('problems')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all
                     ${pageView === 'problems'
-                      ? 'bg-[#141414] text-[#e0e0e0] border border-[#252525]'
-                      : 'text-[#555] hover:text-[#999]'}`}
+                      ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200'}`}
                 >
                   Problems
                 </button>
                 <button
                   onClick={() => handleTabChange('submissions')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all
                     ${pageView === 'submissions'
-                      ? 'bg-[#141414] text-[#e0e0e0] border border-[#252525]'
-                      : 'text-[#555] hover:text-[#999]'}`}
+                      ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shadow-xs'
+                      : 'text-zinc-400 hover:text-zinc-200'}`}
                 >
                   My Submissions
                 </button>
@@ -562,19 +562,19 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search */}
           <div className="relative flex-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#444] text-xs pointer-events-none">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs pointer-events-none">🔍</span>
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search problems or tags…"
-              className="w-full bg-[#080808] border border-[#1a1a1a] rounded-xl pl-8 pr-10 py-2.5
-                text-sm font-mono text-[#e0e0e0] placeholder-[#333]
-                focus:outline-none focus:border-[#00e87a25] transition-colors"
+              className="w-full bg-zinc-950/40 backdrop-blur-md border border-white/[0.08] rounded-xl pl-8 pr-10 py-2
+                text-sm font-mono text-zinc-200 placeholder-zinc-500
+                focus:outline-none focus:border-white/[0.18] transition-colors shadow-xs"
             />
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#555] hover:text-[#e0e0e0] text-xs transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 text-xs transition-colors"
               >
                 ✕
               </button>
@@ -587,16 +587,16 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               const count = d === 'all' ? problems.length : problems.filter(p => p.difficulty === d).length;
               return (
                 <button key={d} onClick={() => setFilter(d)}
-                  className={`px-3.5 py-2.5 rounded-xl text-xs font-mono font-medium transition-all duration-200 flex items-center gap-1.5
+                  className={`px-3 py-2 rounded-xl text-xs font-mono font-medium transition-all duration-150 flex items-center gap-1.5 border
                     ${filter === d
-                      ? d === 'Easy'   ? 'bg-[#00e87a18] text-[#00e87a] border border-[#00e87a30]'
-                      : d === 'Medium' ? 'bg-[#f0b42918] text-[#f0b429] border border-[#f0b42930]'
-                      : d === 'Hard'   ? 'bg-[#ff4d4d18] text-[#ff4d4d] border border-[#ff4d4d30]'
-                      : 'bg-[#00e87a18] text-[#00e87a] border border-[#00e87a30]'
-                      : 'bg-[#080808] border border-[#1a1a1a] text-[#888] hover:text-[#e0e0e0] hover:border-[#222]'}`}>
+                      ? d === 'Easy'   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-medium'
+                      : d === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 font-medium'
+                      : d === 'Hard'   ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 font-medium'
+                      : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30 font-medium shadow-xs'
+                      : 'bg-zinc-900/50 border-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700/80 shadow-xs'}`}>
                   {d === 'all' ? 'All' : d}
                   {count > 0 && (
-                    <span className="opacity-50 text-[10px] tabular-nums">{count}</span>
+                    <span className="opacity-60 text-[10px] tabular-nums">{count}</span>
                   )}
                 </button>
               );
@@ -604,34 +604,34 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           </div>
 
           {/* Free vs Weekly (paid) filter */}
-          <div className="flex bg-[#080808] border border-[#1a1a1a] rounded-xl p-1 gap-1 shrink-0">
+          <div className="flex bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-1 gap-1 shrink-0">
             {([
               { id: 'all',    label: 'All' },
               { id: 'free',   label: '🔓 Free' },
               { id: 'weekly', label: '⭐ Weekly' },
             ] as const).map(opt => (
               <button key={opt.id} onClick={() => setAccessFilter(opt.id)}
-                className={`px-2.5 py-1.5 rounded-lg text-[11px] font-mono font-medium transition-all duration-150 whitespace-nowrap
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-150 whitespace-nowrap
                   ${accessFilter === opt.id
-                    ? 'bg-[#141414] text-[#e0e0e0] border border-[#252525]'
-                    : 'text-[#666] hover:text-[#999] border border-transparent'}`}>
+                    ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shadow-xs'
+                    : 'text-zinc-400 hover:text-zinc-200 border border-transparent'}`}>
                 {opt.label}
               </button>
             ))}
           </div>
 
-          {/* Tag filter — dropdown instead of a pill row so it doesn't eat vertical space */}
+          {/* Tag filter — dropdown */}
           {allTags.length > 0 && (
             <select
               value={allTags.includes(filter) ? filter : ''}
               onChange={e => setFilter(e.target.value || 'all')}
-              className="shrink-0 bg-[#080808] border border-[#1a1a1a] rounded-xl px-3 py-2.5
-                text-xs font-mono text-[#888] focus:outline-none focus:border-[#a78bfa30] transition-colors
-                hover:text-[#e0e0e0] hover:border-[#222] cursor-pointer"
+              className="shrink-0 bg-zinc-900/40 backdrop-blur-md border border-white/[0.08] rounded-xl px-3 py-2
+                text-xs font-mono text-zinc-400 focus:outline-none focus:border-white/[0.18] transition-colors
+                hover:text-zinc-200 hover:border-white/[0.14] cursor-pointer shadow-xs"
             >
-              <option value="">#tag</option>
+              <option value="" className="bg-zinc-900 text-zinc-400">#tag</option>
               {allTags.map(tag => (
-                <option key={tag} value={tag}>#{tag}</option>
+                <option key={tag} value={tag} className="bg-zinc-900 text-zinc-200">#{tag}</option>
               ))}
             </select>
           )}
@@ -640,25 +640,25 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       </div>
 
       {pageView === 'problems' && (recLoading || recommended.length > 0) && (
-        <div className="mb-6 px-5 py-4 bg-[#0d0d0d] border border-[#1a1a1a] rounded-2xl">
+        <div className="mb-6 px-5 py-4 bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm">✦</span>
-            <span className="text-xs font-mono font-bold text-[#a78bfa] uppercase tracking-wider">Based on what you've solved</span>
+            <span className="text-sm text-indigo-400">✦</span>
+            <span className="text-xs font-mono font-medium text-indigo-400 uppercase tracking-wider">Based on your activity</span>
           </div>
           {recLoading ? (
-            <div className="flex items-center gap-2 text-[#666] font-mono text-xs py-2">
-              <div className="spinner-sm" /> Finding problems for you…
+            <div className="flex items-center gap-2 text-zinc-400 font-mono text-xs py-2">
+              <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /> Finding problems for you…
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {recommended.map((p) => (
                 <button key={p.id} onClick={() => handleRowClick(p)}
-                  className="text-left p-3 bg-[#080808] border border-[#1a1a1a] rounded-xl hover:border-[#a78bfa30] transition-all">
-                  <div className="text-xs font-mono font-bold text-[#e0e0e0] truncate mb-1">{p.title}</div>
-                  <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded
-                    ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
-                      p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
-                      'text-[#ff4d4d] bg-[#ff4d4d12]'}`}>
+                  className="text-left p-3.5 bg-zinc-950/40 border border-white/[0.06] rounded-xl hover:border-indigo-500/30 hover:bg-zinc-900/40 transition-all">
+                  <div className="text-xs font-mono font-medium text-zinc-200 truncate mb-1.5">{p.title}</div>
+                  <span className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded-full border
+                    ${p.difficulty === 'Easy' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                      p.difficulty === 'Medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                      'text-rose-400 bg-rose-500/10 border-rose-500/20'}`}>
                     {p.difficulty}
                   </span>
                 </button>
@@ -672,129 +672,104 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         /* ── My Submissions view ─────────────────────────────── */
         subsLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <div className="spinner" />
-            <span className="text-[#999] text-xs font-mono">Loading submissions…</span>
+            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-zinc-400 text-xs font-mono">Loading submissions…</span>
           </div>
         ) : submissions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <div className="text-4xl opacity-30">{'{ }'}</div>
-            <div className="text-[#999] font-mono text-sm">No submissions yet — go solve something!</div>
+            <div className="text-3xl opacity-30 text-zinc-500">{'{ }'}</div>
+            <div className="text-zinc-400 font-mono text-sm">No submissions yet — go solve something!</div>
           </div>
         ) : (
-          <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden" style={{boxShadow:"0 0 0 1px rgba(255,255,255,0.02)"}}>
-            {/* Table header */}
-            <div className="hidden md:grid grid-cols-[1fr_5rem_5rem_6rem_5rem_8rem] gap-4 px-5 py-3
-              border-b border-[#161616] text-[10px] text-[#666] font-mono uppercase tracking-widest bg-[#0a0a0a]">
-              <div>Problem</div>
-              <div>Lang</div>
-              <div>Type</div>
-              <div>Status</div>
-              <div>Points</div>
-              <div>Submitted</div>
-            </div>
+          <div className="w-full bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl overflow-hidden shadow-sm overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[640px]">
+              <thead>
+                <tr className="border-b border-white/[0.06] bg-zinc-950/40 text-xs text-zinc-400 font-mono font-semibold uppercase tracking-wider">
+                  <th className="py-3.5 pl-6 pr-4">Problem</th>
+                  <th className="py-3.5 px-4 w-24">Lang</th>
+                  <th className="py-3.5 px-4 w-28">Type</th>
+                  <th className="py-3.5 px-4 w-32">Status</th>
+                  <th className="py-3.5 px-4 w-24 text-right">Points</th>
+                  <th className="py-3.5 pl-4 pr-6 w-36 text-right">Submitted</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {submissions.map(s => {
+                  const statusColor =
+                    s.status === 'approved'  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                    s.status === 'rejected'  ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' :
+                                               'text-amber-400 bg-amber-500/10 border-amber-500/20';
+                  const statusLabel =
+                    s.status === 'approved' ? '✓ Approved' :
+                    s.status === 'rejected' ? '✗ Rejected' : '⏳ Pending';
+                  const date = new Date(s.submitted_at);
+                  const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
+                  const timeStr = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-            {submissions.map(s => {
-              const statusColor =
-                s.status === 'approved'  ? 'text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]' :
-                s.status === 'rejected'  ? 'text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]' :
-                                           'text-[#f0b429] bg-[#f0b42910] border-[#f0b42920]';
-              const statusLabel =
-                s.status === 'approved' ? '✓ Approved' :
-                s.status === 'rejected' ? '✗ Rejected' : '⏳ Pending';
-              const date = new Date(s.submitted_at);
-              const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
-              const timeStr = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-              return (
-                <div key={s.id}>
-                  {/* Desktop row */}
-                  <div onClick={() => s.code && setViewingCode(s)}
-                    className={`hidden md:grid grid-cols-[1fr_5rem_5rem_6rem_5rem_8rem] gap-4 px-5 py-4
-                    border-b border-[#161616] last:border-0 items-center hover:bg-[#0f0f0f] transition-colors ${s.code ? 'cursor-pointer' : ''}`}>
-                    <div>
-                      <div className="text-[#ddd] font-mono text-sm truncate flex items-center gap-2">
-                        {s.problem_title}
-                        {s.code && <span className="text-[10px] text-[#555] shrink-0" title="View submitted code">{'</>'}</span>}
-                      </div>
-                      {s.status === 'rejected' && s.review_notes && (
-                        <div className="text-[10px] text-[#ff4d4d80] font-mono mt-0.5 truncate">{s.review_notes}</div>
-                      )}
-                    </div>
-                    <div className="text-[#777] text-xs font-mono">{s.lang}</div>
-                    <div>
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-lg border
-                        ${s.type === 'weekly'
-                          ? 'text-[#a78bfa] bg-[#a78bfa10] border-[#a78bfa20]'
-                          : 'text-[#666] bg-[#ffffff08] border-[#1f1f1f]'}`}>
-                        {s.type === 'weekly' ? 'Weekly' : 'Normal'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${statusColor}`}>
-                        {statusLabel}
-                      </span>
-                    </div>
-                    <div className="text-[#a78bfa] text-sm font-mono font-bold">
-                      {s.status === 'approved' ? `${s.points_awarded}` : '—'}
-                    </div>
-                    <div>
-                      <div className="text-[#666] text-[10px] font-mono">{dateStr}</div>
-                      <div className="text-[#444] text-[10px] font-mono">{timeStr}</div>
-                    </div>
-                  </div>
-
-                  {/* Mobile card */}
-                  <div onClick={() => s.code && setViewingCode(s)}
-                    className={`md:hidden px-4 py-3.5 border-b border-[#161616] last:border-0 hover:bg-[#0f0f0f] transition-colors ${s.code ? 'cursor-pointer' : ''}`}>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <span className="text-[#ddd] font-mono text-sm flex-1 truncate flex items-center gap-2">
-                        {s.problem_title}
-                        {s.code && <span className="text-[10px] text-[#555] shrink-0">{'</>'}</span>}
-                      </span>
-                      <span className={`shrink-0 text-[10px] font-mono px-2 py-0.5 rounded-lg border ${statusColor}`}>
-                        {statusLabel}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-[#777] text-[10px] font-mono">{s.lang}</span>
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-lg border
-                        ${s.type === 'weekly'
-                          ? 'text-[#a78bfa] bg-[#a78bfa10] border-[#a78bfa20]'
-                          : 'text-[#555] bg-[#ffffff08] border-[#1f1f1f]'}`}>
-                        {s.type === 'weekly' ? 'Weekly' : 'Normal'}
-                      </span>
-                      {s.status === 'approved' && (
-                        <span className="text-[#a78bfa] text-[10px] font-mono font-bold">{s.points_awarded} pts</span>
-                      )}
-                      <span className="text-[#555] text-[10px] font-mono ml-auto">{dateStr}</span>
-                    </div>
-                    {s.status === 'rejected' && s.review_notes && (
-                      <div className="mt-1.5 text-[10px] text-[#ff4d4d80] font-mono truncate">{s.review_notes}</div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                  return (
+                    <tr
+                      key={s.id}
+                      onClick={() => s.code && setViewingCode(s)}
+                      className={`hover:bg-white/[0.03] transition-colors ${s.code ? 'cursor-pointer' : ''}`}
+                    >
+                      <td className="py-4 pl-6 pr-4">
+                        <div className="text-zinc-200 font-mono text-sm font-medium flex items-center gap-2">
+                          <span className="truncate">{s.problem_title}</span>
+                          {s.code && <span className="text-xs text-indigo-400 shrink-0 font-mono" title="View submitted code">{'</>'}</span>}
+                        </div>
+                        {s.status === 'rejected' && s.review_notes && (
+                          <div className="text-xs text-rose-400/80 font-mono mt-0.5">{s.review_notes}</div>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 text-xs font-mono text-zinc-300">
+                        {s.lang}
+                      </td>
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <span className={`text-xs font-mono px-2 py-0.5 rounded-full border ${
+                          s.type === 'weekly'
+                            ? 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20'
+                            : 'text-zinc-400 bg-white/[0.04] border-white/[0.06]'
+                        }`}>
+                          {s.type === 'weekly' ? 'Weekly' : 'Normal'}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <span className={`text-xs font-mono font-medium px-2.5 py-0.5 rounded-full border ${statusColor}`}>
+                          {statusLabel}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-right text-sm font-mono font-semibold text-indigo-400 whitespace-nowrap">
+                        {s.status === 'approved' ? `${s.points_awarded}` : '—'}
+                      </td>
+                      <td className="py-4 pl-4 pr-6 text-right whitespace-nowrap">
+                        <div className="text-zinc-300 text-xs font-mono">{dateStr}</div>
+                        <div className="text-zinc-500 text-[11px] font-mono">{timeStr}</div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )
       ) : loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="md:hidden space-y-2 w-full animate-pulse">
             {[1, 2, 3, 4, 5, 6].map(k => (
-              <div key={k} className="px-4 py-3.5 bg-[#0a0a0a] border border-[#161616] rounded-xl flex items-center gap-3">
-                <div className="w-5 h-4 bg-[#1a1a1a] rounded" />
+              <div key={k} className="px-4 py-3.5 bg-zinc-900/50 border border-zinc-800/80 rounded-xl flex items-center gap-3">
+                <div className="w-5 h-4 bg-zinc-800 rounded" />
                 <div className="flex-1 space-y-2">
-                  <div className="w-2/3 h-4 bg-[#1f1f1f] rounded" />
+                  <div className="w-2/3 h-4 bg-zinc-800 rounded" />
                   <div className="flex gap-2">
-                    <div className="w-12 h-3 bg-[#161616] rounded" />
-                    <div className="w-10 h-3 bg-[#161616] rounded" />
+                    <div className="w-12 h-3 bg-zinc-800/60 rounded" />
+                    <div className="w-10 h-3 bg-zinc-800/60 rounded" />
                   </div>
                 </div>
               </div>
             ))}
           </div>
-          <div className="hidden md:block w-full bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden animate-pulse" style={{boxShadow:"0 0 0 1px rgba(255,255,255,0.02)"}}>
-            <div className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-3 border-b border-[#161616] text-[10px] text-[#666] font-mono uppercase tracking-widest bg-[#0a0a0a]">
+          <div className="hidden md:block w-full bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden animate-pulse">
+            <div className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-3 border-b border-zinc-800/80 text-[10px] text-zinc-500 font-mono uppercase tracking-widest bg-zinc-950/60">
               <div>#</div>
               <div>Title</div>
               <div>Difficulty</div>
@@ -803,13 +778,13 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               <div>Status</div>
             </div>
             {[1, 2, 3, 4, 5, 6, 7, 8].map(k => (
-              <div key={k} className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-4 border-b border-[#161616] last:border-0 items-center">
-                <div className="w-4 h-4 bg-[#1a1a1a] rounded" />
-                <div className="w-2/5 h-4 bg-[#1f1f1f] rounded" />
-                <div className="w-14 h-5 bg-[#161616] rounded-lg" />
-                <div className="w-10 h-4 bg-[#161616] rounded" />
-                <div className="w-12 h-4 bg-[#161616] rounded" />
-                <div className="w-16 h-5 bg-[#161616] rounded-lg" />
+              <div key={k} className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-4 border-b border-zinc-800/60 last:border-0 items-center">
+                <div className="w-4 h-4 bg-zinc-800 rounded" />
+                <div className="w-2/5 h-4 bg-zinc-800 rounded" />
+                <div className="w-14 h-5 bg-zinc-800/60 rounded-lg" />
+                <div className="w-10 h-4 bg-zinc-800/60 rounded" />
+                <div className="w-12 h-4 bg-zinc-800/60 rounded" />
+                <div className="w-16 h-5 bg-zinc-800/60 rounded-lg" />
               </div>
             ))}
           </div>
@@ -817,138 +792,119 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="text-4xl opacity-30">{ '{  }' }</div>
-          <div className="text-[#999] font-mono text-sm">
+          <div className="text-3xl opacity-30 text-zinc-500">{ '{  }' }</div>
+          <div className="text-zinc-400 font-mono text-sm">
             {problems.length === 0 ? 'No problems yet — check back soon!' : 'Nothing matches this filter.'}
           </div>
         </div>
       ) : (
         <>
-          {/* Mobile card list */}
-          <div className="md:hidden space-y-2">
-            {filtered.map((p, i) => {
-              const isSolved   = solved.includes(p.id);
-              const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
-              const isUnlocked = unlockedIds.has(p.id);
-              const isPaidEndedP = paidEndedIds.has(p.id);
-              const isLocked   = isWeekly && !isUnlocked && !isPaidEndedP;
-              return (
-                <div key={p.id} onClick={() => handleRowClick(p)}
-                  className={`card-hover px-4 py-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.99]
-                    ${isLocked ? 'opacity-70' : ''}`}>
-                  <div className="text-[#ccc] text-xs font-mono w-6 shrink-0 text-center">{i + 1}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[#e0e0e0] font-mono text-sm truncate">{p.title}</span>
-                      {isLocked && <span className="text-xs shrink-0">🔒</span>}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-lg
-                        ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
-                          p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
-                          'text-[#ff4d4d] bg-[#ff4d4d12]'}`}>
-                        {p.difficulty}
-                      </span>
-                      <span className="text-[#a78bfa] text-[10px] font-mono">{p.points} pts</span>
-                      {isLocked && <span className="text-[10px] font-mono text-[#f0b429]">Weekly</span>}
-                      {isPaidEndedP && !isSolved && <span className="text-[10px] font-mono text-[#a78bfa]">Practice (no pts)</span>}
-                    </div>
-                  </div>
-                  <span className={`text-sm shrink-0 ${isSolved ? 'text-[#00e87a]' : isLocked ? 'text-[#f0b42960]' : 'text-[#ccc]'}`}>
-                    {isSolved ? '✓' : isLocked ? '🔒' : '›'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Desktop table */}
-          <div className="hidden md:block bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden" style={{boxShadow:"0 0 0 1px rgba(255,255,255,0.02)"}}>
-            <div className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-3
-              border-b border-[#161616] text-[10px] text-[#666] font-mono uppercase tracking-widest bg-[#0a0a0a]">
-              <div>#</div>
-              <div>Title</div>
-              <div>Difficulty</div>
-              <div>Points</div>
-              <div>Attempts</div>
-              <div>Status</div>
-            </div>
-
-            {filtered.map((p, i) => {
-              const isSolved   = solved.includes(p.id);
-              const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
-              const isUnlocked = unlockedIds.has(p.id);
-              const isPaidEndedP = paidEndedIds.has(p.id);
-              const isLocked   = isWeekly && !isUnlocked && !isPaidEndedP;
-              return (
-                <div key={p.id} onClick={() => handleRowClick(p)}
-                  className={`grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-4
-                    border-b border-[#161616] last:border-0 cursor-pointer
-                    transition-all duration-150 group items-center
-                    ${isLocked
-                      ? 'hover:bg-[#f0b42904] opacity-75'
-                      : 'row-hover hover:bg-[#0f0f0f]'}`}>
-
-                  <div className="text-[#ccc] text-xs font-mono">{i + 1}</div>
-
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`font-mono text-sm transition-colors
-                        ${isLocked
-                          ? 'text-[#ccc] group-hover:text-[#f0b429]'
-                          : 'text-[#ddd] group-hover:text-[#00e87a]'}`}>
-                        {p.title}
-                      </span>
-                      {isLocked && (
-                        <span className="text-[10px] font-mono text-[#f0b429] bg-[#f0b42915] px-1.5 py-0.5 rounded-lg border border-[#f0b42930]">
-                          🔒 Weekly
+          {/* Enterprise-grade Problems Table */}
+          <div className="w-full bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl overflow-hidden shadow-none overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[640px]">
+              <thead>
+                <tr className="border-b border-white/[0.06] bg-zinc-950/40 text-xs text-zinc-400 font-mono font-semibold uppercase tracking-wider">
+                  <th className="py-3.5 pl-6 pr-3 w-12 text-center">#</th>
+                  <th className="py-3.5 px-4">Title</th>
+                  <th className="py-3.5 px-4 w-32">Difficulty</th>
+                  <th className="py-3.5 px-4 w-24 text-right">Points</th>
+                  <th className="py-3.5 px-4 w-28 text-center">Attempts</th>
+                  <th className="py-3.5 pl-4 pr-6 w-32 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {filtered.map((p, i) => {
+                  const isSolved   = solved.includes(p.id);
+                  const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
+                  const isUnlocked = unlockedIds.has(p.id);
+                  const isPaidEndedP = paidEndedIds.has(p.id);
+                  const isLocked   = isWeekly && !isUnlocked && !isPaidEndedP;
+                  return (
+                    <tr
+                      key={p.id}
+                      onClick={() => handleRowClick(p)}
+                      className={`cursor-pointer transition-colors duration-150 group ${
+                        isLocked
+                          ? 'hover:bg-amber-500/5 opacity-75'
+                          : 'hover:bg-white/[0.03]'
+                      }`}
+                    >
+                      <td className="py-4 pl-6 pr-3 text-center text-sm font-mono text-zinc-500 font-medium">
+                        {i + 1}
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <span className={`font-mono text-[15px] transition-colors ${
+                            isLocked
+                              ? 'text-zinc-400 group-hover:text-amber-400'
+                              : 'text-zinc-100 group-hover:text-indigo-300 font-medium'
+                          }`}>
+                            {p.title}
+                          </span>
+                          {isLocked && (
+                            <span className="text-xs font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-medium">
+                              🔒 Weekly
+                            </span>
+                          )}
+                          {isPaidEndedP && !isSolved && (
+                            <span className="text-xs font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20 font-medium">
+                              🏁 Practice
+                            </span>
+                          )}
+                        </div>
+                        {p.tags && p.tags.length > 0 && (
+                          <div className="flex gap-1.5 flex-wrap">
+                            {p.tags.map(t => (
+                              <span key={t} className="text-xs text-zinc-400 bg-zinc-800/60 px-2 py-0.5 rounded-md font-mono border border-zinc-700/60">
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-4 px-4 whitespace-nowrap">
+                        <span className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-full border inline-block ${
+                          p.difficulty === 'Easy' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                          p.difficulty === 'Medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                          'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                        }`}>
+                          {p.difficulty}
                         </span>
-                      )}
-                      {isPaidEndedP && !isSolved && (
-                        <span className="text-[10px] font-mono text-[#a78bfa] bg-[#a78bfa15] px-1.5 py-0.5 rounded-lg border border-[#a78bfa30]">
-                          🏁 Practice (no points)
+                      </td>
+                      <td className="py-4 px-4 text-right whitespace-nowrap">
+                        <span className="text-indigo-400 text-sm font-mono font-semibold">
+                          {p.points}
                         </span>
-                      )}
-                    </div>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {(p.tags || []).map(t => (
-                        <span key={t} className="text-[10px] text-[#5eb3ff] bg-[#5eb3ff12] px-1.5 py-0.5 rounded font-mono border border-[#5eb3ff28]">{t}</span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-lg
-                      ${p.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
-                        p.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
-                        'text-[#ff4d4d] bg-[#ff4d4d12]'}`}>
-                      {p.difficulty}
-                    </span>
-                  </div>
-
-                  <div className="text-[#a78bfa] text-sm font-mono font-bold">{p.points}</div>
-                  <div className="text-[#999] text-sm font-mono">{attemptCounts[p.id] || 0}</div>
-
-                  <div>
-                    {isSolved ? (
-                      <span className="inline-flex items-center gap-1 text-[#00e87a] text-xs font-mono font-bold">
-                        <span>✓</span> Solved
-                      </span>
-                    ) : isLocked ? (
-                      <span className="text-[#f0b429] text-xs font-mono group-hover:text-[#f0b429] transition-colors">
-                        Pay to unlock →
-                      </span>
-                    ) : isPaidEndedP ? (
-                      <span className="text-[#a78bfa] text-xs font-mono group-hover:text-[#c4b5fd] transition-colors">
-                        Practice →
-                      </span>
-                    ) : (
-                      <span className="text-[#ccc] text-xs font-mono group-hover:text-[#aaa] transition-colors">Solve →</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                      </td>
+                      <td className="py-4 px-4 text-center whitespace-nowrap">
+                        <span className="text-zinc-300 text-sm font-mono">
+                          {attemptCounts[p.id] || 0}
+                        </span>
+                      </td>
+                      <td className="py-4 pl-4 pr-6 text-right whitespace-nowrap">
+                        {isSolved ? (
+                          <span className="inline-flex items-center gap-1.5 text-emerald-400 text-sm font-mono font-semibold">
+                            <span>✓</span> Solved
+                          </span>
+                        ) : isLocked ? (
+                          <span className="text-amber-400 text-sm font-mono font-medium group-hover:text-amber-300 transition-colors">
+                            Unlock →
+                          </span>
+                        ) : isPaidEndedP ? (
+                          <span className="text-indigo-400 text-sm font-mono font-medium group-hover:text-indigo-300 transition-colors">
+                            Practice →
+                          </span>
+                        ) : (
+                          <span className="text-zinc-400 text-sm font-mono group-hover:text-zinc-200 transition-colors font-medium">
+                            Solve →
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </>
       )}
@@ -982,9 +938,9 @@ function SubmittedCodeModal({ submission, onClose }: { submission: SubmissionRow
 
   const date = new Date(submission.submitted_at);
   const statusColor =
-    submission.status === 'approved' ? 'text-[#00e87a] bg-[#00e87a10] border-[#00e87a20]' :
-    submission.status === 'rejected' ? 'text-[#ff4d4d] bg-[#ff4d4d10] border-[#ff4d4d20]' :
-                                        'text-[#f0b429] bg-[#f0b42910] border-[#f0b42920]';
+    submission.status === 'approved' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+    submission.status === 'rejected' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' :
+                                        'text-amber-400 bg-amber-500/10 border-amber-500/20';
   const statusLabel =
     submission.status === 'approved' ? '✓ Approved' :
     submission.status === 'rejected' ? '✗ Rejected' : '⏳ Pending';
@@ -1000,41 +956,41 @@ function SubmittedCodeModal({ submission, onClose }: { submission: SubmissionRow
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
       onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        className="w-full max-w-2xl max-h-[85vh] flex flex-col bg-[#0d0d0d] border border-[#1f1f1f] rounded-2xl shadow-2xl overflow-hidden animate-slide-down">
-        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-[#1a1a1a] shrink-0">
+        className="w-full max-w-2xl max-h-[85vh] flex flex-col bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-slide-down">
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800 shrink-0">
           <div className="min-w-0">
-            <h3 className="font-display font-bold text-sm text-[#e0e0e0] truncate">{submission.problem_title}</h3>
+            <h3 className="font-display font-semibold text-sm text-zinc-100 truncate">{submission.problem_title}</h3>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${statusColor}`}>{statusLabel}</span>
-              <span className="text-[10px] font-mono text-[#666]">{submission.lang}</span>
-              <span className="text-[10px] font-mono text-[#444]">
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border ${statusColor}`}>{statusLabel}</span>
+              <span className="text-[10px] font-mono text-zinc-400">{submission.lang}</span>
+              <span className="text-[10px] font-mono text-zinc-500">
                 {date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })} · {date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
               </span>
               {submission.status === 'approved' && (
-                <span className="text-[10px] font-mono text-[#a78bfa] font-bold">{submission.points_awarded} pts</span>
+                <span className="text-[10px] font-mono text-indigo-400 font-semibold">{submission.points_awarded} pts</span>
               )}
             </div>
           </div>
           <button onClick={onClose} aria-label="Close"
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-[#666] hover:text-[#e0e0e0] hover:bg-[#ffffff08] transition-colors">
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors">
             ✕
           </button>
         </div>
 
         {submission.status === 'rejected' && submission.review_notes && (
-          <div className="px-5 py-2.5 bg-[#ff4d4d0a] border-b border-[#ff4d4d15] text-xs font-mono text-[#ff4d4d90] shrink-0">
+          <div className="px-5 py-2.5 bg-rose-500/10 border-b border-rose-500/20 text-xs font-mono text-rose-400 shrink-0">
             {submission.review_notes}
           </div>
         )}
 
-        <pre className="flex-1 overflow-auto px-5 py-4 text-xs font-mono text-[#ccc] leading-relaxed bg-[#0a0a0a]">
+        <pre className="flex-1 overflow-auto px-5 py-4 text-xs font-mono text-zinc-200 leading-relaxed bg-zinc-950">
           {submission.code || '// No code recorded for this submission.'}
         </pre>
 
-        <div className="px-5 py-3 border-t border-[#1a1a1a] shrink-0 flex justify-end">
+        <div className="px-5 py-3 border-t border-zinc-800 shrink-0 flex justify-end">
           <button onClick={copyCode}
-            className="flex items-center gap-2 px-3 py-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl font-mono text-xs text-[#666] hover:text-[#e0e0e0] hover:border-[#252525] transition-all duration-200">
-            {copied ? (<><span className="text-[#00e87a]">✓</span><span className="text-[#00e87a]">Copied</span></>) : (<><span>📋</span><span>Copy code</span></>)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg font-mono text-xs text-zinc-300 hover:text-zinc-100 hover:border-zinc-600 transition-all">
+            {copied ? (<><span className="text-emerald-400">✓</span><span className="text-emerald-400">Copied</span></>) : (<><span>📋</span><span>Copy code</span></>)}
           </button>
         </div>
       </div>
@@ -1058,41 +1014,41 @@ function ShareCardModal({ card, onClose }: { card: ShareCard; onClose: () => voi
 
     // Background
     const bg = ctx.createLinearGradient(0, 0, W, H);
-    bg.addColorStop(0, '#0a0a0a');
-    bg.addColorStop(1, '#0d0d0d');
+    bg.addColorStop(0, '#09090b');
+    bg.addColorStop(1, '#18181b');
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
     // Border
-    ctx.strokeStyle = '#1f1f1f';
+    ctx.strokeStyle = '#27272a';
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, W - 2, H - 2);
 
-    // Glow accent
-    ctx.fillStyle = 'rgba(0,232,122,0.06)';
+    // Subtle ambient accent
+    ctx.fillStyle = 'rgba(99,102,241,0.06)';
     ctx.beginPath();
     ctx.arc(W - 80, 80, 220, 0, Math.PI * 2);
     ctx.fill();
 
     // Brand
-    ctx.fillStyle = '#00e87a';
+    ctx.fillStyle = '#6366f1';
     ctx.font = 'bold 26px monospace';
     ctx.fillText('BitByBit', 56, 76);
-    ctx.fillStyle = '#666';
+    ctx.fillStyle = '#a1a1aa';
     ctx.font = '16px monospace';
     ctx.fillText('TeamCodeLocked', 56, 102);
 
     // Checkmark badge
-    ctx.fillStyle = 'rgba(0,232,122,0.1)';
+    ctx.fillStyle = 'rgba(16,185,129,0.12)';
     ctx.beginPath();
     ctx.arc(W - 100, 130, 42, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#00e87a';
+    ctx.fillStyle = '#10b981';
     ctx.font = 'bold 44px sans-serif';
     ctx.fillText('✓', W - 118, 146);
 
     // Problem title
-    ctx.fillStyle = '#e0e0e0';
+    ctx.fillStyle = '#f4f4f5';
     ctx.font = 'bold 44px sans-serif';
     const words = card.title.split(' ');
     let line = '';
@@ -1110,7 +1066,7 @@ function ShareCardModal({ card, onClose }: { card: ShareCard; onClose: () => voi
     }
     ctx.fillText(line, 56, y);
 
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = '#a1a1aa';
     ctx.font = '20px monospace';
     ctx.fillText('Solved ✓', 56, y + 46);
 
@@ -1124,21 +1080,21 @@ function ShareCardModal({ card, onClose }: { card: ShareCard; onClose: () => voi
     const colW = (W - 112) / 3;
     stats.forEach(([val, label], i) => {
       const x = 56 + i * colW;
-      ctx.fillStyle = '#00e87a';
+      ctx.fillStyle = '#10b981';
       ctx.font = 'bold 32px monospace';
       ctx.fillText(val, x, statY);
-      ctx.fillStyle = '#666';
+      ctx.fillStyle = '#71717a';
       ctx.font = '14px monospace';
       ctx.fillText(label.toUpperCase(), x, statY + 26);
     });
 
     // Footer
-    ctx.strokeStyle = '#1a1a1a';
+    ctx.strokeStyle = '#27272a';
     ctx.beginPath();
     ctx.moveTo(56, H - 56);
     ctx.lineTo(W - 56, H - 56);
     ctx.stroke();
-    ctx.fillStyle = '#555';
+    ctx.fillStyle = '#71717a';
     ctx.font = '14px monospace';
     ctx.fillText('bitbybit.dev', 56, H - 30);
 
@@ -1176,22 +1132,22 @@ function ShareCardModal({ card, onClose }: { card: ShareCard; onClose: () => voi
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-[#0a0a0a] border border-[#1f1f1f] rounded-2xl w-full max-w-lg overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#1a1a1a]">
-          <h3 className="font-display font-bold text-[#e2e2e2] text-base">🎉 Nice solve!</h3>
-          <button onClick={onClose} className="text-[#666] hover:text-[#e0e0e0] transition-colors text-lg">✕</button>
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-slide-down">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+          <h3 className="font-display font-semibold text-zinc-100 text-base">🎉 Nice solve!</h3>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 transition-colors text-lg">✕</button>
         </div>
         <div className="p-4">
-          <canvas ref={canvasRef} className="w-full rounded-xl border border-[#1a1a1a]"/>
+          <canvas ref={canvasRef} className="w-full rounded-xl border border-zinc-800"/>
         </div>
-        <div className="flex gap-2 px-4 pb-4">
+        <div className="flex gap-2.5 px-4 pb-4">
           <button onClick={handleShare}
-            className="flex-1 py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl hover:bg-[#00ff88] transition-all">
+            className="flex-1 py-2 bg-indigo-600 text-white font-mono font-medium text-xs rounded-lg hover:bg-indigo-500 transition-all shadow-sm">
             📤 Share
           </button>
           <button onClick={handleDownload}
-            className="flex-1 py-2.5 bg-[#0d0d0d] border border-[#1a1a1a] text-[#e0e0e0] font-mono text-sm rounded-xl hover:border-[#252525] transition-all">
+            className="flex-1 py-2 bg-zinc-800 border border-zinc-700 text-zinc-200 font-mono text-xs rounded-lg hover:bg-zinc-700/80 transition-all">
             ⬇ Download
           </button>
         </div>

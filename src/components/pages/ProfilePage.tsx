@@ -7,6 +7,7 @@ import { BADGES, computeUnlockedBadges, type Badge } from '@/lib/badges';
 import ContributionHeatmap from '@/components/profile/ContributionHeatmap';
 import SkillRadar from '@/components/profile/SkillRadar';
 import CertificatePreview from '@/components/certificates/CertificatePreview';
+import SpotlightCard from '@/components/ui/SpotlightCard';
 import { Award, Download, Eye, ExternalLink, ShieldCheck, X } from 'lucide-react';
 
 interface ProfilePageProps {
@@ -286,100 +287,121 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
   return (
     <div className="max-w-3xl mx-auto animate-fade-up space-y-6">
       {/* Header */}
-      <div className="card-glow p-6 flex items-center gap-4 flex-wrap">
+      <SpotlightCard
+        spotlightColor="rgba(99, 102, 241, 0.08)"
+        className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-6 flex items-center gap-4 flex-wrap shadow-sm"
+      >
         <img
           src={`https://github.com/${user.github}.png?size=80`}
           alt={user.name}
-          className="w-16 h-16 rounded-full object-cover ring-2 ring-[#262c3a]"
+          className="w-16 h-16 rounded-full object-cover ring-2 ring-white/10"
           onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
         />
         <div className="min-w-0">
-          <h1 className="font-display font-bold text-xl text-[#e0e0e0]">{user.name}</h1>
-          <p className="text-sm font-mono text-[#666]">@{user.github}</p>
+          <h1 className="font-display font-medium text-xl text-zinc-100 tracking-tight">{user.name}</h1>
+          <p className="text-sm font-mono text-zinc-400">@{user.github}</p>
         </div>
         <div className="ml-auto text-right">
-          <p className="text-[10px] font-mono text-[#666] uppercase">Monthly rank</p>
-          <p className="text-2xl font-display font-bold text-[#00e87a]">
+          <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider font-semibold">Monthly rank</p>
+          <p className="text-2xl font-display font-medium text-indigo-400">
             {stats.rank ? `#${stats.rank}` : '-'}
           </p>
         </div>
-      </div>
+      </SpotlightCard>
 
       {/* Stat cards */}
-      <div className={`grid grid-cols-1 sm:grid-cols-3 ${(stats.aiAssists > 0 || stats.bloodFirstCount > 0) ? 'md:grid-cols-5' : ''} gap-4`}>
-        <div className="card-hover p-5 text-center">
-          <p className="text-3xl font-display font-bold text-[#00e87a] stat-glow">{stats.totalPoints}</p>
-          <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide">Total points</p>
-        </div>
-        <div className="card-hover p-5 text-center">
-          <p className="text-3xl font-display font-bold text-[#e0e0e0]">{stats.problemsSolved}</p>
-          <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide">Problems solved</p>
-        </div>
-        <div className="card-hover p-5 text-center">
-          <p className={`text-3xl font-display font-bold ${isActiveToday ? 'text-[#f0b429]' : 'text-[#555]'}`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-3 ${(stats.aiAssists > 0 || stats.bloodFirstCount > 0) ? 'md:grid-cols-5' : ''} gap-3.5`}>
+        <SpotlightCard
+          spotlightColor="rgba(99, 102, 241, 0.08)"
+          className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-5 text-center"
+        >
+          <p className="text-2xl font-sans font-semibold text-indigo-400">{stats.totalPoints}</p>
+          <p className="text-xs font-sans text-zinc-400 mt-1 uppercase tracking-wider font-medium">Total points</p>
+        </SpotlightCard>
+        <SpotlightCard
+          spotlightColor="rgba(255, 255, 255, 0.05)"
+          className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-5 text-center"
+        >
+          <p className="text-2xl font-sans font-semibold text-zinc-100">{stats.problemsSolved}</p>
+          <p className="text-xs font-sans text-zinc-400 mt-1 uppercase tracking-wider font-medium">Problems solved</p>
+        </SpotlightCard>
+        <SpotlightCard
+          spotlightColor="rgba(251, 191, 36, 0.08)"
+          className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-5 text-center"
+        >
+          <p className={`text-2xl font-sans font-semibold ${isActiveToday ? 'text-amber-400' : 'text-zinc-500'}`}>
             🔥 {stats.streak}
           </p>
-          <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide">
-            Day streak {!isActiveToday && stats.streak > 0 && '(solve today to keep it!)'}
+          <p className="text-xs font-sans text-zinc-400 mt-1 uppercase tracking-wider font-medium">
+            Day streak {!isActiveToday && stats.streak > 0 && '(solve today!)'}
           </p>
-        </div>
+        </SpotlightCard>
         {stats.aiAssists > 0 && (
-          <div className="card-hover p-5 text-center">
-            <p className="text-3xl font-display font-bold text-[#a78bfa]">🤖 {stats.aiAssists}</p>
-            <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide">AI assists used</p>
-          </div>
+          <SpotlightCard
+            spotlightColor="rgba(56, 189, 248, 0.08)"
+            className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-5 text-center"
+          >
+            <p className="text-2xl font-sans font-semibold text-sky-400">🤖 {stats.aiAssists}</p>
+            <p className="text-xs font-sans text-zinc-400 mt-1 uppercase tracking-wider font-medium">AI assists</p>
+          </SpotlightCard>
         )}
         {stats.bloodFirstCount > 0 && (
-          <div className="card-hover p-5 text-center">
-            <p className="text-3xl font-display font-bold text-[#ff4d6d]">🩸 {stats.bloodFirstCount}</p>
-            <p className="text-xs font-mono text-[#888] mt-1 uppercase tracking-wide" title="First person platform-wide to solve these problems">
+          <SpotlightCard
+            spotlightColor="rgba(244, 63, 94, 0.08)"
+            className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-5 text-center"
+          >
+            <p className="text-2xl font-sans font-semibold text-rose-400">🩸 {stats.bloodFirstCount}</p>
+            <p className="text-xs font-sans text-zinc-400 mt-1 uppercase tracking-wider font-medium" title="First person platform-wide to solve these problems">
               Blood First
             </p>
-          </div>
+          </SpotlightCard>
         )}
       </div>
 
       {/* ── MY CERTIFICATES SECTION ── */}
-      <div className="card p-5">
+      <SpotlightCard
+        spotlightColor="rgba(99, 102, 241, 0.06)"
+        className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-6 shadow-sm"
+      >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display font-bold text-sm text-[#e0e0e0] flex items-center gap-2">
-            <Award className="w-4 h-4 text-[#00e87a]" /> My Certificates
-            <span className="text-[#666] font-mono font-normal">({stats.certificates.length})</span>
+          <h2 className="font-display font-medium text-sm text-zinc-100 tracking-tight flex items-center gap-2">
+            <Award className="w-4 h-4 text-indigo-400" /> My Certificates
+            <span className="text-zinc-500 font-mono font-normal">({stats.certificates.length})</span>
           </h2>
         </div>
 
         {stats.certificates.length === 0 ? (
-          <div className="text-center py-8 text-[#666] font-mono text-xs">
+          <div className="text-center py-8 text-zinc-500 font-mono text-xs">
             No certificates issued yet. Participate in weekly contests and arena challenges to earn certificates!
           </div>
         ) : (
-          <div className="divide-y divide-[#1a1a1a]">
+          <div className="divide-y divide-white/[0.04]">
             {stats.certificates.map((cert) => {
               const isRevoked = cert.status === 'revoked';
               return (
                 <div key={cert.id} className="py-4 flex items-center justify-between gap-4 flex-wrap">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm font-display text-[#e0e0e0] truncate">
+                      <span className="font-medium text-sm font-sans text-zinc-100 truncate">
                         {cert.title || 'Certificate of Achievement'}
                       </span>
                       {isRevoked ? (
-                        <span className="text-[10px] font-mono font-bold text-red-400 bg-red-950/40 border border-red-800/40 rounded px-1.5 py-0.5">
+                        <span className="text-[10px] font-mono font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-full px-2 py-0.5">
                           Revoked
                         </span>
                       ) : (
-                        <span className="text-[10px] font-mono font-bold text-[#00e87a] bg-[#00e87a15] border border-[#00e87a30] rounded px-1.5 py-0.5">
+                        <span className="text-[10px] font-mono font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5">
                           Verified
                         </span>
                       )}
                     </div>
-                    <p className="text-xs font-mono text-[#888] mt-0.5">{cert.event_name}</p>
-                    <div className="flex items-center gap-3 text-[10px] font-mono text-[#555] mt-1">
+                    <p className="text-xs font-mono text-zinc-400 mt-0.5">{cert.event_name}</p>
+                    <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-500 mt-1">
                       <span>
                         Issued: {new Date(cert.issued_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                       </span>
                       <span>•</span>
-                      <span className="text-[#00e87a]/80 font-bold">{cert.certificate_id}</span>
+                      <span className="text-zinc-400 font-medium">{cert.certificate_id}</span>
                     </div>
                   </div>
 
@@ -394,7 +416,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
                       <button
                         onClick={() => handleDownload(cert.certificate_id)}
                         disabled={downloadingCertId === cert.certificate_id}
-                        className="btn-solid text-xs py-1.5 px-3 flex items-center gap-1.5 font-mono shadow-[0_0_12px_rgba(0,232,122,0.2)]"
+                        className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1.5 font-mono"
                       >
                         <Download className="w-3.5 h-3.5" />
                         {downloadingCertId === cert.certificate_id ? 'Downloading...' : 'Download'}
@@ -406,36 +428,39 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
             })}
           </div>
         )}
-      </div>
+      </SpotlightCard>
 
       {/* Badges */}
-      <div className="card p-5">
+      <SpotlightCard
+        spotlightColor="rgba(255, 255, 255, 0.04)"
+        className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-6 shadow-sm"
+      >
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-display font-bold text-sm text-[#e0e0e0]">
-            Badges <span className="text-[#666] font-mono font-normal">({stats.badges.length}/{BADGES.length})</span>
+          <h2 className="font-display font-medium text-sm text-zinc-100 tracking-tight">
+            Badges <span className="text-zinc-500 font-mono font-normal">({stats.badges.length}/{BADGES.length})</span>
           </h2>
         </div>
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
           {BADGES.map(b => {
             const unlocked = stats.badges.some(ub => ub.id === b.id);
             return (
               <div key={b.id} title={`${b.label} — ${b.description}${!b.permanent ? ' (current status, can change)' : ''}`}
                 className={`flex flex-col items-center text-center gap-1.5 p-3 rounded-xl border transition-all
                   ${unlocked
-                    ? 'bg-[#00e87a0a] border-[#00e87a25]'
-                    : 'bg-[#0a0a0a] border-[#161616] opacity-40 grayscale'}`}>
+                    ? 'bg-indigo-500/10 border-indigo-500/25'
+                    : 'bg-zinc-950/30 border-white/[0.04] opacity-40 grayscale'}`}>
                 <span className="text-2xl">{b.icon}</span>
-                <span className={`text-[10px] font-mono leading-tight ${unlocked ? 'text-[#e0e0e0]' : 'text-[#666]'}`}>
+                <span className={`text-[10px] font-mono leading-tight ${unlocked ? 'text-zinc-200' : 'text-zinc-500'}`}>
                   {b.label}
                 </span>
                 {!b.permanent && unlocked && (
-                  <span className="text-[8px] font-mono text-[#f0b429] uppercase">current</span>
+                  <span className="text-[8px] font-mono text-amber-400 uppercase">current</span>
                 )}
               </div>
             );
           })}
         </div>
-      </div>
+      </SpotlightCard>
 
       {/* Contribution heatmap */}
       <ContributionHeatmap dates={stats.allDates} />
@@ -444,61 +469,64 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       <SkillRadar skills={stats.skillTags} />
 
       {/* Recent activity */}
-      <div className="card p-5">
-        <h2 className="font-display font-bold text-sm text-[#e0e0e0] mb-4">Recent activity</h2>
+      <SpotlightCard
+        spotlightColor="rgba(255, 255, 255, 0.04)"
+        className="bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl p-6 shadow-sm"
+      >
+        <h2 className="font-display font-medium text-sm text-zinc-100 tracking-tight mb-4">Recent activity</h2>
         {stats.recent.length === 0 ? (
-          <div className="text-center py-10 text-[#666] font-mono text-sm">
+          <div className="text-center py-10 text-zinc-500 font-mono text-sm">
             No submissions yet —{' '}
-            <button onClick={() => onNavigate('problems')} className="text-[#00e87a] hover:underline">
+            <button onClick={() => onNavigate('problems')} className="text-indigo-400 hover:underline">
               solve your first problem
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-[#1a1a1a]">
+          <div className="divide-y divide-white/[0.04]">
             {stats.recent.map((r, i) => (
               <div key={i} className="flex items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-mono text-[#e0e0e0] truncate flex items-center gap-1.5">
+                  <p className="text-sm font-mono text-zinc-200 truncate flex items-center gap-1.5">
                     {r.problem_title}
                     {r.isBloodFirst && (
                       <span title="You were the first person platform-wide to solve this" className="shrink-0">🩸</span>
                     )}
                   </p>
-                  <p className="text-[10px] font-mono text-[#666] mt-0.5">
+                  <p className="text-[10px] font-mono text-zinc-500 mt-0.5">
                     {r.source === 'arena' ? '🏆 Arena' : r.source === 'weekly' ? '🏅 Weekly' : '{ } Problems'}
                     {' · '}
                     {new Date(r.when).toLocaleDateString()}
                     {r.total > 0 && ` · ${r.passed}/${r.total} tests`}
                   </p>
                 </div>
-                <span className="text-sm font-mono font-bold text-[#00e87a] shrink-0">+{r.points}</span>
+                <span className="text-xs font-mono font-medium text-emerald-400 shrink-0">+{r.points}</span>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </SpotlightCard>
 
       {/* Certificate Viewer Modal */}
       {viewingCertificate && (
-        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-[#111] border border-[#2a2a2a] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
-            <div className="px-6 py-4 border-b border-[#222] flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-zinc-900/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">
+            <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-[#00e87a]" />
-                <h3 className="font-display font-bold text-base text-[#e0e0e0]">
+                <Award className="w-5 h-5 text-indigo-400" />
+                <h3 className="font-display font-medium text-base text-zinc-100 tracking-tight">
                   {viewingCertificate.certificate_id}
                 </h3>
               </div>
               <button
                 onClick={() => setViewingCertificate(null)}
-                className="p-1 rounded-lg text-[#666] hover:text-[#fff] hover:bg-[#222]"
+                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06] transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-4">
-              <div className="card p-3 bg-[#0a0a0a] border-[#222]">
+              <div className="p-3 bg-zinc-950/60 rounded-xl border border-white/[0.06]">
                 <CertificatePreview
                   recipientName={viewingCertificate.recipient_name}
                   title={viewingCertificate.title}
@@ -521,7 +549,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
                   href={`/certificate/${viewingCertificate.certificate_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs font-mono text-[#00e87a] hover:underline flex items-center gap-1"
+                  className="text-xs font-mono text-indigo-400 hover:underline flex items-center gap-1"
                 >
                   <ExternalLink className="w-3.5 h-3.5" /> Public Verification Link
                 </a>
@@ -529,7 +557,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
                   <button
                     onClick={() => handleDownload(viewingCertificate.certificate_id)}
                     disabled={downloadingCertId === viewingCertificate.certificate_id}
-                    className="btn-solid py-2 px-4 text-xs font-mono flex items-center gap-2"
+                    className="btn-primary py-2 px-4 text-xs font-mono flex items-center gap-2"
                   >
                     <Download className="w-4 h-4" />
                     {downloadingCertId === viewingCertificate.certificate_id ? 'Downloading...' : 'Download PDF'}

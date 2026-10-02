@@ -214,7 +214,7 @@ export default function TermsPage({ onNavigate }: Props) {
       <div className="text-center">
         <button
           onClick={() => onNavigate("about")}
-          className="text-xs font-mono text-[#555] hover:text-[#00e87a] transition-colors"
+          className="text-xs font-mono text-zinc-500 hover:text-indigo-400 transition-colors"
         >
           ← Back to About
         </button>

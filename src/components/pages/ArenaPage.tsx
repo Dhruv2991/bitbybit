@@ -498,8 +498,8 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                   setShowFsOverlay(false);
                 }
               }}
-              className="px-8 py-3 bg-[var(--acc)] text-black font-mono font-bold text-sm rounded-2xl
-                hover:bg-[var(--acc-bright)] active:scale-95 transition-all shadow-[0_0_30px_rgba(0,232,122,0.3)]"
+              className="px-8 py-3 bg-indigo-600 text-white font-mono font-medium text-sm rounded-xl
+                hover:bg-indigo-500 active:scale-95 transition-colors shadow-sm"
             >
               ↩ Re-enter Fullscreen
             </button>
@@ -521,7 +521,7 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
             <div className="flex items-center gap-3 shrink-0">
               {/* Countdown */}
               <div className={`font-mono text-xl md:text-2xl font-bold tabular-nums transition-all duration-500
-                ${timeLeft <= 60 ? 'text-[var(--danger)] animate-pulse' : 'text-[var(--acc)] stat-glow'}`}>
+                ${timeLeft <= 60 ? 'text-[var(--danger)] animate-pulse' : 'text-indigo-400 font-semibold'}`}>
                 {fmtTime(timeLeft)}
               </div>
 
@@ -545,12 +545,12 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
             <div className="flex gap-2 mt-2.5 overflow-x-auto pb-1">
               {ids.map((id, i) => (
                 <button key={id} onClick={() => switchProblem(activeContest, i)}
-                  className={`px-3 py-1 rounded-lg text-xs font-mono whitespace-nowrap transition-all shrink-0
+                  className={`px-3 py-1 rounded-lg text-xs font-mono whitespace-nowrap transition-colors shrink-0
                     ${problemIndex === i
-                      ? 'bg-[var(--acc)] text-black font-bold shadow-[0_0_12px_rgba(0,232,122,0.3)]'
+                      ? 'bg-zinc-800 text-zinc-100 font-semibold border border-zinc-700'
                       : solved.has(id)
-                        ? 'bg-[rgba(var(--acc-rgb),0.063)] text-[var(--acc)] border border-[rgba(var(--acc-rgb),0.125)]'
-                        : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text3)] hover:text-[var(--text)] hover:border-[var(--border2)]'}`}>
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                        : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'}`}>
                   {solved.has(id) ? '✓ ' : ''}Problem {i + 1}
                   {arenaProblems[id] ? ` — ${arenaProblems[id].title}` : ''}
                 </button>
@@ -663,22 +663,22 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
               <div key={ct.id}
                 className={`flex flex-col gap-4 p-5 rounded-2xl border transition-all duration-300
                   ${ct.status === 'live'
-                    ? 'bg-[var(--bg2)] border-[rgba(var(--acc-rgb),0.145)] shadow-[0_0_32px_rgba(0,232,122,0.08)]'
+                    ? 'bg-zinc-900/70 border-emerald-500/30'
                     : ct.status === 'ended'
-                    ? 'bg-[var(--bg)] border-[var(--card)] opacity-50'
-                    : 'bg-[var(--bg2)] border-[var(--border)] hover:border-[var(--border2)]'}`}>
+                    ? 'bg-zinc-900/30 border-zinc-800/40 opacity-50'
+                    : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'}`}>
 
                 {/* Status + price */}
                 <div className="flex items-center justify-between">
                   {ct.status === 'live'     ? <span className="badge-live flex items-center gap-1.5"><span className="live-dot" /> LIVE</span> :
                    ct.status === 'upcoming' ? <span className="badge-upcoming">◌ Upcoming</span> :
                                               <span className="badge-ended">✓ Ended</span>}
-                  <span className="text-[var(--acc)] font-mono font-bold text-xs">Free for subscribers</span>
+                  <span className="text-emerald-400 font-mono font-medium text-xs">Free for subscribers</span>
                 </div>
 
                 {/* Contest info */}
                 <div>
-                  <div className="font-display font-bold text-[var(--text)] text-base mb-1">{ct.name}</div>
+                  <div className="font-semibold text-zinc-100 text-base mb-1">{ct.name}</div>
                 </div>
 
                 {/* Stats grid */}
@@ -696,9 +696,9 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                     },
                     { val: ct.status === 'live' ? 'Active' : ct.status === 'ended' ? 'Done' : 'Open', label: 'Phase' },
                   ].map(item => (
-                    <div key={item.label} className="bg-[var(--surface2)] rounded-xl p-2.5 text-center border border-[var(--border)]">
-                      <div className="text-[var(--text)] font-mono font-bold text-xs">{item.val}</div>
-                      <div className="text-[10px] text-[var(--text-soft)] font-mono mt-0.5">{item.label}</div>
+                    <div key={item.label} className="bg-zinc-950/60 rounded-xl p-2.5 text-center border border-zinc-800/80">
+                      <div className="text-zinc-200 font-mono font-bold text-xs">{item.val}</div>
+                      <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{item.label}</div>
                     </div>
                   ))}
                 </div>
@@ -710,52 +710,52 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                       {outcome ? (
                         <div className={`text-center text-xs font-mono py-2.5 px-3 rounded-xl
                           ${outcome === 'disqualified'
-                            ? 'bg-[rgba(var(--danger-rgb),0.071)] text-[var(--danger)] border border-[rgba(var(--danger-rgb),0.125)]'
-                            : 'bg-[rgba(var(--acc-rgb),0.071)] text-[var(--acc)] border border-[rgba(var(--acc-rgb),0.125)]'}`}>
+                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
                           {outcome === 'disqualified' ? '❌ Disqualified' : '✅ Submitted — awaiting results'}
                         </div>
                       ) : (
-                        <div className="text-center text-xs text-[var(--text-soft)] font-mono py-2.5">Contest ended</div>
+                        <div className="text-center text-xs text-zinc-500 font-mono py-2.5">Contest ended</div>
                       )}
                       <button onClick={() => setResultsContest(ct)}
-                        className="w-full py-2 bg-[var(--surface2)] border border-[rgba(var(--purple-rgb),0.145)] text-[var(--purple)]
-                          font-mono text-xs rounded-xl hover:bg-[rgba(var(--purple-rgb),0.063)] transition-all">
+                        className="w-full py-2 bg-zinc-900 border border-indigo-500/30 text-indigo-400
+                          font-mono text-xs rounded-xl hover:bg-indigo-500/10 transition-colors">
                         🏁 View Results
                       </button>
                     </div>
                   ) : reg ? (
                     <>
                       <div className={`text-xs font-mono mb-3 px-3 py-2 rounded-xl text-center
-                        ${reg.status === 'confirmed' ? 'bg-[rgba(var(--acc-rgb),0.071)] text-[var(--acc)] border border-[rgba(var(--acc-rgb),0.125)]' :
-                          reg.status === 'pending'   ? 'bg-[rgba(var(--warn-rgb),0.071)] text-[var(--warn)] border border-[rgba(var(--warn-rgb),0.125)]' :
-                                                       'bg-[rgba(var(--danger-rgb),0.071)] text-[var(--danger)] border border-[rgba(var(--danger-rgb),0.125)]'}`}>
+                        ${reg.status === 'confirmed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                          reg.status === 'pending'   ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                                       'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
                         {reg.status === 'confirmed' ? '✓ Registered & confirmed' :
                          reg.status === 'pending'   ? '⏳ Registration pending'  :
                                                       '✗ Registration rejected — please re-apply'}
                       </div>
                       {/* Countdown for confirmed upcoming */}
                       {reg.status === 'confirmed' && ct.status === 'upcoming' && countdowns[ct.id] > 0 && (
-                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--surface2)] border border-[var(--border)] mb-3">
-                          <span className="text-[10px] font-mono text-[var(--text3)]">Starts in</span>
+                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 mb-3">
+                          <span className="text-[10px] font-mono text-zinc-500">Starts in</span>
                           <span className={`font-mono font-bold text-sm tabular-nums
-                            ${countdowns[ct.id] < 3600 ? 'text-[var(--warn)]' : 'text-[var(--acc)]'}`}>
+                            ${countdowns[ct.id] < 3600 ? 'text-amber-400' : 'text-emerald-400'}`}>
                             {fmtCountdown(countdowns[ct.id])}
                           </span>
                         </div>
                       )}
                       {reg.status === 'confirmed' && ct.status === 'live' && (
                         outcome === 'disqualified' ? (
-                          <div className="w-full py-2.5 bg-[rgba(var(--danger-rgb),0.063)] text-[var(--danger)] font-mono text-sm rounded-xl text-center border border-[rgba(var(--danger-rgb),0.082)]">
+                          <div className="w-full py-2.5 bg-rose-500/10 text-rose-400 font-mono text-xs rounded-xl text-center border border-rose-500/20">
                             ❌ Disqualified
                           </div>
                         ) : outcome === 'submitted' ? (
-                          <div className="w-full py-2.5 bg-[var(--border)] text-[var(--text2)] font-mono text-sm rounded-xl text-center border border-[var(--border2)]">
+                          <div className="w-full py-2.5 bg-zinc-800 text-zinc-300 font-mono text-xs rounded-xl text-center border border-zinc-700">
                             ✓ Submitted — contest locked
                           </div>
                         ) : (
                           <button onClick={() => startContest(ct)}
-                            className="w-full py-2.5 bg-[var(--acc)] text-black font-mono font-bold text-sm rounded-xl
-                              hover:bg-[var(--acc-bright)] transition-all active:scale-[0.98] shadow-[0_0_16px_rgba(0,232,122,0.2)]">
+                            className="w-full py-2.5 bg-indigo-600 text-white font-mono font-medium text-xs rounded-xl
+                              hover:bg-indigo-500 transition-colors active:scale-[0.98] shadow-sm">
                             Enter Live Arena →
                           </button>
                         )

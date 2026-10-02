@@ -16,11 +16,16 @@ export interface CertificateData {
   eventName: string;
   organizationText: string;
   activityPointsText?: string | null;
+  institutionName?: string;
+  institutionSubtext?: string;
+  presentedToText?: string;
+  customDescription?: string;
   coordinators: CertificateCoordinator[];
   dateStr?: string;
   issuedAt?: string;
   issuedBy?: string;
   verificationUrl?: string;
+  status?: CertificateStatus;
 }
 
 export const DEFAULT_COORDINATORS: CertificateCoordinator[] = [

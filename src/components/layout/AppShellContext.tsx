@@ -127,28 +127,19 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [liveItems, setLiveItems] = useState<LiveItem[]>([]);
   const [userStreak, setUserStreak] = useState(0);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme] = useState<"dark" | "light">("dark");
 
   const toastCounter = useRef(0);
   const resolving = useRef(false);
 
   useEffect(() => {
-    let saved: "dark" | "light" = "dark";
-    try {
-      const stored = localStorage.getItem("bb_theme");
-      if (stored === "light" || stored === "dark") saved = stored;
-    } catch {}
-    setTheme(saved);
-    document.documentElement.setAttribute("data-theme", saved);
+    document.documentElement.setAttribute("data-theme", "dark");
+    document.documentElement.classList.remove("light");
+    document.documentElement.classList.add("dark");
   }, []);
 
   function toggleTheme() {
-    setTheme(prev => {
-      const next = prev === "dark" ? "light" : "dark";
-      document.documentElement.setAttribute("data-theme", next);
-      try { localStorage.setItem("bb_theme", next); } catch {}
-      return next;
-    });
+    // Light mode removed permanently per design requirements
   }
 
   function showToast(msg: string, type: ToastType = "info") {

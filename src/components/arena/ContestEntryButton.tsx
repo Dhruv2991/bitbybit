@@ -57,17 +57,16 @@ export default function ContestEntryButton({
 
   if (!isSubscriber) {
     return (
-      <div className="flex flex-col items-center gap-2 p-3 bg-[#0f0f0f] rounded-xl border border-[#1f1f1f]">
-        <p className="text-[11px] font-mono text-[#888] text-center leading-relaxed">
-          Contest entry is <span className="text-[#00e87a] font-bold">free for subscribers</span> —
+      <div className="flex flex-col items-center gap-2.5 p-3.5 bg-zinc-900/50 rounded-xl border border-zinc-800/80">
+        <p className="text-[11px] font-mono text-zinc-400 text-center leading-relaxed">
+          Contest entry is <span className="text-emerald-400 font-semibold">free for subscribers</span> &mdash;
           subscribe monthly (₹39/month) to unlock every contest, weekly problem, and AI feature.
         </p>
         <button
           onClick={onNavigateSubscribe}
-          className="w-full py-2.5 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-lg
-            hover:bg-[#00ff88] active:scale-[0.98] transition-all"
+          className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono font-medium text-xs rounded-lg active:scale-[0.98] transition-colors"
         >
-          Subscribe to Enter →
+          Subscribe to Enter &rarr;
         </button>
       </div>
     );
@@ -77,14 +76,14 @@ export default function ContestEntryButton({
     <button
       onClick={handleRegister}
       disabled={loading}
-      className={`w-full py-2.5 font-mono font-bold text-sm rounded-lg transition-all active:scale-[0.98]
+      className={`w-full py-2.5 font-mono font-medium text-xs rounded-lg transition-colors active:scale-[0.98]
         ${loading
-          ? 'bg-[#00e87a40] text-[#00e87a60] cursor-not-allowed'
-          : 'bg-[#00e87a] text-black hover:bg-[#00ff88]'}`}
+          ? 'bg-indigo-600/50 text-white/50 cursor-not-allowed'
+          : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-sm'}`}
     >
       {loading ? (
         <span className="flex items-center justify-center gap-2">
-          <span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+          <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
           Registering…
         </span>
       ) : (

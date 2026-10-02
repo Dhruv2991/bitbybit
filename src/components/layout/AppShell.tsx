@@ -6,44 +6,145 @@ import AnimatedBackground from "@/components/pages/AnimatedBackground";
 import GlobalSearch from "@/components/GlobalSearch";
 import { useAppShell, ROUTE_TO_PAGE, PAGE_TO_ROUTE, type PageId } from "./AppShellContext";
 
-const NAV_ITEMS: { id: PageId; label: string; icon: string }[] = [
-  { id: "home", label: "Home", icon: "⌂" },
-  { id: "problems", label: "Problems", icon: "{ }" },
-  { id: "leaderboard", label: "Leaderboard", icon: "⚡" },
-  { id: "arena", label: "Arena", icon: "🏆" },
-  { id: "weekly", label: "Weekly", icon: "🏅" },
-];
+interface NavEntry {
+  id: PageId;
+  label: string;
+  href?: string;
+  badge?: string;
+  badgeColor?: string;
+  icon: (props: { className?: string }) => JSX.Element;
+}
+
+interface NavGroup {
+  group: string;
+  items: NavEntry[];
+}
+
+function IconHome({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  );
+}
+
+function IconProblems({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
+    </svg>
+  );
+}
+
+function IconLeaderboard({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 20V10" />
+      <path d="M12 20V4" />
+      <path d="M6 20v-6" />
+    </svg>
+  );
+}
+
+function IconArena({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+      <path d="M4 22h16" />
+      <path d="M10 14.66V17c0 .55-.45 1-1 1H7" />
+      <path d="M14 14.66V17c0 .55.45 1 1 1h2" />
+      <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+    </svg>
+  );
+}
+
+function IconWeekly({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
+function IconProfile({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function IconAbout({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  );
+}
+
+function IconAdmin({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
 
 const toastColors: Record<string, string> = {
-  ok: "bg-[#00e87a] text-black",
-  err: "bg-[#ff4d4d] text-white",
-  warn: "bg-[#f0b429] text-black",
-  info: "bg-[#1f1f1f] text-[#e0e0e0] border border-[#2a2a2a]",
+  ok: "bg-zinc-900 border border-emerald-500/30 text-emerald-400 shadow-xl",
+  err: "bg-zinc-900 border border-rose-500/30 text-rose-400 shadow-xl",
+  warn: "bg-zinc-900 border border-amber-500/30 text-amber-400 shadow-xl",
+  info: "bg-zinc-900 border border-zinc-700 text-zinc-200 shadow-xl",
 };
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const page: PageId = ROUTE_TO_PAGE[pathname] ?? "home";
+  const isFullBleed = pathname === "/problems" || pathname.startsWith("/problems/") || pathname === "/arena" || pathname.startsWith("/arena/");
   const {
-    user, authChecked, toasts, theme, toggleTheme, liveItems, userStreak,
+    user, authChecked, toasts, liveItems, userStreak,
     navigate, signIn, signOut, switchAccount,
   } = useAppShell();
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const navRef = useRef<HTMLDivElement>(null);
-  const navItemRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const [pillStyle, setPillStyle] = useState<{ left: number; width: number; opacity: number; color: "green" | "purple" }>({ left: 0, width: 0, opacity: 0, color: "green" });
+
   const notifRef = useRef<HTMLDivElement>(null);
-  const notifRefMob = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
+  // Load sidebar collapsed preference
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("bb_sidebar_collapsed");
+      if (saved !== null) setSidebarCollapsed(saved === "true");
+    } catch {}
+  }, []);
+
+  function handleToggleSidebar() {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem("bb_sidebar_collapsed", String(next)); } catch {}
+      return next;
+    });
+  }
+
+  // Handle outside click for profile dropdown
   useEffect(() => {
     if (!profileOpen) return;
     function handlePointer(e: MouseEvent) {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
     }
     function handleKey(e: KeyboardEvent) { if (e.key === "Escape") setProfileOpen(false); }
     document.addEventListener("mousedown", handlePointer);
@@ -54,69 +155,114 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [profileOpen]);
 
+  // Handle outside click for notification popover
   useEffect(() => {
-    function handleKey(e: KeyboardEvent) { if (e.key === "Escape") setNotifOpen(false); }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, []);
-
-  useEffect(() => {
-    function measure() {
-      const activeKey = page === "admin" && user?.is_admin ? "admin" : page;
-      const btn = navItemRefs.current[activeKey as string];
-      const container = navRef.current;
-      if (btn && container) {
-        const btnRect = btn.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-        setPillStyle({
-          left: btnRect.left - containerRect.left,
-          width: btnRect.width,
-          opacity: 1,
-          color: activeKey === "admin" ? "purple" : "green",
-        });
-      } else {
-        setPillStyle(s => ({ ...s, opacity: 0 }));
+    if (!notifOpen) return;
+    function handlePointer(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
       }
     }
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [page, user?.is_admin, authChecked]);
+    function handleKey(e: KeyboardEvent) { if (e.key === "Escape") setNotifOpen(false); }
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [notifOpen]);
 
   function go(id: PageId) {
     setNotifOpen(false);
-    setMobileMenuOpen(false);
+    setMobileDrawerOpen(false);
+    setProfileOpen(false);
     navigate(id);
   }
 
   const liveCount = liveItems.filter(i => i.status === "live").length;
   const upcomingCount = liveItems.filter(i => i.status === "upcoming").length;
 
+  const NAV_GROUPS: NavGroup[] = [
+    {
+      group: "Learn & Practice",
+      items: [
+        { id: "home", label: "Dashboard", icon: IconHome },
+        { id: "problems", label: "Problem Set", icon: IconProblems },
+        { id: "weekly", label: "Weekly DSA", icon: IconWeekly, badge: "New", badgeColor: "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" },
+      ],
+    },
+    {
+      group: "Compete",
+      items: [
+        {
+          id: "arena",
+          label: "Arena Contests",
+          icon: IconArena,
+          badge: liveCount > 0 ? `${liveCount} Live` : undefined,
+          badgeColor: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium",
+        },
+        { id: "leaderboard", label: "Leaderboard", icon: IconLeaderboard },
+      ],
+    },
+    {
+      group: "General",
+      items: [
+        { id: "profile", label: "My Profile", icon: IconProfile },
+        { id: "about", label: "About & Docs", icon: IconAbout },
+      ],
+    },
+  ];
+
+  if (user?.is_admin) {
+    NAV_GROUPS.push({
+      group: "Management",
+      items: [
+        { id: "admin", label: "Admin Console", icon: IconAdmin, badge: "Admin", badgeColor: "bg-purple-500/10 text-purple-400 border border-purple-500/20" },
+      ],
+    });
+  }
+
+  const activeEntry = NAV_GROUPS.flatMap(g => g.items).find(i => i.id === page) || { label: page.toUpperCase() };
+
   const bellDropdown = notifOpen && (
-    <div className="absolute right-0 top-10 w-72 bg-[#0f0f0f] border border-[#1f1f1f] rounded-2xl shadow-2xl overflow-hidden z-[100]">
-      <div className="px-4 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
-        <span className="text-xs font-mono font-bold text-[#e0e0e0]">Events</span>
+    <div className="absolute right-0 top-12 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-[100] animate-slide-down">
+      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono font-medium text-zinc-100">Contests & Challenges</span>
+          {liveCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+        </div>
         <div className="flex items-center gap-1.5">
-          {liveCount > 0 && <span className="text-[10px] font-mono bg-[#00e87a20] text-[#00e87a] px-2 py-0.5 rounded-lg">{liveCount} live</span>}
-          {upcomingCount > 0 && <span className="text-[10px] font-mono bg-[#f0b42920] text-[#f0b429] px-2 py-0.5 rounded-lg">{upcomingCount} upcoming</span>}
+          {liveCount > 0 && <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md font-medium border border-emerald-500/20">{liveCount} live</span>}
+          {upcomingCount > 0 && <span className="text-[10px] font-mono bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-md font-medium border border-amber-500/20">{upcomingCount} soon</span>}
         </div>
       </div>
       {liveItems.length === 0 ? (
-        <div className="px-4 py-6 text-center text-[#666] font-mono text-xs">Nothing live or upcoming right now</div>
+        <div className="px-4 py-8 text-center text-zinc-400 font-mono text-xs">
+          No live contests right now. Check back soon!
+        </div>
       ) : (
-        <div className="divide-y divide-[#1a1a1a]">
+        <div className="divide-y divide-zinc-800 max-h-80 overflow-y-auto">
           {liveItems.map(item => (
             <button key={item.id + item.status} onClick={() => { setNotifOpen(false); go(item.page); }}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#161616] transition-all text-left group">
-              <span className="text-base shrink-0">{item.type === "arena" ? "🏆" : "🏅"}</span>
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-all text-left group">
+              <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center shrink-0 text-sm">
+                {item.type === "arena" ? "🏆" : "🏅"}
+              </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-mono font-bold text-[#e0e0e0] truncate">{item.label}</p>
-                <p className="text-[10px] font-mono text-[#555] mt-0.5">
-                  {item.type === "arena" ? "Arena Contest" : "Weekly Challenge"} ·{" "}
-                  {item.status === "live" ? <span className="text-[#00e87a]">LIVE</span> : <span className="text-[#f0b429]">UPCOMING</span>}
+                <p className="text-xs font-mono font-medium text-zinc-200 group-hover:text-zinc-100 transition-colors truncate">{item.label}</p>
+                <p className="text-[10px] font-mono text-zinc-400 mt-0.5 flex items-center gap-1.5">
+                  <span>{item.type === "arena" ? "Arena Contest" : "Weekly DSA"}</span>
+                  <span>·</span>
+                  {item.status === "live" ? (
+                    <span className="text-emerald-400 font-medium flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> LIVE
+                    </span>
+                  ) : (
+                    <span className="text-amber-400">UPCOMING</span>
+                  )}
                 </p>
               </div>
-              <span className="text-[10px] font-mono text-[#00e87a] group-hover:translate-x-0.5 transition-transform shrink-0">Go →</span>
+              <span className="text-xs font-mono text-zinc-500 group-hover:text-zinc-300 group-hover:translate-x-0.5 transition-all shrink-0">→</span>
             </button>
           ))}
         </div>
@@ -125,256 +271,583 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-transparent">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col antialiased selection:bg-indigo-500/20 selection:text-indigo-300">
       <AnimatedBackground />
       <GlobalSearch user={user} navigate={(id: string) => go(id as PageId)} open={searchOpen} onOpenChange={setSearchOpen} />
 
-      <div className="fixed top-20 right-4 md:right-6 z-[200] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+      {/* Floating Toast notifications container */}
+      <div className="fixed top-5 right-5 z-[300] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         {toasts.map(t => (
-          <div key={t.id} className={`${toastColors[t.type]} px-4 py-3 rounded-xl font-mono text-sm shadow-2xl pointer-events-auto animate-slide-down backdrop-blur-sm`}>
-            {t.msg}
+          <div key={t.id} className={`${toastColors[t.type]} px-3.5 py-2.5 rounded-lg font-mono text-xs shadow-xl pointer-events-auto animate-slide-down flex items-center justify-between`}>
+            <span>{t.msg}</span>
           </div>
         ))}
       </div>
 
-      <header className="sticky top-0 z-50 border-b" style={{
-        borderColor: "var(--nav-border)",
-        background: "linear-gradient(180deg, var(--nav-bg-top), var(--nav-bg-bottom))",
-        backdropFilter: "blur(20px) saturate(150%)",
-        WebkitBackdropFilter: "blur(20px) saturate(150%)",
-        boxShadow: "var(--nav-shadow)",
-      }}>
-        <div className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 flex items-center justify-between h-14">
-          <button className="flex items-center gap-2.5 shrink-0 group" onClick={() => go("home")}>
-            <img src="/logo.png" alt="BitByBit" className="w-8 h-8 object-contain" />
-            <span className="font-display font-bold text-lg select-none tracking-tight">
-              BitBy<span className="text-[#00e87a]">Bit</span>
-            </span>
-          </button>
+      <div className="flex flex-1 min-h-screen relative">
+        {/* ========================================================================= */}
+        {/* DESKTOP SIDEBAR                                                           */}
+        {/* ========================================================================= */}
+        <aside
+          className={`hidden md:flex flex-col fixed top-0 left-0 bottom-0 z-40 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] transition-all duration-300 ease-out select-none
+            ${sidebarCollapsed ? "w-[72px]" : "w-[260px]"}`}
+        >
+          {/* Sidebar Header / Brand */}
+          <div className="h-16 px-4 flex items-center justify-between border-b border-[var(--sidebar-border)] shrink-0">
+            <button
+              onClick={() => go("home")}
+              className="flex items-center gap-3 overflow-hidden text-left focus:outline-none group"
+              title="BitByBit Home"
+            >
+              <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-700/90 p-1 flex items-center justify-center shrink-0 group-hover:border-indigo-500/60 shadow-md group-hover:shadow-[0_0_15px_rgba(99,102,241,0.3)] transition-all">
+                <img src="/logo.png" alt="BitByBit" className="w-full h-full object-contain filter drop-shadow-sm" />
+              </div>
+              {!sidebarCollapsed && (
+                <div className="flex flex-col min-w-0 transition-opacity duration-200">
+                  <div className="flex items-center gap-2">
+                    <span className="font-display font-bold text-[17px] tracking-tight text-white group-hover:text-indigo-300 transition-colors leading-tight">
+                      BitByBit
+                    </span>
+                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30 leading-none">
+                      v3
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-zinc-400 font-medium tracking-tight truncate mt-0.5">
+                    TeamCodeLocked
+                  </span>
+                </div>
+              )}
+            </button>
 
-          <nav ref={navRef} className="hidden md:flex items-center gap-0.5 relative">
-            <span className={`absolute top-0 h-full rounded-xl border transition-all duration-300 ease-out pointer-events-none
-              ${pillStyle.color === "purple" ? "bg-[#a78bfa15] border-[#a78bfa30]" : "bg-[#00e87a10] border-[#00e87a20]"}`}
-              style={{ left: pillStyle.left, width: pillStyle.width, opacity: pillStyle.opacity }} />
-            {NAV_ITEMS.map(item => (
-              <button key={item.id} ref={el => { navItemRefs.current[item.id] = el; }} onClick={() => go(item.id)}
-                className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-sm transition-colors duration-200
-                  ${page === item.id ? "text-[#00e87a] font-bold" : "text-[var(--muted)] hover:text-[var(--text)]"}`}>
-                <span className="text-xs opacity-70">{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-            {user?.is_admin && (
-              <button ref={el => { navItemRefs.current["admin"] = el; }} onClick={() => go("admin")}
-                className={`relative z-10 px-3.5 py-1.5 rounded-xl font-mono text-sm transition-colors duration-200
-                  ${page === "admin" ? "text-[#a78bfa] font-bold" : "text-[var(--muted)] hover:text-[#a78bfa]"}`}>
-                Admin
+            {!sidebarCollapsed && (
+              <button
+                onClick={handleToggleSidebar}
+                title="Collapse sidebar"
+                aria-label="Collapse sidebar"
+                className="w-7 h-7 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 flex items-center justify-center transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
               </button>
             )}
-          </nav>
+          </div>
 
-          <div className="hidden md:flex items-center gap-1">
-            <button onClick={() => setSearchOpen(true)} title="Search (⌘K)" aria-label="Search"
-              className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors rounded-xl hover:bg-[var(--hover-overlay)]">
-              <span className="text-base">🔍</span>
-            </button>
-            <button onClick={toggleTheme} title="Toggle theme" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-              className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors rounded-xl hover:bg-[var(--hover-overlay)]">
-              <span className="text-base">{theme === "dark" ? "☀️" : "🌙"}</span>
-            </button>
-            <div className="relative" ref={notifRef}>
-              <button onClick={() => setNotifOpen(o => !o)} aria-label="Notifications"
-                className="relative p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors rounded-xl hover:bg-[var(--hover-overlay)]">
-                <span className="text-base">🔔</span>
-                {liveItems.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#00e87a] animate-pulse" />}
+          {/* Sidebar Navigation */}
+          <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+            {NAV_GROUPS.map((group, gIdx) => (
+              <div key={group.group + gIdx} className="space-y-1">
+                {!sidebarCollapsed ? (
+                  <div className="px-3 pb-2 text-xs font-mono font-semibold tracking-wider uppercase text-zinc-400">
+                    {group.group}
+                  </div>
+                ) : (
+                  <div className="w-full h-px bg-[var(--sidebar-border)] my-2" />
+                )}
+                {group.items.map(item => {
+                  const isActive = page === item.id;
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => go(item.id)}
+                      title={sidebarCollapsed ? item.label : undefined}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-mono text-sm transition-colors group relative
+                        ${isActive
+                          ? "bg-indigo-500/10 text-indigo-300 font-medium border border-indigo-500/25 shadow-sm"
+                          : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border border-transparent"
+                        }
+                        ${sidebarCollapsed ? "justify-center px-0" : ""}`}
+                    >
+                      <div className={`shrink-0 ${isActive ? "text-indigo-400" : "text-zinc-400 group-hover:text-zinc-200"}`}>
+                        <Icon className="w-[18px] h-[18px]" />
+                      </div>
+                      {!sidebarCollapsed && (
+                        <span className="flex-1 text-left truncate font-medium">{item.label}</span>
+                      )}
+                      {!sidebarCollapsed && item.badge && (
+                        <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${item.badgeColor || "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Sidebar Collapse Expand Button (When collapsed) */}
+          {sidebarCollapsed && (
+            <div className="p-2 border-t border-[var(--sidebar-border)] flex justify-center">
+              <button
+                onClick={handleToggleSidebar}
+                title="Expand sidebar"
+                aria-label="Expand sidebar"
+                className="w-8 h-8 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 flex items-center justify-center transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
               </button>
-              {bellDropdown}
             </div>
-            <div className="w-px h-5 bg-[var(--card)] mx-1" />
+          )}
+
+          {/* Sidebar Footer User Card */}
+          <div className="p-3 border-t border-[var(--sidebar-border)] shrink-0">
             {!authChecked ? (
-              <div className="w-24 h-8 rounded-xl bg-[var(--card)] animate-pulse" />
+              <div className="h-10 rounded-lg bg-zinc-900 animate-pulse" />
             ) : user ? (
-              <div className="relative" ref={profileRef}>
-                <button onClick={() => setProfileOpen(o => !o)} aria-haspopup="menu" aria-expanded={profileOpen} aria-label="User menu"
-                  className="flex items-center gap-2.5 pl-1 pr-2 py-1 rounded-xl hover:bg-[var(--hover-overlay)] transition-colors">
-                  <img src={`https://github.com/${user.github}.png?size=32`} alt={user.name}
-                    className="w-7 h-7 rounded-full object-cover ring-1 ring-[#2a2a2a]"
-                    onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                  <span className="text-xs font-mono text-[var(--muted)]">{user.name}</span>
+              <button
+                onClick={() => go("profile")}
+                className={`w-full flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-zinc-800/60 transition-colors group text-left
+                  ${sidebarCollapsed ? "justify-center p-1" : ""}`}
+                title={user.name}
+              >
+                <div className="relative shrink-0">
+                  <img
+                    src={`https://github.com/${user.github}.png?size=64`}
+                    alt={user.name}
+                    className="w-8 h-8 rounded-full object-cover ring-1 ring-zinc-700 group-hover:ring-zinc-500"
+                    onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
                   {userStreak > 0 && (
-                    <span title={`${userStreak}-day streak`}
-                      className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#f0b429] bg-[#f0b42912] border border-[#f0b42925] rounded-full px-1.5 py-0.5">
-                      🔥{userStreak}
+                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-zinc-900 text-[10px] flex items-center justify-center font-bold text-amber-400 border border-amber-500/30">
+                      🔥
                     </span>
                   )}
-                  <span className={`text-[10px] text-[var(--muted)] transition-transform ${profileOpen ? "rotate-180" : ""}`}>▾</span>
-                </button>
-                {profileOpen && (
-                  <div role="menu" className="absolute right-0 top-11 w-56 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down">
-                    <div className="px-4 py-3 border-b border-[var(--border)] flex items-center gap-2.5">
-                      <img src={`https://github.com/${user.github}.png?size=32`} alt={user.name}
-                        className="w-8 h-8 rounded-full object-cover ring-1 ring-[#2a2a2a]"
-                        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                      <div className="min-w-0">
-                        <p className="text-sm font-mono text-[var(--text)] truncate">{user.name}</p>
-                        <p className="text-[10px] font-mono text-[var(--muted)] truncate">@{user.github}</p>
-                      </div>
-                    </div>
-                    <button role="menuitem" onClick={() => { setProfileOpen(false); go("profile"); }}
-                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-overlay)] transition-colors flex items-center gap-2.5">
-                      <span className="text-sm">👤</span> My profile
-                    </button>
-                    <button role="menuitem" onClick={() => { setProfileOpen(false); go("profile"); }}
-                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-overlay)] transition-colors flex items-center gap-2.5">
-                      <span className="text-sm">📜</span> My certificates
-                    </button>
-                    <button role="menuitem" onClick={() => { setProfileOpen(false); switchAccount(); }}
-                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-overlay)] transition-colors flex items-center gap-2.5">
-                      <span className="text-sm">🔁</span> Switch account
-                    </button>
-                    <button role="menuitem" onClick={() => { setProfileOpen(false); signOut(); }}
-                      className="w-full text-left px-4 py-2.5 text-xs font-mono text-[var(--muted)] hover:text-[#ff4d4d] hover:bg-[#ff4d4d0a] transition-colors flex items-center gap-2.5 border-t border-[var(--border)]">
-                      <span className="text-sm">⏻</span> Sign out
-                    </button>
+                </div>
+                {!sidebarCollapsed && (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-mono font-medium text-zinc-200 truncate">{user.name}</p>
+                    <p className="text-xs font-mono text-zinc-500 truncate">@{user.github}</p>
                   </div>
                 )}
-              </div>
+              </button>
             ) : (
-              <button onClick={signIn}
-                className="px-4 py-1.5 rounded-xl font-mono text-sm bg-[#00e87a] text-black font-bold hover:bg-[#00ff88] transition-all shadow-[0_0_16px_rgba(0,232,122,0.2)]">
-                Sign in with GitHub
+              <button
+                onClick={signIn}
+                className={`w-full btn-primary text-sm py-2 flex items-center justify-center gap-2
+                  ${sidebarCollapsed ? "px-0" : ""}`}
+                title="Sign in with GitHub"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+                </svg>
+                {!sidebarCollapsed && <span>Sign In</span>}
               </button>
             )}
           </div>
+        </aside>
 
-          <div className="md:hidden flex items-center gap-1">
-            <button onClick={() => setSearchOpen(true)} title="Search" aria-label="Search" className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
-              <span className="text-base">🔍</span>
-            </button>
-            <div className="relative" ref={notifRefMob}>
-              <button onClick={() => setNotifOpen(o => !o)} aria-label="Notifications" className="relative p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
-                <span className="text-base">🔔</span>
-                {liveItems.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#00e87a] animate-pulse" />}
+        {/* ========================================================================= */}
+        {/* MAIN LAYOUT WRAPPER                                                       */}
+        {/* ========================================================================= */}
+        <div
+          className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-out
+            ${sidebarCollapsed ? "md:pl-[72px]" : "md:pl-[260px]"}`}
+        >
+          {/* TOPBAR / HEADER */}
+          <header
+            className="sticky top-0 z-30 h-16 border-b border-[var(--topbar-border)] bg-[var(--topbar-bg)] backdrop-blur-xl flex items-center justify-between px-4 sm:px-6 lg:px-8"
+          >
+            {/* Left: Mobile menu button + Brand + Breadcrumb */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setMobileDrawerOpen(true)}
+                className="md:hidden p-2 text-zinc-400 hover:text-zinc-100 rounded-lg hover:bg-zinc-800/60 transition-colors"
+                aria-label="Open menu"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="3" y1="12" x2="21" y2="12" />
+                  <line x1="3" y1="6" x2="21" y2="6" />
+                  <line x1="3" y1="18" x2="21" y2="18" />
+                </svg>
               </button>
-              {bellDropdown}
-            </div>
-            <button type="button" aria-label="Toggle menu" onClick={() => setMobileMenuOpen(o => !o)} className="p-2 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
-              <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all duration-200 ${mobileMenuOpen ? "rotate-45 translate-y-2" : ""}`} />
-              <div className={`w-5 h-0.5 bg-current mb-1.5 transition-all duration-200 ${mobileMenuOpen ? "opacity-0" : ""}`} />
-              <div className={`w-5 h-0.5 bg-current transition-all duration-200 ${mobileMenuOpen ? "-rotate-45 -translate-y-2" : ""}`} />
-            </button>
-          </div>
-        </div>
 
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[var(--border)] bg-[var(--card)]/98 backdrop-blur pb-3">
-            {NAV_ITEMS.map(item => (
-              <button key={item.id} onClick={() => go(item.id)}
-                className={`w-full text-left px-5 py-3 font-mono text-sm transition-all flex items-center gap-3 relative
-                  ${page === item.id ? "text-[#00e87a] bg-[#00e87a06]" : "text-[var(--muted)] hover:text-[var(--text)]"}`}>
-                {page === item.id && <span className="absolute left-0 top-2 bottom-2 w-0.5 bg-[#00e87a] rounded-full" />}
-                <span className="w-5 text-base">{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-            {user?.is_admin && (
-              <button onClick={() => go("admin")}
-                className={`w-full text-left px-5 py-3 font-mono text-sm flex items-center gap-3
-                  ${page === "admin" ? "text-[#a78bfa]" : "text-[var(--muted)] hover:text-[#a78bfa]"}`}>
-                <span className="w-5">⚙</span> Admin
-              </button>
-            )}
-            <button onClick={() => go("about")}
-              className={`w-full text-left px-5 py-3 font-mono text-sm flex items-center gap-3
-                ${page === "about" ? "text-[#00e87a]" : "text-[var(--muted)] hover:text-[var(--text)]"}`}>
-              <span className="w-5">ℹ</span> About
-            </button>
-            <button onClick={toggleTheme} className="w-full text-left px-5 py-3 font-mono text-sm flex items-center gap-3 text-[var(--muted)] hover:text-[var(--text)]">
-              <span className="w-5">{theme === "dark" ? "☀️" : "🌙"}</span>
-              {theme === "dark" ? "Light mode" : "Dark mode"}
-            </button>
-            <div className="mt-2 border-t border-[var(--border)] pt-2 px-4">
-              {!authChecked ? null : user ? (
-                <div className="py-2">
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <img src={`https://github.com/${user.github}.png?size=28`} alt={user.name} className="w-7 h-7 rounded-full object-cover"
-                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                    <span className="text-sm font-mono text-[var(--text)] truncate max-w-[160px]">{user.name}</span>
-                    {userStreak > 0 && (
-                      <span title={`${userStreak}-day streak`}
-                        className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[#f0b429] bg-[#f0b42912] border border-[#f0b42925] rounded-full px-1.5 py-0.5 shrink-0">
-                        🔥{userStreak}
-                      </span>
-                    )}
+              {/* Mobile Brand */}
+              <button
+                onClick={() => go("home")}
+                className="md:hidden flex items-center gap-2.5 text-left focus:outline-none"
+              >
+                <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-700/90 p-1 flex items-center justify-center shrink-0 shadow-sm">
+                  <img src="/logo.png" alt="BitByBit" className="w-full h-full object-contain" />
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-display font-bold text-base tracking-tight text-white leading-tight">
+                      BitByBit
+                    </span>
+                    <span className="text-[9px] font-mono font-semibold uppercase bg-indigo-500/20 text-indigo-300 px-1 py-0.2 rounded border border-indigo-500/30 leading-none">
+                      v3
+                    </span>
                   </div>
-                  <button onClick={() => go("profile")}
-                    className="w-full text-center py-2 mb-2 rounded-xl font-mono text-xs border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--border)] transition-colors">
-                    👤 My profile
+                  <span className="text-[10px] font-mono text-zinc-400 font-medium leading-tight">
+                    TeamCodeLocked
+                  </span>
+                </div>
+              </button>
+
+              {/* Dynamic Breadcrumbs */}
+              <div className="hidden sm:flex items-center gap-2 text-sm font-mono">
+                <span className="text-zinc-500">~</span>
+                <span className="text-zinc-600">/</span>
+                <span className="text-zinc-100 font-semibold flex items-center gap-1.5">
+                  {activeEntry.label}
+                </span>
+              </div>
+            </div>
+
+            {/* Center: Command Palette Trigger */}
+            <div className="hidden sm:flex items-center max-w-xs w-full mx-4">
+              <button
+                onClick={() => setSearchOpen(true)}
+                className="w-full flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-zinc-900/40 backdrop-blur-md border border-white/[0.08] text-zinc-400 hover:border-white/[0.16] hover:text-zinc-200 transition-colors text-sm font-mono shadow-sm group"
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <span>Quick search...</span>
+                </div>
+                <kbd className="text-xs font-mono bg-zinc-800/80 px-2 py-0.5 rounded-md border border-zinc-700 text-zinc-300 shadow-xs">
+                  ⌘K
+                </kbd>
+              </button>
+            </div>
+
+            {/* Right: Quick actions (Streak, Notifications, User Profile) */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSearchOpen(true)}
+                className="sm:hidden p-2 text-zinc-400 hover:text-zinc-100 rounded-lg hover:bg-zinc-800/60 transition-colors"
+                title="Search"
+                aria-label="Search"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </button>
+
+              {/* Streak Badge */}
+              {userStreak > 0 && (
+                <div
+                  title={`${userStreak}-day coding streak!`}
+                  className="flex items-center gap-1.5 text-xs font-mono font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg shadow-sm"
+                >
+                  <span>🔥</span>
+                  <span>{userStreak}d</span>
+                </div>
+              )}
+
+              {/* Notification / Contests Button */}
+              <div className="relative" ref={notifRef}>
+                <button
+                  onClick={() => setNotifOpen(o => !o)}
+                  aria-label="Notifications"
+                  className="relative p-2 text-zinc-400 hover:text-zinc-100 rounded-lg hover:bg-zinc-800/60 transition-colors"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  </svg>
+                  {liveCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-emerald-500 ring-2 ring-[var(--bg)]" />
+                  )}
+                </button>
+                {bellDropdown}
+              </div>
+
+              {/* User profile dropdown button */}
+              {!authChecked ? (
+                <div className="w-7 h-7 rounded-full bg-zinc-800 animate-pulse" />
+              ) : user ? (
+                <div className="relative" ref={profileRef}>
+                  <button
+                    onClick={() => setProfileOpen(o => !o)}
+                    aria-haspopup="menu"
+                    aria-expanded={profileOpen}
+                    aria-label="User menu"
+                    className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-zinc-800/60 transition-colors"
+                  >
+                    <img
+                      src={`https://github.com/${user.github}.png?size=64`}
+                      alt={user.name}
+                      className="w-7 h-7 rounded-full object-cover ring-1 ring-zinc-700"
+                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                    <svg className={`w-3 h-3 text-zinc-400 transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
                   </button>
+
+                  {/* Profile Dropdown */}
+                  {profileOpen && (
+                    <div
+                      role="menu"
+                      className="absolute right-0 top-11 w-60 bg-zinc-900/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down"
+                    >
+                      <div className="px-4 py-3 border-b border-white/[0.06] bg-zinc-950/40">
+                        <p className="text-xs font-mono font-medium text-zinc-100 truncate">{user.name}</p>
+                        <p className="text-[10px] font-mono text-zinc-400 truncate">@{user.github}</p>
+                      </div>
+
+                      <div className="py-1">
+                        <button
+                          role="menuitem"
+                          onClick={() => { setProfileOpen(false); go("profile"); }}
+                          className="w-full text-left px-4 py-2 text-xs font-mono text-zinc-300 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors flex items-center gap-2.5"
+                        >
+                          <IconProfile className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>My Profile & Stats</span>
+                        </button>
+                        <button
+                          role="menuitem"
+                          onClick={() => { setProfileOpen(false); go("profile"); }}
+                          className="w-full text-left px-4 py-2 text-xs font-mono text-zinc-300 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors flex items-center gap-2.5"
+                        >
+                          <svg className="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                            <line x1="8" y1="21" x2="16" y2="21" />
+                            <line x1="12" y1="17" x2="12" y2="21" />
+                          </svg>
+                          <span>Certificates</span>
+                        </button>
+                        <button
+                          role="menuitem"
+                          onClick={() => { setProfileOpen(false); switchAccount(); }}
+                          className="w-full text-left px-4 py-2 text-xs font-mono text-zinc-300 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors flex items-center gap-2.5"
+                        >
+                          <svg className="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 2v6h-6" />
+                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                            <path d="M3 22v-6h6" />
+                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+                          </svg>
+                          <span>Switch Account</span>
+                        </button>
+                      </div>
+
+                      <div className="border-t border-white/[0.06] pt-1">
+                        <button
+                          role="menuitem"
+                          onClick={() => { setProfileOpen(false); signOut(); }}
+                          className="w-full text-left px-4 py-2.5 text-xs font-mono text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2.5"
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                          </svg>
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={signIn}
+                  className="btn-primary text-xs py-1.5 px-3"
+                >
+                  Sign In
+                </button>
+              )}
+            </div>
+          </header>
+
+          {/* MAIN CONTENT AREA — full-bleed for workspace, padded for all other pages */}
+          {isFullBleed ? (
+            <main className="flex-1 w-full min-h-0">
+              {children}
+            </main>
+          ) : (
+            <main className="flex-1 w-full max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 py-8 md:py-10">
+              {children}
+            </main>
+          )}
+
+          {/* FOOTER */}
+          <footer className="border-t border-zinc-800/80 bg-zinc-950/60 py-6 px-4 sm:px-6 lg:px-8 mt-auto">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono text-zinc-400">
+              <div className="flex items-center gap-2">
+                <img src="/logo.png" alt="BitByBit" className="w-5 h-5 object-contain opacity-70" />
+                <span>
+                  © {new Date().getFullYear()} TeamCodeLocked · BMS College of Engineering
+                </span>
+              </div>
+              <div className="flex items-center gap-4">
+                <a
+                  href="https://www.instagram.com/teamcodelocked/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-zinc-200 transition-colors"
+                >
+                  Instagram
+                </a>
+                <button onClick={() => go("about")} className="hover:text-zinc-200 transition-colors">About & Legal</button>
+                <button onClick={() => go("privacy")} className="hover:text-zinc-200 transition-colors">Privacy</button>
+                <button onClick={() => go("terms")} className="hover:text-zinc-200 transition-colors">Terms</button>
+                <button onClick={() => go("refunds")} className="hover:text-zinc-200 transition-colors">Refunds</button>
+              </div>
+            </div>
+          </footer>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MOBILE DRAWER OVERLAY & SIDEBAR                                           */}
+      {/* ========================================================================= */}
+      {mobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm animate-fade-in"
+            onClick={() => setMobileDrawerOpen(false)}
+          />
+          <div className="relative w-72 max-w-[85vw] bg-zinc-950 border-r border-zinc-800 h-full flex flex-col z-10 animate-slide-right shadow-2xl">
+            {/* Drawer Header */}
+            <div className="h-16 px-4 flex items-center justify-between border-b border-zinc-800 bg-zinc-950">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-700/90 p-1 flex items-center justify-center shrink-0 shadow-md">
+                  <img src="/logo.png" alt="BitByBit" className="w-full h-full object-contain filter drop-shadow-sm" />
+                </div>
+                <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-2">
-                    <button onClick={() => { setMobileMenuOpen(false); switchAccount(); }}
-                      className="flex-1 text-center py-2 rounded-xl font-mono text-xs border border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:border-[var(--border)] transition-colors">
-                      🔁 Switch account
+                    <span className="font-display font-bold text-[17px] tracking-tight text-white leading-tight">
+                      BitByBit
+                    </span>
+                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded border border-indigo-500/30 leading-none">
+                      v3
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono text-zinc-400 font-medium tracking-tight truncate mt-0.5">
+                    TeamCodeLocked
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setMobileDrawerOpen(false)}
+                  className="p-2 text-zinc-400 hover:text-zinc-100 rounded-lg hover:bg-zinc-800/60 transition-colors font-mono text-sm"
+                  aria-label="Close menu"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Drawer Navigation */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {NAV_GROUPS.map((group, gIdx) => (
+                <div key={group.group + gIdx} className="space-y-1">
+                  <div className="px-3 pb-1 text-[10px] font-mono font-medium uppercase tracking-wider text-zinc-500">
+                    {group.group}
+                  </div>
+                  {group.items.map(item => {
+                    const isActive = page === item.id;
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => go(item.id)}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-mono text-xs transition-colors
+                          ${isActive
+                            ? "bg-zinc-800 text-zinc-100 font-medium border border-zinc-700/60"
+                            : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
+                          }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="flex-1 text-left">{item.label}</span>
+                        {item.badge && (
+                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${item.badgeColor || "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="p-4 border-t border-zinc-800 bg-zinc-900/50">
+              {user ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2.5">
+                    <img
+                      src={`https://github.com/${user.github}.png?size=64`}
+                      alt={user.name}
+                      className="w-7 h-7 rounded-full object-cover ring-1 ring-zinc-700"
+                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-mono font-medium text-zinc-100 truncate">{user.name}</p>
+                      <p className="text-[10px] font-mono text-zinc-500 truncate">@{user.github}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <button
+                      onClick={() => { setMobileDrawerOpen(false); switchAccount(); }}
+                      className="py-1.5 px-2 rounded-lg font-mono text-[10px] border border-zinc-800 text-zinc-400 hover:text-zinc-200 bg-transparent text-center"
+                    >
+                      Switch
                     </button>
-                    <button onClick={() => { setMobileMenuOpen(false); signOut(); }}
-                      className="flex-1 text-center py-2 rounded-xl font-mono text-xs border border-[var(--border)] text-[var(--muted)] hover:text-[#ff4d4d] hover:border-[#ff4d4d30] transition-colors">
-                      ⏻ Sign out
+                    <button
+                      onClick={() => { setMobileDrawerOpen(false); signOut(); }}
+                      className="py-1.5 px-2 rounded-lg font-mono text-[10px] border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 text-center"
+                    >
+                      Sign Out
                     </button>
                   </div>
                 </div>
               ) : (
-                <button onClick={signIn} className="w-full py-2.5 rounded-xl font-mono text-sm bg-[#00e87a] text-black font-bold">
-                  Sign in with GitHub
+                <button
+                  onClick={signIn}
+                  className="w-full btn-primary text-xs py-2"
+                >
+                  Sign In with GitHub
                 </button>
               )}
             </div>
           </div>
-        )}
-      </header>
-
-      <div className="border-b" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
-        <div className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 h-8 flex items-center gap-1.5 text-[11px] font-mono">
-          <span className="text-[#00e87a]">$</span>
-          <span style={{ color: "var(--muted2)" }}>cd</span>
-          <span style={{ color: "var(--text2)" }}>~/{NAV_ITEMS.find(i => i.id === page)?.label.toLowerCase() || page}</span>
-          <span className="w-1.5 h-3 bg-[#00e87a] cursor-blink inline-block ml-0.5" />
         </div>
-      </div>
+      )}
 
-      <main className="w-full px-4 sm:px-8 lg:px-16 xl:px-24 py-6 md:py-10">
-        {children}
-      </main>
-
-      <footer className="border-t border-[#161616] py-5 px-4 sm:px-8 lg:px-16 xl:px-24">
-        <div className="w-full flex items-center justify-between flex-wrap gap-3">
-          <span className="text-[11px] font-mono text-[#555]">
-            © {new Date().getFullYear()} Dhruv G Nayak · TeamCodeLocked · BMS College of Engineering
-          </span>
-          <div className="flex items-center gap-4">
-            <a href="https://www.instagram.com/teamcodelocked/" target="_blank" rel="noopener noreferrer"
-              className="text-[11px] font-mono text-[#666] hover:text-[#f0b429] transition-colors">
-              Instagram
-            </a>
-            <button onClick={() => go("about")} className="text-[11px] font-mono text-[#666] hover:text-[#00e87a] transition-colors">About & Legal</button>
-            <button onClick={() => go("privacy")} className="text-[11px] font-mono text-[#666] hover:text-[#00e87a] transition-colors">Privacy</button>
-            <button onClick={() => go("terms")} className="text-[11px] font-mono text-[#666] hover:text-[#00e87a] transition-colors">Terms</button>
-            <button onClick={() => go("refunds")} className="text-[11px] font-mono text-[#666] hover:text-[#00e87a] transition-colors">Refunds</button>
-          </div>
-        </div>
-      </footer>
-
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#080808]/98 backdrop-blur-xl border-t border-[#161616] flex z-40" style={{ boxShadow: "0 -1px 0 rgba(255,255,255,0.02)" }}>
-        {NAV_ITEMS.map(item => (
-          <button key={item.id} onClick={() => go(item.id)}
-            className={`flex-1 flex flex-col items-center py-3 gap-1 font-mono text-[10px] transition-all relative
-              ${page === item.id ? "text-[#00e87a]" : "text-[#555] hover:text-[#aaa]"}`}>
-            {page === item.id && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-[#00e87a] rounded-full" />}
-            <span className="text-base leading-none">{item.icon}</span>
-            <span className={page === item.id ? "font-bold" : ""}>{item.label}</span>
-          </button>
-        ))}
+      {/* ========================================================================= */}
+      {/* MOBILE BOTTOM THUMB BAR                                                   */}
+      {/* ========================================================================= */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800 flex items-center justify-around px-2 py-1.5 shadow-2xl">
+        {[
+          { id: "home" as PageId, label: "Home", icon: IconHome },
+          { id: "problems" as PageId, label: "Problems", icon: IconProblems },
+          { id: "arena" as PageId, label: "Arena", icon: IconArena, badge: liveCount > 0 },
+          { id: "leaderboard" as PageId, label: "Rankings", icon: IconLeaderboard },
+          { id: "profile" as PageId, label: "Profile", icon: IconProfile },
+        ].map(item => {
+          const isActive = page === item.id;
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              onClick={() => go(item.id)}
+              className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-lg transition-all relative font-mono text-[10px]
+                ${isActive ? "text-indigo-400 font-medium" : "text-zinc-400 hover:text-zinc-200"}`}
+            >
+              <div className="relative">
+                <Icon className="w-5 h-5" />
+                {item.badge && (
+                  <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                )}
+              </div>
+              <span className="mt-0.5 tracking-tight">{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
-      <div className="md:hidden h-16" />
+      <div className="md:hidden h-14" />
     </div>
   );
 }

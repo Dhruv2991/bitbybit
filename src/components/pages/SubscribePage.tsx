@@ -96,8 +96,8 @@ export default function SubscribePage({ user }: Props) {
 
   if (loading) return (
     <div className="flex flex-col items-center justify-center py-24 gap-3">
-      <div className="spinner" />
-      <span className="text-[#bbb] text-xs font-mono">Loading…</span>
+      <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+      <span className="text-zinc-400 text-xs font-mono">Loading…</span>
     </div>
   );
 
@@ -105,30 +105,30 @@ export default function SubscribePage({ user }: Props) {
   if (isActive) return (
     <div className="max-w-lg mx-auto py-12 text-center animate-fade-up">
       <div className="text-5xl mb-4">🎉</div>
-      <h1 className="font-display font-bold text-2xl text-[#e0e0e0] mb-2">You're subscribed!</h1>
-      <p className="text-[#777] font-mono text-sm mb-6">
+      <h1 className="font-display font-semibold text-2xl text-zinc-100 mb-2">You're subscribed!</h1>
+      <p className="text-zinc-400 font-sans text-sm mb-6">
         {expiryLabel ? `Active until ${expiryLabel}.` : "Monthly access active."} Renew before then to avoid losing access.
       </p>
-      <div className="bg-[#00e87a08] border border-[#00e87a20] rounded-2xl px-5 py-4 text-left space-y-2 mb-6">
+      <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl px-5 py-4 text-left space-y-2 mb-6 shadow-sm">
         <div className="flex items-center gap-2 text-xs font-mono">
-          <span className="text-[#00e87a]">✓</span>
-          <span className="text-[#bbb]">All weekly challenge problems unlocked</span>
+          <span className="text-emerald-400">✓</span>
+          <span className="text-zinc-300">All weekly challenge problems unlocked</span>
         </div>
         <div className="flex items-center gap-2 text-xs font-mono">
-          <span className="text-[#00e87a]">✓</span>
-          <span className="text-[#bbb]">Every future weekly challenge included</span>
+          <span className="text-emerald-400">✓</span>
+          <span className="text-zinc-300">Every future weekly challenge included</span>
         </div>
         <div className="flex items-center gap-2 text-xs font-mono">
-          <span className="text-[#00e87a]">✓</span>
-          <span className="text-[#bbb]">Free entry to every Arena contest</span>
+          <span className="text-emerald-400">✓</span>
+          <span className="text-zinc-300">Free entry to every Arena contest</span>
         </div>
       </div>
       {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === "true" && (
         <button
           onClick={handlePay}
           disabled={paying || fee === null}
-          className="px-5 py-2.5 bg-[#00e87a10] border border-[#00e87a30] text-[#00e87a] font-mono font-bold text-sm rounded-xl
-            hover:bg-[#00e87a18] active:scale-[0.98] transition-all disabled:opacity-40"
+          className="px-5 py-2.5 bg-indigo-600 text-white font-mono font-medium text-sm rounded-xl
+            hover:bg-indigo-500 active:scale-[0.98] transition-all disabled:opacity-40 shadow-sm"
         >
           {paying ? "Processing…" : `Renew early — ₹${fee ?? "—"}`}
         </button>
@@ -140,8 +140,8 @@ export default function SubscribePage({ user }: Props) {
   if (!user) return (
     <div className="max-w-lg mx-auto py-12 text-center animate-fade-up">
       <div className="text-5xl mb-4">🔒</div>
-      <h1 className="font-display font-bold text-2xl text-[#e0e0e0] mb-2">Sign in to subscribe</h1>
-      <p className="text-[#777] font-mono text-sm">
+      <h1 className="font-display font-semibold text-2xl text-zinc-100 mb-2">Sign in to subscribe</h1>
+      <p className="text-zinc-400 font-mono text-sm">
         Please sign in with GitHub to get monthly access.
       </p>
     </div>
@@ -156,10 +156,10 @@ export default function SubscribePage({ user }: Props) {
       {/* Header */}
       <div className="mb-8 text-center">
         <div className="text-4xl mb-3">⭐</div>
-        <h1 className="font-display font-bold text-2xl md:text-3xl text-[#e0e0e0] mb-2">
+        <h1 className="font-display font-semibold text-2xl md:text-3xl text-zinc-100 mb-2">
           {isLapsed ? "Renew Your Access" : "Monthly Access"}
         </h1>
-        <p className="text-[#777] font-mono text-sm">
+        <p className="text-zinc-400 font-sans text-sm">
           {isLapsed && expiryLabel
             ? `Your access ended on ${expiryLabel}. Renew to continue.`
             : "₹39/month · Unlock all weekly problems, Arena contests & AI features"}
@@ -167,34 +167,34 @@ export default function SubscribePage({ user }: Props) {
       </div>
 
       {/* What you get */}
-      <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-5 mb-6 space-y-3">
-        <p className="text-[10px] text-[#666] font-mono uppercase tracking-widest mb-3">What's included</p>
+      <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-5 mb-6 space-y-3 shadow-sm">
+        <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-3">What's included</p>
         {[
-          ["✓", "All current and future weekly challenge problems", "#00e87a"],
-          ["✓", "Free entry to every Arena contest", "#00e87a"],
-          ["✓", "Early-solver time bonus (solve earlier = more points)", "#00e87a"],
-          ["✓", "Weekly leaderboard participation", "#00e87a"],
-        ].map(([icon, text, color], i) => (
+          ["✓", "All current and future weekly challenge problems"],
+          ["✓", "Free entry to every Arena contest"],
+          ["✓", "Early-solver time bonus (solve earlier = more points)"],
+          ["✓", "Weekly leaderboard participation"],
+        ].map(([icon, text], i) => (
           <div key={i} className="flex items-start gap-3 text-xs font-mono">
-            <span style={{ color }} className="shrink-0 mt-0.5">{icon}</span>
-            <span className="text-[#bbb]">{text}</span>
+            <span className="text-emerald-400 shrink-0 mt-0.5">{icon}</span>
+            <span className="text-zinc-300">{text}</span>
           </div>
         ))}
       </div>
 
       {/* Payment card */}
-      <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl overflow-hidden">
+      <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden shadow-sm">
         {/* Price */}
-        <div className="px-5 py-4 border-b border-[#161616] text-center">
-          <div className="text-4xl font-display font-bold text-[#00e87a] mb-1">
+        <div className="px-5 py-4 border-b border-zinc-800/80 text-center">
+          <div className="text-4xl font-display font-bold text-indigo-400 mb-1">
             {fee !== null ? `₹${fee}` : "—"}
           </div>
-          <div className="text-[10px] font-mono text-[#555]">per month · 30 days of access</div>
+          <div className="text-xs font-mono text-zinc-400">per month · 30 days of access</div>
         </div>
 
         <div className="px-5 py-5">
           {err && (
-            <p className="text-[10px] text-[#ff4d4d] font-mono mb-3 text-center">{err}</p>
+            <p className="text-xs text-rose-400 font-mono mb-3 text-center">{err}</p>
           )}
 
           {process.env.NEXT_PUBLIC_PAYMENTS_LIVE === "true" ? (
@@ -202,22 +202,22 @@ export default function SubscribePage({ user }: Props) {
               <button
                 onClick={handlePay}
                 disabled={paying || fee === null}
-                className="w-full py-3 bg-[#00e87a] text-black font-mono font-bold text-sm rounded-xl
-                  hover:bg-[#00ff88] active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full py-2.5 bg-indigo-600 text-white font-mono font-medium text-sm rounded-xl
+                  hover:bg-indigo-500 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
               >
                 {paying ? "Processing…" : isLapsed ? `Renew — ₹${fee ?? "—"} →` : `Pay ₹${fee ?? "—"} →`}
               </button>
-              <p className="text-center text-[10px] text-[#444] font-mono mt-4">
+              <p className="text-center text-[11px] text-zinc-500 font-mono mt-4">
                 Secured by Razorpay · Cards, UPI, Netbanking, Wallets · Access unlocks instantly ·
                 Renews manually every 30 days — no auto-debit, ever
               </p>
             </>
           ) : (
             <div className="text-center py-2">
-              <div className="w-full py-3 bg-[#1a1a1a] text-[#666] font-mono font-bold text-sm rounded-xl cursor-not-allowed">
+              <div className="w-full py-2.5 bg-zinc-800 text-zinc-500 font-mono font-semibold text-sm rounded-xl cursor-not-allowed">
                 We'll be back soon
               </div>
-              <p className="text-[10px] text-[#555] font-mono mt-3">
+              <p className="text-xs text-zinc-500 font-mono mt-3">
                 Payments are temporarily unavailable while we finish setting things up. Check back shortly.
               </p>
             </div>

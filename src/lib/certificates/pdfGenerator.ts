@@ -4,11 +4,13 @@
 
 import { jsPDF } from 'jspdf';
 import QRCode from 'qrcode';
+import fs from 'fs';
+import path from 'path';
 import type { CertificateData } from './types';
 
 /**
- * Generates a high-quality, printable vector PDF certificate matching
- * the reference certificate visual design (BMSCE + TeamCodeLocked layout).
+ * Generates a high-resolution, printable PDF certificate based on the
+ * official master certificate base template image (/certificates/certificate-base.png).
  * 
  * Returns a Buffer of the generated PDF.
  */
@@ -25,199 +27,124 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
   const height = 210;
   const centerX = width / 2;
 
-  // 1. Background Canvas Fill (#FCFBF8 - Ivory)
-  doc.setFillColor(252, 251, 248);
-  doc.rect(0, 0, width, height, 'F');
+  // 1. Embed Official Certificate Base Background (Contains borders, seals, signatures, header)
+  try {
+    let templatePath = path.join(process.cwd(), 'public', 'certificates', 'certificate-base.png');
+    if (!fs.existsSync(templatePath)) {
+      templatePath = path.join(process.cwd(), 'public', 'certificates', 'certificate-template.png');
+    }
 
-  // 2. Double Border Design
-  // Outer Gold Border
-  doc.setDrawColor(191, 162, 104); // #BFA268 Gold
-  doc.setLineWidth(1.0);
-  doc.rect(9, 9, width - 18, height - 18);
+    if (fs.existsSync(templatePath)) {
+      const templateBuffer = fs.readFileSync(templatePath);
+      const templateBase64 = `data:image/png;base64,${templateBuffer.toString('base64')}`;
+      doc.addImage(templateBase64, 'PNG', 0, 0, width, height, undefined, 'FAST');
+    } else {
+      doc.setFillColor(255, 255, 255);
+      doc.rect(0, 0, width, height, 'F');
+    }
+  } catch (err) {
+    console.error('[pdfGenerator] Error loading certificate template image:', err);
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, width, height, 'F');
+  }
 
-  // Inner Charcoal Border
-  doc.setDrawColor(40, 40, 40); // #282828
-  doc.setLineWidth(0.35);
-  doc.rect(11.5, 11.5, width - 23, height - 23);
+  // 2. Optional Custom Title Overlay (if not CERTIFICATE OF ACHIEVEMENT)
+  const isCustomTitle = Boolean(
+    data.title &&
+    data.title.toUpperCase() !== 'CERTIFICATE OF ACHIEVEMENT' &&
+    data.title !== 'Certificate of Achievement'
+  );
 
-  // Decorative Corner Accents
-  doc.setDrawColor(191, 162, 104);
-  doc.setLineWidth(0.8);
-  // Top-left
-  doc.line(14, 14, 25, 14);
-  doc.line(14, 14, 14, 25);
-  // Top-right
-  doc.line(width - 25, 14, width - 14, 14);
-  doc.line(width - 14, 14, width - 14, 25);
-  // Bottom-left
-  doc.line(14, height - 14, 25, height - 14);
-  doc.line(14, height - 14, 14, height - 25);
-  // Bottom-right
-  doc.line(width - 25, height - 14, width - 14, height - 14);
-  doc.line(width - 14, height - 14, width - 14, height - 25);
+  if (isCustomTitle) {
+    doc.setFillColor(255, 255, 255);
+    doc.rect(40, 56, width - 80, 14, 'F');
+    doc.setTextColor(17, 24, 39);
+    doc.setFont('times', 'bold');
+    doc.setFontSize(22);
+    doc.text(data.title.toUpperCase(), centerX, 66, { align: 'center' });
+  }
 
-  // 3. Institution Header (BMS College of Engineering)
-  doc.setTextColor(20, 20, 20);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(16);
-  doc.text('BMS COLLEGE OF ENGINEERING', centerX, 24, { align: 'center' });
+  // 3. Dynamic Recipient Name - Centered precisely on the blank area under 'PRESENTED TO'
+  doc.setTextColor(9, 9, 11);
+  doc.setFont('times', 'bolditalic');
+  doc.setFontSize(34);
+  doc.text(data.recipientName || 'Recipient Name', centerX, 104, { align: 'center' });
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(70, 70, 70);
-  doc.text('ESTD .1946 AUTONOMOUS INSTITUTE, AFFILIATED TO VTU', centerX, 29.5, { align: 'center' });
+  // 4. Recognition Statement & Event/Date
+  const displayDate = data.dateStr || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const org = data.organizationText || 'from teamcodelocked club';
+  const event = data.eventName || 'BitByBit Weekly Contest';
+  let ach = data.achievementText || 'securing 1st Place for the';
 
-  // 4. Header Decorative Badges / Logos (Vector approximations)
-  // Left: BMSCE Emblem vector circle
-  doc.setDrawColor(30, 30, 30);
-  doc.setLineWidth(0.4);
-  doc.circle(28, 26, 9, 'S');
-  doc.circle(28, 26, 7.8, 'S');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(4);
+  let bodyText = data.customDescription;
+  if (!bodyText) {
+    const achClean = ach.trim();
+    const eventClean = event.trim();
+    const hasEvent = achClean.toLowerCase().includes(eventClean.toLowerCase());
+    const eventSuffix = hasEvent ? '' : ` ${eventClean}`;
+
+    if (achClean.toLowerCase().startsWith('in recognition of')) {
+      bodyText = `${org} ${achClean}${eventSuffix} ORGANISED IN ${displayDate.toUpperCase()}`;
+    } else if (achClean.toLowerCase().startsWith('for active participation') || achClean.toLowerCase().startsWith('for participating')) {
+      bodyText = `${org} ${achClean}${hasEvent ? '' : ` in the ${eventClean}`} ORGANISED IN ${displayDate.toUpperCase()}`;
+    } else {
+      bodyText = `${org} in recognition of ${achClean}${eventSuffix} ORGANISED IN ${displayDate.toUpperCase()}`;
+    }
+  }
+
   doc.setTextColor(30, 30, 30);
-  doc.text('B.M.S.', 28, 24.5, { align: 'center' });
-  doc.setFontSize(3.2);
-  doc.text('ENGINEERING', 28, 27.5, { align: 'center' });
-  doc.text('BANGALORE', 28, 30, { align: 'center' });
-
-  // Right: TeamCodeLocked Hexagon
-  const hexX = width - 28;
-  const hexY = 26;
-  const r = 9;
-  const points: [number, number][] = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i + Math.PI / 6;
-    points.push([hexX + r * Math.cos(angle), hexY + r * Math.sin(angle)]);
-  }
-  doc.setDrawColor(30, 30, 30);
-  doc.setLineWidth(0.4);
-  for (let i = 0; i < 6; i++) {
-    const next = (i + 1) % 6;
-    doc.line(points[i][0], points[i][1], points[next][0], points[next][1]);
-  }
-  doc.setFont('courier', 'bold');
-  doc.setFontSize(4.5);
-  doc.setTextColor(20, 20, 20);
-  doc.text('CODELOCKED', hexX, hexY + 1.2, { align: 'center' });
-
-  // 5. Main Title
-  doc.setTextColor(15, 15, 15);
-  doc.setFont('times', 'bold');
-  doc.setFontSize(22);
-  doc.text(data.title || 'CERTIFICATE OF ACHIEVEMENT', centerX, 49, { align: 'center' });
-
-  // 6. "PRESENTED TO" Subtitle
-  doc.setTextColor(90, 90, 90);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('P R E S E N T E D   T O', centerX, 59, { align: 'center' });
-
-  // 7. Recipient Name (Visual Focal Point)
-  doc.setTextColor(10, 10, 10);
-  doc.setFont('times', 'italic');
-  doc.setFontSize(28);
-  doc.text(data.recipientName || 'Recipient Name', centerX, 77, { align: 'center' });
-
-  // Stylized Name Underline
-  doc.setDrawColor(191, 162, 104);
-  doc.setLineWidth(0.5);
-  doc.line(centerX - 45, 81, centerX + 45, 81);
-
-  // 8. Recognition Statement & Event Information
-  doc.setTextColor(35, 35, 35);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10.5);
-  const line1 = `${data.organizationText || 'from teamcodelocked club'} in recognition of securing ${data.achievementText || 'outstanding performance'} for the`;
-  doc.text(line1, centerX, 93, { align: 'center' });
+  doc.setFontSize(19.5);
+  doc.setLineHeightFactor(1.35);
+  const wrappedBody = doc.splitTextToSize(bodyText, width - 90);
+  const bodyY = 119;
+  doc.text(wrappedBody, centerX, bodyY, { align: 'center' });
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(15, 15, 15);
-  const line2 = `${data.eventName || 'Bit By Bit Contest'} ORGANISED in ${data.dateStr || new Date().getFullYear()}`;
-  doc.text(line2, centerX, 100, { align: 'center' });
+  const numLines = Array.isArray(wrappedBody) ? wrappedBody.length : 1;
+  const activityY = bodyY + (numLines * 9.2) + 4;
 
-  // 9. Activity Points Statement
-  if (data.activityPointsText) {
-    doc.setTextColor(80, 80, 80);
+  // 5. Activity Points Disclaimer
+  const activityText = data.activityPointsText !== undefined
+    ? data.activityPointsText
+    : 'This certificate is eligible for claiming 1-2 activity points.';
+
+  if (activityText) {
+    doc.setTextColor(70, 70, 75);
     doc.setFont('times', 'italic');
-    doc.setFontSize(9.5);
-    doc.text(data.activityPointsText, centerX, 112, { align: 'center' });
+    doc.setFontSize(14.5);
+    doc.text(activityText, centerX, activityY, { align: 'center' });
   }
 
-  // 10. Coordinators / Signatories (3 Columns)
-  const coordinators = (data.coordinators && data.coordinators.length >= 3)
-    ? data.coordinators.slice(0, 3)
-    : [
-        { name: 'PROF. NAMRATHA M.', title: 'FACULTY CLUB COORDINATOR', org: 'TEAMCODELOCKED', signatureText: 'Namratha M' },
-        { name: 'PANNAG K', title: 'STUDENT CLUB COORDINATOR', org: 'TEAMCODELOCKED', signatureText: 'PannagK' },
-        { name: 'AAKANSHYA AGARWAL', title: 'STUDENT CLUB COORDINATOR', org: 'TEAMCODELOCKED', signatureText: 'Aakanshya' },
-      ];
-
-  const colPositions = [55, centerX, width - 55];
-  const sigY = 146;
-
-  coordinators.forEach((coord, idx) => {
-    const colX = colPositions[idx];
-
-    // Cursive signature representation
-    doc.setFont('times', 'italic');
-    doc.setFontSize(15);
-    doc.setTextColor(25, 25, 25);
-    doc.text(coord.signatureText || coord.name.split(' ')[0] || 'Signature', colX, sigY, { align: 'center' });
-
-    // Underline
-    doc.setDrawColor(40, 40, 40);
-    doc.setLineWidth(0.35);
-    doc.line(colX - 25, sigY + 3, colX + 25, sigY + 3);
-
-    // Name
+  // 6. Revoked Watermark (if status is revoked)
+  if (data.status === 'revoked') {
+    doc.setTextColor(220, 38, 38);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(20, 20, 20);
-    doc.text(coord.name, colX, sigY + 8, { align: 'center' });
+    doc.setFontSize(44);
+    doc.text('REVOKED', centerX, height / 2, { align: 'center', angle: -20 });
+  }
 
-    // Title
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(80, 80, 80);
-    doc.text(coord.title, colX, sigY + 12, { align: 'center' });
-
-    // Org
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6);
-    doc.setTextColor(110, 110, 110);
-    doc.text(coord.org, colX, sigY + 15.5, { align: 'center' });
-  });
-
-  // 11. Verification QR Code & Certificate ID
+  // 7. Verification QR Code (Bottom-Right)
   const verifyUrl = data.verificationUrl || `${process.env.NEXT_PUBLIC_SITE_URL || 'https://bitbybit.club'}/certificate/${data.certificateId}`;
   try {
     const qrDataUrl = await QRCode.toDataURL(verifyUrl, {
       margin: 1,
-      width: 120,
-      color: { dark: '#111111', light: '#FCFBF8' },
+      width: 140,
+      color: { dark: '#111111', light: '#FFFFFF' },
     });
-    // Add QR code to bottom-right
-    doc.addImage(qrDataUrl, 'PNG', width - 34, height - 34, 18, 18);
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(5.5);
-    doc.setTextColor(110, 110, 110);
-    doc.text('Scan to Verify', width - 25, height - 13.5, { align: 'center' });
+    doc.addImage(qrDataUrl, 'PNG', width - 29, height - 29, 17, 17);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+    doc.text('Scan to Verify', width - 20.5, height - 8.5, { align: 'center' });
   } catch (err) {
     console.error('[pdfGenerator] QR code generation error:', err);
   }
 
-  // Bottom-left Certificate ID
+  // 8. Bottom-Left Certificate ID
   doc.setFont('courier', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(80, 80, 80);
-  doc.text(`ID: ${data.certificateId}`, 16, height - 18);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(130, 130, 130);
-  doc.text('Bit by Bit Platform • BMSCE TeamCodeLocked', 16, height - 14);
+  doc.setFontSize(10);
+  doc.setTextColor(70, 70, 70);
+  doc.text(`ID: ${data.certificateId}`, 14, height - 8.5);
 
   // Return PDF as Buffer
   const arrayBuffer = doc.output('arraybuffer');

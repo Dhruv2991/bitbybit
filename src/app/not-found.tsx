@@ -4,20 +4,17 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-transparent flex items-center justify-center px-4">
       <div className="text-center max-w-md">
-        <div className="font-mono text-[#00e87a] text-sm mb-3 opacity-70">
-          $ cd /this-page
+        <div className="font-mono text-indigo-400 text-xs mb-3 font-medium">
+          404 &mdash; Page Not Found
         </div>
-        <h1 className="font-display font-extrabold text-7xl text-[#f1f3f8] mb-2 glow-text">
+        <h1 className="text-6xl font-bold tracking-tight text-zinc-100 mb-3">
           404
         </h1>
-        <p className="font-mono text-sm text-[#666] mb-1">
-          bash: page: command not found
+        <p className="font-mono text-xs text-zinc-400 mb-6">
+          The page you requested does not exist or has been moved.
         </p>
-        <p className="font-mono text-xs text-[#4a5268] mb-8">
-          Whatever you&apos;re looking for isn&apos;t at this address.
-        </p>
-        <Link href="/" className="btn-primary inline-block">
-          $ cd ~
+        <Link href="/" className="inline-flex items-center justify-center px-4 py-2 text-xs font-mono font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors">
+          Return to Dashboard
         </Link>
       </div>
     </div>

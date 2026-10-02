@@ -154,27 +154,27 @@ function CommentInput({
         }}
         placeholder={placeholder}
         rows={3}
-        className="w-full bg-[#060606] border border-[#1a1a1a] rounded-xl px-3.5 py-2.5
-          text-[#e0e0e0] text-sm font-mono placeholder-[#2a2a2a] resize-none
-          focus:outline-none focus:border-[#00e87a30] transition-colors"
+        className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5
+          text-zinc-200 text-sm font-mono placeholder-zinc-500 resize-none
+          focus:outline-none focus:border-indigo-500 transition-colors"
       />
 
       {/* Spoiler warning */}
       {spoilerWarn && (
-        <div className="bg-[#f0b42908] border border-[#f0b42925] rounded-xl p-3.5 space-y-2.5">
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3.5 space-y-2.5">
           <div className="flex items-start gap-2">
-            <span className="text-[#f0b429] text-base shrink-0">⚠️</span>
+            <span className="text-amber-400 text-base shrink-0">⚠️</span>
             <div>
-              <p className="text-xs font-mono font-bold text-[#f0b429] mb-1">
+              <p className="text-xs font-mono font-bold text-amber-400 mb-1">
                 This might be a spoiler
               </p>
               {spoilerWarn.reason && (
-                <p className="text-[10px] font-mono text-[#bbb] leading-relaxed">
+                <p className="text-[10px] font-mono text-zinc-300 leading-relaxed">
                   {spoilerWarn.reason}
                 </p>
               )}
               {spoilerWarn.suggestion && (
-                <p className="text-[10px] font-mono text-[#777] leading-relaxed mt-1">
+                <p className="text-[10px] font-mono text-zinc-400 leading-relaxed mt-1">
                   💡 {spoilerWarn.suggestion}
                 </p>
               )}
@@ -183,18 +183,18 @@ function CommentInput({
           <div className="flex gap-2">
             <button
               onClick={() => { setSpoilerWarn(null); setPendingBody(''); }}
-              className="flex-1 py-2 text-xs font-mono font-bold bg-[#1a1a1a] text-[#ccc]
-                rounded-lg hover:bg-[#222] transition-all border border-[#2a2a2a]"
+              className="flex-1 py-2 text-xs font-mono font-medium bg-zinc-900 text-zinc-300
+                rounded-lg hover:bg-zinc-800 transition-colors border border-zinc-800"
             >
               ✏ Edit comment
             </button>
             <button
               onClick={() => doPost(pendingBody)}
               disabled={posting}
-              className="flex-1 py-2 text-xs font-mono font-bold bg-[#f0b429] text-black
-                rounded-lg hover:bg-[#fbbf24] disabled:opacity-50 transition-all"
+              className="flex-1 py-2 text-xs font-mono font-semibold bg-amber-500 hover:bg-amber-400 text-zinc-950
+                rounded-lg disabled:opacity-50 transition-colors"
             >
-              Post anyway →
+              Post anyway &rarr;
             </button>
           </div>
         </div>
@@ -202,12 +202,12 @@ function CommentInput({
 
       {!spoilerWarn && (
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-[#444] font-mono">Ctrl+Enter to post</span>
+          <span className="text-[10px] text-zinc-500 font-mono">Ctrl+Enter to post</span>
           <div className="flex gap-2">
             {onCancel && (
               <button
                 onClick={onCancel}
-                className="px-3 py-1.5 text-xs font-mono text-[#555] hover:text-[#999] transition-colors"
+                className="px-3 py-1.5 text-xs font-mono text-zinc-400 hover:text-zinc-200 transition-colors"
               >
                 Cancel
               </button>
@@ -215,8 +215,8 @@ function CommentInput({
             <button
               onClick={handleSubmit}
               disabled={!body.trim() || posting || checking}
-              className="px-4 py-1.5 bg-[#00e87a] text-black text-xs font-mono font-bold rounded-lg
-                hover:bg-[#00ff88] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="px-4 py-1.5 bg-indigo-600 text-white text-xs font-mono font-medium rounded-lg
+                hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {checking ? '✦ Checking…' : posting ? 'Posting…' : 'Post'}
             </button>
@@ -257,24 +257,24 @@ function CommentCard({
 
   return (
     <div className={`${depth > 0 ? 'ml-8 mt-2' : ''}`}>
-      <div className={`flex gap-3 group ${depth > 0 ? 'bg-[#060606] border border-[#141414]' : 'bg-[#0a0a0a] border border-[#161616]'} rounded-2xl p-3.5`}>
+      <div className={`flex gap-3 group ${depth > 0 ? 'bg-zinc-900/30 border border-zinc-800/60' : 'bg-zinc-900/50 border border-zinc-800/80'} rounded-2xl p-3.5`}>
         <Avatar github={comment.github} size={depth > 0 ? 24 : 28} />
         <div className="flex-1 min-w-0">
           {/* Header */}
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
-            <span className="text-xs font-mono font-bold text-[#e0e0e0]">{comment.name}</span>
-            <span className="text-[10px] font-mono text-[#444]">@{comment.github}</span>
+            <span className="text-xs font-mono font-semibold text-zinc-200">{comment.name}</span>
+            <span className="text-[10px] font-mono text-zinc-500">@{comment.github}</span>
             {isSolved && (
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md
-                bg-[#00e87a12] text-[#00e87a] border border-[#00e87a20]">
+              <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded-md
+                bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 ✓ Solved
               </span>
             )}
-            <span className="text-[10px] font-mono text-[#444] ml-auto">{timeAgo(comment.created_at)}</span>
+            <span className="text-[10px] font-mono text-zinc-500 ml-auto">{timeAgo(comment.created_at)}</span>
           </div>
 
           {/* Body */}
-          <p className="text-sm font-mono text-[#bbb] leading-relaxed whitespace-pre-wrap break-words">
+          <p className="text-sm font-mono text-zinc-300 leading-relaxed whitespace-pre-wrap break-words">
             {comment.body}
           </p>
 
@@ -284,7 +284,7 @@ function CommentCard({
             {depth === 0 && user && (
               <button
                 onClick={() => setShowReplyBox(v => !v)}
-                className="text-[10px] font-mono text-[#555] hover:text-[#00e87a] transition-colors"
+                className="text-[10px] font-mono text-zinc-400 hover:text-indigo-400 transition-colors"
               >
                 {showReplyBox ? 'Cancel' : '↩ Reply'}
               </button>
@@ -294,7 +294,7 @@ function CommentCard({
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="text-[10px] font-mono text-[#555] hover:text-[#ff4d4d] transition-colors ml-auto opacity-0 group-hover:opacity-100"
+                className="text-[10px] font-mono text-zinc-500 hover:text-rose-400 transition-colors ml-auto opacity-0 group-hover:opacity-100"
               >
                 {deleting ? 'Deleting…' : 'Delete'}
               </button>
@@ -439,12 +439,12 @@ export default function ProblemDiscussion({ problemId, problemTitle, user }: Pro
   const totalCount = comments.reduce((n, c) => n + 1 + (c.replies?.length || 0), 0);
 
   return (
-    <div className="col-span-full border-t border-[#141414] mt-2 pt-6 pb-8 px-5 md:px-6">
+    <div className="col-span-full border-t border-zinc-800/80 mt-2 pt-6 pb-8 px-5 md:px-6">
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
-        <h3 className="font-display font-bold text-[#e0e0e0] text-base">Discussion</h3>
+        <h3 className="font-semibold text-zinc-100 text-base">Discussion</h3>
         {!loading && totalCount > 0 && (
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-lg bg-[#141414] border border-[#1f1f1f] text-[#666]">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-zinc-400">
             {totalCount} comment{totalCount !== 1 ? 's' : ''}
           </span>
         )}
@@ -463,21 +463,21 @@ export default function ProblemDiscussion({ problemId, problemTitle, user }: Pro
           </div>
         </div>
       ) : (
-        <div className="mb-6 px-4 py-3 bg-[#0a0a0a] border border-[#161616] rounded-xl text-xs font-mono text-[#555] text-center">
+        <div className="mb-6 px-4 py-3 bg-zinc-900/40 border border-zinc-800 rounded-xl text-xs font-mono text-zinc-400 text-center">
           Sign in to join the discussion
         </div>
       )}
 
       {/* Comments */}
       {loading ? (
-        <div className="flex items-center gap-2 text-[#555] font-mono text-xs py-4">
-          <div className="w-3.5 h-3.5 border-2 border-[#333] border-t-[#555] rounded-full animate-spin" />
+        <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs py-4">
+          <div className="w-3.5 h-3.5 border-2 border-zinc-700 border-t-indigo-500 rounded-full animate-spin" />
           Loading discussion…
         </div>
       ) : comments.length === 0 ? (
         <div className="text-center py-10">
           <div className="text-3xl mb-2 opacity-20">💬</div>
-          <div className="text-[#555] font-mono text-xs">No comments yet — be the first!</div>
+          <div className="text-zinc-500 font-mono text-xs">No comments yet — be the first!</div>
         </div>
       ) : (
         <div className="space-y-3">

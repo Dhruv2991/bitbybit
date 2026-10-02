@@ -28,11 +28,11 @@ export default function LangTabs({ current, onChange, allowedLangs }: LangTabsPr
             key={id}
             onClick={() => onChange(id)}
             className={`
-              flex items-center justify-center sm:justify-start gap-1.5 px-3 py-2 rounded-xl
+              flex items-center justify-center sm:justify-start gap-1.5 px-3 py-1.5 rounded-lg
               text-xs font-mono font-medium transition-all duration-150 border
               ${isActive
-                ? 'bg-[#00e87a15] text-[#00e87a] border-[#00e87a30] font-bold'
-                : 'bg-[#0d0d0d] text-[#555] border-[#1a1a1a] hover:text-[#e0e0e0] hover:border-[#2a2a2a] hover:bg-[#161616]'}
+                ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold shadow-sm'
+                : 'bg-zinc-900/50 text-zinc-400 border-zinc-800/80 hover:text-zinc-200 hover:border-zinc-700 hover:bg-zinc-800/40'}
             `}
           >
             <span className="text-sm leading-none">{icon}</span>

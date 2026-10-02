@@ -1,199 +1,77 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
-import type { User } from '@/types/database';
+import type { User, Problem } from '@/types/database';
+import { effectiveStreak } from '@/lib/streak';
+
+import WelcomeHero from '@/components/home/WelcomeHero';
+import DashboardMetrics from '@/components/home/DashboardMetrics';
+import ProblemOfTheDay from '@/components/home/ProblemOfTheDay';
+import ProgressOverview from '@/components/home/ProgressOverview';
+import ContinueLearning from '@/components/home/ContinueLearning';
+import RecentActivity from '@/components/home/RecentActivity';
+import LeaderboardPreview from '@/components/home/LeaderboardPreview';
+import QuickActions from '@/components/home/QuickActions';
 
 interface HomePageProps {
-  user:       User | null;
+  user: User | null;
   onNavigate: (page: any) => void;
 }
 
-// Animated counter hook
-function useCountUp(target: number, duration = 1200) {
-  const [val, setVal] = useState(0);
-  const started = useRef(false);
-  useEffect(() => {
-    if (!target || started.current) return;
-    started.current = true;
-    const start = performance.now();
-    function step(now: number) {
-      const p = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setVal(Math.floor(eased * target));
-      if (p < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-  }, [target, duration]);
-  return val;
-}
-
-function StatCard({ value, label, delay }: { value: string; label: string; delay: number }) {
-  const num = parseInt(value) || 0;
-  const counted = useCountUp(num, 1400);
-  const isLoaded = value !== undefined;
-  return (
-    <div className="text-center animate-counter-up" style={{ animationDelay: `${delay}ms` }}>
-      <div className="text-2xl sm:text-3xl md:text-4xl font-display font-extrabold stat-glow text-[#00e87a] tabular-nums">
-        {isLoaded ? (num > 0 ? counted.toLocaleString() : value) : (
-          <span className="inline-block w-14 h-9 bg-[#1a1a1a] rounded-lg animate-pulse" />
-        )}
-      </div>
-      <div className="text-[10px] text-[#555] font-mono mt-2 tracking-[0.2em] uppercase">{label}</div>
-    </div>
-  );
-}
-
-// Floating terminal snippet
-function TerminalSnippet() {
-  const lines = [
-    { text: '$ run solution.py', color: '#00e87a', delay: 0 },
-    { text: 'Testing... 5/5 passed ✓', color: '#e2e2e2', delay: 300 },
-    { text: 'Points awarded: +187 pts', color: '#a78bfa', delay: 600 },
-    { text: 'Rank updated: #3 → #1 🏆', color: '#f0b429', delay: 900 },
-  ];
-  return (
-    <div className="animate-float" style={{ animationDelay: '500ms' }}>
-      <div className="bg-[#0a0a0a] border border-[#1c1c1c] rounded-2xl overflow-hidden w-72 shadow-2xl">
-        {/* Terminal title bar */}
-        <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-[#1c1c1c]">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#ff4d4d]" />
-          <span className="w-2.5 h-2.5 rounded-full bg-[#f0b429]" />
-          <span className="w-2.5 h-2.5 rounded-full bg-[#00e87a]" />
-          <span className="ml-2 text-[10px] font-mono text-[#333]">bit-by-bit ~ arena</span>
-        </div>
-        <div className="p-4 space-y-2 font-mono text-xs">
-          {lines.map((l, i) => (
-            <div key={i} className="animate-fade-up" style={{ animationDelay: `${800 + l.delay}ms` }}>
-              <span style={{ color: l.color }}>{l.text}</span>
-            </div>
-          ))}
-          <div className="flex items-center gap-1 animate-fade-up" style={{ animationDelay: '2000ms' }}>
-            <span className="text-[#00e87a]">$</span>
-            <span className="w-2 h-3.5 bg-[#00e87a] cursor-blink inline-block ml-0.5" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Live activity ticker — pulls real recent solves from Supabase and
-// updates instantly via Realtime when a new one comes in, instead of
-// cycling canned placeholder strings.
-function ActivityTicker({ members }: { members: number }) {
-  const db = getSupabaseClient();
-  const fallback = `👥 ${members} coders active this week`;
-  const [items, setItems] = useState<string[]>([]);
-  const [idx, setIdx] = useState(0);
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadRecent() {
-      const [{ data: subs }, { data: weekly }, { data: arena }] = await Promise.all([
-        db.from('submissions').select('name, github, problem_id, problem_title, created_at')
-          .eq('status', 'approved').order('created_at', { ascending: false }).limit(5),
-        // eslint-disable-next-line
-        (db.from('weekly_submissions') as any).select('name, github, problem_id, problem_title, submitted_at')
-          .eq('status', 'approved').order('submitted_at', { ascending: false }).limit(5),
-        // eslint-disable-next-line
-        (db.from('arena_submissions') as any).select('name, github, problem_id, problem_title, created_at')
-          .eq('status', 'reviewed').order('created_at', { ascending: false }).limit(5),
-      ]);
-
-      const combinedRaw = [
-        ...(subs || []).map((s: any) => ({ who: s.name || s.github, github: s.github, problemId: s.problem_id, what: s.problem_title, when: s.created_at })),
-        ...(weekly || []).map((s: any) => ({ who: s.name || s.github, github: s.github, problemId: s.problem_id, what: s.problem_title, when: s.submitted_at })),
-        ...(arena || []).map((s: any) => ({ who: s.name || s.github, github: s.github, problemId: s.problem_id, what: s.problem_title, when: s.created_at })),
-      ]
-        .filter(r => r.who && r.what)
-        .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
-        .slice(0, 6);
-
-      // "Blood First" check — for just these 6 recent items, was each
-      // one the very first approved solve of that problem anywhere on
-      // the platform? Scoped to a tiny set of problem_ids so this stays
-      // cheap even as total submissions grow.
-      const ids = [...new Set(combinedRaw.map(r => r.problemId).filter(Boolean))];
-      const firstSolvers = new Map<string, string>();
-      if (ids.length > 0) {
-        const [{ data: s2 }, { data: w2 }, { data: a2 }] = await Promise.all([
-          db.from('submissions').select('github, problem_id, created_at').eq('status', 'approved').in('problem_id', ids),
-          // eslint-disable-next-line
-          (db.from('weekly_submissions') as any).select('github, problem_id, submitted_at').eq('status', 'approved').in('problem_id', ids),
-          // eslint-disable-next-line
-          (db.from('arena_submissions') as any).select('github, problem_id, created_at').eq('status', 'reviewed').in('problem_id', ids),
-        ]);
-        const all = [
-          ...(s2 || []).map((r: any) => ({ github: r.github, pid: r.problem_id, when: r.created_at })),
-          ...(w2 || []).map((r: any) => ({ github: r.github, pid: r.problem_id, when: r.submitted_at })),
-          ...(a2 || []).map((r: any) => ({ github: r.github, pid: r.problem_id, when: r.created_at })),
-        ];
-        const earliest = new Map<string, { github: string; when: number }>();
-        for (const r of all) {
-          const t = new Date(r.when).getTime();
-          const cur = earliest.get(r.pid);
-          if (!cur || t < cur.when) earliest.set(r.pid, { github: r.github, when: t });
-        }
-        earliest.forEach((v, k) => firstSolvers.set(k, v.github));
-      }
-
-      const combined = combinedRaw.map(r =>
-        firstSolvers.get(r.problemId) === r.github
-          ? `🩸 ${r.who} got Blood First on ${r.what}`
-          : `🔥 ${r.who} just solved ${r.what}`
-      );
-
-      if (!cancelled) setItems(combined.length > 0 ? combined : [fallback]);
-    }
-
-    loadRecent();
-
-    // Re-pull the moment any new approved solve lands, so the very
-    // latest real activity shows up without waiting for a page refresh.
-    const channel = db
-      .channel('home-activity-ticker')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'submissions' }, loadRecent)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'weekly_submissions' }, loadRecent)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'arena_submissions' }, loadRecent)
-      .subscribe();
-
-    return () => { cancelled = true; db.removeChannel(channel); };
-  }, [db]);
-
-  useEffect(() => {
-    if (items.length <= 1) return;
-    const interval = setInterval(() => {
-      setVisible(false);
-      setTimeout(() => {
-        setIdx(i => (i + 1) % items.length);
-        setVisible(true);
-      }, 300);
-    }, 3500);
-    return () => clearInterval(interval);
-  }, [items.length]);
-
-  const current = items[idx] || fallback;
-
-  return (
-    <div className="flex items-center gap-2.5 bg-[#0f0f0f] border border-[#1c1c1c] px-4 py-2 rounded-full max-w-xs overflow-hidden">
-      <span className="live-dot shrink-0" />
-      <span
-        className="text-[11px] font-mono text-[#666] truncate transition-opacity duration-300"
-        style={{ opacity: visible ? 1 : 0 }}
-      >
-        {current}
-      </span>
-    </div>
-  );
-}
+const TOPIC_ICONS: Record<string, string> = {
+  Arrays: '📦',
+  'Arrays & Matrix': '📦',
+  Strings: '🔤',
+  'Linked List': '🔗',
+  'Trees & BST': '🌳',
+  Trees: '🌳',
+  Graphs: '🕸️',
+  'Dynamic Programming': '⚡',
+  DP: '⚡',
+  'Binary Search': '🔍',
+  Math: '📐',
+  Recursion: '🔄',
+  Greedy: '🎯',
+  'Bit Manipulation': '💻',
+};
 
 export default function HomePage({ user, onNavigate }: HomePageProps) {
-  const [stats, setStats] = useState<{ problems: string; submissions: string; members: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Announcement state
   const [announcement, setAnnouncement] = useState<string>('');
   const [dismissed, setDismissed] = useState(false);
 
+  // User metrics
+  const [problemsSolvedCount, setProblemsSolvedCount] = useState(0);
+  const [totalProblemsCount, setTotalProblemsCount] = useState(0);
+  const [totalPoints, setTotalPoints] = useState(0);
+  const [userRank, setUserRank] = useState<number | null>(null);
+  const [userStreak, setUserStreak] = useState(0);
+
+  // Problem of the Day
+  const [dailyProblem, setDailyProblem] = useState<Problem | null>(null);
+  const [dailySolvedToday, setDailySolvedToday] = useState(false);
+  const [dailySolverCount, setDailySolverCount] = useState<number | null>(null);
+
+  // Progress stats (Easy/Medium/Hard)
+  const [difficultyStats, setDifficultyStats] = useState({
+    easy: { solved: 0, total: 0 },
+    medium: { solved: 0, total: 0 },
+    hard: { solved: 0, total: 0 },
+  });
+
+  // Topics & Continue Learning
+  const [topics, setTopics] = useState<any[]>([]);
+
+  // Recent Activity
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+
+  // Leaderboard Preview
+  const [topUsers, setTopUsers] = useState<any[]>([]);
+
+  // Announcement check
   useEffect(() => {
     const db = getSupabaseClient();
     (async () => {
@@ -213,340 +91,366 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
     } catch {}
   }, []);
 
-  function dismissAnnouncement() {
+  function handleDismissAnnouncement() {
     setDismissed(true);
     try { sessionStorage.setItem('bb_announcement_dismissed', '1'); } catch {}
   }
 
-  useEffect(() => {
+  // Main Dashboard Data Loader
+  const loadDashboardData = useCallback(async () => {
+    setLoading(true);
     const db = getSupabaseClient();
-    (async () => {
-      try {
-        const [{ data: pd }, { data: sd }, { data: wd }, { data: md }] = await Promise.all([
-          db.from('problems').select('id'),
-          db.from('submissions').select('id'),
-          (db.from('weekly_submissions') as any).select('id'),
-          db.from('members').select('id'),
-        ]);
-        setStats({
-          problems:    String(pd?.length ?? 0),
-          submissions: String((sd?.length ?? 0) + (wd?.length ?? 0)),
-          members:     String(md?.length ?? 0),
-        });
-      } catch {
-        setStats({ problems: '—', submissions: '—', members: '—' });
-      }
-    })();
-  }, []);
 
-  const [dailyProblem, setDailyProblem] = useState<any>(null);
-  const [dailySolvedToday, setDailySolvedToday] = useState(false);
-  const [dailySolverCount, setDailySolverCount] = useState<number | null>(null);
-  // Ticks every minute so the "resets in Xh Ym" countdown stays live
-  // without needing a full page refresh.
-  const [, tickMinute] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => tickMinute(n => n + 1), 60_000);
-    return () => clearInterval(id);
-  }, []);
+    try {
+      // 1. Fetch all public problems
+      const { data: problemsData } = await db
+        .from('problems')
+        .select('*')
+        .eq('visibility', 'public');
 
-  useEffect(() => {
-    const db = getSupabaseClient();
-    (async () => {
-      try {
-        const { data } = await db.from('problems').select('*')
-          .eq('visibility', 'public');
-        const pool = ((data || []) as any[]).filter((p: any) => !p.is_contest_problem);
-        if (!pool.length) return;
+      const allProblems: Problem[] = (problemsData || []) as Problem[];
+      const regularProblems = allProblems.filter((p) => !p.is_contest_problem);
+      setTotalProblemsCount(regularProblems.length);
 
-        // Deterministic pick — same problem for everyone, changes once per day
+      // Breakdown by difficulty
+      const easyTotal = regularProblems.filter((p) => p.difficulty === 'Easy').length;
+      const medTotal = regularProblems.filter((p) => p.difficulty === 'Medium').length;
+      const hardTotal = regularProblems.filter((p) => p.difficulty === 'Hard').length;
+
+      // 2. Deterministic Daily Problem calculation
+      if (regularProblems.length > 0) {
         const dayKey = new Date().toISOString().slice(0, 10);
         let hash = 0;
-        for (let i = 0; i < dayKey.length; i++) hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
-        const problem = pool[hash % pool.length];
-        setDailyProblem(problem);
-
-        if (user?.github) {
-          const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-          const { data: subs } = await db.from('submissions').select('id, created_at')
-            .eq('github', user.github).eq('problem_id', problem.id).eq('status', 'approved');
-          const solvedToday = (subs || []).some((s: any) => new Date(s.created_at) >= startOfDay);
-          setDailySolvedToday(solvedToday);
+        for (let i = 0; i < dayKey.length; i++) {
+          hash = (hash * 31 + dayKey.charCodeAt(i)) >>> 0;
         }
+        const pickedDaily = regularProblems[hash % regularProblems.length];
+        setDailyProblem(pickedDaily);
 
-        // Social proof — how many distinct people have solved today's
-        // pick so far. Cheap query: only rows for this one problem_id,
-        // filtered client-side to today (submissions table is small
-        // enough at current scale; revisit with a date filter server-side
-        // if this table grows much larger).
+        // Daily solver count for today
         try {
-          const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
-          const { data: allSubs } = await db.from('submissions')
-            .select('github, created_at').eq('problem_id', problem.id).eq('status', 'approved');
-          const solvers = new Set(
-            (allSubs || [])
+          const startOfDay = new Date();
+          startOfDay.setHours(0, 0, 0, 0);
+          const { data: dailySubs } = await db
+            .from('submissions')
+            .select('github, created_at')
+            .eq('problem_id', pickedDaily.id)
+            .eq('status', 'approved');
+
+          const solversToday = new Set(
+            (dailySubs || [])
               .filter((s: any) => new Date(s.created_at) >= startOfDay)
               .map((s: any) => s.github)
           );
-          setDailySolverCount(solvers.size);
+          setDailySolverCount(solversToday.size);
+
+          if (user?.github) {
+            setDailySolvedToday(solversToday.has(user.github));
+          }
         } catch {}
-      } catch {}
-    })();
+      }
+
+      // 3. User Solved Submissions & Points
+      let solvedProblemIds = new Set<string>();
+      let userPointsSum = 0;
+      let userEasySolved = 0;
+      let userMedSolved = 0;
+      let userHardSolved = 0;
+      const userActivities: any[] = [];
+
+      if (user?.github) {
+        const [{ data: normalSubs }, { data: weeklySubs }, { data: arenaSubs }, { data: memberRow }, { data: certsData }] =
+          await Promise.all([
+            db
+              .from('submissions')
+              .select('problem_id, problem_title, points_awarded, tests_passed, tests_total, created_at')
+              .eq('github', user.github)
+              .eq('status', 'approved')
+              .order('created_at', { ascending: false }),
+            (db.from('weekly_submissions') as any)
+              .select('problem_id, problem_title, points_awarded, tests_passed, tests_total, submitted_at')
+              .eq('github', user.github)
+              .eq('status', 'approved')
+              .order('submitted_at', { ascending: false }),
+            (db.from('arena_submissions') as any)
+              .select('problem_id, problem_title, points_awarded, tests_passed, tests_total, created_at')
+              .eq('github', user.github)
+              .eq('status', 'reviewed')
+              .order('created_at', { ascending: false }),
+            (db.from('members') as any)
+              .select('streak, last_solved_at, total_points, problems_solved')
+              .eq('github', user.github)
+              .maybeSingle(),
+            (db.from('certificates') as any)
+              .select('id, title, issue_date')
+              .eq('recipient_github', user.github)
+              .order('issue_date', { ascending: false })
+              .limit(3),
+          ]);
+
+        // Deduplicate best score per problem
+        const bestScores = new Map<string, { title: string; points: number; date: string }>();
+        for (const s of (normalSubs as any[] || [])) {
+          solvedProblemIds.add(s.problem_id);
+          const cur = bestScores.get(s.problem_id);
+          if (!cur || (s.points_awarded || 0) > cur.points) {
+            bestScores.set(s.problem_id, { title: s.problem_title, points: s.points_awarded || 0, date: s.created_at });
+          }
+          userActivities.push({
+            id: s.problem_id,
+            type: 'solve',
+            title: s.problem_title,
+            points: s.points_awarded,
+            date: s.created_at,
+          });
+        }
+
+        for (const w of (weeklySubs as any[] || [])) {
+          solvedProblemIds.add(w.problem_id);
+          const cur = bestScores.get(w.problem_id);
+          if (!cur || (w.points_awarded || 0) > cur.points) {
+            bestScores.set(w.problem_id, { title: w.problem_title, points: w.points_awarded || 0, date: w.submitted_at });
+          }
+          userActivities.push({
+            id: w.problem_id,
+            type: 'weekly',
+            title: w.problem_title,
+            points: w.points_awarded,
+            date: w.submitted_at,
+          });
+        }
+
+        for (const a of (arenaSubs as any[] || [])) {
+          solvedProblemIds.add(a.problem_id);
+          userActivities.push({
+            id: a.problem_id,
+            type: 'arena',
+            title: a.problem_title,
+            points: a.points_awarded,
+            date: a.created_at,
+          });
+        }
+
+        for (const c of (certsData as any[] || [])) {
+          userActivities.push({
+            id: c.id,
+            type: 'certificate',
+            title: c.title,
+            date: c.issue_date,
+          });
+        }
+
+        // Sort activities by date descending
+        userActivities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setRecentActivities(userActivities);
+
+        // Sum points
+        userPointsSum = Array.from(bestScores.values()).reduce((sum, item) => sum + item.points, 0);
+        setTotalPoints(userPointsSum);
+        setProblemsSolvedCount(solvedProblemIds.size);
+
+        // Effective streak
+        if (memberRow) {
+          setUserStreak(effectiveStreak(memberRow.streak, memberRow.last_solved_at));
+        }
+
+        // Breakdown solved counts by difficulty
+        const problemsMap = new Map(regularProblems.map((p) => [p.id, p]));
+        for (const pid of solvedProblemIds) {
+          const p = problemsMap.get(pid);
+          if (p?.difficulty === 'Easy') userEasySolved++;
+          else if (p?.difficulty === 'Medium') userMedSolved++;
+          else if (p?.difficulty === 'Hard') userHardSolved++;
+        }
+      }
+
+      setDifficultyStats({
+        easy: { solved: userEasySolved, total: easyTotal },
+        medium: { solved: userMedSolved, total: medTotal },
+        hard: { solved: userHardSolved, total: hardTotal },
+      });
+
+      // 4. Topic-based progress calculation
+      const topicMap = new Map<string, { total: number; solved: number }>();
+      const defaultTopics = ['Arrays', 'Strings', 'Trees', 'Graphs', 'Dynamic Programming', 'Linked List', 'Binary Search', 'Recursion'];
+      for (const t of defaultTopics) topicMap.set(t, { total: 0, solved: 0 });
+
+      for (const p of regularProblems) {
+        const tags = p.tags || [];
+        for (const tag of tags) {
+          const normalizedTag =
+            tag.includes('Array') ? 'Arrays' :
+            tag.includes('String') ? 'Strings' :
+            tag.includes('Tree') ? 'Trees' :
+            tag.includes('Graph') ? 'Graphs' :
+            tag.includes('DP') || tag.includes('Dynamic') ? 'Dynamic Programming' :
+            tag.includes('Linked') ? 'Linked List' :
+            tag.includes('Binary Search') ? 'Binary Search' :
+            tag;
+
+          const stat = topicMap.get(normalizedTag) || { total: 0, solved: 0 };
+          stat.total += 1;
+          if (solvedProblemIds.has(p.id)) stat.solved += 1;
+          topicMap.set(normalizedTag, stat);
+        }
+      }
+
+      const formattedTopics = Array.from(topicMap.entries())
+        .filter(([_, stat]) => stat.total > 0)
+        .slice(0, 8)
+        .map(([name, stat]) => ({
+          id: name.toLowerCase().replace(/\s+/g, '-'),
+          name,
+          solved: stat.solved,
+          total: stat.total,
+          icon: TOPIC_ICONS[name] || '📌',
+        }));
+
+      setTopics(formattedTopics);
+
+      // 5. Leaderboard Top 5 & User Rank
+      const [{ data: normalAll }, { data: arenaAll }, { data: weeklyAll }, { data: membersAll }] =
+        await Promise.all([
+          db.from('submissions').select('github, name, points_awarded, problem_id').eq('status', 'approved').limit(4000),
+          db.from('arena_submissions').select('github, name, points_awarded, problem_id').eq('status', 'reviewed').limit(4000),
+          (db.from('weekly_submissions') as any).select('github, name, points_awarded, problem_id').eq('status', 'approved').limit(4000),
+          db.from('members').select('github, name, streak, last_solved_at, problems_solved').limit(1000),
+        ]);
+
+      const bestOverall = new Map<string, { github: string; name: string; points: number }>();
+      for (const s of [...(normalAll || []), ...(arenaAll || []), ...(weeklyAll || [])]) {
+        const key = `${s.github}::${s.problem_id}`;
+        const existing = bestOverall.get(key);
+        if (!existing || (s.points_awarded || 0) > existing.points) {
+          bestOverall.set(key, { github: s.github, name: s.name, points: s.points_awarded || 0 });
+        }
+      }
+
+      const scoreMap: Record<string, { github: string; name: string; total: number; solved: number }> = {};
+      for (const v of bestOverall.values()) {
+        if (!scoreMap[v.github]) scoreMap[v.github] = { github: v.github, name: v.name, total: 0, solved: 0 };
+        scoreMap[v.github].total += v.points;
+        scoreMap[v.github].solved += 1;
+      }
+
+      const sortedLeaderboard = Object.values(scoreMap).sort((a, b) => b.total - a.total);
+
+      const top5List = sortedLeaderboard.slice(0, 5).map((m, idx) => ({
+        rank: idx + 1,
+        github: m.github,
+        name: m.name || m.github,
+        points: m.total,
+        solved: m.solved,
+      }));
+
+      setTopUsers(top5List);
+
+      if (user?.github) {
+        const userIndex = sortedLeaderboard.findIndex((m) => m.github === user.github);
+        if (userIndex !== -1) {
+          setUserRank(userIndex + 1);
+        } else {
+          setUserRank(null);
+        }
+      }
+    } catch {
+      // Graceful fallback for non-blocking UI
+    } finally {
+      setLoading(false);
+    }
   }, [user?.github]);
 
-  function openDailyProblem() {
-    if (!dailyProblem) return;
-    try { sessionStorage.setItem('bb_open_problem_id', dailyProblem.id); } catch {}
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  // Handle direct solve from Problem of the Day
+  function handleSolveDaily(problemId: string) {
+    try {
+      sessionStorage.setItem('bb_open_problem_id', problemId);
+    } catch {}
     onNavigate('problems');
   }
 
-  function timeUntilNextDaily(): string {
-    const now = new Date();
-    const midnight = new Date(now);
-    midnight.setHours(24, 0, 0, 0);
-    const ms = midnight.getTime() - now.getTime();
-    const h = Math.floor(ms / 3_600_000);
-    const m = Math.floor((ms % 3_600_000) / 60_000);
-    return `${h}h ${m}m`;
+  // Handle topic click
+  function handleSelectTopic(topicName: string) {
+    onNavigate('problems');
   }
 
-  const features = [
-    {
-      icon: '⚡',
-      label: 'Weekly',
-      title: 'Weekly Challenges',
-      desc: '3 new problems every week. Solve earlier for a higher time bonus — points decay as the week progresses.',
-      color: '#f0b429',
-      glow: 'rgba(240,180,41,0.08)',
-      page: 'weekly',
-    },
-    {
-      icon: '🏆',
-      label: 'Rewards',
-      title: 'Points & Prizes',
-      desc: 'Every test case you pass earns points. Contest winners may receive a prize, arranged and given separately by the organizer.',
-      color: '#00e87a',
-      glow: 'rgba(0,232,122,0.08)',
-      page: 'leaderboard',
-    },
-    {
-      icon: '🛡️',
-      label: 'Arena',
-      title: 'Proctored Arena',
-      desc: 'Compete in a supervised, fullscreen environment. Tab switches are monitored. 3 strikes = disqualified.',
-      color: '#ff4d4d',
-      glow: 'rgba(255,77,77,0.08)',
-      page: 'arena',
-    },
-    {
-      icon: '💡',
-      label: 'Multi-lang',
-      title: 'Real Code Execution',
-      desc: 'Python, JavaScript, C++, Java, Rust, Go — all run live in your browser or server-side with real test cases.',
-      color: '#a78bfa',
-      glow: 'rgba(167,139,250,0.08)',
-      page: 'problems',
-    },
-  ];
-
   return (
-    <div className="animate-fade-up">
+    <div className="space-y-8 animate-fade-up">
+      {/* 1. Welcome & Personalized Hero */}
+      <WelcomeHero
+        user={user}
+        userStreak={userStreak}
+        onNavigate={onNavigate}
+        announcement={announcement}
+        onDismissAnnouncement={handleDismissAnnouncement}
+        dismissedAnnouncement={dismissed}
+      />
 
-      {announcement && !dismissed && (
-        <div className="flex items-center gap-3 px-4 py-3 mb-4 bg-[#00e87a08] border border-[#00e87a20]
-          rounded-2xl text-sm font-mono text-[#00e87a] animate-fade-up">
-          <span className="shrink-0">📣</span>
-          <span className="flex-1">{announcement}</span>
-          <button
-            onClick={dismissAnnouncement}
-            aria-label="Dismiss announcement"
-            className="shrink-0 text-[#00e87a80] hover:text-[#00e87a] transition-colors px-1"
-          >
-            ✕
-          </button>
+      {/* 2. Top-Level Metric Cards */}
+      <DashboardMetrics
+        problemsSolved={problemsSolvedCount}
+        totalProblems={totalProblemsCount}
+        totalPoints={totalPoints}
+        rank={userRank}
+        streak={userStreak}
+        loading={loading}
+      />
+
+      {/* 3. Problem of the Day & Personal Progress Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-7">
+          <ProblemOfTheDay
+            problem={dailyProblem}
+            solvedToday={dailySolvedToday}
+            solverCount={dailySolverCount}
+            loading={loading}
+            onSolve={handleSolveDaily}
+          />
         </div>
-      )}
-
-      {/* ── Hero ───────────────────────────────────────────── */}
-      <section className="relative text-center pt-12 pb-16 md:pt-20 md:pb-24 overflow-hidden">
-
-        {/* Grid background */}
-        <div className="absolute inset-0 hero-grid opacity-100 pointer-events-none" />
-
-        {/* Radial glow */}
-        <div className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse 70% 50% at 50% 0%, rgba(0,232,122,0.06) 0%, transparent 70%)' }} />
-
-        {/* Live badge */}
-        <div className="relative inline-flex items-center gap-2 bg-[#0f0f0f] border border-[#1c1c1c]
-          px-4 py-1.5 rounded-full text-xs font-mono text-[#555] mb-8 animate-fade-up">
-          <span className="live-dot" />
-          <span>by <span className="text-[#00e87a]">TeamCodeLocked</span></span>
-          <span className="text-[#2a2a2a]">·</span>
-          <span>Beta v2.0</span>
+        <div className="lg:col-span-5">
+          <ProgressOverview
+            easy={difficultyStats.easy}
+            medium={difficultyStats.medium}
+            hard={difficultyStats.hard}
+            loading={loading}
+            onExplore={() => onNavigate('problems')}
+          />
         </div>
+      </div>
 
-        {/* Headline */}
-        <h1 className="relative font-display font-extrabold text-[#e2e2e2]
-          mb-5 leading-[1.05] tracking-tight px-4 animate-fade-up delay-75"
-          style={{ fontSize: 'var(--fs-hero)' }}>
-          Build Sharper.<br />
-          <span className="text-[#00e87a] glow-text">Code Bit By Bit.</span>
-        </h1>
+      {/* 4. Continue Learning (Topic tracks) */}
+      <ContinueLearning
+        topics={topics}
+        loading={loading}
+        onSelectTopic={handleSelectTopic}
+        onViewAllTopics={() => onNavigate('problems')}
+      />
 
-        <p className="relative text-[#555] text-sm md:text-base font-mono max-w-lg mx-auto mb-10 px-4
-          leading-relaxed animate-fade-up delay-150">
-          The private coding arena for TeamCodeLocked — solve daily problems,
-          run real tests, and compete in proctored contests.
-        </p>
-
-        {/* CTA buttons */}
-        <div className="relative flex items-center justify-center gap-3 flex-wrap px-4 mb-10 animate-fade-up delay-225">
-          <button onClick={() => onNavigate('problems')} className="btn-primary text-sm px-6 py-3">
-            Browse Problems →
-          </button>
-          <button onClick={() => onNavigate('weekly')} className="btn-ghost text-sm px-6 py-3">
-            Weekly Challenge
-          </button>
+      {/* 5. Recent Activity & Leaderboard Top 5 Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-7">
+          <RecentActivity
+            activities={recentActivities}
+            loading={loading}
+            onExploreProblems={() => onNavigate('problems')}
+          />
         </div>
-
-        {/* Activity ticker */}
-        <div className="relative flex justify-center mb-14 animate-fade-up delay-300">
-          <ActivityTicker members={parseInt(stats?.members || '0')} />
+        <div className="lg:col-span-5">
+          <LeaderboardPreview
+            topUsers={topUsers}
+            currentUserGithub={user?.github}
+            currentUserRank={userRank}
+            loading={loading}
+            onViewFullLeaderboard={() => onNavigate('leaderboard')}
+          />
         </div>
+      </div>
 
-        {/* Stats row */}
-        <div className="relative flex items-center justify-center flex-wrap gap-6 sm:gap-10 md:gap-20 px-4">
-          <StatCard value={stats?.problems ?? ''} label="Problems" delay={400} />
-          <div className="w-px h-10 bg-[#1c1c1c] hidden sm:block" />
-          <StatCard value={stats?.submissions ?? ''} label="Submissions" delay={500} />
-          <div className="w-px h-10 bg-[#1c1c1c] hidden sm:block" />
-          <StatCard value={stats?.members ?? ''} label="Members" delay={600} />
-        </div>
-      </section>
-
-      {/* ── Features ───────────────────────────────────────── */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pb-8">
-        {features.map((f, i) => (
-          <button
-            key={f.title}
-            onClick={() => onNavigate(f.page as any)}
-            className="card-glow p-5 text-left group animate-fade-up cursor-pointer"
-            style={{ animationDelay: `${700 + i * 80}ms` }}
-          >
-            {/* Icon + label row */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-2xl">{f.icon}</div>
-              <span className="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-md"
-                style={{ color: f.color, background: f.glow }}>
-                {f.label}
-              </span>
-            </div>
-
-            <h3 className="font-display font-bold text-[#e2e2e2] text-sm mb-2
-              group-hover:text-[#00e87a] transition-colors duration-200">
-              {f.title}
-            </h3>
-            <p className="text-[#444] text-xs font-mono leading-relaxed">{f.desc}</p>
-
-            {/* Bottom CTA */}
-            <div className="mt-4 flex items-center gap-1 text-[10px] font-mono transition-all duration-200"
-              style={{ color: f.color, opacity: 0.5 }}>
-              <span className="group-hover:opacity-100 transition-opacity">Explore →</span>
-            </div>
-          </button>
-        ))}
-      </section>
-
-      {/* ── Daily Problem ─────────────────────────────────────
-           Kept on the homepage but not glued to the very top —
-           one section further down, still a single click away. */}
-      {dailyProblem && (
-        <section className="pb-8">
-          <button onClick={openDailyProblem}
-            className="w-full flex items-center gap-4 px-5 py-4 bg-[#f0b42908] border border-[#f0b42925]
-              rounded-2xl text-left hover:border-[#f0b42945] transition-all duration-200 group">
-            <div className="w-11 h-11 rounded-xl bg-[#f0b42912] flex items-center justify-center text-xl shrink-0">
-              🗓️
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-[#f0b429] font-bold">Daily Problem</span>
-                {dailySolvedToday && (
-                  <span className="text-[10px] font-mono text-[#00e87a] bg-[#00e87a12] border border-[#00e87a20] rounded-full px-2 py-0.5">
-                    ✓ Solved today
-                  </span>
-                )}
-                <span className="text-[10px] font-mono text-[#666]">· resets in {timeUntilNextDaily()}</span>
-              </div>
-              <div className="font-display font-bold text-[#e2e2e2] text-sm truncate">{dailyProblem.title}</div>
-              {dailySolverCount !== null && dailySolverCount > 0 && (
-                <div className="text-[10px] font-mono text-[#888] mt-0.5">
-                  🔥 {dailySolverCount} {dailySolverCount === 1 ? 'person has' : 'people have'} solved this today
-                </div>
-              )}
-            </div>
-            <span className={`text-xs font-mono font-bold shrink-0 px-2 py-1 rounded-lg
-              ${dailyProblem.difficulty === 'Easy' ? 'text-[#00e87a] bg-[#00e87a12]' :
-                dailyProblem.difficulty === 'Medium' ? 'text-[#f0b429] bg-[#f0b42912]' :
-                'text-[#ff4d4d] bg-[#ff4d4d12]'}`}>
-              {dailyProblem.difficulty}
-            </span>
-            <span className="text-[#666] group-hover:text-[#f0b429] transition-colors shrink-0">→</span>
-          </button>
-        </section>
-      )}
-
-      {/* ── Terminal snippet + how it works ────────────────── */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 pb-8">
-
-        {/* Terminal */}
-        <div className="flex items-center justify-center p-8 card relative overflow-hidden">
-          <div className="absolute inset-0 pointer-events-none"
-            style={{ background: 'radial-gradient(ellipse 60% 60% at 50% 50%, rgba(0,232,122,0.04) 0%, transparent 70%)' }} />
-          <TerminalSnippet />
-        </div>
-
-        {/* How it works */}
-        <div className="card p-6 flex flex-col justify-center gap-4">
-          <h2 className="font-display font-bold text-[#e2e2e2] text-base mb-1">How it works</h2>
-          {[
-            { n: '01', t: 'Pick a problem', d: 'Browse by difficulty or weekly challenge pool', c: '#00e87a' },
-            { n: '02', t: 'Write & run', d: 'Code in your language, run against real test cases', c: '#a78bfa' },
-            { n: '03', t: 'Submit', d: 'Admin reviews your approach, awards points', c: '#f0b429' },
-            { n: '04', t: 'Climb the ranks', d: 'Points accumulate, top coders may receive a prize', c: '#ff4d4d' },
-          ].map((step, i) => (
-            <div key={step.n} className="flex items-start gap-3 animate-fade-up"
-              style={{ animationDelay: `${900 + i * 100}ms` }}>
-              <span className="font-mono text-xs font-bold shrink-0 mt-0.5 tabular-nums"
-                style={{ color: step.c }}>
-                {step.n}
-              </span>
-              <div>
-                <div className="font-mono text-sm text-[#e2e2e2] font-bold">{step.t}</div>
-                <div className="font-mono text-[11px] text-[#444] mt-0.5">{step.d}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── CTA banner ─────────────────────────────────────── */}
-      {!user && (
-        <section className="card animate-border-glow p-8 text-center mb-4 relative overflow-hidden animate-fade-up"
-          style={{ animationDelay: '1200ms' }}>
-          <div className="absolute inset-0 pointer-events-none"
-            style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 100%, rgba(0,232,122,0.05) 0%, transparent 70%)' }} />
-          <p className="font-mono text-[#555] text-xs mb-1 uppercase tracking-widest">Ready to compete?</p>
-          <h2 className="font-display font-bold text-xl text-[#e2e2e2] mb-4">
-            Sign in with GitHub to start solving
-          </h2>
-          <button onClick={() => onNavigate('arena')} className="btn-primary">
-            Get Started →
-          </button>
-        </section>
-      )}
-
+      {/* 6. Quick Action Product Tiles */}
+      <QuickActions onNavigate={onNavigate} />
     </div>
   );
 }

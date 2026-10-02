@@ -55,21 +55,21 @@ export default function ContributionHeatmap({ dates }: Props) {
   }, [dates]);
 
   function colorFor(count: number) {
-    if (count === 0) return '#161616';
+    if (count === 0) return '#27272a'; // zinc-800
     const ratio = count / max;
-    if (ratio > 0.75) return '#00e87a';
-    if (ratio > 0.5) return '#00b85f';
-    if (ratio > 0.25) return '#008a47';
-    return '#0d3d24';
+    if (ratio > 0.75) return '#10b981'; // emerald-500
+    if (ratio > 0.5) return '#059669'; // emerald-600
+    if (ratio > 0.25) return '#047857'; // emerald-700
+    return '#064e3b'; // emerald-900
   }
 
   return (
-    <div className="card p-5 mb-6 relative">
+    <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-xl p-5 mb-6 relative">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display font-bold text-sm text-[#e0e0e0]">
-          Activity <span className="text-[#666] font-mono font-normal">({totalDays} active days, last {WEEKS} weeks)</span>
+        <h2 className="font-semibold text-sm text-zinc-100">
+          Activity <span className="text-zinc-500 font-mono font-normal text-xs">({totalDays} active days, last {WEEKS} weeks)</span>
         </h2>
-        <div className="flex items-center gap-1 text-[9px] font-mono text-[#666]">
+        <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500">
           <span>Less</span>
           {[0, 0.2, 0.4, 0.6, 0.8].map((r) => (
             <div key={r} className="w-2.5 h-2.5 rounded-sm" style={{ background: colorFor(r * max || (r === 0 ? 0 : 1)) }} />
@@ -102,7 +102,7 @@ export default function ContributionHeatmap({ dates }: Props) {
 
       {hovered && (
         <div
-          className="fixed z-50 px-2 py-1 rounded-md bg-[#111] border border-[#222] text-[10px] font-mono text-[#e0e0e0] pointer-events-none"
+          className="fixed z-50 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-700 text-[11px] font-mono text-zinc-200 shadow-lg pointer-events-none"
           style={{ left: hovered.x, top: hovered.y - 32 }}
         >
           {hovered.count} solve{hovered.count === 1 ? '' : 's'} on {new Date(hovered.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
