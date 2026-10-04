@@ -953,3 +953,534 @@ export function parseHarnessArgs(inputJson: string | null, paramCount: number, p
     return [];
   }
 }
+
+// ── 4. Clean Driver-Based Execution Program Generators ──────────────────────────
+
+export function splitCppHeaders(code: string): { headers: string; body: string } {
+  const lines = code.split('\n');
+  let i = 0;
+  const headerLines: string[] = [];
+
+  while (i < lines.length) {
+    const t = lines[i].trim();
+    if (
+      t.startsWith('#include') || t.startsWith('#define') || t.startsWith('#pragma') ||
+      t.startsWith('#ifndef') || t.startsWith('#ifdef') || t.startsWith('#endif') ||
+      t.startsWith('#undef') || t === ''
+    ) {
+      headerLines.push(lines[i]);
+      i++;
+    } else {
+      break;
+    }
+  }
+
+  return { headers: headerLines.join('\n').trimEnd(), body: lines.slice(i).join('\n') };
+}
+
+export function splitJavaImports(code: string): { imports: string; body: string } {
+  const lines = code.split('\n');
+  let i = 0;
+  const importLines: string[] = [];
+
+  while (i < lines.length) {
+    const t = lines[i].trim();
+    if (t.startsWith('import ') || t.startsWith('package ') || t === '') {
+      importLines.push(lines[i]);
+      i++;
+    } else {
+      break;
+    }
+  }
+
+  return { imports: importLines.join('\n').trimEnd(), body: lines.slice(i).join('\n') };
+}
+
+export function splitGoImports(code: string): { packageLine: string; imports: string; body: string } {
+  const lines = code.split('\n');
+  let i = 0;
+
+  while (i < lines.length && lines[i].trim() === '') i++;
+
+  let packageLine = '';
+  if (i < lines.length && lines[i].trim().startsWith('package ')) {
+    packageLine = lines[i].trim();
+    i++;
+  }
+
+  while (i < lines.length && lines[i].trim() === '') i++;
+
+  const importLines: string[] = [];
+
+  if (i < lines.length && /^import\s+"/.test(lines[i].trim())) {
+    importLines.push(lines[i]);
+    i++;
+  } else if (i < lines.length && /^import\s*\(/.test(lines[i].trim())) {
+    importLines.push(lines[i]);
+    i++;
+    while (i < lines.length && !lines[i].includes(')')) {
+      importLines.push(lines[i]);
+      i++;
+    }
+    if (i < lines.length) { importLines.push(lines[i]); i++; }
+  }
+
+  return { packageLine, imports: importLines.join('\n'), body: lines.slice(i).join('\n') };
+}
+
+export function splitRustUses(code: string): { uses: string; body: string } {
+  const lines = code.split('\n');
+  let i = 0;
+  const useLines: string[] = [];
+
+  while (i < lines.length) {
+    const t = lines[i].trim();
+    if (t.startsWith('use ') || t.startsWith('extern crate') || t.startsWith('#![') || t === '') {
+      useLines.push(lines[i]);
+      i++;
+    } else {
+      break;
+    }
+  }
+
+  return { uses: useLines.join('\n').trimEnd(), body: lines.slice(i).join('\n') };
+}
+
+export function buildJavaDriverProgram(userCode: string, inputJson: string | null): string {
+  const { imports: userImports, body: userBody } = splitJavaImports(userCode);
+
+  const REQUIRED_IMPORTS = ['import java.util.*;', 'import java.util.stream.*;'];
+  const existingImportSet = new Set(userImports.split('\n').map(l => l.trim()).filter(Boolean));
+  const extraImports = REQUIRED_IMPORTS.filter(im => !existingImportSet.has(im));
+
+  const traceHelper = [
+    "    // ── BB Trace Helpers ──────────────────────────────────────────────────",
+    "",
+    "    private static void __bb_emit(int line, String vars) {",
+    "        System.out.println(\"__BB_TRACE__:{\\\"line\\\":\" + line + \",\\\"vars\\\":\" + vars + \"}\");",
+    "    }",
+    "",
+    "    private static String __bb_vars(String... pairs) {",
+    "        StringBuilder sb = new StringBuilder(\"{\");",
+    "        for (int i = 0; i < pairs.length; i += 2) {",
+    "            if (i > 0) sb.append(\",\");",
+    "            sb.append(\"\\\"\").append(pairs[i]).append(\"\\\":\").append(pairs[i + 1]);",
+    "        }",
+    "        return sb.append(\"}\").toString();",
+    "    }",
+    "",
+    "    private static String __bb_escapeStr(String v) {",
+    "        return v.replace(\"\\\\\", \"\\\\\\\\\").replace(\"\\\"\", \"\\\\\\\"\");",
+    "    }",
+    "",
+    "    private static String __bb_repr(Object v) {",
+    "        if (v == null) return \"null\";",
+    "        if (v instanceof ListNode) return serializeList((ListNode) v);",
+    "        if (v instanceof TreeNode) return serializeTree((TreeNode) v);",
+    "        if (v instanceof String) return \"\\\"\" + __bb_escapeStr((String) v) + \"\\\"\";",
+    "        if (v instanceof int[]) return Arrays.toString((int[]) v).replace(\" \", \"\");",
+    "        if (v instanceof int[][]) return Arrays.deepToString((int[][]) v).replace(\" \", \"\");",
+    "        if (v instanceof boolean[]) return Arrays.toString((boolean[]) v).replace(\" \", \"\");",
+    "        if (v instanceof Object[]) return Arrays.deepToString((Object[]) v).replace(\" \", \"\");",
+    "        if (v instanceof Collection) return String.valueOf(v).replace(\" \", \"\");",
+    "        return String.valueOf(v);",
+    "    }",
+  ].join('\n');
+
+  // Check if the user code contains a class declaration
+  const hasClassDecl = /(?:public\s+|private\s+|protected\s+|static\s+|abstract\s+|final\s+)*class\s+\w+/.test(userBody);
+
+  let cleanBody: string;
+
+  if (!hasClassDecl) {
+    // User provided method-only code (LeetCode style). Wrap in static class Solution without touching method body.
+    cleanBody = `    static class Solution {\n${userBody}\n    }`;
+  } else {
+    // User provided class(es). Strip any main method and normalize class header.
+    let processed = userBody.replace(
+      /public\s+static\s+void\s+main\s*\([^)]*\)\s*\{[\s\S]*?\n\s*\}/g,
+      ''
+    );
+
+    const hasSolutionClass = /\bclass\s+Solution\b/.test(processed);
+    if (hasSolutionClass) {
+      processed = processed.replace(
+        /(?:public\s+|private\s+|protected\s+)?class\s+Solution\b/g,
+        'static class Solution'
+      );
+    } else {
+      processed = processed.replace(
+        /(?:public\s+|private\s+|protected\s+)?class\s+\w+/,
+        'static class Solution'
+      );
+    }
+
+    processed = processed.replace(
+      /(^|\n)\s*(?:public\s+|private\s+|protected\s+)?class\s+((?!Solution\b)\w+)/g,
+      '$1    static class $2'
+    );
+
+    cleanBody = processed;
+  }
+
+  const sig = inspectSignature(userCode, 'java');
+  const fnName = sig.name;
+  const paramCount = sig.params.length || 1;
+  const args = parseHarnessArgs(inputJson, paramCount, sig.params);
+
+  const argDecls = args.map((a, i) => {
+    const param = sig.params[i] || { name: `arg${i}`, rawType: 'int', kind: 'primitive' };
+    return generateArgDeserializer(param, a, 'java', i).decl;
+  }).join('\n');
+  const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
+
+  const initialVarsPairs = args.map((_, i) => {
+    const pName = sig.params[i]?.name || `arg${i}`;
+    return `"${pName}", __bb_repr(__bb_a${i}__)`;
+  }).join(', ');
+  const initialVarsExpr = initialVarsPairs ? `__bb_vars(${initialVarsPairs})` : '"{}"';
+
+  const finalVarsPairs = [
+    ...args.map((_, i) => {
+      const pName = sig.params[i]?.name || `arg${i}`;
+      return `"${pName}", __bb_repr(__bb_a${i}__)`;
+    }),
+    ...(sig.isVoid ? [] : ['"__result__", __bb_repr(__result__)'])
+  ].join(', ');
+  const finalVarsExpr = finalVarsPairs ? `__bb_vars(${finalVarsPairs})` : '"{}"';
+
+  const lineCount = Math.max(2, userCode.split('\n').length);
+
+  const invocation = sig.isVoid
+    ? `__sol__.${fnName}(${callArgs});`
+    : `Object __result__ = __sol__.${fnName}(${callArgs});`;
+
+  return [
+    userImports,
+    extraImports.join('\n'),
+    '',
+    'public class Main {',
+    traceHelper,
+    '',
+    JAVA_PREAMBLE,
+    '',
+    cleanBody,
+    '',
+    '    public static void main(String[] args) {',
+    '        try {',
+    argDecls,
+    '            Solution __sol__ = new Solution();',
+    `            __bb_emit(1, ${initialVarsExpr});`,
+    `            ${invocation}`,
+    `            __bb_emit(${lineCount}, ${finalVarsExpr});`,
+    '            System.err.flush();',
+    '        } catch (Exception e) {',
+    '            System.err.println("RuntimeError: " + e.getMessage());',
+    '        }',
+    '    }',
+    '}',
+  ].join('\n');
+}
+
+export function buildCppDriverProgram(userCode: string, inputJson: string | null): string {
+  const { headers: userHeaders, body: userBody } = splitCppHeaders(userCode);
+
+  const REQUIRED = [
+    '#include <iostream>',
+    '#include <vector>',
+    '#include <string>',
+    '#include <sstream>',
+    '#include <map>',
+    '#include <unordered_map>',
+    '#include <set>',
+    '#include <unordered_set>',
+    '#include <algorithm>',
+    '#include <cmath>',
+    '#include <queue>',
+    '#include <stack>',
+    '#include <initializer_list>',
+  ];
+
+  const existingHeaders = new Set(userHeaders.split('\n').map(l => l.trim()).filter(Boolean));
+  const extraHeaders = REQUIRED.filter(h => !existingHeaders.has(h));
+
+  const traceHelper = [
+    "// -- BB Trace Helpers ------------------------------------------",
+    "template<typename T>",
+    "std::string __bb_repr(const T& v) { std::ostringstream s; s << v; return s.str(); }",
+    "template<> inline std::string __bb_repr(const bool& v) { return v ? \"true\" : \"false\"; }",
+    "template<> inline std::string __bb_repr(const std::string& v) { return \"\\\"\" + v + \"\\\"\"; }",
+    "template<> inline std::string __bb_repr(ListNode* const& v) { return serializeList(v); }",
+    "template<> inline std::string __bb_repr(TreeNode* const& v) { return serializeTree(v); }",
+    "template<typename T>",
+    "std::string __bb_repr(const std::vector<T>& vec) {",
+    "    std::string s = \"[\";",
+    "    for (size_t i = 0; i < vec.size(); ++i) { if (i) s += \",\"; s += __bb_repr(vec[i]); }",
+    "    return s + \"]\";",
+    "}",
+    "inline void __bb_emit(int line, const std::string& vars) {",
+    "    std::cout << \"__BB_TRACE__:{\\\"line\\\":\" << line << \",\\\"vars\\\":\" << vars << \"}\" << std::endl;",
+    "}",
+    "inline std::string __bb_vars(std::initializer_list<std::pair<const char*, std::string>> kv) {",
+    "    std::string s = \"{\";",
+    "    bool first = true;",
+    "    for (auto& p : kv) {",
+    "        if (!first) s += \",\"; first = false;",
+    "        s += \"\\\"\"; s += p.first; s += \"\\\":\"; s += p.second;",
+    "    }",
+    "    return s + \"}\";",
+    "}"
+  ].join('\n');
+
+  const sig = inspectSignature(userCode, 'cpp');
+  const fnName = sig.name;
+  const paramCount = sig.params.length || 1;
+  const args = parseHarnessArgs(inputJson, paramCount, sig.params);
+
+  const argDecls = args.map((a, i) => {
+    const param = sig.params[i] || { name: `arg${i}`, rawType: 'int', kind: 'primitive' };
+    return generateArgDeserializer(param, a, 'cpp', i).decl;
+  }).join('\n');
+  const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
+
+  const initialVarsPairs = args.map((_, i) => {
+    const pName = sig.params[i]?.name || `arg${i}`;
+    return `{"${pName}", __bb_repr(__bb_a${i}__)}`;
+  }).join(', ');
+  const initialVarsExpr = initialVarsPairs ? `__bb_vars({${initialVarsPairs}})` : '"{}"';
+
+  const finalVarsPairs = [
+    ...args.map((_, i) => {
+      const pName = sig.params[i]?.name || `arg${i}`;
+      return `{"${pName}", __bb_repr(__bb_a${i}__)}`;
+    }),
+    ...(sig.isVoid ? [] : ['{"__result__", __bb_repr(__result__)}'])
+  ].join(', ');
+  const finalVarsExpr = finalVarsPairs ? `__bb_vars({${finalVarsPairs}})` : '"{}"';
+
+  const lineCount = Math.max(2, userCode.split('\n').length);
+
+  const classMatch = userBody.match(/class\s+(\w+)\b/);
+  const targetClass = classMatch ? classMatch[1] : null;
+
+  let invocation = '';
+  if (targetClass) {
+    invocation = sig.isVoid
+      ? `${targetClass} __sol__;\n        __sol__.${fnName}(${callArgs});`
+      : `${targetClass} __sol__;\n        auto __result__ = __sol__.${fnName}(${callArgs});`;
+  } else {
+    invocation = sig.isVoid
+      ? `${fnName}(${callArgs});`
+      : `auto __result__ = ${fnName}(${callArgs});`;
+  }
+
+  const mainBlock = `
+int main() {
+${argDecls}
+    __bb_emit(1, ${initialVarsExpr});
+    try {
+        ${invocation}
+        __bb_emit(${lineCount}, ${finalVarsExpr});
+    } catch (const std::exception& e) {
+        std::cerr << "RuntimeError: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "RuntimeError: unknown exception" << std::endl;
+    }
+    return 0;
+}`;
+
+  return [
+    userHeaders,
+    extraHeaders.join('\n'),
+    CPP_PREAMBLE,
+    '',
+    traceHelper,
+    'using namespace std;',
+    '',
+    userBody,
+    mainBlock,
+  ].filter(s => s.trim() !== '').join('\n');
+}
+
+export function buildGoDriverProgram(userCode: string, inputJson: string | null): string {
+  const { packageLine, imports: userImports, body: userBody } = splitGoImports(userCode);
+
+  const REQUIRED_PKGS = ['fmt', 'strings', 'strconv'];
+  const mergedImports = `import (\n${REQUIRED_PKGS.map(p => `\t"${p}"`).join('\n')}\n)`;
+
+  const traceHelper = [
+    "func __bb_emit(line int, vars string) {",
+    "\tfmt.Printf(\"__BB_TRACE__:{\\\"line\\\":%d,\\\"vars\\\":%s}\\n\", line, vars)",
+    "}",
+    "",
+    "func __bb_repr(v interface{}) string {",
+    "\tif v == nil { return \"null\" }",
+    "\tswitch val := v.(type) {",
+    "\tcase *ListNode:",
+    "\t\treturn serializeList(val)",
+    "\tcase *TreeNode:",
+    "\t\treturn serializeTree(val)",
+    "\tcase string:",
+    "\t\treturn \"\\\"\" + strings.ReplaceAll(val, \"\\\"\", \"\\\\\\\"\") + \"\\\"\"",
+    "\tcase bool:",
+    "\t\tif val { return \"true\" }",
+    "\t\treturn \"false\"",
+    "\tcase []int:",
+    "\t\tparts := make([]string, len(val))",
+    "\t\tfor i, x := range val { parts[i] = fmt.Sprintf(\"%d\", x) }",
+    "\t\treturn \"[\" + strings.Join(parts, \",\") + \"]\"",
+    "\tcase []string:",
+    "\t\tparts := make([]string, len(val))",
+    "\t\tfor i, x := range val { parts[i] = \"\\\"\" + x + \"\\\"\" }",
+    "\t\treturn \"[\" + strings.Join(parts, \",\") + \"]\"",
+    "\tdefault:",
+    "\t\treturn fmt.Sprintf(\"%v\", val)",
+    "\t}",
+    "}",
+    "",
+    "func __bb_vars(pairs ...string) string {",
+    "\tvar sb strings.Builder",
+    "\tsb.WriteString(\"{\")",
+    "\tfor i := 0; i+1 < len(pairs); i += 2 {",
+    "\t\tif i > 0 { sb.WriteString(\",\") }",
+    "\t\tsb.WriteString(\"\\\"\" + pairs[i] + \"\\\":\" + pairs[i+1])",
+    "\t}",
+    "\tsb.WriteString(\"}\")",
+    "\treturn sb.String()",
+    "}"
+  ].join('\n');
+
+  const sig = inspectSignature(userCode, 'go');
+  const fnName = sig.name;
+  const paramCount = sig.params.length || 1;
+  const args = parseHarnessArgs(inputJson, paramCount, sig.params);
+
+  const argDecls = args.map((a, i) => {
+    const param = sig.params[i] || { name: `arg${i}`, rawType: 'int', kind: 'primitive' };
+    return generateArgDeserializer(param, a, 'go', i).decl;
+  }).join('\n');
+  const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
+
+  const initialVarsPairs = args.map((_, i) => {
+    const pName = sig.params[i]?.name || `arg${i}`;
+    return `"${pName}", __bb_repr(__bb_a${i}__)`;
+  }).join(', ');
+  const initialVarsExpr = initialVarsPairs ? `__bb_vars(${initialVarsPairs})` : '"{}"';
+
+  const finalVarsPairs = [
+    ...args.map((_, i) => {
+      const pName = sig.params[i]?.name || `arg${i}`;
+      return `"${pName}", __bb_repr(__bb_a${i}__)`;
+    }),
+    ...(sig.isVoid ? [] : ['"__result__", __bb_repr(__result__)'])
+  ].join(', ');
+  const finalVarsExpr = finalVarsPairs ? `__bb_vars(${finalVarsPairs})` : '"{}"';
+
+  const lineCount = Math.max(2, userCode.split('\n').length);
+
+  const invocation = sig.isVoid
+    ? `${fnName}(${callArgs})`
+    : `__result__ := ${fnName}(${callArgs})`;
+
+  const mainFn = `
+func main() {
+${argDecls}
+\t__bb_emit(1, ${initialVarsExpr})
+\t${invocation}
+\t__bb_emit(${lineCount}, ${finalVarsExpr})
+}
+`;
+
+  return [
+    packageLine || 'package main',
+    '',
+    mergedImports,
+    GO_PREAMBLE,
+    '',
+    traceHelper,
+    userBody,
+    mainFn,
+  ].join('\n');
+}
+
+export function buildRustDriverProgram(userCode: string, inputJson: string | null): string {
+  const { uses: userUses, body: userBody } = splitRustUses(userCode);
+
+  const hasImplSolution = /impl\s+Solution\b/.test(userBody);
+  const hasStructSolution = /struct\s+Solution\b/.test(userBody);
+  const prefixStruct = (hasImplSolution && !hasStructSolution) ? 'struct Solution;\n' : '';
+
+  const traceHelper = `
+macro_rules! bb_emit {
+    (\$line:expr, \$vars:expr) => {
+        println!("__BB_TRACE__:{{\\"line\\":{},\\"vars\\":{}}}", \$line, \$vars);
+    };
+}
+
+fn bb_repr<T: std::fmt::Debug>(v: &T) -> String {
+    format!("{:?}", v)
+}
+`;
+
+  const sig = inspectSignature(userCode, 'rust');
+  const fnName = sig.name;
+  const paramCount = sig.params.length || 1;
+  const args = parseHarnessArgs(inputJson, paramCount, sig.params);
+
+  const argDecls = args.map((a, i) => {
+    const param = sig.params[i] || { name: `arg${i}`, rawType: 'i32', kind: 'primitive' };
+    return generateArgDeserializer(param, a, 'rust', i).decl;
+  }).join('\n');
+  const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
+
+  const initialVarsPairs = args.map((_, i) => {
+    const pName = sig.params[i]?.name || `arg${i}`;
+    return `"\\\"${pName}\\\":\\"" + &bb_repr(&__bb_a${i}__) + "\\""`;
+  }).join(' + "," + ');
+  const initialVarsExpr = initialVarsPairs ? `"{" + ${initialVarsPairs} + "}"` : '"{}".to_string()';
+
+  const finalVarsPairs = [
+    ...args.map((_, i) => {
+      const pName = sig.params[i]?.name || `arg${i}`;
+      return `"\\\"${pName}\\\":\\"" + &bb_repr(&__bb_a${i}__) + "\\""`;
+    }),
+    ...(sig.isVoid ? [] : ['"\"__result__\":\"" + &bb_repr(&__result__) + "\""'])
+  ].join(' + "," + ');
+  const finalVarsExpr = finalVarsPairs ? `"{" + ${finalVarsPairs} + "}"` : '"{}".to_string()';
+
+  const lineCount = Math.max(2, userCode.split('\n').length);
+
+  let invocation = '';
+  if (hasImplSolution) {
+    invocation = sig.isVoid
+      ? `Solution::${fnName}(${callArgs});`
+      : `let __result__ = Solution::${fnName}(${callArgs});`;
+  } else {
+    invocation = sig.isVoid
+      ? `${fnName}(${callArgs});`
+      : `let __result__ = ${fnName}(${callArgs});`;
+  }
+
+  const mainFn = `
+fn main() {
+${argDecls}
+    bb_emit!(1, &format!("{}", ${initialVarsExpr}));
+    ${invocation}
+    bb_emit!(${lineCount}, &format!("{}", ${finalVarsExpr}));
+}
+`;
+
+  return [
+    userUses,
+    prefixStruct,
+    RUST_PREAMBLE,
+    traceHelper,
+    userBody,
+    mainFn,
+  ].filter(s => s.trim() !== '').join('\n');
+}
+
+export function extractParamCount(code: string, lang: SupportedLang): number {
+  const sig = inspectSignature(code, lang);
+  return sig.params.length || 0;
+}
