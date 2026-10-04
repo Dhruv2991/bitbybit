@@ -12,10 +12,10 @@
 //   { stdout: string, stderr: string, compileError?: string }
 //
 // Response body (422):
-//   { error: string, compileError: string } — compilation failed cleanly
+//   { error: string, compileError: string } ï¿½ compilation failed cleanly
 //
 // Response body (500):
-//   { error: string } — infrastructure / network failure
+//   { error: string } ï¿½ infrastructure / network failure
 // ------------------------------------------------------------
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -75,10 +75,10 @@ async function executeRawProgramWithStatus(
       judgeOk   = true;
     } else {
       const errBody = await submitRes.text();
-      console.warn(`[trace] Judge0 HTTP ${submitRes.status}: ${errBody} — falling back to Wandbox`);
+      console.warn(`[trace] Judge0 HTTP ${submitRes.status}: ${errBody} ï¿½ falling back to Wandbox`);
     }
   } catch (e: any) {
-    console.warn(`[trace] Judge0 unreachable: ${e.message} — falling back to Wandbox`);
+    console.warn(`[trace] Judge0 unreachable: ${e.message} ï¿½ falling back to Wandbox`);
   }
 
   if (judgeOk && judgeData) {
@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
 
     const result = await executeRawProgramWithStatus(code, language);
 
-    // Compilation failed — return 422 so the frontend can surface it cleanly
+    // Compilation failed ï¿½ return 422 so the frontend can surface it cleanly
     if (result.compileError) {
       return NextResponse.json(
         { error: 'Compilation failed', compileError: result.compileError },

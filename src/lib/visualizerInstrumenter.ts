@@ -7,13 +7,13 @@
 //           C++, Java, Go, Rust (Judge0/Wandbox Server).
 //
 // Key design rules for compiled language builders:
-//   1. HEADER PRESERVATION — user #include / import / use statements
+//   1. HEADER PRESERVATION ï¿½ user #include / import / use statements
 //      are extracted and placed BEFORE any injected helpers so the
 //      compiler sees them in the right order.
-//   2. REAL PER-LINE TRACE INJECTION — every non-blank, non-comment
+//   2. REAL PER-LINE TRACE INJECTION ï¿½ every non-blank, non-comment
 //      statement line inside user functions gets a __BB_TRACE__ call
 //      appended after it.
-//   3. CORRECT ESCAPING — JSON payloads inside language string literals
+//   3. CORRECT ESCAPING ï¿½ JSON payloads inside language string literals
 //      use the minimal escaping required by that language, not JS escapes.
 // ------------------------------------------------------------
 
