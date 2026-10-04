@@ -204,7 +204,7 @@ export const JAVA_PREAMBLE = `
         while (cur != null) {
             if (visited.contains(cur)) {
                 if (!first) sb.append(",");
-                sb.append("{\"cycle\":").append(cur.val).append("}");
+                sb.append('{"cycle":').append(cur.val).append('}');
                 break;
             }
             visited.add(cur);
