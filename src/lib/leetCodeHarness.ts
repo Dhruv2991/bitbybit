@@ -1046,6 +1046,345 @@ export function splitRustUses(code: string): { uses: string; body: string } {
   return { uses: useLines.join('\n').trimEnd(), body: lines.slice(i).join('\n') };
 }
 
+// ── 5. Statement-Level Multi-Step AST & Line Instrumenter ──────────────────────
+
+const KEYWORDS_SET = new Set([
+  'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue',
+  'return', 'goto', 'public', 'private', 'protected', 'static', 'final', 'const',
+  'class', 'struct', 'interface', 'enum', 'fn', 'func', 'let', 'mut', 'var',
+  'auto', 'void', 'int', 'long', 'float', 'double', 'bool', 'boolean', 'char',
+  'string', 'import', 'package', 'use', 'impl', 'true', 'false', 'null', 'nil',
+  'nullptr', 'None', 'Some', 'Ok', 'Err', 'new', 'delete', 'this', 'self', 'super'
+]);
+
+export function stripStringsAndComments(line: string, lang: SupportedLang): string {
+  let s = line.replace(/\/\/.*$/, '');
+  s = s.replace(/\/\*.*?\*\//g, '');
+  s = s.replace(/"(?:[^"\\]|\\.)*"/g, '""');
+  s = s.replace(/'(?:[^'\\]|\\.)*'/g, "''");
+  if (lang === 'rust') {
+    s = s.replace(/'[a-zA-Z_]\w*/g, '');
+  }
+  return s;
+}
+
+function countChar(str: string, ch: string): number {
+  let count = 0;
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === ch) count++;
+  }
+  return count;
+}
+
+function extractVarList(str: string): string[] {
+  return str.split(',').map(part => {
+    const item = part.trim().split(/\s*=/)[0].trim();
+    const tokens = item.split(/\s+/);
+    return tokens[tokens.length - 1];
+  }).filter(Boolean);
+}
+
+export function extractDeclaredVariables(line: string, lang: SupportedLang): string[] {
+  const vars: string[] = [];
+  const clean = stripStringsAndComments(line, lang).trim();
+
+  if (lang === 'java') {
+    const forEachMatch = clean.match(/for\s*\(\s*(?:final\s+)?[\w<>\[\]]+\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/);
+    if (forEachMatch) vars.push(forEachMatch[1]);
+
+    const forMatch = clean.match(/for\s*\(\s*(?:final\s+)?[\w<>\[\]]+\s+([a-zA-Z_$][a-zA-Z0-9_$]*(?:\s*=\s*[^;]+)?(?:\s*,\s*[a-zA-Z_$][a-zA-Z0-9_$]*(?:\s*=\s*[^;]+)?)*)\s*;/);
+    if (forMatch) {
+      extractVarList(forMatch[1]).forEach(v => vars.push(v));
+    }
+
+    const declMatch = clean.match(/(?:^|[;{}]\s*)(?:final\s+)?(?:byte|short|int|long|float|double|boolean|char|String|var|ListNode|TreeNode|Node|StringBuilder|List<[^>]+>|Map<[^>]+>|Set<[^>]+>|Queue<[^>]+>|Deque<[^>]+>|Stack<[^>]+>|[\w<>]+(?:\[\])+|[\w<>]+)\s+([a-zA-Z_$][a-zA-Z0-9_$]*(?:\s*=\s*[^,;]+)?(?:\s*,\s*[a-zA-Z_$][a-zA-Z0-9_$]*(?:\s*=\s*[^,;]+)?)*)\s*;/);
+    if (declMatch) {
+      extractVarList(declMatch[1]).forEach(v => vars.push(v));
+    }
+  } else if (lang === 'cpp') {
+    const forRangeMatch = clean.match(/for\s*\(\s*(?:const\s+)?(?:auto|[\w<>:*&]+)\s*&?\s*([a-zA-Z_]\w*)\s*:/);
+    if (forRangeMatch) vars.push(forRangeMatch[1]);
+
+    const forMatch = clean.match(/for\s*\(\s*(?:const\s+)?[\w<>:*&]+\s+([a-zA-Z_]\w*(?:\s*=\s*[^;]+)?(?:\s*,\s*[a-zA-Z_]\w*(?:\s*=\s*[^;]+)?)*)\s*;/);
+    if (forMatch) {
+      extractVarList(forMatch[1]).forEach(v => vars.push(v));
+    }
+
+    const declMatch = clean.match(/(?:^|[;{}]\s*)(?:const\s+)?(?:int|long|long\s+long|double|float|bool|char|size_t|auto|string|ListNode\*?|TreeNode\*?|Node\*?|vector<[\w<>,\s:*&]+>|unordered_map<[\w<>,\s:*&]+>|map<[\w<>,\s:*&]+>|unordered_set<[\w<>,\s:*&]+>|set<[\w<>,\s:*&]+>|queue<[\w<>,\s:*&]+>|stack<[\w<>,\s:*&]+>|pair<[\w<>,\s:*&]+>|[\w:*&<>]+)\s+([a-zA-Z_]\w*(?:\s*=\s*[^,;]+|\s*\([^)]*\))?(?:\s*,\s*[a-zA-Z_]\w*(?:\s*=\s*[^,;]+|\s*\([^)]*\))?)*)\s*;/);
+    if (declMatch) {
+      extractVarList(declMatch[1]).forEach(v => vars.push(v));
+    }
+  } else if (lang === 'go') {
+    const rangeMatch = clean.match(/for\s+([a-zA-Z_]\w*)(?:\s*,\s*([a-zA-Z_]\w*))?\s*:=\s*range/);
+    if (rangeMatch) {
+      if (rangeMatch[1] && rangeMatch[1] !== '_') vars.push(rangeMatch[1]);
+      if (rangeMatch[2] && rangeMatch[2] !== '_') vars.push(rangeMatch[2]);
+    }
+
+    const forMatch = clean.match(/for\s+([a-zA-Z_]\w*)\s*:=/);
+    if (forMatch && !rangeMatch) {
+      if (forMatch[1] !== '_') vars.push(forMatch[1]);
+    }
+
+    const shortDecl = clean.match(/(?:if\s+)?([a-zA-Z_]\w*(?:\s*,\s*[a-zA-Z_]\w*)*)\s*:=/);
+    if (shortDecl && !clean.startsWith('for')) {
+      shortDecl[1].split(',').map(s => s.trim()).filter(s => s && s !== '_').forEach(v => vars.push(v));
+    }
+
+    const varDecl = clean.match(/var\s+([a-zA-Z_]\w*(?:\s*,\s*[a-zA-Z_]\w*)*)/);
+    if (varDecl) {
+      varDecl[1].split(',').map(s => s.trim()).filter(s => s && s !== '_').forEach(v => vars.push(v));
+    }
+  } else if (lang === 'rust') {
+    const forTupleMatch = clean.match(/for\s*\(\s*([a-zA-Z_]\w*)\s*,\s*([a-zA-Z_]\w*)\s*\)\s+in\s+/);
+    if (forTupleMatch) {
+      if (forTupleMatch[1] !== '_') vars.push(forTupleMatch[1]);
+      if (forTupleMatch[2] !== '_') vars.push(forTupleMatch[2]);
+    } else {
+      const forMatch = clean.match(/for\s+([a-zA-Z_]\w*)\s+in\s+/);
+      if (forMatch && forMatch[1] !== '_') vars.push(forMatch[1]);
+    }
+
+    const letMatch = clean.match(/let\s+(?:mut\s+)?([a-zA-Z_]\w*)/);
+    if (letMatch && letMatch[1] !== '_') vars.push(letMatch[1]);
+
+    const letTuple = clean.match(/let\s+(?:mut\s+)?\(\s*([a-zA-Z_]\w*)\s*,\s*([a-zA-Z_]\w*)\s*\)/);
+    if (letTuple) {
+      if (letTuple[1] !== '_') vars.push(letTuple[1]);
+      if (letTuple[2] !== '_') vars.push(letTuple[2]);
+    }
+
+    const whileLet = clean.match(/while\s+let\s+(?:Some|Ok)\s*\(\s*([a-zA-Z_]\w*)\s*\)/);
+    if (whileLet && whileLet[1] !== '_') vars.push(whileLet[1]);
+  }
+
+  return vars.filter(v => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(v) && !KEYWORDS_SET.has(v));
+}
+
+export function emitTraceStatement(lineNum: number, vars: string[], lang: SupportedLang): string {
+  if (lang === 'java') {
+    if (vars.length === 0) return `__bb_emit(${lineNum}, "{}");`;
+    const pairs = vars.map(v => `"${v}", __bb_repr(${v})`).join(', ');
+    return `__bb_emit(${lineNum}, __bb_vars(${pairs}));`;
+  }
+  if (lang === 'cpp') {
+    if (vars.length === 0) return `__bb_emit(${lineNum}, "{}");`;
+    const pairs = vars.map(v => `{"${v}", __bb_repr(${v})}`).join(', ');
+    return `__bb_emit(${lineNum}, __bb_vars({${pairs}}));`;
+  }
+  if (lang === 'go') {
+    if (vars.length === 0) return `__bb_emit(${lineNum}, "{}")`;
+    const pairs = vars.map(v => `"${v}", __bb_repr(${v})`).join(', ');
+    return `__bb_emit(${lineNum}, __bb_vars(${pairs}))`;
+  }
+  if (lang === 'rust') {
+    if (vars.length === 0) return `bb_emit!(${lineNum}, "{}");`;
+    const pairs = vars.map(v => `("${v}", bb_repr(&${v}))`).join(', ');
+    return `bb_emit!(${lineNum}, &bb_vars(&[${pairs}]));`;
+  }
+  return '';
+}
+
+export function normalizeUnbracedBlocks(code: string): string {
+  const lines = code.split('\n');
+  const result: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    const singleLineMatch = trimmed.match(/^(if\s*\([^)]+\)|else\s+if\s*\([^)]+\)|else|for\s*\([^)]+\)|while\s*\([^)]+\))\s+([^{};]+;)$/);
+    if (singleLineMatch) {
+      const header = singleLineMatch[1];
+      const stmt = singleLineMatch[2];
+      const indent = line.match(/^\s*/)?.[0] || '';
+      result.push(`${indent}${header} {`);
+      result.push(`${indent}    ${stmt}`);
+      result.push(`${indent}}`);
+      continue;
+    }
+
+    const isControlHeaderWithoutBrace =
+      /^(if\s*\([^)]+\)|else\s+if\s*\([^)]+\)|else|for\s*\([^)]+\)|while\s*\([^)]+\))$/.test(trimmed) &&
+      !trimmed.endsWith('{');
+
+    if (isControlHeaderWithoutBrace && i + 1 < lines.length) {
+      const nextTrimmed = lines[i + 1].trim();
+      if (!nextTrimmed.startsWith('{')) {
+        const indent = line.match(/^\s*/)?.[0] || '';
+        result.push(`${line} {`);
+        i++;
+        result.push(lines[i]);
+        result.push(`${indent}}`);
+        continue;
+      }
+    }
+
+    result.push(line);
+  }
+
+  return result.join('\n');
+}
+
+export function instrumentCompiledMethodBody(userCode: string, lang: SupportedLang): string {
+  const normalized = (lang === 'java' || lang === 'cpp') ? normalizeUnbracedBlocks(userCode) : userCode;
+  const sig = inspectSignature(userCode, lang);
+  const paramNames = (sig.params || []).map(p => p.name).filter(Boolean);
+
+  const rawLines = normalized.split('\n');
+  const instrumentedLines: string[] = [];
+
+  const scopeStack: Set<string>[] = [new Set(paramNames)];
+
+  function getActiveVars(): string[] {
+    const all = new Set<string>();
+    for (const scope of scopeStack) {
+      for (const v of scope) {
+        all.add(v);
+      }
+    }
+    return Array.from(all);
+  }
+
+  let inMethod = false;
+  let braceDepth = 0;
+  let methodStartLine = -1;
+
+  for (let i = 0; i < rawLines.length; i++) {
+    const origLineNum = i + 1;
+    const line = rawLines[i];
+    const trimmed = line.trim();
+
+    if (
+      trimmed === '' ||
+      trimmed.startsWith('//') ||
+      trimmed.startsWith('/*') ||
+      trimmed.startsWith('*') ||
+      trimmed.startsWith('#') ||
+      trimmed.startsWith('import ') ||
+      trimmed.startsWith('package ') ||
+      trimmed.startsWith('use ')
+    ) {
+      instrumentedLines.push(line);
+      continue;
+    }
+
+    if (!inMethod) {
+      const isFnHeader =
+        (lang === 'java' && /(?:public|private|protected|static|\s)+[\w<>\[\]]+\s+\w+\s*\(/.test(trimmed)) ||
+        (lang === 'cpp' && /\b(?:\w+::)?[\w<>:*&\s]+\s+\w+\s*\([^)]*\)\s*\{?/.test(trimmed) && !trimmed.startsWith('class ') && !trimmed.startsWith('struct ')) ||
+        (lang === 'go' && /^func\s+/.test(trimmed)) ||
+        (lang === 'rust' && /^(?:pub\s+)?fn\s+/.test(trimmed));
+
+      if (isFnHeader) {
+        inMethod = true;
+        methodStartLine = origLineNum;
+        instrumentedLines.push(line);
+
+        if (trimmed.includes('{')) {
+          braceDepth += countChar(stripStringsAndComments(trimmed, lang), '{') - countChar(stripStringsAndComments(trimmed, lang), '}');
+          const active = getActiveVars();
+          instrumentedLines.push('        ' + emitTraceStatement(origLineNum, active, lang));
+        }
+        continue;
+      }
+
+      instrumentedLines.push(line);
+      continue;
+    }
+
+    if (inMethod && braceDepth === 0 && trimmed.startsWith('{')) {
+      braceDepth++;
+      instrumentedLines.push(line);
+      const active = getActiveVars();
+      instrumentedLines.push('        ' + emitTraceStatement(methodStartLine > 0 ? methodStartLine : origLineNum, active, lang));
+      continue;
+    }
+
+    const declaredOnThisLine = extractDeclaredVariables(line, lang);
+    const activeBeforeStmt = getActiveVars();
+
+    const isControlBlockStart =
+      trimmed.startsWith('for ') || trimmed.startsWith('for(') ||
+      trimmed.startsWith('while ') || trimmed.startsWith('while(') ||
+      trimmed.startsWith('if ') || trimmed.startsWith('if(') ||
+      trimmed.startsWith('else if') || trimmed.startsWith('} else if') ||
+      trimmed.startsWith('else') || trimmed.startsWith('} else') ||
+      trimmed.startsWith('switch ') || trimmed.startsWith('switch(');
+
+    const isReturn = trimmed.startsWith('return ') || trimmed.startsWith('return;') || (lang === 'rust' && !trimmed.endsWith(';') && !trimmed.endsWith('}') && !trimmed.endsWith('{') && trimmed.length > 0 && !trimmed.startsWith('let ') && !trimmed.startsWith('for ') && !trimmed.startsWith('if '));
+    const isStatement = trimmed.endsWith(';') || isReturn || isControlBlockStart;
+
+    const openBraces = countChar(stripStringsAndComments(line, lang), '{');
+    const closeBraces = countChar(stripStringsAndComments(line, lang), '}');
+
+    if (closeBraces > 0) {
+      for (let b = 0; b < closeBraces; b++) {
+        if (scopeStack.length > 1) {
+          scopeStack.pop();
+        }
+        braceDepth = Math.max(0, braceDepth - 1);
+      }
+      if (braceDepth === 0) {
+        inMethod = false;
+      }
+    }
+
+    if (inMethod && isStatement && trimmed !== '{' && trimmed !== '}' && !trimmed.startsWith('class ') && !trimmed.startsWith('struct ')) {
+      if (trimmed.startsWith('else {') || trimmed.startsWith('} else {') || trimmed === 'else') {
+        instrumentedLines.push(line);
+        if (openBraces > 0) {
+          for (let b = 0; b < openBraces; b++) {
+            scopeStack.push(new Set());
+            braceDepth++;
+          }
+          instrumentedLines.push('        ' + emitTraceStatement(origLineNum, getActiveVars(), lang));
+        }
+        continue;
+      }
+
+      if (trimmed.startsWith('for') || trimmed.startsWith('while')) {
+        instrumentedLines.push('        ' + emitTraceStatement(origLineNum, activeBeforeStmt, lang));
+        instrumentedLines.push(line);
+
+        if (openBraces > 0) {
+          for (let b = 0; b < openBraces; b++) {
+            const newScope = new Set(declaredOnThisLine);
+            scopeStack.push(newScope);
+            braceDepth++;
+          }
+          instrumentedLines.push('        ' + emitTraceStatement(origLineNum, getActiveVars(), lang));
+        }
+        continue;
+      }
+
+      instrumentedLines.push('        ' + emitTraceStatement(origLineNum, activeBeforeStmt, lang));
+    }
+
+    if (declaredOnThisLine.length > 0) {
+      const topScope = scopeStack[scopeStack.length - 1];
+      for (const v of declaredOnThisLine) {
+        topScope.add(v);
+      }
+    }
+
+    if (openBraces > 0 && !trimmed.startsWith('for') && !trimmed.startsWith('while') && !trimmed.startsWith('else')) {
+      for (let b = 0; b < openBraces; b++) {
+        scopeStack.push(new Set(declaredOnThisLine));
+        braceDepth++;
+      }
+    }
+
+    if (!trimmed.startsWith('for') && !trimmed.startsWith('while') && !trimmed.startsWith('else {') && !trimmed.startsWith('} else {') && trimmed !== 'else') {
+      instrumentedLines.push(line);
+    }
+  }
+
+  return instrumentedLines.join('\n');
+}
+
+// ── 6. Driver Program Builders with Multi-Step Statement Tracing ───────────────
+
 export function buildJavaDriverProgram(userCode: string, inputJson: string | null): string {
   const { imports: userImports, body: userBody } = splitJavaImports(userCode);
 
@@ -1055,12 +1394,11 @@ export function buildJavaDriverProgram(userCode: string, inputJson: string | nul
 
   const traceHelper = [
     "    // ── BB Trace Helpers ──────────────────────────────────────────────────",
-    "",
-    "    private static void __bb_emit(int line, String vars) {",
+    "    public static void __bb_emit(int line, String vars) {",
     "        System.out.println(\"__BB_TRACE__:{\\\"line\\\":\" + line + \",\\\"vars\\\":\" + vars + \"}\");",
     "    }",
     "",
-    "    private static String __bb_vars(String... pairs) {",
+    "    public static String __bb_vars(Object... pairs) {",
     "        StringBuilder sb = new StringBuilder(\"{\");",
     "        for (int i = 0; i < pairs.length; i += 2) {",
     "            if (i > 0) sb.append(\",\");",
@@ -1069,35 +1407,64 @@ export function buildJavaDriverProgram(userCode: string, inputJson: string | nul
     "        return sb.append(\"}\").toString();",
     "    }",
     "",
-    "    private static String __bb_escapeStr(String v) {",
-    "        return v.replace(\"\\\\\", \"\\\\\\\\\").replace(\"\\\"\", \"\\\\\\\"\");",
+    "    public static String __bb_escapeStr(String v) {",
+    "        if (v == null) return \"\";",
+    "        return v.replace(\"\\\\\", \"\\\\\\\\\").replace(\"\\\"\", \"\\\\\\\"\").replace(\"\\n\", \"\\\\n\").replace(\"\\r\", \"\\\\r\").replace(\"\\t\", \"\\\\t\");",
     "    }",
     "",
-    "    private static String __bb_repr(Object v) {",
+    "    public static String __bb_repr(Object v) {",
     "        if (v == null) return \"null\";",
     "        if (v instanceof ListNode) return serializeList((ListNode) v);",
     "        if (v instanceof TreeNode) return serializeTree((TreeNode) v);",
     "        if (v instanceof String) return \"\\\"\" + __bb_escapeStr((String) v) + \"\\\"\";",
+    "        if (v instanceof Character) return \"\\\"\" + __bb_escapeStr(String.valueOf(v)) + \"\\\"\";",
+    "        if (v instanceof Boolean || v instanceof Number) return String.valueOf(v);",
     "        if (v instanceof int[]) return Arrays.toString((int[]) v).replace(\" \", \"\");",
-    "        if (v instanceof int[][]) return Arrays.deepToString((int[][]) v).replace(\" \", \"\");",
+    "        if (v instanceof long[]) return Arrays.toString((long[]) v).replace(\" \", \"\");",
+    "        if (v instanceof double[]) return Arrays.toString((double[]) v).replace(\" \", \"\");",
     "        if (v instanceof boolean[]) return Arrays.toString((boolean[]) v).replace(\" \", \"\");",
+    "        if (v instanceof char[]) return \"\\\"\" + __bb_escapeStr(new String((char[]) v)) + \"\\\"\";",
     "        if (v instanceof Object[]) return Arrays.deepToString((Object[]) v).replace(\" \", \"\");",
-    "        if (v instanceof Collection) return String.valueOf(v).replace(\" \", \"\");",
-    "        return String.valueOf(v);",
+    "        if (v instanceof Map) {",
+    "            Map<?, ?> m = (Map<?, ?>) v;",
+    "            StringBuilder sb = new StringBuilder(\"{\");",
+    "            boolean first = true;",
+    "            for (Map.Entry<?, ?> e : m.entrySet()) {",
+    "                if (!first) sb.append(\",\");",
+    "                first = false;",
+    "                sb.append(\"\\\"\").append(__bb_escapeStr(String.valueOf(e.getKey()))).append(\"\\\":\").append(__bb_repr(e.getValue()));",
+    "            }",
+    "            return sb.append(\"}\").toString();",
+    "        }",
+    "        if (v instanceof Collection) {",
+    "            Collection<?> c = (Collection<?>) v;",
+    "            StringBuilder sb = new StringBuilder(\"[\");",
+    "            boolean first = true;",
+    "            for (Object item : c) {",
+    "                if (!first) sb.append(\",\");",
+    "                first = false;",
+    "                sb.append(__bb_repr(item));",
+    "            }",
+    "            return sb.append(\"]\").toString();",
+    "        }",
+    "        return \"\\\"\" + __bb_escapeStr(String.valueOf(v)) + \"\\\"\";",
     "    }",
   ].join('\n');
 
+  // Perform multi-step statement-level instrumentation
+  const instrumentedBody = instrumentCompiledMethodBody(userBody, 'java');
+
   // Check if the user code contains a class declaration
-  const hasClassDecl = /(?:public\s+|private\s+|protected\s+|static\s+|abstract\s+|final\s+)*class\s+\w+/.test(userBody);
+  const hasClassDecl = /(?:public\s+|private\s+|protected\s+|static\s+|abstract\s+|final\s+)*class\s+\w+/.test(instrumentedBody);
 
   let cleanBody: string;
 
   if (!hasClassDecl) {
-    // User provided method-only code (LeetCode style). Wrap in static class Solution without touching method body.
-    cleanBody = `    static class Solution {\n${userBody}\n    }`;
+    // User provided method-only code (LeetCode style). Wrap in static class Solution with trace helpers.
+    cleanBody = `    static class Solution {\n${traceHelper}\n${instrumentedBody}\n    }`;
   } else {
     // User provided class(es). Strip any main method and normalize class header.
-    let processed = userBody.replace(
+    let processed = instrumentedBody.replace(
       /public\s+static\s+void\s+main\s*\([^)]*\)\s*\{[\s\S]*?\n\s*\}/g,
       ''
     );
@@ -1119,6 +1486,9 @@ export function buildJavaDriverProgram(userCode: string, inputJson: string | nul
       /(^|\n)\s*(?:public\s+|private\s+|protected\s+)?class\s+((?!Solution\b)\w+)/g,
       '$1    static class $2'
     );
+
+    // Inject trace helpers inside Solution class
+    processed = processed.replace(/static class Solution\s*\{/, `static class Solution {\n${traceHelper}\n`);
 
     cleanBody = processed;
   }
@@ -1199,38 +1569,117 @@ export function buildCppDriverProgram(userCode: string, inputJson: string | null
     '#include <queue>',
     '#include <stack>',
     '#include <initializer_list>',
+    '#include <utility>',
   ];
 
   const existingHeaders = new Set(userHeaders.split('\n').map(l => l.trim()).filter(Boolean));
   const extraHeaders = REQUIRED.filter(h => !existingHeaders.has(h));
 
   const traceHelper = [
-    "// -- BB Trace Helpers ------------------------------------------",
+    "// ── BB Trace Helpers ──────────────────────────────────────────",
+    "inline std::string __bb_escapeStr(const std::string& s) {",
+    "    std::string out;",
+    "    for (char c : s) {",
+    "        if (c == '\"') out += \"\\\\\\\"\";",
+    "        else if (c == '\\\\') out += \"\\\\\\\\\";",
+    "        else if (c == '\\n') out += \"\\\\n\";",
+    "        else if (c == '\\r') out += \"\\\\r\";",
+    "        else if (c == '\\t') out += \"\\\\t\";",
+    "        else out += c;",
+    "    }",
+    "    return out;",
+    "}",
+    "",
     "template<typename T>",
-    "std::string __bb_repr(const T& v) { std::ostringstream s; s << v; return s.str(); }",
-    "template<> inline std::string __bb_repr(const bool& v) { return v ? \"true\" : \"false\"; }",
-    "template<> inline std::string __bb_repr(const std::string& v) { return \"\\\"\" + v + \"\\\"\"; }",
-    "template<> inline std::string __bb_repr(ListNode* const& v) { return serializeList(v); }",
-    "template<> inline std::string __bb_repr(TreeNode* const& v) { return serializeTree(v); }",
+    "std::string __bb_repr(const T& v) {",
+    "    std::ostringstream ss;",
+    "    ss << v;",
+    "    return ss.str();",
+    "}",
+    "",
+    "inline std::string __bb_repr(bool v) { return v ? \"true\" : \"false\"; }",
+    "inline std::string __bb_repr(char v) { std::string s = \"\\\"\"; s += v; s += \"\\\"\"; return s; }",
+    "inline std::string __bb_repr(const char* v) { return v ? (\"\\\"\" + __bb_escapeStr(v) + \"\\\"\") : \"null\"; }",
+    "inline std::string __bb_repr(const std::string& v) { return \"\\\"\" + __bb_escapeStr(v) + \"\\\"\"; }",
+    "inline std::string __bb_repr(ListNode* v) { return serializeList(v); }",
+    "inline std::string __bb_repr(TreeNode* v) { return serializeTree(v); }",
+    "",
+    "template<typename T1, typename T2>",
+    "std::string __bb_repr(const std::pair<T1, T2>& p) {",
+    "    return \"[\" + __bb_repr(p.first) + \",\" + __bb_repr(p.second) + \"]\";",
+    "}",
+    "",
     "template<typename T>",
     "std::string __bb_repr(const std::vector<T>& vec) {",
     "    std::string s = \"[\";",
-    "    for (size_t i = 0; i < vec.size(); ++i) { if (i) s += \",\"; s += __bb_repr(vec[i]); }",
+    "    for (size_t i = 0; i < vec.size(); ++i) {",
+    "        if (i) s += \",\";",
+    "        s += __bb_repr(vec[i]);",
+    "    }",
     "    return s + \"]\";",
     "}",
+    "",
+    "template<typename K, typename V>",
+    "std::string __bb_repr(const std::unordered_map<K, V>& m) {",
+    "    std::string s = \"{\";",
+    "    bool first = true;",
+    "    for (const auto& kv : m) {",
+    "        if (!first) s += \",\"; first = false;",
+    "        s += \"\\\"\" + __bb_escapeStr(__bb_repr(kv.first)) + \"\\\":\" + __bb_repr(kv.second);",
+    "    }",
+    "    return s + \"}\";",
+    "}",
+    "",
+    "template<typename K, typename V>",
+    "std::string __bb_repr(const std::map<K, V>& m) {",
+    "    std::string s = \"{\";",
+    "    bool first = true;",
+    "    for (const auto& kv : m) {",
+    "        if (!first) s += \",\"; first = false;",
+    "        s += \"\\\"\" + __bb_escapeStr(__bb_repr(kv.first)) + \"\\\":\" + __bb_repr(kv.second);",
+    "    }",
+    "    return s + \"}\";",
+    "}",
+    "",
+    "template<typename T>",
+    "std::string __bb_repr(const std::unordered_set<T>& set) {",
+    "    std::string s = \"[\";",
+    "    bool first = true;",
+    "    for (const auto& x : set) {",
+    "        if (!first) s += \",\"; first = false;",
+    "        s += __bb_repr(x);",
+    "    }",
+    "    return s + \"]\";",
+    "}",
+    "",
+    "template<typename T>",
+    "std::string __bb_repr(const std::set<T>& set) {",
+    "    std::string s = \"[\";",
+    "    bool first = true;",
+    "    for (const auto& x : set) {",
+    "        if (!first) s += \",\"; first = false;",
+    "        s += __bb_repr(x);",
+    "    }",
+    "    return s + \"]\";",
+    "}",
+    "",
     "inline void __bb_emit(int line, const std::string& vars) {",
     "    std::cout << \"__BB_TRACE__:{\\\"line\\\":\" << line << \",\\\"vars\\\":\" << vars << \"}\" << std::endl;",
     "}",
+    "",
     "inline std::string __bb_vars(std::initializer_list<std::pair<const char*, std::string>> kv) {",
     "    std::string s = \"{\";",
     "    bool first = true;",
-    "    for (auto& p : kv) {",
+    "    for (const auto& p : kv) {",
     "        if (!first) s += \",\"; first = false;",
     "        s += \"\\\"\"; s += p.first; s += \"\\\":\"; s += p.second;",
     "    }",
     "    return s + \"}\";",
     "}"
   ].join('\n');
+
+  // Perform multi-step statement-level instrumentation
+  const instrumentedBody = instrumentCompiledMethodBody(userBody, 'cpp');
 
   const sig = inspectSignature(userCode, 'cpp');
   const fnName = sig.name;
@@ -1297,7 +1746,7 @@ ${argDecls}
     traceHelper,
     'using namespace std;',
     '',
-    userBody,
+    instrumentedBody,
     mainBlock,
   ].filter(s => s.trim() !== '').join('\n');
 }
@@ -1313,26 +1762,79 @@ export function buildGoDriverProgram(userCode: string, inputJson: string | null)
     "\tfmt.Printf(\"__BB_TRACE__:{\\\"line\\\":%d,\\\"vars\\\":%s}\\n\", line, vars)",
     "}",
     "",
+    "func __bb_escapeStr(s string) string {",
+    "\ts = strings.ReplaceAll(s, \"\\\\\", \"\\\\\\\\\")",
+    "\ts = strings.ReplaceAll(s, \"\\\"\", \"\\\\\\\"\")",
+    "\ts = strings.ReplaceAll(s, \"\\n\", \"\\\\n\")",
+    "\ts = strings.ReplaceAll(s, \"\\r\", \"\\\\r\")",
+    "\ts = strings.ReplaceAll(s, \"\\t\", \"\\\\t\")",
+    "\treturn s",
+    "}",
+    "",
     "func __bb_repr(v interface{}) string {",
-    "\tif v == nil { return \"null\" }",
+    "\tif v == nil {",
+    "\t\treturn \"null\"",
+    "\t}",
     "\tswitch val := v.(type) {",
     "\tcase *ListNode:",
     "\t\treturn serializeList(val)",
     "\tcase *TreeNode:",
     "\t\treturn serializeTree(val)",
     "\tcase string:",
-    "\t\treturn \"\\\"\" + strings.ReplaceAll(val, \"\\\"\", \"\\\\\\\"\") + \"\\\"\"",
+    "\t\treturn \"\\\"\" + __bb_escapeStr(val) + \"\\\"\"",
     "\tcase bool:",
-    "\t\tif val { return \"true\" }",
+    "\t\tif val {",
+    "\t\t\treturn \"true\"",
+    "\t\t}",
     "\t\treturn \"false\"",
+    "\tcase int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:",
+    "\t\treturn fmt.Sprintf(\"%d\", val)",
+    "\tcase float32, float64:",
+    "\t\treturn fmt.Sprintf(\"%g\", val)",
     "\tcase []int:",
     "\t\tparts := make([]string, len(val))",
-    "\t\tfor i, x := range val { parts[i] = fmt.Sprintf(\"%d\", x) }",
+    "\t\tfor i, x := range val {",
+    "\t\t\tparts[i] = fmt.Sprintf(\"%d\", x)",
+    "\t\t}",
     "\t\treturn \"[\" + strings.Join(parts, \",\") + \"]\"",
     "\tcase []string:",
     "\t\tparts := make([]string, len(val))",
-    "\t\tfor i, x := range val { parts[i] = \"\\\"\" + x + \"\\\"\" }",
+    "\t\tfor i, x := range val {",
+    "\t\t\tparts[i] = \"\\\"\" + __bb_escapeStr(x) + \"\\\"\"",
+    "\t\t}",
     "\t\treturn \"[\" + strings.Join(parts, \",\") + \"]\"",
+    "\tcase []bool:",
+    "\t\tparts := make([]string, len(val))",
+    "\t\tfor i, x := range val {",
+    "\t\t\tif x {",
+    "\t\t\t\tparts[i] = \"true\"",
+    "\t\t\t} else {",
+    "\t\t\t\tparts[i] = \"false\"",
+    "\t\t\t}",
+    "\t\t}",
+    "\t\treturn \"[\" + strings.Join(parts, \",\") + \"]\"",
+    "\tcase [][]int:",
+    "\t\trows := make([]string, len(val))",
+    "\t\tfor i, row := range val {",
+    "\t\t\tparts := make([]string, len(row))",
+    "\t\t\tfor j, x := range row {",
+    "\t\t\t\tparts[j] = fmt.Sprintf(\"%d\", x)",
+    "\t\t\t}",
+    "\t\t\trows[i] = \"[\" + strings.Join(parts, \",\") + \"]\"",
+    "\t\t}",
+    "\t\treturn \"[\" + strings.Join(rows, \",\") + \"]\"",
+    "\tcase map[int]int:",
+    "\t\tvar parts []string",
+    "\t\tfor k, v := range val {",
+    "\t\t\tparts = append(parts, fmt.Sprintf(\"\\\"%d\\\":%d\", k, v))",
+    "\t\t}",
+    "\t\treturn \"{\" + strings.Join(parts, \",\") + \"}\"",
+    "\tcase map[string]int:",
+    "\t\tvar parts []string",
+    "\t\tfor k, v := range val {",
+    "\t\t\tparts = append(parts, fmt.Sprintf(\"\\\"%s\\\":%d\", __bb_escapeStr(k), v))",
+    "\t\t}",
+    "\t\treturn \"{\" + strings.Join(parts, \",\") + \"}\"",
     "\tdefault:",
     "\t\treturn fmt.Sprintf(\"%v\", val)",
     "\t}",
@@ -1342,13 +1844,18 @@ export function buildGoDriverProgram(userCode: string, inputJson: string | null)
     "\tvar sb strings.Builder",
     "\tsb.WriteString(\"{\")",
     "\tfor i := 0; i+1 < len(pairs); i += 2 {",
-    "\t\tif i > 0 { sb.WriteString(\",\") }",
+    "\t\tif i > 0 {",
+    "\t\t\tsb.WriteString(\",\")",
+    "\t\t}",
     "\t\tsb.WriteString(\"\\\"\" + pairs[i] + \"\\\":\" + pairs[i+1])",
     "\t}",
     "\tsb.WriteString(\"}\")",
     "\treturn sb.String()",
     "}"
   ].join('\n');
+
+  // Perform multi-step statement-level instrumentation
+  const instrumentedBody = instrumentCompiledMethodBody(userBody, 'go');
 
   const sig = inspectSignature(userCode, 'go');
   const fnName = sig.name;
@@ -1398,7 +1905,7 @@ ${argDecls}
     GO_PREAMBLE,
     '',
     traceHelper,
-    userBody,
+    instrumentedBody,
     mainFn,
   ].join('\n');
 }
@@ -1417,10 +1924,42 @@ macro_rules! bb_emit {
     };
 }
 
+fn bb_escape_str(s: &str) -> String {
+    s.replace('\\\\', "\\\\\\\\")
+     .replace('"', "\\\\\"")
+     .replace('\\n', "\\\\n")
+     .replace('\\r', "\\\\r")
+     .replace('\\t', "\\\\t")
+}
+
 fn bb_repr<T: std::fmt::Debug>(v: &T) -> String {
-    format!("{:?}", v)
+    let s = format!("{:?}", v);
+    if s.starts_with('"') && s.ends_with('"') {
+        s
+    } else if s == "true" || s == "false" || s.chars().all(|c| c.is_ascii_digit() || c == '-' || c == '.') {
+        s
+    } else if s.starts_with('[') && s.ends_with(']') {
+        s
+    } else if s.starts_with("Some(") && s.ends_with(')') {
+        s
+    } else if s == "None" {
+        "null".to_string()
+    } else {
+        format!("\"{}\"", bb_escape_str(&s))
+    }
+}
+
+fn bb_vars(pairs: &[(&str, String)]) -> String {
+    let mut parts = Vec::new();
+    for (k, v) in pairs {
+        parts.push(format!("\"{}\":{}", k, v));
+    }
+    format!("{{{}}}", parts.join(","))
 }
 `;
+
+  // Perform multi-step statement-level instrumentation
+  const instrumentedBody = instrumentCompiledMethodBody(userBody, 'rust');
 
   const sig = inspectSignature(userCode, 'rust');
   const fnName = sig.name;
@@ -1435,18 +1974,18 @@ fn bb_repr<T: std::fmt::Debug>(v: &T) -> String {
 
   const initialVarsPairs = args.map((_, i) => {
     const pName = sig.params[i]?.name || `arg${i}`;
-    return `"\\\"${pName}\\\":\\"" + &bb_repr(&__bb_a${i}__) + "\\""`;
-  }).join(' + "," + ');
-  const initialVarsExpr = initialVarsPairs ? `"{" + ${initialVarsPairs} + "}"` : '"{}".to_string()';
+    return `("${pName}", bb_repr(&__bb_a${i}__))`;
+  }).join(', ');
+  const initialVarsExpr = initialVarsPairs ? `&bb_vars(&[${initialVarsPairs}])` : '"{}".to_string()';
 
   const finalVarsPairs = [
     ...args.map((_, i) => {
       const pName = sig.params[i]?.name || `arg${i}`;
-      return `"\\\"${pName}\\\":\\"" + &bb_repr(&__bb_a${i}__) + "\\""`;
+      return `("${pName}", bb_repr(&__bb_a${i}__))`;
     }),
-    ...(sig.isVoid ? [] : ['"\"__result__\":\"" + &bb_repr(&__result__) + "\""'])
-  ].join(' + "," + ');
-  const finalVarsExpr = finalVarsPairs ? `"{" + ${finalVarsPairs} + "}"` : '"{}".to_string()';
+    ...(sig.isVoid ? [] : ['("__result__", bb_repr(&__result__))'])
+  ].join(', ');
+  const finalVarsExpr = finalVarsPairs ? `&bb_vars(&[${finalVarsPairs}])` : '"{}".to_string()';
 
   const lineCount = Math.max(2, userCode.split('\n').length);
 
@@ -1464,9 +2003,9 @@ fn bb_repr<T: std::fmt::Debug>(v: &T) -> String {
   const mainFn = `
 fn main() {
 ${argDecls}
-    bb_emit!(1, &format!("{}", ${initialVarsExpr}));
+    bb_emit!(1, ${initialVarsExpr});
     ${invocation}
-    bb_emit!(${lineCount}, &format!("{}", ${finalVarsExpr}));
+    bb_emit!(${lineCount}, ${finalVarsExpr});
 }
 `;
 
@@ -1475,7 +2014,7 @@ ${argDecls}
     prefixStruct,
     RUST_PREAMBLE,
     traceHelper,
-    userBody,
+    instrumentedBody,
     mainFn,
   ].filter(s => s.trim() !== '').join('\n');
 }
@@ -1484,3 +2023,4 @@ export function extractParamCount(code: string, lang: SupportedLang): number {
   const sig = inspectSignature(code, lang);
   return sig.params.length || 0;
 }
+

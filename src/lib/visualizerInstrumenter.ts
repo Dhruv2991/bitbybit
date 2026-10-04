@@ -20,6 +20,9 @@ import {
   buildCppDriverProgram,
   buildGoDriverProgram,
   buildRustDriverProgram,
+  instrumentCompiledMethodBody,
+  extractDeclaredVariables,
+  normalizeUnbracedBlocks,
   splitCppHeaders,
   splitJavaImports,
   splitGoImports,
@@ -37,6 +40,9 @@ export const buildGoTraceProgram   = buildGoDriverProgram;
 export const buildRustTraceProgram = buildRustDriverProgram;
 
 export {
+  instrumentCompiledMethodBody,
+  extractDeclaredVariables,
+  normalizeUnbracedBlocks,
   splitCppHeaders,
   splitJavaImports,
   splitGoImports,
