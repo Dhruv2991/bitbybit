@@ -337,17 +337,38 @@ async function traceCompiledOnServer(
   });
 
   const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Server trace compilation failed');
+
+  // ── Compilation error (422) ───────────────────────────────────
+  if (res.status === 422) {
+    const compileMsg = data.compileError || data.error || 'Compilation failed';
+    return {
+      steps:  [],
+      stdout: '',
+      stderr: compileMsg,
+      error:  `Compilation error:\n${compileMsg}`,
+    };
   }
 
-  const { steps, cleanStdout } = parseExecutionStdout(data.stdout || '');
+  // ── Infrastructure / network error (5xx) ─────────────────────
+  if (!res.ok) {
+    throw new Error(data.error || 'Server trace execution failed');
+  }
+
+  // ── Successful execution — split stdout into user lines + trace tokens ─
+  const rawStdout = data.stdout || '';
+  const { steps, cleanStdout } = parseExecutionStdout(rawStdout);
+
+  // stderr from Judge0/Wandbox may contain benign linker notes or
+  // actual runtime panics.  Only surface it as an error when it
+  // looks like a real problem (non-empty AND no steps were produced).
+  const stderr     = (data.stderr || '').trim();
+  const isRealErr  = stderr.length > 0 && steps.length === 0;
 
   return {
     steps,
     stdout: cleanStdout,
-    stderr: data.stderr || '',
-    error:  data.stderr ? `Compiler/Runtime notes:\n${data.stderr}` : undefined,
+    stderr,
+    error:  isRealErr ? `Runtime error:\n${stderr}` : undefined,
   };
 }
 
