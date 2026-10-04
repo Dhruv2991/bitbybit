@@ -429,27 +429,37 @@ export function buildJavaTraceProgram(userCode: string, inputJson: string | null
   const existingImportSet = new Set(userImports.split('\n').map(l => l.trim()).filter(Boolean));
   const extraImports = REQUIRED_IMPORTS.filter(im => !existingImportSet.has(im));
 
-  // Java string literals: use \" for embedded quotes.
-  const traceHelper = `
-    private static void __bb_emit(int line, String vars) {
-        System.out.println("__BB_TRACE__:{\\"line\\":"+line+",\\"vars\\":"+vars+"}");
-    }
-    private static String __bb_vars(String... pairs) {
-        StringBuilder sb = new StringBuilder("{");
-        for (int i = 0; i < pairs.length; i += 2) {
-            if (i > 0) sb.append(",");
-            sb.append("\\"").append(pairs[i]).append("\\":").append(pairs[i+1]);
-        }
-        return sb.append("}").toString();
-    }
-    private static String __bb_repr(Object v) {
-        if (v == null) return "null";
-        if (v instanceof String) return "\\"" + ((String)v).replace("\\\\","\\\\\\\\").replace("\\"","\\\\\"") + "\\"";
-        if (v instanceof int[]) return Arrays.toString((int[]) v).replace(" ","");
-        if (v instanceof int[][]) return Arrays.deepToString((int[][]) v).replace(" ","");
-        if (v instanceof boolean[]) return Arrays.toString((boolean[]) v).replace(" ","");
-        return String.valueOf(v);
-    }`;
+  // Build the Java trace helper as an array of Java source lines,
+  // one JS string per Java line — no template-literal nesting.
+  const traceHelper = [
+    "    // ── BB Trace Helpers ──────────────────────────────────────────────────",
+    "",
+    "    private static void __bb_emit(int line, String vars) {",
+    "        System.out.println(\"__BB_TRACE__:{\\\"line\\\":\" + line + \",\\\"vars\\\":\" + vars + \"}\");",
+    "    }",
+    "",
+    "    private static String __bb_vars(String... pairs) {",
+    "        StringBuilder sb = new StringBuilder(\"{\");",
+    "        for (int i = 0; i < pairs.length; i += 2) {",
+    "            if (i > 0) sb.append(\",\");",
+    "            sb.append(\"\\\"\").append(pairs[i]).append(\"\\\":\").append(pairs[i + 1]);",
+    "        }",
+    "        return sb.append(\"}\").toString();",
+    "    }",
+    "",
+    "    private static String __bb_escapeStr(String v) {",
+    "        return v.replace(\"\\\\\", \"\\\\\\\\\").replace(\"\\\"\", \"\\\\\\\"\");",
+    "    }",
+    "",
+    "    private static String __bb_repr(Object v) {",
+    "        if (v == null) return \"null\";",
+    "        if (v instanceof String) return \"\\\"\" + __bb_escapeStr((String) v) + \"\\\"\";",
+    "        if (v instanceof int[]) return Arrays.toString((int[]) v).replace(\" \", \"\");",
+    "        if (v instanceof int[][]) return Arrays.deepToString((int[][]) v).replace(\" \", \"\");",
+    "        if (v instanceof boolean[]) return Arrays.toString((boolean[]) v).replace(\" \", \"\");",
+    "        return String.valueOf(v);",
+    "    }",
+  ].join('\n');
 
   // Strip public class wrapper, rename Solution, remove user main
   const cleanBody = userBody
