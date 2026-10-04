@@ -60,6 +60,55 @@ export function extractFunctionName(code: string, lang: SupportedLang): string {
   }
 }
 
+// -- Parameter Count Extractor & Arg Parser -------------------
+
+export function extractParamCount(code: string, lang: SupportedLang): number {
+  switch (lang) {
+    case 'java': {
+      const m = code.match(/(?:public|private|protected|static|\s)+[\w<>\[\]]+\s+\w+\s*\(([^)]*)\)/);
+      if (!m || !m[1].trim()) return 0;
+      return m[1].split(',').filter(s => s.trim().length > 0).length;
+    }
+    case 'cpp': {
+      const lines = code.split('\n').filter(l => !l.trim().startsWith('//') && !l.trim().startsWith('#'));
+      for (const line of lines) {
+        const m = line.match(/\b(?:\w+::)?\w+[\w<>:*&\s]+\s+(\w+)\s*\(([^)]*)\)\s*\{/);
+        if (m && !['main', 'if', 'for', 'while', 'switch'].includes(m[1])) {
+          if (!m[2].trim()) return 0;
+          return m[2].split(',').filter(s => s.trim().length > 0).length;
+        }
+      }
+      return 0;
+    }
+    case 'rust': {
+      const m = code.match(/fn\s+\w+\s*(?:<[^>]*>)?\s*\(([^)]*)\)/);
+      if (!m || !m[1].trim()) return 0;
+      return m[1].split(',').filter(s => s.trim().length > 0 && !s.includes('&self') && s.trim() !== 'self').length;
+    }
+    case 'go': {
+      const m = code.match(/func\s+(?:\([^)]*\)\s*)?\w+\s*\(([^)]*)\)/);
+      if (!m || !m[1].trim()) return 0;
+      return m[1].split(',').filter(s => s.trim().length > 0).length;
+    }
+    default:
+      return 0;
+  }
+}
+
+export function parseHarnessArgs(inputJson: string | null, paramCount: number): any[] {
+  if (!inputJson || inputJson.trim() === '') return [];
+  try {
+    const parsed = JSON.parse(inputJson);
+    if (!Array.isArray(parsed)) return [parsed];
+    if (paramCount === 1 && parsed.length > 0 && !Array.isArray(parsed[0])) {
+      return [parsed];
+    }
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
 // -- JavaScript Client-Side Tracer ------------------------------
 
 export async function traceJavaScript(
@@ -316,19 +365,23 @@ inline std::string __bb_vars(std::initializer_list<std::pair<const char*, std::s
   const instrumentedBody = instrumentCppBody(userBody);
 
   const fnName = extractFunctionName(userCode, 'cpp');
-  let args: any[] = [];
-  try { args = JSON.parse(inputJson || '[]'); if (!Array.isArray(args)) args = [args]; } catch { args = []; }
+  const paramCount = extractParamCount(userCode, 'cpp');
+  const args = parseHarnessArgs(inputJson, paramCount);
 
   const argDecls = args.map((a, i) => `    ${cppArgType(a)} __bb_a${i}__ = ${cppLiteral(a)};`).join('\n');
   const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
+
+  const classMatch = userBody.match(/class\s+(\w+)\b/);
+  const callInvocation = classMatch
+    ? `${classMatch[1]} __sol__;\n        __sol__.${fnName}(${callArgs});`
+    : `${fnName}(${callArgs});`;
 
   const mainBlock = `
 int main() {
 ${argDecls}
     __bb_emit(0, "{}");
     try {
-        auto __result__ = ${fnName}(${callArgs});
-        (void)__result__;
+        ${callInvocation}
     } catch (const std::exception& e) {
         std::cerr << "RuntimeError: " << e.what() << std::endl;
     } catch (...) {
@@ -336,7 +389,6 @@ ${argDecls}
     }
     return 0;
 }`;
-
   return [
     userHeaders,
     extraHeaders.join('\n'),
@@ -461,15 +513,55 @@ export function buildJavaTraceProgram(userCode: string, inputJson: string | null
     "    }",
   ].join('\n');
 
-  // Strip public class wrapper, rename Solution, remove user main
-  const cleanBody = userBody
-    .replace(/public\s+class\s+\w+\s*\{/, 'static class Solution {')
-    .replace(/public\s+static\s+void\s+main\s*\(String\[\]\s*\w+\)\s*\{[\s\S]*?\n\s*\}/, '');
+  // Check if the user code contains a class declaration
+  const hasClassDecl = /(?:public\s+|private\s+|protected\s+|static\s+|abstract\s+|final\s+)*class\s+\w+/.test(userBody);
 
-  const instrumentedBody = instrumentJavaBody(cleanBody);
+  let cleanBody: string;
+  let lineOffset = 0;
 
-  let args: any[] = [];
-  try { args = JSON.parse(inputJson || '[]'); if (!Array.isArray(args)) args = [args]; } catch { args = []; }
+  if (!hasClassDecl) {
+    // User provided method-only code (LeetCode style method submission).
+    // Automatically wrap in static class Solution.
+    cleanBody = `    static class Solution {\n${userBody}\n    }`;
+    lineOffset = 1; // 1 prepended line before user code
+  } else {
+    // User provided class(es).
+    // 1. Strip any existing public static void main so it does not conflict with our harness
+    let processed = userBody.replace(
+      /public\s+static\s+void\s+main\s*\([^)]*\)\s*\{[\s\S]*?\n\s*\}/g,
+      ''
+    );
+
+    // 2. Check if there is a class named Solution
+    const hasSolutionClass = /\bclass\s+Solution\b/.test(processed);
+
+    if (hasSolutionClass) {
+      // Make `public class Solution` or `class Solution` -> `static class Solution`
+      processed = processed.replace(
+        /(?:public\s+|private\s+|protected\s+)?class\s+Solution\b/g,
+        'static class Solution'
+      );
+    } else {
+      // Rename the first class to `static class Solution` so harness Solution instantiates cleanly
+      processed = processed.replace(
+        /(?:public\s+|private\s+|protected\s+)?class\s+\w+/,
+        'static class Solution'
+      );
+    }
+
+    // Ensure any auxiliary classes (e.g. TreeNode, ListNode) are also static inner classes
+    processed = processed.replace(
+      /(^|\n)\s*(?:public\s+|private\s+|protected\s+)?class\s+((?!Solution\b)\w+)/g,
+      '$1    static class $2'
+    );
+
+    cleanBody = processed;
+  }
+
+  const instrumentedBody = instrumentJavaBody(cleanBody, lineOffset);
+
+  const paramCount = extractParamCount(userCode, 'java');
+  const args = parseHarnessArgs(inputJson, paramCount);
 
   const fnName = extractFunctionName(userCode, 'java');
   const argDecls = args.map((a, i) => `        ${javaArgType(a)} __bb_a${i}__ = ${javaLiteral(a)};`).join('\n');
@@ -489,7 +581,7 @@ export function buildJavaTraceProgram(userCode: string, inputJson: string | null
     argDecls,
     '            Solution __sol__ = new Solution();',
     '            __bb_emit(0, "{}");',
-    `            Object __result__ = __sol__.${fnName}(${callArgs});`,
+    `            __sol__.${fnName}(${callArgs});`,
     '            System.err.flush();',
     '        } catch (Exception e) {',
     '            System.err.println("RuntimeError: " + e.getMessage());',
@@ -499,20 +591,35 @@ export function buildJavaTraceProgram(userCode: string, inputJson: string | null
   ].join('\n');
 }
 
-function instrumentJavaBody(body: string): string {
+function instrumentJavaBody(body: string, lineOffset: number = 0): string {
   const lines = body.split('\n');
   const result: string[] = [];
   let depth = 0;
-  let userLineNum = 0;
+  let rawLineNum = 0;
   const varStack: string[][] = [[]];
 
   for (const line of lines) {
-    userLineNum++;
+    rawLineNum++;
+    const userLineNum = Math.max(1, rawLineNum - lineOffset);
     const trimmed = line.trim();
     result.push(line);
 
     const opens  = (line.match(/\{/g) || []).length;
     const closes = (line.match(/\}/g) || []).length;
+
+    // Track parameters in method signatures at depth 1
+    if (depth === 1 && opens > 0) {
+      const methodMatch = trimmed.match(/(?:public|private|protected|static|\s)+[\w<>\[\]]+\s+(\w+)\s*\(([^)]*)\)/);
+      if (methodMatch && methodMatch[2]) {
+        const params = methodMatch[2]
+          .split(',')
+          .map(p => p.trim().split(/\s+/).pop())
+          .filter((p): p is string => Boolean(p && !p.includes('[') && !p.includes(']')));
+        if (params.length > 0) {
+          (varStack[varStack.length - 1] || []).push(...params);
+        }
+      }
+    }
 
     if (depth >= 2) {
       const varMatch = trimmed.match(/^(?:int|long|double|float|boolean|char|String|List|Map|Set|var)\s+(\w+)\s*[=;]/);
@@ -526,7 +633,7 @@ function instrumentJavaBody(body: string): string {
       !trimmed.startsWith('import') &&
       !trimmed.startsWith('package')
     ) {
-      const allVars = varStack.flat();
+      const allVars = [...new Set(varStack.flat())];
       const pairs = allVars.map(v => `"${v}", __bb_repr(${v})`).join(', ');
       const varsExpr = allVars.length > 0 ? `__bb_vars(${pairs})` : '"{}"';
       const indent = line.match(/^(\s*)/)?.[1] ?? '        ';
@@ -626,8 +733,8 @@ func __bb_vars(pairs ...string) string {
 
   const instrumentedBody = instrumentGoBody(userBody);
 
-  let args: any[] = [];
-  try { args = JSON.parse(inputJson || '[]'); if (!Array.isArray(args)) args = [args]; } catch { args = []; }
+  const paramCount = extractParamCount(userCode, 'go');
+  const args = parseHarnessArgs(inputJson, paramCount);
 
   const fnName = extractFunctionName(userCode, 'go');
   const argDecls = args.map((a, i) => {
@@ -636,14 +743,17 @@ func __bb_vars(pairs ...string) string {
   }).join('\n');
   const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
 
+  const fnSig = userCode.match(new RegExp(`func\\s+${fnName}\\s*\\([^)]*\\)\\s*([^{]*)`));
+  const hasReturn = fnSig && fnSig[1] && fnSig[1].trim() !== '';
+  const callInvocation = hasReturn ? `_ = ${fnName}(${callArgs})` : `${fnName}(${callArgs})`;
+
   const mainFn = `
 func main() {
 ${argDecls}
 \t__bb_emit(0, "{}")
-\t_ = ${fnName}(${callArgs})
+\t${callInvocation}
 }
 `;
-
   return [
     packageLine || 'package main',
     '',
@@ -761,12 +871,14 @@ function goLiteral(v: any, type: string): string {
 export function buildRustTraceProgram(userCode: string, inputJson: string | null): string {
   const { uses: userUses, body: userBody } = splitRustUses(userCode);
 
-  // Rust macro: {} in println! format string are format placeholders.
-  // To print a literal { we use {{, to print } we use }}.
+  const hasImplSolution = /impl\s+Solution\b/.test(userBody);
+  const hasStructSolution = /struct\s+Solution\b/.test(userBody);
+  const prefixStruct = (hasImplSolution && !hasStructSolution) ? 'struct Solution;\n' : '';
+
   const traceHelper = `
 macro_rules! bb_emit {
     ($line:expr, $vars:expr) => {
-        println!("__BB_TRACE__:{{\\\"line\\\":{},\\\"vars\\\":{}}}", $line, $vars);
+        println!("__BB_TRACE__:{{\\"line\\":{},\\"vars\\":{}}}", $line, $vars);
     };
 }
 
@@ -776,7 +888,7 @@ fn bb_repr<T: std::fmt::Debug>(v: &T) -> String {
 
 macro_rules! bb_vars {
     () => { "{}".to_string() };
-    ($($k:literal => $v:expr),* $(,)?) => {{
+    ($($k:literal => $v:expr),* $(\,)?) => {{
         let mut __s = String::from("{");
         let mut __first = true;
         $(
@@ -792,8 +904,8 @@ macro_rules! bb_vars {
 
   const instrumentedBody = instrumentRustBody(userBody);
 
-  let args: any[] = [];
-  try { args = JSON.parse(inputJson || '[]'); if (!Array.isArray(args)) args = [args]; } catch { args = []; }
+  const paramCount = extractParamCount(userCode, 'rust');
+  const args = parseHarnessArgs(inputJson, paramCount);
 
   const fnName = extractFunctionName(userCode, 'rust');
   const argDecls = args.map((a, i) => {
@@ -802,21 +914,25 @@ macro_rules! bb_vars {
   }).join('\n');
   const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
 
+  const callInvocation = hasImplSolution
+    ? `Solution::${fnName}(${callArgs});`
+    : `let _ = ${fnName}(${callArgs});`;
+
   const mainFn = `
 fn main() {
 ${argDecls}
     bb_emit!(0, "{}");
-    let _ = ${fnName}(${callArgs});
+    ${callInvocation}
 }
 `;
 
   return [
     userUses,
-    '',
+    prefixStruct,
     traceHelper,
     instrumentedBody,
     mainFn,
-  ].join('\n');
+  ].filter(s => s.trim() !== '').join('\n');
 }
 
 function instrumentRustBody(body: string): string {
