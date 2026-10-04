@@ -1,3 +1,14 @@
+import {
+  inspectSignature,
+  JAVA_PREAMBLE,
+  CPP_PREAMBLE,
+  GO_PREAMBLE,
+  RUST_PREAMBLE,
+  PYTHON_PREAMBLE,
+  JS_PREAMBLE,
+  generateArgDeserializer,
+  parseHarnessArgs,
+} from './leetCodeHarness';
 // ------------------------------------------------------------
 // src/lib/visualizerInstrumenter.ts
 // Multi-language code instrumenter and test harness builder
@@ -95,20 +106,6 @@ export function extractParamCount(code: string, lang: SupportedLang): number {
   }
 }
 
-export function parseHarnessArgs(inputJson: string | null, paramCount: number): any[] {
-  if (!inputJson || inputJson.trim() === '') return [];
-  try {
-    const parsed = JSON.parse(inputJson);
-    if (!Array.isArray(parsed)) return [parsed];
-    if (paramCount === 1 && parsed.length > 0 && !Array.isArray(parsed[0])) {
-      return [parsed];
-    }
-    return parsed;
-  } catch {
-    return [];
-  }
-}
-
 // -- JavaScript Client-Side Tracer ------------------------------
 
 export async function traceJavaScript(
@@ -178,6 +175,7 @@ export async function traceJavaScript(
       '__bb_print__',
       '__args__',
       `
+      ${JS_PREAMBLE}
       const console = {
         log: (...args) => __bb_print__(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')),
         warn: (...args) => __bb_print__(args.join(' ')),
@@ -343,6 +341,8 @@ template<typename T>
 std::string __bb_repr(const T& v) { std::ostringstream s; s << v; return s.str(); }
 template<> std::string __bb_repr(const bool& v) { return v ? "true" : "false"; }
 template<> std::string __bb_repr(const std::string& v) { return "\\"" + v + "\\""; }
+template<> inline std::string __bb_repr(ListNode* const& v) { return serializeList(v); }
+template<> inline std::string __bb_repr(TreeNode* const& v) { return serializeTree(v); }
 template<typename T>
 std::string __bb_repr(const std::vector<T>& vec) {
     std::string s = "[";
@@ -364,11 +364,15 @@ inline std::string __bb_vars(std::initializer_list<std::pair<const char*, std::s
 
   const instrumentedBody = instrumentCppBody(userBody);
 
-  const fnName = extractFunctionName(userCode, 'cpp');
-  const paramCount = extractParamCount(userCode, 'cpp');
-  const args = parseHarnessArgs(inputJson, paramCount);
+  const sig = inspectSignature(userCode, 'cpp');
+  const fnName = sig.name;
+  const paramCount = sig.params.length || 1;
+  const args = parseHarnessArgs(inputJson, paramCount, sig.params);
 
-  const argDecls = args.map((a, i) => `    ${cppArgType(a)} __bb_a${i}__ = ${cppLiteral(a)};`).join('\n');
+  const argDecls = args.map((a, i) => {
+    const param = sig.params[i] || { name: `arg${i}`, rawType: 'int', kind: 'primitive' };
+    return generateArgDeserializer(param, a, 'cpp', i).decl;
+  }).join('\n');
   const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
 
   const classMatch = userBody.match(/class\s+(\w+)\b/);
@@ -392,6 +396,9 @@ ${argDecls}
   return [
     userHeaders,
     extraHeaders.join('\n'),
+    '#include <queue>',
+    '#include <unordered_set>',
+    CPP_PREAMBLE,
     '',
     traceHelper,
     'using namespace std;',
@@ -560,11 +567,15 @@ export function buildJavaTraceProgram(userCode: string, inputJson: string | null
 
   const instrumentedBody = instrumentJavaBody(cleanBody, lineOffset);
 
-  const paramCount = extractParamCount(userCode, 'java');
-  const args = parseHarnessArgs(inputJson, paramCount);
+  const sig = inspectSignature(userCode, 'java');
+  const fnName = sig.name;
+  const paramCount = sig.params.length || 1;
+  const args = parseHarnessArgs(inputJson, paramCount, sig.params);
 
-  const fnName = extractFunctionName(userCode, 'java');
-  const argDecls = args.map((a, i) => `        ${javaArgType(a)} __bb_a${i}__ = ${javaLiteral(a)};`).join('\n');
+  const argDecls = args.map((a, i) => {
+    const param = sig.params[i] || { name: `arg${i}`, rawType: 'int', kind: 'primitive' };
+    return generateArgDeserializer(param, a, 'java', i).decl;
+  }).join('\n');
   const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
 
   return [
@@ -576,6 +587,7 @@ export function buildJavaTraceProgram(userCode: string, inputJson: string | null
     '',
     instrumentedBody,
     '',
+        JAVA_PREAMBLE,
     '    public static void main(String[] args) {',
     '        try {',
     argDecls,
@@ -733,13 +745,14 @@ func __bb_vars(pairs ...string) string {
 
   const instrumentedBody = instrumentGoBody(userBody);
 
-  const paramCount = extractParamCount(userCode, 'go');
-  const args = parseHarnessArgs(inputJson, paramCount);
+  const sig = inspectSignature(userCode, 'go');
+  const fnName = sig.name;
+  const paramCount = sig.params.length || 1;
+  const args = parseHarnessArgs(inputJson, paramCount, sig.params);
 
-  const fnName = extractFunctionName(userCode, 'go');
   const argDecls = args.map((a, i) => {
-    const goT = goArgType(a);
-    return `\tvar __bb_a${i}__ ${goT} = ${goLiteral(a, goT)}`;
+    const param = sig.params[i] || { name: `arg${i}`, rawType: 'int', kind: 'primitive' };
+    return generateArgDeserializer(param, a, 'go', i).decl;
   }).join('\n');
   const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
 
@@ -758,6 +771,7 @@ ${argDecls}
     packageLine || 'package main',
     '',
     mergedImports,
+    GO_PREAMBLE,
     '',
     traceHelper,
     instrumentedBody,
@@ -904,13 +918,14 @@ macro_rules! bb_vars {
 
   const instrumentedBody = instrumentRustBody(userBody);
 
-  const paramCount = extractParamCount(userCode, 'rust');
-  const args = parseHarnessArgs(inputJson, paramCount);
+  const sig = inspectSignature(userCode, 'rust');
+  const fnName = sig.name;
+  const paramCount = sig.params.length || 1;
+  const args = parseHarnessArgs(inputJson, paramCount, sig.params);
 
-  const fnName = extractFunctionName(userCode, 'rust');
   const argDecls = args.map((a, i) => {
-    const rt = rustArgType(a);
-    return `    let __bb_a${i}__: ${rt} = ${rustLiteral(a)};`;
+    const param = sig.params[i] || { name: `arg${i}`, rawType: 'i32', kind: 'primitive' };
+    return generateArgDeserializer(param, a, 'rust', i).decl;
   }).join('\n');
   const callArgs = args.map((_, i) => `__bb_a${i}__`).join(', ');
 
@@ -929,6 +944,7 @@ ${argDecls}
   return [
     userUses,
     prefixStruct,
+    RUST_PREAMBLE,
     traceHelper,
     instrumentedBody,
     mainFn,
