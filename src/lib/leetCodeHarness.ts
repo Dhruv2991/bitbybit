@@ -489,6 +489,10 @@ func serializeTree(root *TreeNode) string {
 
 export const RUST_PREAMBLE = `
 // ── Built-in LeetCode Data Structures ──────────────────────────────────────
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::collections::VecDeque;
+
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct ListNode {
     pub val: i32,
@@ -501,9 +505,6 @@ impl ListNode {
         ListNode { next: None, val }
     }
 }
-
-use std::rc::Rc;
-use std::cell::RefCell;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TreeNode {
@@ -536,6 +537,55 @@ pub fn serialize_list(mut head: Option<Box<ListNode>>) -> String {
         head = node.next;
     }
     format!("[{}]", parts.join(","))
+}
+
+pub fn deserialize_tree(vals: &[Option<i32>]) -> Option<Rc<RefCell<TreeNode>>> {
+    if vals.is_empty() || vals[0].is_none() { return None; }
+    let root = Rc::new(RefCell::new(TreeNode::new(vals[0].unwrap())));
+    let mut queue = VecDeque::new();
+    queue.push_back(Rc::clone(&root));
+    let mut i = 1;
+    while !queue.is_empty() && i < vals.len() {
+        let curr = queue.pop_front().unwrap();
+        if i < vals.len() {
+            if let Some(val) = vals[i] {
+                let left = Rc::new(RefCell::new(TreeNode::new(val)));
+                curr.borrow_mut().left = Some(Rc::clone(&left));
+                queue.push_back(left);
+            }
+            i += 1;
+        }
+        if i < vals.len() {
+            if let Some(val) = vals[i] {
+                let right = Rc::new(RefCell::new(TreeNode::new(val)));
+                curr.borrow_mut().right = Some(Rc::clone(&right));
+                queue.push_back(right);
+            }
+            i += 1;
+        }
+    }
+    Some(root)
+}
+
+pub fn serialize_tree(root: Option<Rc<RefCell<TreeNode>>>) -> String {
+    if root.is_none() { return "[]".to_string(); }
+    let mut list = Vec::new();
+    let mut queue = VecDeque::new();
+    queue.push_back(root);
+    while let Some(node_opt) = queue.pop_front() {
+        if let Some(node) = node_opt {
+            let n = node.borrow();
+            list.push(n.val.to_string());
+            queue.push_back(n.left.clone());
+            queue.push_back(n.right.clone());
+        } else {
+            list.push("null".to_string());
+        }
+    }
+    while !list.is_empty() && list.last().map(|s| s.as_str()) == Some("null") {
+        list.pop();
+    }
+    format!("[{}]", list.join(","))
 }
 `;
 
