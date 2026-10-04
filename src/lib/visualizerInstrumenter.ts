@@ -408,6 +408,192 @@ ${argDecls}
   ].filter(s => s.trim() !== '').join('\n');
 }
 
+
+// ── Universal Variable Extractors for Compiled Languages ────────
+
+const JAVA_KEYWORDS = new Set([
+  'abstract', 'assert', 'boolean', 'break', 'byte', 'case', 'catch', 'char', 'class', 'const',
+  'continue', 'default', 'do', 'double', 'else', 'enum', 'extends', 'final', 'finally', 'float',
+  'for', 'goto', 'if', 'implements', 'import', 'instanceof', 'int', 'interface', 'long', 'native',
+  'new', 'package', 'private', 'protected', 'public', 'return', 'short', 'static', 'strictfp',
+  'super', 'switch', 'synchronized', 'this', 'throw', 'throws', 'transient', 'try', 'void',
+  'volatile', 'while', 'true', 'false', 'null', 'var', 'record', 'yield', 'sealed', 'non-sealed'
+]);
+
+function extractJavaVars(line: string): string[] {
+  const vars: string[] = [];
+  const trimmed = line.trim();
+
+  // For-each loop: for (Type var : expr)
+  const forEachMatch = trimmed.match(/for\s*\(\s*(?:final\s+)?(?:[\w<>\[\],\s?]+?)\s+([a-zA-Z_]\w*)\s*:/);
+  if (forEachMatch && !JAVA_KEYWORDS.has(forEachMatch[1])) {
+    vars.push(forEachMatch[1]);
+  }
+
+  // Standard for loop: for (Type i = 0, j = n; ...)
+  const forStandardMatch = trimmed.match(/for\s*\(\s*(?:final\s+)?(?:[\w<>\[\],\s?]+?)\s+([^;]+);/);
+  if (forStandardMatch) {
+    const decls = forStandardMatch[1].split(',');
+    for (const d of decls) {
+      const vMatch = d.trim().match(/(?:[\w<>\[\],\s?]+\s+)?([a-zA-Z_]\w*)\s*=/);
+      if (vMatch && !JAVA_KEYWORDS.has(vMatch[1])) vars.push(vMatch[1]);
+    }
+  }
+
+  // Regular declarations: Type var1 = val, var2 = val; or Type var;
+  if (
+    !trimmed.startsWith('return') &&
+    !trimmed.startsWith('throw') &&
+    !trimmed.startsWith('System.') &&
+    !trimmed.startsWith('if') &&
+    !trimmed.startsWith('while') &&
+    !trimmed.startsWith('for') &&
+    !trimmed.startsWith('switch') &&
+    !trimmed.startsWith('case') &&
+    !trimmed.startsWith('break') &&
+    !trimmed.startsWith('continue') &&
+    !trimmed.startsWith('//') &&
+    !trimmed.startsWith('/*')
+  ) {
+    const declMatch = trimmed.match(/^(?:final\s+)?(?:[\w<>\[\],\s?]+?)\s+([a-zA-Z_]\w*(?:\s*=\s*[^,;]+)?(?:\s*,\s*[a-zA-Z_]\w*(?:\s*=\s*[^,;]+)?)*)\s*;/);
+    if (declMatch) {
+      const declList = declMatch[1].split(',');
+      for (const d of declList) {
+        const v = d.trim().split(/\s*=/)[0].trim().split(/\s+/).pop();
+        if (v && /^[a-zA-Z_]\w*$/.test(v) && !JAVA_KEYWORDS.has(v)) {
+          vars.push(v);
+        }
+      }
+    }
+  }
+
+  return vars;
+}
+
+const CPP_KEYWORDS = new Set([
+  'alignas', 'alignof', 'and', 'and_eq', 'asm', 'atomic_cancel', 'atomic_commit', 'atomic_noexcept',
+  'auto', 'bitand', 'bitor', 'bool', 'break', 'case', 'catch', 'char', 'char8_t', 'char16_t',
+  'char32_t', 'class', 'compl', 'concept', 'const', 'consteval', 'constexpr', 'constinit',
+  'const_cast', 'continue', 'co_await', 'co_return', 'co_yield', 'decltype', 'default', 'delete',
+  'do', 'double', 'dynamic_cast', 'else', 'enum', 'explicit', 'export', 'extern', 'false',
+  'float', 'for', 'friend', 'goto', 'if', 'inline', 'int', 'long', 'mutable', 'namespace',
+  'new', 'noexcept', 'not', 'not_eq', 'nullptr', 'operator', 'or', 'or_eq', 'private',
+  'protected', 'public', 'reflexpr', 'register', 'reinterpret_cast', 'requires', 'return',
+  'short', 'signed', 'sizeof', 'static', 'static_assert', 'static_cast', 'struct', 'switch',
+  'synchronized', 'template', 'this', 'thread_local', 'throw', 'true', 'try', 'typedef',
+  'typeid', 'typename', 'union', 'unsigned', 'using', 'virtual', 'void', 'volatile', 'wchar_t',
+  'while', 'xor', 'xor_eq', 'std', 'vector', 'string', 'map', 'unordered_map', 'set', 'unordered_set', 'queue', 'stack', 'pair'
+]);
+
+function extractCppVars(line: string): string[] {
+  const vars: string[] = [];
+  const trimmed = line.trim();
+
+  // Range-based for: for (auto& x : vec) or for (int x : vec)
+  const rangeFor = trimmed.match(/for\s*\(\s*(?:const\s+)?(?:auto|[\w<>:*&\s]+?)\s+([*&]?\s*([a-zA-Z_]\w*))\s*:/);
+  if (rangeFor && !CPP_KEYWORDS.has(rangeFor[2])) vars.push(rangeFor[2]);
+
+  // Standard for loop: for (int i = 0, j = 1; ...)
+  const standardFor = trimmed.match(/for\s*\(\s*([^;]+);/);
+  if (standardFor) {
+    const decls = standardFor[1].split(',');
+    for (const d of decls) {
+      const vMatch = d.trim().match(/(?:[\w<>:*&\s]+\s+)?([*&]?\s*([a-zA-Z_]\w*))\s*=/);
+      if (vMatch && !CPP_KEYWORDS.has(vMatch[2])) vars.push(vMatch[2]);
+    }
+  }
+
+  // Regular declarations: Type var1 = val, var2 = val; or Type var(arg);
+  if (
+    !trimmed.startsWith('return') &&
+    !trimmed.startsWith('cout') &&
+    !trimmed.startsWith('cin') &&
+    !trimmed.startsWith('if') &&
+    !trimmed.startsWith('while') &&
+    !trimmed.startsWith('for') &&
+    !trimmed.startsWith('using') &&
+    !trimmed.startsWith('#') &&
+    !trimmed.startsWith('//')
+  ) {
+    const declMatch = trimmed.match(/^(?:const\s+)?(?:[\w<>:*&\s]+?)\s+([*&]?\s*[a-zA-Z_]\w*(?:\s*=\s*[^,;]+|\s*\([^)]*\))?(?:\s*,\s*[*&]?\s*[a-zA-Z_]\w*(?:\s*=\s*[^,;]+|\s*\([^)]*\))?)*)\s*;/);
+    if (declMatch) {
+      const declList = declMatch[1].split(',');
+      for (const d of declList) {
+        const cleaned = d.trim().replace(/[*&]/g, '').split(/\s*=/)[0].split(/\s*\(/)[0].trim().split(/\s+/).pop();
+        if (cleaned && /^[a-zA-Z_]\w*$/.test(cleaned) && !CPP_KEYWORDS.has(cleaned)) {
+          vars.push(cleaned);
+        }
+      }
+    }
+  }
+
+  return vars;
+}
+
+function extractGoVars(line: string): string[] {
+  const vars: string[] = [];
+  const trimmed = line.trim();
+
+  // Range loop: for i, v := range nums / for _, v := range nums / for i := range nums
+  const rangeMatch = trimmed.match(/for\s+([a-zA-Z0-9_,\s]+)\s*:=\s*range\b/);
+  if (rangeMatch) {
+    const names = rangeMatch[1].split(',').map(s => s.trim()).filter(s => s && s !== '_');
+    vars.push(...names);
+  }
+
+  // Standard for loop: for i := 0; ...
+  const forMatch = trimmed.match(/for\s+([a-zA-Z0-9_,\s]+)\s*:=/);
+  if (forMatch && !trimmed.includes('range')) {
+    const names = forMatch[1].split(',').map(s => s.trim()).filter(s => s && s !== '_');
+    vars.push(...names);
+  }
+
+  // Short variable declarations: a, b := 1, 2
+  const shortDecl = trimmed.match(/^([a-zA-Z0-9_,\s]+)\s*:=/);
+  if (shortDecl && !trimmed.startsWith('for')) {
+    const names = shortDecl[1].split(',').map(s => s.trim()).filter(s => s && s !== '_');
+    vars.push(...names);
+  }
+
+  // Var declarations: var a, b int = 1, 2 or var a int
+  const varDecl = trimmed.match(/^var\s+([a-zA-Z0-9_,\s]+)(?:\s+[\w*\[\]]+|\s*=)/);
+  if (varDecl) {
+    const names = varDecl[1].split(',').map(s => s.trim()).filter(s => s && s !== '_');
+    vars.push(...names);
+  }
+
+  return vars;
+}
+
+function extractRustVars(line: string): string[] {
+  const vars: string[] = [];
+  const trimmed = line.trim();
+
+  // For loop: for (i, x) in ... or for x in ...
+  const forMatch = trimmed.match(/for\s+(?:&|mut\s+)?([a-zA-Z0-9_,\s()&]+)\s+in\b/);
+  if (forMatch) {
+    const raw = forMatch[1].replace(/[()&]/g, '');
+    const names = raw.split(',').map(s => s.trim()).filter(s => s && s !== '_' && !s.startsWith('mut '));
+    for (const n of names) {
+      const clean = n.replace(/^mut\s+/, '').trim();
+      if (clean && clean !== '_') vars.push(clean);
+    }
+  }
+
+  // Let bindings: let mut a = ..., let (a, b) = ..., let a: i32 = ...
+  const letMatch = trimmed.match(/^let\s+(?:mut\s+)?([a-zA-Z0-9_,\s()&]+?)(?::\s*[^=]+)?\s*=/);
+  if (letMatch) {
+    const raw = letMatch[1].replace(/[()&]/g, '');
+    const names = raw.split(',').map(s => s.trim()).filter(s => s && s !== '_');
+    for (const n of names) {
+      const clean = n.replace(/^mut\s+/, '').trim();
+      if (clean && clean !== '_' && /^[a-zA-Z_]\w*$/.test(clean)) vars.push(clean);
+    }
+  }
+
+  return vars;
+}
+
 function instrumentCppBody(body: string): string {
   const lines = body.split('\n');
   const result: string[] = [];
@@ -423,19 +609,35 @@ function instrumentCppBody(body: string): string {
     const opens  = (line.match(/\{/g) || []).length;
     const closes = (line.match(/\}/g) || []).length;
 
-    if (depth > 0) {
-      const varMatch = trimmed.match(/^(?:int|long|double|float|bool|char|auto|std::string|string)\s+(\w+)/);
-      if (varMatch) (varStack[varStack.length - 1] || []).push(varMatch[1]);
+    // Track parameters in method signatures at depth 0 or 1
+    if (depth <= 1 && opens > 0) {
+      const methodMatch = trimmed.match(/\b(?:\w+::)?(?:[\w<>:*&\s]+)\s+(\w+)\s*\(([^)]*)\)\s*\{/);
+      if (methodMatch && methodMatch[2] && !['if', 'for', 'while', 'switch'].includes(methodMatch[1])) {
+        const params = methodMatch[2]
+          .split(',')
+          .map(p => p.trim().replace(/[*&]/g, '').split(/\s*=/)[0].trim().split(/\s+/).pop())
+          .filter((p): p is string => Boolean(p && /^[a-zA-Z_]\w*$/.test(p) && !CPP_KEYWORDS.has(p)));
+        if (params.length > 0) {
+          (varStack[varStack.length - 1] || []).push(...params);
+        }
+      }
+    }
+
+    if (depth >= 1) {
+      const newVars = extractCppVars(line);
+      if (newVars.length > 0) {
+        (varStack[varStack.length - 1] || []).push(...newVars);
+      }
     }
 
     if (
-      depth > 0 &&
+      depth >= 1 &&
       trimmed.endsWith(';') &&
       !trimmed.startsWith('//') &&
       !trimmed.startsWith('#') &&
       !trimmed.startsWith('using ')
     ) {
-      const allVars = varStack.flat();
+      const allVars = [...new Set(varStack.flat())];
       const kvPairs = allVars.map(v => `{"${v}", __bb_repr(${v})}`).join(', ');
       const varsExpr = allVars.length > 0 ? `__bb_vars({${kvPairs}})` : '"{}"';
       result.push(`    __bb_emit(${userLineNum}, ${varsExpr});`);
@@ -625,8 +827,8 @@ function instrumentJavaBody(body: string, lineOffset: number = 0): string {
       if (methodMatch && methodMatch[2]) {
         const params = methodMatch[2]
           .split(',')
-          .map(p => p.trim().split(/\s+/).pop())
-          .filter((p): p is string => Boolean(p && !p.includes('[') && !p.includes(']')));
+          .map(p => p.trim().split(/\s*=/)[0].trim().split(/\s+/).pop())
+          .filter((p): p is string => Boolean(p && /^[a-zA-Z_]\w*$/.test(p) && !JAVA_KEYWORDS.has(p)));
         if (params.length > 0) {
           (varStack[varStack.length - 1] || []).push(...params);
         }
@@ -634,8 +836,10 @@ function instrumentJavaBody(body: string, lineOffset: number = 0): string {
     }
 
     if (depth >= 2) {
-      const varMatch = trimmed.match(/^(?:int|long|double|float|boolean|char|String|List|Map|Set|var)\s+(\w+)\s*[=;]/);
-      if (varMatch) (varStack[varStack.length - 1] || []).push(varMatch[1]);
+      const newVars = extractJavaVars(line);
+      if (newVars.length > 0) {
+        (varStack[varStack.length - 1] || []).push(...newVars);
+      }
     }
 
     if (
@@ -816,20 +1020,34 @@ function instrumentGoBody(body: string): string {
     const opens  = (line.match(/\{/g) || []).length;
     const closes = (line.match(/\}/g) || []).length;
 
+    // Track parameters in func signatures at depth 0
+    if (depth === 0 && opens > 0) {
+      const fnMatch = trimmed.match(/func\s+(?:\([^)]*\)\s*)?\w+\s*\(([^)]*)\)/);
+      if (fnMatch && fnMatch[1]) {
+        const params = fnMatch[1]
+          .split(',')
+          .map(p => p.trim().split(/\s+/)[0])
+          .filter((p): p is string => Boolean(p && /^[a-zA-Z_]\w*$/.test(p) && p !== '_'));
+        if (params.length > 0) {
+          (varStack[varStack.length - 1] || []).push(...params);
+        }
+      }
+    }
+
     if (depth >= 1) {
-      const shortDecl = trimmed.match(/^(\w+)\s*:=/);
-      if (shortDecl) (varStack[varStack.length - 1] || []).push(shortDecl[1]);
-      const varDecl = trimmed.match(/^var\s+(\w+)/);
-      if (varDecl) (varStack[varStack.length - 1] || []).push(varDecl[1]);
+      const newVars = extractGoVars(line);
+      if (newVars.length > 0) {
+        (varStack[varStack.length - 1] || []).push(...newVars);
+      }
 
       const isTraceable =
         !trimmed.startsWith('//') &&
         !trimmed.startsWith('/*') &&
         trimmed !== '' && trimmed !== '{' && trimmed !== '}' &&
-        (trimmed.includes(':=') || trimmed.startsWith('return') || (trimmed.endsWith('}') && !trimmed.startsWith('func')));
+        (trimmed.includes(':=') || trimmed.startsWith('var ') || trimmed.startsWith('return') || trimmed.includes('=') || (trimmed.endsWith('}') && !trimmed.startsWith('func')));
 
       if (isTraceable) {
-        const allVars = varStack.flat();
+        const allVars = [...new Set(varStack.flat())];
         const pairs = allVars.map(v => `"${v}", __bb_repr(${v})`).join(', ');
         const varsExpr = allVars.length > 0 ? `__bb_vars(${pairs})` : '"{}"';
         const indent = line.match(/^(\s*)/)?.[1] ?? '\t';
@@ -966,9 +1184,27 @@ function instrumentRustBody(body: string): string {
     const opens  = (line.match(/\{/g) || []).length;
     const closes = (line.match(/\}/g) || []).length;
 
+    // Track parameters in fn signatures
+    if (depth <= 1 && opens > 0) {
+      const fnMatch = trimmed.match(/fn\s+\w+\s*(?:<[^>]*>)?\s*\(([^)]*)\)/);
+      if (fnMatch && fnMatch[1]) {
+        const params = fnMatch[1]
+          .split(',')
+          .map(p => p.trim())
+          .filter(p => p && !p.includes('&self') && p !== 'self')
+          .map(p => p.split(':')[0].replace(/^mut\s+/, '').trim())
+          .filter((p): p is string => Boolean(p && /^[a-zA-Z_]\w*$/.test(p) && p !== '_'));
+        if (params.length > 0) {
+          (varStack[varStack.length - 1] || []).push(...params);
+        }
+      }
+    }
+
     if (depth >= 1) {
-      const letMatch = trimmed.match(/^let\s+(?:mut\s+)?(\w+)/);
-      if (letMatch) (varStack[varStack.length - 1] || []).push(letMatch[1]);
+      const newVars = extractRustVars(line);
+      if (newVars.length > 0) {
+        (varStack[varStack.length - 1] || []).push(...newVars);
+      }
 
       const isStatement =
         !trimmed.startsWith('//') &&
@@ -977,7 +1213,7 @@ function instrumentRustBody(body: string): string {
         (trimmed.endsWith(';') || trimmed.startsWith('return'));
 
       if (isStatement) {
-        const allVars = varStack.flat();
+        const allVars = [...new Set(varStack.flat())];
         const pairs = allVars.map(v => `"${v}" => ${v}`).join(', ');
         const varsExpr = allVars.length > 0 ? `bb_vars!(${pairs})` : '"{}".to_string()';
         const indent = line.match(/^(\s*)/)?.[1] ?? '    ';
