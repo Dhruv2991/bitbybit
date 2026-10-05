@@ -23,5 +23,5 @@
     "**/*.d.ts",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "src/components/editor"]
+  "exclude": ["node_modules", "src/components/editor", "src/lib/sanitize.ts"]
 }

@@ -12,7 +12,7 @@
 
 import React, { useMemo } from 'react';
 import type { Problem } from '@/types/database';
-import { sanitizeHtml } from '@/lib/sanitize';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 
 interface ProblemDescriptionProps {
   problem: Problem;
@@ -79,7 +79,30 @@ function parseExampleText(exampleText: string): ParsedExample[] {
 }
 
 /**
- * Parses markdown into stylized React nodes with inline code pills, links, bold text, and constraints
+ * Renders an image element with graceful fallback and responsive styling
+ */
+function renderImageBlock(src: string, alt = '', key: string | number) {
+  // Clean URL if surrounded by quotes or whitespace
+  const cleanSrc = (src || '').trim().replace(/^['"]|['"]$/g, '');
+  const cleanAlt = (alt || 'Problem illustration').trim();
+
+  return (
+    <div key={key} className="my-4 text-center">
+      <img
+        src={cleanSrc}
+        alt={cleanAlt}
+        className="max-w-full h-auto max-h-[380px] object-contain rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-2.5 mx-auto shadow-md transition-transform hover:scale-[1.01]"
+        loading="lazy"
+      />
+      {cleanAlt && cleanAlt !== 'Problem illustration' && (
+        <p className="text-xs text-zinc-400 font-mono mt-1.5 italic">{cleanAlt}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Parses markdown into stylized React nodes with inline code pills, links, images, bold text, and constraints
  */
 function renderMarkdownRich(content: string): React.ReactNode {
   if (!content) return null;
@@ -93,7 +116,7 @@ function renderMarkdownRich(content: string): React.ReactNode {
   function flushList() {
     if (inList && listItems.length > 0) {
       elements.push(
-        <ul key={`ul-${elements.length}`} className="my-3 space-y-1.5 list-none pl-1">
+        <ul key={`ul-${elements.length}`} className="my-3 space-y-2 list-none pl-1">
           {listItems}
         </ul>
       );
@@ -105,22 +128,25 @@ function renderMarkdownRich(content: string): React.ReactNode {
   lines.forEach((line, lineIdx) => {
     const trimmed = line.trim();
 
-    // Check if image: ![alt](url)
+    // Check if standalone markdown image: ![alt](url)
     const imgMatch = trimmed.match(/^!\[(.*?)\]\((.*?)\)$/);
     if (imgMatch) {
       flushList();
       const [, alt, src] = imgMatch;
-      elements.push(
-        <div key={`img-${lineIdx}`} className="my-4 text-center">
-          <img
-            src={src}
-            alt={alt || 'Problem illustration'}
-            className="max-w-full h-auto max-h-[360px] object-contain rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-2 mx-auto shadow-md transition-transform hover:scale-[1.01]"
-            loading="lazy"
-          />
-          {alt && <p className="text-[11px] text-zinc-500 font-mono mt-1.5 italic">{alt}</p>}
-        </div>
-      );
+      // Strip optional title part e.g. "url title"
+      const urlPart = src.split(/\s+/)[0];
+      elements.push(renderImageBlock(urlPart, alt, `img-${lineIdx}`));
+      return;
+    }
+
+    // Check if HTML image tag: <img src="..." alt="..." />
+    const htmlImgMatch = trimmed.match(/^<img\s+[^>]*src=["']([^"']+)["'][^>]*>/i);
+    if (htmlImgMatch) {
+      flushList();
+      const src = htmlImgMatch[1];
+      const altMatch = trimmed.match(/alt=["']([^"']*)["']/i);
+      const alt = altMatch ? altMatch[1] : '';
+      elements.push(renderImageBlock(src, alt, `htmlimg-${lineIdx}`));
       return;
     }
 
@@ -176,11 +202,11 @@ function renderMarkdownRich(content: string): React.ReactNode {
 }
 
 /**
- * Renders inline code `x`, bold **text**, and math notation cleanly
+ * Renders inline code `x`, images ![alt](url), bold **text**, and links
  */
 function renderInlineStyled(text: string): React.ReactNode {
-  // Regex to match code `...`, bold **...**, or links [...](...)
-  const tokenRegex = /(`[^`]+`|\*\*[^*]+\*\*|\[([^\]]+)\]\(([^)]+)\))/g;
+  // Regex to match markdown images, code `...`, bold **...**, links [...](...), or HTML <img> tags
+  const tokenRegex = /(!\[([^\]]*)\]\(([^)]+)\)|`[^`]+`|\*\*[^*]+\*\*|\[([^\]]+)\]\(([^)]+)\)|<img\s+[^>]*src=["']([^"']+)["'][^>]*>)/gi;
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -191,7 +217,22 @@ function renderInlineStyled(text: string): React.ReactNode {
     }
 
     const token = match[0];
-    if (token.startsWith('`') && token.endsWith('`')) {
+
+    // Markdown Image: ![alt](url)
+    if (token.startsWith('![') && token.includes('](')) {
+      const altText = match[2] || '';
+      const srcUrl = (match[3] || '').split(/\s+/)[0];
+      parts.push(renderImageBlock(srcUrl, altText, `inline-img-${match.index}`));
+    }
+    // HTML Image tag: <img src="..." />
+    else if (token.toLowerCase().startsWith('<img')) {
+      const src = match[6] || '';
+      const altMatch = token.match(/alt=["']([^"']*)["']/i);
+      const alt = altMatch ? altMatch[1] : '';
+      parts.push(renderImageBlock(src, alt, `inline-html-img-${match.index}`));
+    }
+    // Inline code: `...`
+    else if (token.startsWith('`') && token.endsWith('`')) {
       const codeVal = token.slice(1, -1);
       parts.push(
         <code
@@ -201,15 +242,19 @@ function renderInlineStyled(text: string): React.ReactNode {
           {codeVal}
         </code>
       );
-    } else if (token.startsWith('**') && token.endsWith('**')) {
+    }
+    // Bold text: **...**
+    else if (token.startsWith('**') && token.endsWith('**')) {
       parts.push(
         <strong key={match.index} className="text-zinc-100 font-semibold">
           {token.slice(2, -2)}
         </strong>
       );
-    } else if (token.startsWith('[') && token.includes('](')) {
-      const linkText = match[2];
-      const linkUrl = match[3];
+    }
+    // Link: [text](url)
+    else if (token.startsWith('[') && token.includes('](')) {
+      const linkText = match[4];
+      const linkUrl = match[5];
       parts.push(
         <a
           key={match.index}
@@ -241,7 +286,13 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
 
   const sanitizedHtml = useMemo(() => {
     if (!isHtml) return '';
-    return sanitizeHtml(problem.description || '<p>No description provided.</p>');
+    let raw = problem.description || '<p>No description provided.</p>';
+    // If description has markdown images ![alt](url) alongside HTML, convert them to <img> tags
+    raw = raw.replace(/!\[(.*?)\]\((.*?)\)/g, (_m, alt, src) => {
+      const urlPart = (src || '').split(/\s+/)[0];
+      return `<img src="${urlPart}" alt="${alt || ''}" class="max-w-full h-auto max-h-[380px] object-contain rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-2.5 my-4 shadow-md mx-auto block" />`;
+    });
+    return sanitizeHtml(raw);
   }, [isHtml, problem.description]);
 
   const parsedExamples = useMemo(() => {

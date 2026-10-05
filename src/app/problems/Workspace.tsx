@@ -14,7 +14,7 @@ import {
   getStrategy,
   type RunResult,
 } from '@/lib/browserExecutor';
-import { sanitizeHtml } from '@/lib/sanitize';
+import { sanitizeHtml } from '@/lib/sanitizeHtml';
 import ProblemDescription from '@/components/problem/ProblemDescription';
 import { formatTestCaseInput } from '@/lib/testCaseFormatter';
 import { isActiveSubscription } from '@/lib/subscription';

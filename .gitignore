@@ -29,3 +29,5 @@ yarn-error.log*
 
 # orphaned corrupted legacy dir
 src/components/editor/
+src/lib/sanitize.ts
+*.tsbuildinfo
