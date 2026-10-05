@@ -11,6 +11,8 @@ export type ArenaStatus      = 'submitted' | 'disqualified' | 'reviewed';
 export interface TestCase {
   input: string;
   expected: string;
+  is_hidden?: boolean;
+  explanation?: string;
 }
 import {
   cppType,

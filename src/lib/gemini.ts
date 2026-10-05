@@ -413,9 +413,13 @@ export async function generateEditorial(
 
 // ── Admin Feature: Auto Test Case Generator ───────────────────────────────────
 
+// ── Admin Feature: Auto Test Case Generator ───────────────────────────────────
+
 export interface GeneratedTestCase {
-  input:    string;
-  expected: string;
+  input:       string;
+  expected:    string;
+  is_hidden?:  boolean;
+  explanation?: string;
 }
 
 export async function generateTestCases(
@@ -424,52 +428,96 @@ export async function generateTestCases(
   paramTypes:         string[],
   returnType:         string,
   existingCases:      GeneratedTestCase[],
+  starterCode?:       string,
 ): Promise<GeneratedTestCase[]> {
+  // Extract parameter names from starter code or generate defaults
+  let paramNames: string[] = [];
+  if (starterCode) {
+    const pyMatch = starterCode.match(/def\s+\w+\s*\(([^)]*)\)/);
+    if (pyMatch && pyMatch[1]) {
+      paramNames = pyMatch[1].split(',').map(p => p.trim()).filter(p => p && p !== 'self').map(p => p.split(':')[0].trim());
+    }
+  }
+  if (!paramNames.length && paramTypes.length) {
+    paramNames = paramTypes.map((_, i) => `arg${i + 1}`);
+  }
+
+  const signatureDesc = paramNames.length > 0
+    ? `Function Signature: solution(${paramNames.map((name, i) => `${name}: ${paramTypes[i] || 'any'}`).join(', ')}) -> ${returnType}`
+    : `Parameter Types: [${paramTypes.join(', ')}], Return Type: ${returnType}`;
+
   const existingSummary = existingCases.length
-    ? `Existing test cases (do NOT duplicate these):\n${existingCases.map(c => `  input: ${c.input} → expected: ${c.expected}`).join('\n')}`
+    ? `Existing test cases (do NOT duplicate these):\n${existingCases.map(c => `  input: ${c.input} → expected: ${c.expected}${c.is_hidden ? ' (hidden)' : ''}`).join('\n')}`
     : 'No existing test cases yet.';
 
   const result = await callAI(
     `Problem: "${problemTitle}"
-Description: ${problemDescription.replace(/<[^>]*>/g, '').slice(0, 800)}
-Parameter types: ${paramTypes.join(', ') || 'unknown'}
-Return type: ${returnType}
+Description: ${problemDescription.replace(/<[^>]*>/g, '').slice(0, 1000)}
+${signatureDesc}
 
 ${existingSummary}
 
-Generate 8 diverse test cases covering:
-- Basic/typical cases (2)
-- Edge cases: empty input, single element, all same values (2)
-- Large/stress cases (1)
-- Negative numbers or boundary values (1)
-- Cases where the answer is 0, false, empty, or null (1)
-- A tricky case that commonly trips up naive solutions (1)
+Generate exactly 8 high-quality, comprehensive test cases adhering strictly to the function signature and parameter types:
+1. Basic / Example Cases (2): Standard typical inputs. Mark "is_hidden": false.
+2. Edge Cases (2): Empty arrays/strings, single-element arrays, all identical values, minimum/maximum allowed constraints. Mark "is_hidden": true.
+3. Stress / Large Cases (1): Larger inputs to test algorithm performance and non-trivial patterns. Mark "is_hidden": true.
+4. Boundary / Negative Values (1): Negative numbers, zeroes, special character strings if applicable. Mark "is_hidden": true.
+5. Zero / False / None / Empty Result Cases (1): Inputs where expected output is 0, false, empty array, or false. Mark "is_hidden": true.
+6. Tricky / Counter-Intuitive Case (1): Edge cases that break naive greedy or brute-force approaches. Mark "is_hidden": true.
 
-CRITICAL FORMAT — respond with ONLY a JSON array, no markdown, no explanation:
+CRITICAL SCHEMA REQUIREMENTS:
+- Output ONLY a raw JSON array of objects. No markdown, no commentary, no wrapping text.
+- Every object MUST have:
+  - "input": A single valid JSON array containing ALL arguments in exact positional order. Example for two params (nums: int[], k: int): "[[2,7,11,15], 9]". Example for single param (s: string): "[\"babad\"]".
+  - "expected": A single valid JSON string or literal representing the exact expected return value. Example: "[0,1]" or "true" or "42" or "\"bab\"".
+  - "is_hidden": boolean (false for first 2 sample cases, true for remaining 6).
+  - "explanation": Short 1-sentence explanation of what this test case tests.
+
+Example format:
 [
-  {"input": "[[2,7,11,15], 9]", "expected": "[0,1]"},
-  {"input": "[[], 0]", "expected": "[]"}
-]
-
-Each "input" must be a SINGLE valid JSON array containing every argument in order — i.e. exactly
-the format "[[2,7,11,15], 9]", NOT the comma-separated form "[2,7,11,15], 9" (that is invalid JSON
-and will be rejected). If there is only one parameter, still wrap it in an outer array, e.g. "[5]".
-Each "expected" must be valid JSON matching the return type.`,
-    800,
-    'You are a competitive programming test case generator. Output ONLY valid JSON array, where every "input" value is itself a single valid JSON array of arguments (e.g. "[[2,7,11,15], 9]"), never a bare comma-separated list. No markdown fences, no explanation, no extra text.',
+  {"input": "[[1,2,1,3], 3]", "expected": "1", "is_hidden": false, "explanation": "Basic sample with frequency count"},
+  {"input": "[[5], 1]", "expected": "5", "is_hidden": true, "explanation": "Single element boundary case"}
+]`,
+    1000,
+    `You are a LeetCode principal test engineer. You produce bulletproof, syntactically flawless test suites. Every test case "input" MUST be a single valid JSON array wrapping all arguments in order. Output ONLY the JSON array matching the schema.`,
   );
 
   try {
     const cleaned = result.replace(/```(?:json)?/g, '').trim();
     const match   = cleaned.match(/\[[\s\S]*\]/);
     if (!match) throw new Error('No array found');
-    const parsed: GeneratedTestCase[] = JSON.parse(match[0]);
+    const parsed: any[] = JSON.parse(match[0]);
     if (!Array.isArray(parsed)) throw new Error('Not an array');
-    return parsed
-      .filter(c => c.input !== undefined && c.expected !== undefined)
-      .map(c => ({ ...c, input: normalizeTestInput(c.input) }))
-      .slice(0, 10);
-  } catch {
+
+    // Strict schema validation and normalization
+    const validated: GeneratedTestCase[] = [];
+    for (let i = 0; i < parsed.length; i++) {
+      const item = parsed[i];
+      if (!item || typeof item !== 'object') continue;
+      if (item.input === undefined || item.expected === undefined) continue;
+
+      const normalizedInput = normalizeTestInput(String(item.input));
+      const normalizedExpected = typeof item.expected === 'string' ? item.expected : JSON.stringify(item.expected);
+
+      // Verify that input is valid JSON
+      try {
+        const testArgs = JSON.parse(normalizedInput);
+        if (!Array.isArray(testArgs)) continue;
+      } catch {
+        continue;
+      }
+
+      validated.push({
+        input: normalizedInput,
+        expected: normalizedExpected,
+        is_hidden: item.is_hidden !== undefined ? Boolean(item.is_hidden) : i >= 2,
+        explanation: typeof item.explanation === 'string' ? item.explanation : undefined,
+      });
+    }
+
+    return validated.slice(0, 10);
+  } catch (err) {
+    console.error('[generateTestCases] Error parsing AI response:', err);
     return [];
   }
 }
@@ -482,8 +530,9 @@ Each "expected" must be valid JSON matching the return type.`,
 function normalizeTestInput(input: string): string {
   const trimmed = input.trim();
   try {
-    JSON.parse(trimmed);
-    return trimmed; // already valid JSON as-is
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) return trimmed; // already valid JSON array
+    return JSON.stringify([parsed]);
   } catch {
     // Not valid JSON by itself — try wrapping in an outer array,
     // which is exactly what fixes "[2,7,11,15], 9" → "[[2,7,11,15], 9]"
@@ -556,17 +605,20 @@ export async function generateFullProblem(concept: string): Promise<GeneratedPro
 Output ONLY a valid JSON object with this exact structure (no markdown, no explanation):
 {
   "title": "Problem Title",
-  "description": "<p>Clear problem statement in HTML...</p>",
+  "description": "<p>Clear problem statement in HTML with <code>inline code</code> and constraints...</p>",
   "difficulty": "Easy|Medium|Hard",
   "points": 100,
   "tags": ["array", "hashmap"],
-  "example": "Input: nums = [2,7,11,15], target = 9\\nOutput: [0,1]",
+  "example": "Input: nums = [2,7,11,15], target = 9\\nOutput: [0,1]\\nExplanation: Because nums[0] + nums[1] == 9, we return [0, 1].",
   "param_types": ["int[]", "int"],
   "return_type": "int[]",
   "hints": ["Think about what complement each number needs", "A hashmap gives O(1) lookup"],
   "test_cases": [
-    {"input": "[[2,7,11,15], 9]", "expected": "[0,1]"},
-    {"input": "[[3,2,4], 6]", "expected": "[1,2]"}
+    {"input": "[[2,7,11,15], 9]", "expected": "[0,1]", "is_hidden": false},
+    {"input": "[[3,2,4], 6]", "expected": "[1,2]", "is_hidden": false},
+    {"input": "[[3,3], 6]", "expected": "[0,1]", "is_hidden": true},
+    {"input": "[[-1,-2,-3,-4,-5], -8]", "expected": "[2,4]", "is_hidden": true},
+    {"input": "[[0,4,3,0], 0]", "expected": "[0,3]", "is_hidden": true}
   ]
 }
 
@@ -576,10 +628,7 @@ Rules:
 - param_types: array of Java-style types (int, int[], String, boolean, etc.)
 - return_type: single Java-style type
 - hints: exactly 2-3 progressive hints, no code
-- test_cases: exactly 5 diverse test cases. Each "input" MUST be a single valid JSON array
-  wrapping every argument in order (e.g. "[[2,7,11,15], 9]"), never the bare comma-separated
-  form "[2,7,11,15], 9" — that is not valid JSON and will break execution. A single-argument
-  problem still needs the outer array, e.g. "[5]".`,
+- test_cases: exactly 5 diverse test cases (first 2 is_hidden: false, remaining 3 is_hidden: true). Each "input" MUST be a single valid JSON array wrapping every argument in order.`,
     1000,
     'You are a competitive programming problem generator. Output ONLY valid JSON, where every test case "input" is itself a single valid JSON array of arguments, never a bare comma-separated list. No markdown, no explanation.',
   );
@@ -590,9 +639,10 @@ Rules:
     if (!match) throw new Error('No object found');
     const parsed = JSON.parse(match[0]);
     if (Array.isArray(parsed.test_cases)) {
-      parsed.test_cases = parsed.test_cases.map((c: GeneratedTestCase) => ({
+      parsed.test_cases = parsed.test_cases.map((c: GeneratedTestCase, i: number) => ({
         ...c,
         input: normalizeTestInput(c.input),
+        is_hidden: c.is_hidden !== undefined ? c.is_hidden : i >= 2,
       }));
     }
     return parsed as GeneratedProblem;

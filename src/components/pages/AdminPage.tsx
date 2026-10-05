@@ -17,10 +17,13 @@ import type {
   ContestRegistration,
   ArenaSubmission,
   Difficulty,
-  WeeklyChallenge,
   Subscriber,
   ContestFeedback,
+  TestCase,
+  WeeklyChallenge,
 } from "@/types/database";
+import MarkdownEditorWithImages from "@/components/admin/MarkdownEditorWithImages";
+import { formatTestCaseInput } from "@/lib/testCaseFormatter";
 
 // Fires the "contest live" / "new weekly challenge" email blast via
 // /api/notify/broadcast. Best-effort from the caller's point of view —
@@ -195,59 +198,111 @@ function TagInput({
 function TestCaseEditor({
   cases,
   onChange,
+  starterCode,
+  paramNames,
 }: {
-  cases: { input: string; expected: string }[];
-  onChange: (tc: { input: string; expected: string }[]) => void;
+  cases: TestCase[];
+  onChange: (tc: TestCase[]) => void;
+  starterCode?: string;
+  paramNames?: string[];
 }) {
-  function upd(i: number, f: "input" | "expected", v: string) {
+  function upd(i: number, f: keyof TestCase, v: any) {
     const n = [...cases];
     n[i] = { ...n[i], [f]: v };
     onChange(n);
   }
   return (
-    <div className="space-y-2">
-      {cases.map((tc, i) => (
-        <div key={i} className="flex gap-2 items-start">
-          <div className="flex-1 grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-[#999] font-mono uppercase">
-                Input{" "}
-                <span className="normal-case text-[#ccc]">
-                  (JSON array of args)
-                </span>
-              </label>
-              <textarea
-                value={tc.input}
-                onChange={(e) => upd(i, "input", e.target.value)}
-                rows={2}
-                className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs font-mono text-[#e0e0e0] resize-none focus:outline-none focus:border-[#00e87a40]"
-                placeholder="JSON args e.g. [[2,7,11,15], 9]"
-              />
+    <div className="space-y-3">
+      {cases.map((tc, i) => {
+        const formattedPreview = formatTestCaseInput(tc.input, paramNames || starterCode || '');
+        const hasValidMapping = formattedPreview && formattedPreview !== '(empty)' && !formattedPreview.startsWith('arg');
+
+        return (
+          <div key={i} className="bg-[#121216] border border-[#2a2a32] rounded-xl p-3.5 space-y-2.5 relative">
+            <div className="flex items-center justify-between pb-1 border-b border-[#22222a]">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-zinc-300">Case {i + 1}</span>
+                {tc.is_hidden ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700">
+                    🔒 Hidden Test
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 text-cyan-400 border border-cyan-800/40">
+                    👁️ Sample (Visible)
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => onChange(cases.filter((_, idx) => idx !== i))}
+                className="text-[#999] hover:text-[#ff4d4d] text-base leading-none font-mono px-1 transition-colors"
+                title="Remove test case"
+              >
+                ×
+              </button>
             </div>
-            <div>
-              <label className="text-[10px] text-[#999] font-mono uppercase">
-                Expected
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] text-[#999] font-mono uppercase block mb-1">
+                  Input <span className="normal-case text-zinc-400">(JSON array of args e.g. [[2,7,11,15], 9])</span>
+                </label>
+                <textarea
+                  value={tc.input}
+                  onChange={(e) => upd(i, "input", e.target.value)}
+                  rows={2}
+                  className="w-full bg-[#09090c] border border-[#2a2a32] rounded-lg px-2.5 py-1.5 text-xs font-mono text-[#e0e0e0] resize-none focus:outline-none focus:border-cyan-500/50"
+                  placeholder="[[2,7,11,15], 9]"
+                />
+                {tc.input && (
+                  <div className="text-[11px] font-mono text-cyan-300/90 bg-cyan-950/30 px-2 py-1 rounded border border-cyan-900/40 mt-1 truncate">
+                    <span className="text-zinc-500 mr-1.5 select-none font-sans">Mapped:</span>
+                    <code>{formattedPreview}</code>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[10px] text-[#999] font-mono uppercase block mb-1">
+                  Expected <span className="normal-case text-zinc-400">(JSON return value e.g. [0,1])</span>
+                </label>
+                <textarea
+                  value={tc.expected}
+                  onChange={(e) => upd(i, "expected", e.target.value)}
+                  rows={2}
+                  className="w-full bg-[#09090c] border border-[#2a2a32] rounded-lg px-2.5 py-1.5 text-xs font-mono text-[#e0e0e0] resize-none focus:outline-none focus:border-cyan-500/50"
+                  placeholder="[0,1] or true or 42"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1 text-[11px] font-mono">
+              <label className="flex items-center gap-2 text-zinc-400 cursor-pointer hover:text-zinc-200 select-none">
+                <input
+                  type="checkbox"
+                  checked={!!tc.is_hidden}
+                  onChange={(e) => upd(i, "is_hidden", e.target.checked)}
+                  className="rounded bg-zinc-900 border-zinc-700 text-cyan-500 focus:ring-0 cursor-pointer"
+                />
+                <span>Hide test case from users (evaluated on submission only)</span>
               </label>
-              <textarea
-                value={tc.expected}
-                onChange={(e) => upd(i, "expected", e.target.value)}
-                rows={2}
-                className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded px-2 py-1.5 text-xs font-mono text-[#e0e0e0] resize-none focus:outline-none focus:border-[#00e87a40]"
-                placeholder="JSON value e.g. [0,1] or true or 42"
+
+              <input
+                type="text"
+                value={tc.explanation || ""}
+                onChange={(e) => upd(i, "explanation", e.target.value)}
+                placeholder="Optional explanation/category"
+                className="bg-[#09090c] border border-[#2a2a32] rounded px-2 py-0.5 text-[11px] font-mono text-zinc-300 w-48 focus:outline-none focus:border-cyan-500/50"
               />
             </div>
           </div>
-          <button
-            onClick={() => onChange(cases.filter((_, idx) => idx !== i))}
-            className="mt-4 text-[#999] hover:text-[#ff4d4d] text-lg leading-none font-mono"
-          >
-            ×
-          </button>
-        </div>
-      ))}
+        );
+      })}
+
       <button
-        onClick={() => onChange([...cases, { input: "", expected: "" }])}
-        className="w-full py-1.5 border border-dashed border-[#2a2a2a] text-[#999] hover:text-[#00e87a] hover:border-[#00e87a40] text-xs font-mono rounded-lg transition-all"
+        type="button"
+        onClick={() => onChange([...cases, { input: "", expected: "", is_hidden: cases.length >= 2 }])}
+        className="w-full py-2 border border-dashed border-[#2a2a32] hover:border-cyan-500/50 text-zinc-400 hover:text-cyan-400 text-xs font-mono rounded-xl transition-all duration-150"
       >
         + Add Test Case
       </button>
@@ -326,6 +381,7 @@ function ProblemForm({
         form.param_types,
         form.return_type,
         form.test_cases,
+        form.starter_code,
       );
       if (!generated.length) {
         setAiTestErr(
@@ -481,33 +537,17 @@ function ProblemForm({
         </p>
       </div>
       <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-xs text-[#bbb] font-mono uppercase tracking-wider">
-            Description * (HTML)
-          </label>
-          <button
-            onClick={handleImproveDescription}
-            disabled={improvingDesc || !form.description.trim()}
-            className="flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-1 rounded-lg
-              bg-[#a78bfa10] border border-[#a78bfa25] text-[#a78bfa]
-              hover:bg-[#a78bfa18] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          >
-            {improvingDesc ? (
-              <>
-                <span className="w-2.5 h-2.5 border border-[#a78bfa] border-t-transparent rounded-full animate-spin inline-block mr-1" />
-                Improving…
-              </>
-            ) : (
-              "✦ AI Improve"
-            )}
-          </button>
-        </div>
-        <textarea
+        <label className="block text-xs text-[#bbb] font-mono mb-2 uppercase tracking-wider">
+          Problem Statement (Markdown / HTML) *
+        </label>
+        <MarkdownEditorWithImages
           value={form.description}
-          onChange={(e) => set("description", e.target.value)}
-          rows={compact ? 3 : 5}
-          className="w-full bg-[#0f0f0f] border border-[#2a2a2a] rounded-lg px-3 py-2.5 text-sm font-mono text-[#e0e0e0] placeholder-[#333] resize-y focus:outline-none focus:border-[#00e87a40]"
-          placeholder="<p>Given an array of integers...</p>"
+          onChange={(val) => set("description", val)}
+          rows={compact ? 5 : 8}
+          placeholder="Describe the problem, input format, output, and constraints using Markdown or HTML..."
+          onAiImprove={handleImproveDescription}
+          improvingAi={improvingDesc}
+          problemPreviewData={form}
         />
       </div>
       <div>
@@ -648,6 +688,8 @@ function ProblemForm({
         <TestCaseEditor
           cases={form.test_cases}
           onChange={(tc) => set("test_cases", tc)}
+          starterCode={form.starter_code}
+          paramNames={form.param_types}
         />
       </div>
       <div className="flex gap-3 pt-2">
@@ -5144,8 +5186,13 @@ function AiGenerateSection() {
                       className="flex items-center gap-2 text-[10px] font-mono bg-[#060606] rounded-lg px-3 py-2 border border-[#141414]"
                     >
                       <span className="text-[#555]">#{i + 1}</span>
-                      <span className="text-[#777]">input:</span>
-                      <code className="text-[#ccc] flex-1">{tc.input}</code>
+                      {tc.is_hidden && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                          🔒 Hidden
+                        </span>
+                      )}
+                      <span className="text-[#777]">Input:</span>
+                      <code className="text-[#ccc] flex-1 truncate">{formatTestCaseInput(tc.input, generated)}</code>
                       <span className="text-[#555]">→</span>
                       <code className="text-[#00e87a]">{tc.expected}</code>
                     </div>

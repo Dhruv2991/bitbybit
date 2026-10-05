@@ -44,11 +44,12 @@ export interface RunResult {
 
 // Judge0 language IDs
 const JUDGE0_LANGUAGE_ID: Record<string, number> = {
-  cpp:    54,  // C++ (GCC 9.2.0)
-  java:   62,  // Java (OpenJDK 13.0.1)
-  rust:   73,  // Rust (1.40.0)
-  go:     60,  // Go (1.13.5)
-  python: 71,  // Python (3.8.1)
+  cpp:        54,  // C++ (GCC 9.2.0)
+  java:       62,  // Java (OpenJDK 13.0.1)
+  rust:       73,  // Rust (1.40.0)
+  go:         60,  // Go (1.13.5)
+  python:     71,  // Python (3.8.1)
+  javascript: 63,  // JavaScript (Node.js 12.14.0)
 };
 
 // Sentinel printed between test case outputs so we can split the stdout
@@ -60,6 +61,10 @@ function extractFuncName(code: string, lang: string): string {
   if (lang === "python") {
     const m = code.match(/def\s+(\w+)\s*\(/);
     return m?.[1] || "solution";
+  }
+  if (lang === "javascript") {
+    const m = code.match(/(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*(?:function|\([^)]*\)\s*=>))/);
+    return m?.[1] || m?.[2] || "solution";
   }
   if (lang === "java") {
     const m = code.match(
@@ -556,6 +561,28 @@ function buildBatchedProgram(
       ].join("\n");
     }
 
+    case "javascript": {
+      const caseBlocks = parsedArgs.map((args, idx) => {
+        const argsJson = JSON.stringify(JSON.stringify(args));
+        return [
+          `// case ${idx}`,
+          `(() => {`,
+          `  const __args__ = JSON.parse(${argsJson});`,
+          `  const __fn__ = typeof ${fn} !== 'undefined' ? ${fn} : solution;`,
+          `  const __res__ = __fn__(...(Array.isArray(__args__) ? __args__ : [__args__]));`,
+          `  console.log(JSON.stringify(__res__));`,
+          `  console.log("${SENTINEL}");`,
+          `})();`,
+        ].join("\n");
+      });
+
+      return [
+        userCode,
+        "",
+        caseBlocks.join("\n"),
+      ].join("\n");
+    }
+
     default:
       return userCode;
   }
@@ -634,11 +661,12 @@ async function executeWithJudge0(
 // ── Wandbox language compiler map ────────────────────────────
 
 const WANDBOX_COMPILER: Record<string, string> = {
-  cpp:    "gcc-head",
-  java:   "openjdk-jdk-22+36",
-  rust:   "rust-1.82.0",
-  go:     "go-1.23.2",
-  python: "cpython-3.12.0",
+  cpp:        "gcc-head",
+  java:       "openjdk-jdk-22+36",
+  rust:       "rust-1.82.0",
+  go:         "go-1.23.2",
+  python:     "cpython-3.12.0",
+  javascript: "nodejs-head",
 };
 
 // ── Wandbox fallback execution ────────────────────────────────

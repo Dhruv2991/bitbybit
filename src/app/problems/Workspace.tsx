@@ -15,6 +15,8 @@ import {
   type RunResult,
 } from '@/lib/browserExecutor';
 import { sanitizeHtml } from '@/lib/sanitize';
+import ProblemDescription from '@/components/problem/ProblemDescription';
+import { formatTestCaseInput } from '@/lib/testCaseFormatter';
 import { isActiveSubscription } from '@/lib/subscription';
 import {
   explainFailure,
@@ -972,27 +974,39 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     if (isWeekly && !testResult) { showToast('Please run the tests before submitting.', 'warn'); return; }
     if (submitBlocked) return;
 
-    // ── Arena: if no test result yet, run tests in background first ───────
-    let finalTestResult = testResult;
-    if (onArenaSubmit && !testResult && (problem.test_cases || []).length > 0) {
-      setSubmitting(true);
-      setStatusMsg('Running tests before submitting…');
-      showToast('⏳ Running tests in background before submitting…', 'info');
-      try {
+    // ── Server-Side Submission Execution (Isolated & Hidden Test Case Secure) ──
+    setSubmitting(true);
+    setStatusMsg('Running full test suite on server…');
+    let finalTestResult: RunResult | null = null;
+    try {
+      const execRes = await fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          language: lang,
+          problem_id: problem.id,
+          mode: 'submit',
+        }),
+      });
+      if (execRes.ok) {
+        finalTestResult = await execRes.json();
+        setTestResult(finalTestResult);
+      } else {
+        // Fallback to client/server runner if problem not found in DB
         const strategy = getStrategy(lang);
         if (strategy === 'browser') {
-          finalTestResult = await runInBrowser(code, lang, problem.test_cases, () => {});
+          finalTestResult = await runInBrowser(code, lang, problem.test_cases || [], () => {});
         } else {
-          finalTestResult = await runOnServer(code, lang, problem.test_cases);
+          finalTestResult = await runOnServer(code, lang, problem.test_cases || []);
         }
         setTestResult(finalTestResult);
-      } catch {
-        // If tests fail to run, submit with 0/0 — admin can review code
-        finalTestResult = null;
       }
+    } catch {
+      finalTestResult = testResult;
     }
 
-    setSubmitting(true); setStatusMsg('Uploading…');
+    setStatusMsg('Uploading submission…');
     try {
       const passed = finalTestResult?.passed ?? 0;
       const total  = finalTestResult?.total  ?? 0;
@@ -1211,48 +1225,32 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         )}
 
         {leftTab === 'problem' && (<>
-        <div className="flex items-start gap-3 mb-4 flex-wrap">
-          <h2 className="text-xl font-display font-bold text-[var(--text)] flex-1">{problem.title}</h2>
-          <span className={problem.difficulty === 'Easy' ? 'diff-easy' : problem.difficulty === 'Medium' ? 'diff-medium' : 'diff-hard'}>
-            {problem.difficulty}
-          </span>
-          <span className="px-2.5 py-0.5 bg-[rgba(var(--purple-rgb),0.063)] text-[var(--purple)] rounded-lg text-xs font-mono font-bold shrink-0 border border-[rgba(var(--purple-rgb),0.082)]">
-            {problem.points} pts
-          </span>
-        </div>
-
-        {(problem.tags || []).length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-5">
-            {problem.tags.map(tag => (
-              <span key={tag} className="px-2 py-0.5 bg-[var(--info-dim)] text-[var(--info)] rounded-lg text-xs font-mono border border-[var(--info-dim)]">{tag}</span>
-            ))}
-          </div>
-        )}
-
-        <div className="prose prose-invert prose-sm max-w-none text-[var(--text-soft)] leading-relaxed mb-5"
-          dangerouslySetInnerHTML={{ __html: sanitizeHtml(problem.description || '<p>No description provided.</p>') }} />
-
-        {problem.example && (
-          <div className="bg-[var(--bg2)] border border-[var(--border)] rounded-xl p-4 mb-5">
-            <div className="text-[10px] text-[var(--text3)] font-mono mb-2 uppercase tracking-widest">Example</div>
-            <pre className="text-[var(--acc)] text-sm font-mono whitespace-pre-wrap">{problem.example}</pre>
-          </div>
-        )}
+        <ProblemDescription problem={problem} />
 
         {(problem.test_cases || []).length > 0 && (
-          <div>
-            <div className="text-[10px] text-[var(--text3)] font-mono mb-3 uppercase tracking-widest">🧪 Sample Test Cases</div>
+          <div className="mt-6">
+            <div className="text-[10px] text-zinc-400 font-mono mb-3 uppercase tracking-widest flex items-center gap-1.5">
+              <span>🧪</span>
+              <span>Sample Test Cases</span>
+            </div>
             <div className="space-y-2">
               {problem.test_cases.slice(0, 3).map((tc, i) => (
-                <div key={i} className="bg-[var(--bg2)] border border-[var(--card3)] rounded-xl px-3.5 py-2.5 text-xs font-mono hover:border-[var(--border)] transition-colors">
-                  <span className="text-[var(--text3)]">Input: </span>
-                  <code className="text-[var(--text2)]">{tc.input}</code>
-                  <span className="text-[var(--text3)] ml-3">→ </span>
-                  <code className="text-[var(--acc)]">{tc.expected}</code>
+                <div key={i} className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl px-3.5 py-2.5 text-xs font-mono hover:border-zinc-700 transition-colors shadow-2xs">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-zinc-500 font-sans font-semibold text-[11px] w-14 shrink-0">Input:</span>
+                    <code className="text-zinc-200 break-all flex-1">{formatTestCaseInput(tc.input, problem)}</code>
+                  </div>
+                  <div className="flex items-baseline gap-2 mt-1.5 pt-1.5 border-t border-zinc-800/40">
+                    <span className="text-zinc-500 font-sans font-semibold text-[11px] w-14 shrink-0">Output:</span>
+                    <code className="text-emerald-400 font-semibold break-all flex-1">{tc.expected}</code>
+                  </div>
                 </div>
               ))}
               {problem.test_cases.length > 3 && (
-                <div className="text-xs text-[var(--text3)] font-mono pl-1">+{problem.test_cases.length - 3} hidden test cases</div>
+                <div className="text-xs text-zinc-500 font-mono pl-1 pt-1 flex items-center gap-1">
+                  <span>🔒</span>
+                  <span>+{problem.test_cases.length - 3} hidden test cases (tested on submission)</span>
+                </div>
               )}
             </div>
           </div>
@@ -1478,7 +1476,8 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           results={testResult?.results || []}
           passed={testResult?.passed || 0}
           total={testResult?.total || 0}
-          loading={running}
+          loading={running || submitting}
+          starterCode={problem.starter_code}
         />
 
         {/* ── AI Failure Explainer ── */}
