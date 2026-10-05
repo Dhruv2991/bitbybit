@@ -379,6 +379,15 @@ export default function MarkdownEditorWithImages({
                         alt={img.alt}
                         className="w-full h-full object-contain"
                         loading="lazy"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (img.src.includes('/problem-images/')) {
+                            const fileName = img.src.split('/problem-images/')[1]?.split('?')[0];
+                            if (fileName) target.src = `/api/images/${fileName}`;
+                          } else if (img.src.startsWith('/uploads/')) {
+                            target.src = `/api/images/${img.src.replace('/uploads/', '')}`;
+                          }
+                        }}
                       />
                     </div>
                     <div className="flex-1 min-w-0 text-left">
@@ -458,6 +467,15 @@ export default function MarkdownEditorWithImages({
                 src={previewModalImg.src}
                 alt={previewModalImg.alt}
                 className="max-w-full w-full max-h-[65vh] object-contain rounded-lg"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (previewModalImg.src.includes('/problem-images/')) {
+                    const fileName = previewModalImg.src.split('/problem-images/')[1]?.split('?')[0];
+                    if (fileName) target.src = `/api/images/${fileName}`;
+                  } else if (previewModalImg.src.startsWith('/uploads/')) {
+                    target.src = `/api/images/${previewModalImg.src.replace('/uploads/', '')}`;
+                  }
+                }}
               />
             </div>
             <div className="flex items-center justify-between text-xs font-mono text-zinc-400 pt-1">

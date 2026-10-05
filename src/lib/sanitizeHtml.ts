@@ -50,12 +50,26 @@ function ensureHooks(DOMPurify: any) {
 }
 
 /**
+ * Safe server-side fallback that strips scripts and unsafe handlers without destroying HTML/SVG/images.
+ */
+function serverSanitize(dirty: string): string {
+  return dirty
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
+    .replace(/\s*on\w+\s*=\s*(['"][^'"]*['"]|[^\s>]+)/gi, '')
+    .replace(/href\s*=\s*['"]javascript:[^'"]*['"]/gi, 'href="#"');
+}
+
+/**
  * Returns a sanitized HTML string safe to pass to dangerouslySetInnerHTML.
- * Must only be called in a browser context (inside useEffect or event handlers).
  */
 export function sanitizeHtml(dirty: string): string {
+  if (!dirty) return '';
+
   if (typeof window === 'undefined') {
-    return dirty.replace(/<[^>]*>/g, '');
+    return serverSanitize(dirty);
   }
 
   // eslint-disable-next-line

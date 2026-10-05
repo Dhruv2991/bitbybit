@@ -90,54 +90,46 @@ export async function POST(req: NextRequest) {
     const cleanBaseName = path.basename(fileName, extFromName || ext).replace(/[^a-zA-Z0-9_-]/g, '_') || 'image';
     const finalFileName = `${cleanBaseName}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}${ext}`;
 
-    // ── 1. Try Supabase Storage first ─────────────────────────
+    // ── 1. Always save a local copy to public/uploads directory ──
+    try {
+      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      const localFilePath = path.join(uploadsDir, finalFileName);
+      fs.writeFileSync(localFilePath, fileBuffer);
+    } catch (fsErr) {
+      console.warn('Local file write warning:', fsErr);
+    }
+
+    // ── 2. Sync to Supabase Storage ───────────────────────────
     try {
       if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
         const supabase = createServerSupabaseClient();
         const bucketName = 'problem-images';
 
-        // Check/create bucket if not exists
+        // Check/create and update bucket to ensure public read
         try {
           await supabase.storage.createBucket(bucketName, { public: true });
-        } catch {
-          // Bucket may already exist
-        }
+        } catch {}
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        try {
+          await supabase.storage.updateBucket(bucketName, { public: true });
+        } catch {}
+
+        await supabase.storage
           .from(bucketName)
           .upload(finalFileName, fileBuffer, {
             contentType,
             upsert: true,
           });
-
-        if (!uploadError && uploadData) {
-          const { data: publicUrlData } = supabase.storage
-            .from(bucketName)
-            .getPublicUrl(finalFileName);
-
-          if (publicUrlData?.publicUrl) {
-            return NextResponse.json({
-              url: publicUrlData.publicUrl,
-              name: finalFileName,
-              size: fileBuffer.length,
-            });
-          }
-        }
       }
     } catch (storageErr) {
-      console.warn('Supabase storage upload failed, falling back to local file system:', storageErr);
+      console.warn('Supabase storage upload warning:', storageErr);
     }
 
-    // ── 2. Fallback: Save to public/uploads directory ─────────
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
-    const localFilePath = path.join(uploadsDir, finalFileName);
-    fs.writeFileSync(localFilePath, fileBuffer);
-
-    const publicUrl = `/uploads/${finalFileName}`;
+    // Return the universal endpoint URL which guarantees image loads anywhere
+    const publicUrl = `/api/images/${finalFileName}`;
     return NextResponse.json({
       url: publicUrl,
       name: finalFileName,

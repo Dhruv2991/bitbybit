@@ -79,20 +79,77 @@ function parseExampleText(exampleText: string): ParsedExample[] {
 }
 
 /**
+ * Resilient image renderer that automatically resolves Supabase storage URLs
+ * and falls back to the /api/images proxy if direct CDN access fails.
+ */
+function ProblemImage({ src, alt, className = '' }: { src: string; alt: string; className?: string }) {
+  const [imgSrc, setImgSrc] = React.useState(() => {
+    const clean = (src || '').trim().replace(/^['"]|['"]$/g, '');
+    if (clean.includes('/storage/v1/object/public/problem-images/')) {
+      const fileName = clean.split('/problem-images/')[1]?.split('?')[0];
+      if (fileName) return `/api/images/${fileName}`;
+    }
+    return clean;
+  });
+  const [loadError, setLoadError] = React.useState(false);
+
+  React.useEffect(() => {
+    const clean = (src || '').trim().replace(/^['"]|['"]$/g, '');
+    if (clean.includes('/storage/v1/object/public/problem-images/')) {
+      const fileName = clean.split('/problem-images/')[1]?.split('?')[0];
+      if (fileName) {
+        setImgSrc(`/api/images/${fileName}`);
+        setLoadError(false);
+        return;
+      }
+    }
+    setImgSrc(clean);
+    setLoadError(false);
+  }, [src]);
+
+  const handleError = () => {
+    if (!imgSrc.startsWith('/api/images/')) {
+      const parts = imgSrc.split('/');
+      const fileName = parts[parts.length - 1]?.split('?')[0];
+      if (fileName) {
+        setImgSrc(`/api/images/${fileName}`);
+        return;
+      }
+    }
+    setLoadError(true);
+  };
+
+  if (loadError) {
+    return (
+      <div className="my-3 p-3 rounded-xl border border-zinc-800 bg-zinc-950/60 text-center font-mono text-xs text-zinc-400">
+        <span className="text-zinc-500">🖼️ Image unavailable</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={imgSrc}
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={handleError}
+    />
+  );
+}
+
+/**
  * Renders an image element with graceful fallback and responsive styling
  */
 function renderImageBlock(src: string, alt = '', key: string | number) {
-  // Clean URL if surrounded by quotes or whitespace
-  const cleanSrc = (src || '').trim().replace(/^['"]|['"]$/g, '');
   const cleanAlt = (alt || 'Problem illustration').trim();
 
   return (
     <div key={key} className="my-4 text-center">
-      <img
-        src={cleanSrc}
+      <ProblemImage
+        src={src}
         alt={cleanAlt}
         className="max-w-full w-full max-h-[380px] object-contain rounded-xl border border-zinc-800 bg-zinc-950/40 p-2.5 mx-auto shadow-md transition-transform hover:scale-[1.01]"
-        loading="lazy"
       />
       {cleanAlt && cleanAlt !== 'Problem illustration' && (
         <p className="text-xs text-zinc-400 font-mono mt-1.5 italic">{cleanAlt}</p>
@@ -292,6 +349,8 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
       const urlPart = (src || '').split(/\s+/)[0];
       return `<img src="${urlPart}" alt="${alt || ''}" class="max-w-full w-full max-h-[380px] object-contain rounded-xl border border-zinc-800 bg-zinc-950/40 p-2.5 my-4 shadow-md mx-auto block" />`;
     });
+    // Route any Supabase storage problem-images URLs through universal /api/images/ proxy
+    raw = raw.replace(/https?:\/\/[^"'\s]+\/storage\/v1\/object\/public\/problem-images\/([^"'\s>]+)/gi, '/api/images/$1');
     return sanitizeHtml(raw);
   }, [isHtml, problem.description]);
 
