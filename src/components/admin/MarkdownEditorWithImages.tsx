@@ -127,7 +127,7 @@ export default function MarkdownEditorWithImages({
     const files = e.dataTransfer?.files;
     if (files && files.length > 0) {
       const file = files[0];
-      if (file.type.startsWith('image/')) {
+      if (file.type.startsWith('image/') || file.name.toLowerCase().endsWith('.svg') || file.type.includes('svg')) {
         try {
           const url = await uploadImageFile(file);
           const altText = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
@@ -259,7 +259,7 @@ export default function MarkdownEditorWithImages({
             type="file"
             ref={fileInputRef}
             onChange={handleFileSelect}
-            accept="image/*"
+            accept="image/*,.svg"
             className="hidden"
           />
 
@@ -371,13 +371,13 @@ export default function MarkdownEditorWithImages({
                   >
                     <div
                       onClick={() => setPreviewModalImg(img)}
-                      className="w-12 h-12 rounded-md bg-zinc-900 border border-zinc-800 overflow-hidden shrink-0 cursor-pointer relative group-hover:ring-1 ring-cyan-500/50"
+                      className="w-12 h-12 rounded-md bg-zinc-900 border border-zinc-800 overflow-hidden shrink-0 cursor-pointer relative group-hover:ring-1 ring-cyan-500/50 flex items-center justify-center p-1"
                       title="Click to view full image"
                     >
                       <img
                         src={img.src}
                         alt={img.alt}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-contain"
                         loading="lazy"
                       />
                     </div>
@@ -457,7 +457,7 @@ export default function MarkdownEditorWithImages({
               <img
                 src={previewModalImg.src}
                 alt={previewModalImg.alt}
-                className="max-w-full max-h-[65vh] object-contain rounded-lg"
+                className="max-w-full w-full max-h-[65vh] object-contain rounded-lg"
               />
             </div>
             <div className="flex items-center justify-between text-xs font-mono text-zinc-400 pt-1">

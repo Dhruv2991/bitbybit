@@ -16,14 +16,23 @@ const ALLOWED_TAGS = [
   'a',
   'img', 'figure', 'figcaption',
   'span', 'div',
+  // Direct SVG elements
+  'svg', 'g', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon',
+  'text', 'tspan', 'defs', 'clipPath', 'use', 'marker',
+  'linearGradient', 'radialGradient', 'stop', 'image'
 ];
 
 const ALLOWED_ATTR = [
   'href', 'title', 'target', 'rel',
   'src', 'alt', 'width', 'height', 'loading',
-  'class', 'id',
+  'class', 'id', 'style',
   'colspan', 'rowspan',
   'start', 'type',
+  // SVG attributes
+  'viewBox', 'xmlns', 'xmlns:xlink', 'xlink:href',
+  'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray',
+  'd', 'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'points',
+  'transform', 'opacity', 'fill-opacity', 'stroke-opacity', 'preserveAspectRatio'
 ];
 
 let hookAdded = false;
@@ -57,8 +66,10 @@ export function sanitizeHtml(dirty: string): string {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
     ADD_ATTR: ['target'],
-    ADD_DATA_URI_TAGS: ['img'],
-    FORBID_ATTR: ['style', 'onerror', 'onload'],
+    ADD_DATA_URI_TAGS: ['img', 'image'],
+    USE_PROFILES: { html: true, svg: true, svgFilters: true },
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'textarea', 'select'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'onchange', 'onsubmit'],
     FORCE_BODY: false,
     SANITIZE_DOM: true,
   });

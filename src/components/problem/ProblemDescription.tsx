@@ -91,7 +91,7 @@ function renderImageBlock(src: string, alt = '', key: string | number) {
       <img
         src={cleanSrc}
         alt={cleanAlt}
-        className="max-w-full h-auto max-h-[380px] object-contain rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-2.5 mx-auto shadow-md transition-transform hover:scale-[1.01]"
+        className="max-w-full w-full max-h-[380px] object-contain rounded-xl border border-zinc-800 bg-zinc-950/40 p-2.5 mx-auto shadow-md transition-transform hover:scale-[1.01]"
         loading="lazy"
       />
       {cleanAlt && cleanAlt !== 'Problem illustration' && (
@@ -290,7 +290,7 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
     // If description has markdown images ![alt](url) alongside HTML, convert them to <img> tags
     raw = raw.replace(/!\[(.*?)\]\((.*?)\)/g, (_m, alt, src) => {
       const urlPart = (src || '').split(/\s+/)[0];
-      return `<img src="${urlPart}" alt="${alt || ''}" class="max-w-full h-auto max-h-[380px] object-contain rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-2.5 my-4 shadow-md mx-auto block" />`;
+      return `<img src="${urlPart}" alt="${alt || ''}" class="max-w-full w-full max-h-[380px] object-contain rounded-xl border border-zinc-800 bg-zinc-950/40 p-2.5 my-4 shadow-md mx-auto block" />`;
     });
     return sanitizeHtml(raw);
   }, [isHtml, problem.description]);
@@ -346,7 +346,8 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
             className="prose prose-invert prose-base max-w-none text-zinc-200 leading-relaxed
               [&>p]:mb-3.5 [&>p]:leading-relaxed [&>p]:text-zinc-200 [&>p]:text-[15px]
               [&_code]:px-2 [&_code]:py-0.5 [&_code]:mx-0.5 [&_code]:rounded-md [&_code]:bg-zinc-800/90 [&_code]:border [&_code]:border-zinc-700/70 [&_code]:text-cyan-200 [&_code]:text-[13px] [&_code]:font-mono [&_code]:font-semibold
-              [&_img]:max-w-full [&_img]:h-auto [&_img]:max-h-[360px] [&_img]:object-contain [&_img]:rounded-xl [&_img]:border [&_img]:border-zinc-800/80 [&_img]:bg-zinc-950/40 [&_img]:p-2 [&_img]:mx-auto [&_img]:my-4 [&_img]:shadow-md
+              [&_img]:max-w-full [&_img]:w-full [&_img]:max-h-[380px] [&_img]:object-contain [&_img]:rounded-xl [&_img]:border [&_img]:border-zinc-800 [&_img]:bg-zinc-950/40 [&_img]:p-2.5 [&_img]:mx-auto [&_img]:my-4 [&_img]:shadow-md
+              [&_svg]:max-w-full [&_svg]:max-h-[380px] [&_svg]:mx-auto [&_svg]:my-4 [&_svg]:rounded-xl [&_svg]:border [&_svg]:border-zinc-800 [&_svg]:bg-zinc-950/40 [&_svg]:p-2.5
               [&_ul]:my-3 [&_ul]:space-y-2 [&_ul]:list-disc [&_ul]:pl-5
               [&_li]:text-sm md:[&_li]:text-[14.5px] [&_li]:font-mono [&_li]:text-zinc-200 [&_li]:leading-relaxed
               [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_h4]:text-base

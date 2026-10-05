@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   try {
     let fileBuffer: Buffer | null = null;
     let fileName = '';
-    let contentType = 'image/png';
+    let rawContentType = '';
 
     const reqContentType = req.headers.get('content-type') || '';
 
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       const arrayBuffer = await file.arrayBuffer();
       fileBuffer = Buffer.from(arrayBuffer);
       fileName = file.name || `image_${Date.now()}.png`;
-      contentType = file.type || 'image/png';
+      rawContentType = file.type || '';
     } else {
       const body = await req.json();
       const { image, name } = body;
@@ -30,15 +30,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'No image data provided' }, { status: 400 });
       }
 
-      // Handle data URL (data:image/png;base64,...)
+      // Handle data URL (data:image/svg+xml;base64,... or data:image/png;base64,...)
       const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       if (matches && matches.length === 3) {
-        contentType = matches[1];
+        rawContentType = matches[1];
         fileBuffer = Buffer.from(matches[2], 'base64');
       } else {
         fileBuffer = Buffer.from(image, 'base64');
       }
-      fileName = name || `image_${Date.now()}.${contentType.split('/')[1] || 'png'}`;
+      fileName = name || `image_${Date.now()}`;
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -50,8 +50,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Image file too large (max 10MB)' }, { status: 400 });
     }
 
-    const ext = path.extname(fileName) || `.${contentType.split('/')[1] || 'png'}`;
-    const cleanBaseName = path.basename(fileName, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    // Determine clean file extension & explicit MIME type
+    const lowerName = fileName.toLowerCase();
+    const extFromName = path.extname(lowerName);
+
+    // Detect SVG content or extension
+    const isSvg =
+      extFromName === '.svg' ||
+      rawContentType.includes('svg') ||
+      fileBuffer.slice(0, 100).toString('utf8').toLowerCase().includes('<svg') ||
+      fileBuffer.slice(0, 100).toString('utf8').toLowerCase().includes('<?xml');
+
+    let ext = extFromName;
+    let contentType = 'image/png';
+
+    if (isSvg) {
+      ext = '.svg';
+      contentType = 'image/svg+xml';
+    } else if (extFromName === '.png' || rawContentType === 'image/png') {
+      ext = '.png';
+      contentType = 'image/png';
+    } else if (extFromName === '.jpg' || extFromName === '.jpeg' || rawContentType === 'image/jpeg') {
+      ext = '.jpg';
+      contentType = 'image/jpeg';
+    } else if (extFromName === '.webp' || rawContentType === 'image/webp') {
+      ext = '.webp';
+      contentType = 'image/webp';
+    } else if (extFromName === '.gif' || rawContentType === 'image/gif') {
+      ext = '.gif';
+      contentType = 'image/gif';
+    } else if (extFromName === '.avif' || rawContentType === 'image/avif') {
+      ext = '.avif';
+      contentType = 'image/avif';
+    } else {
+      ext = extFromName || '.png';
+      contentType = rawContentType || 'image/png';
+    }
+
+    const cleanBaseName = path.basename(fileName, extFromName || ext).replace(/[^a-zA-Z0-9_-]/g, '_') || 'image';
     const finalFileName = `${cleanBaseName}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}${ext}`;
 
     // ── 1. Try Supabase Storage first ─────────────────────────
