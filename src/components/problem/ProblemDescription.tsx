@@ -129,8 +129,8 @@ function renderMarkdownRich(content: string): React.ReactNode {
     if (bulletMatch) {
       inList = true;
       listItems.push(
-        <li key={`li-${lineIdx}`} className="flex items-start gap-2.5 text-xs text-zinc-300 font-mono leading-relaxed">
-          <span className="text-cyan-400 font-bold select-none text-[13px] leading-none mt-1">•</span>
+        <li key={`li-${lineIdx}`} className="flex items-start gap-2.5 text-sm md:text-[14.5px] text-zinc-200 font-mono leading-relaxed">
+          <span className="text-cyan-400 font-bold select-none text-[15px] leading-none mt-1">•</span>
           <span className="flex-1">{renderInlineStyled(bulletMatch[1])}</span>
         </li>
       );
@@ -152,8 +152,8 @@ function renderMarkdownRich(content: string): React.ReactNode {
       elements.push(
         <h4
           key={`h-${lineIdx}`}
-          className={`font-semibold tracking-wide my-3 font-mono flex items-center gap-2 ${
-            isConstraints ? 'text-zinc-200 text-xs uppercase tracking-wider text-cyan-400' : 'text-zinc-100 text-sm'
+          className={`font-semibold tracking-wide my-4 font-mono flex items-center gap-2 ${
+            isConstraints ? 'text-cyan-400 text-sm md:text-base uppercase tracking-wider font-bold' : 'text-zinc-100 text-base md:text-lg font-bold'
           }`}
         >
           {isConstraints && <span className="text-cyan-400">⚡</span>}
@@ -165,14 +165,14 @@ function renderMarkdownRich(content: string): React.ReactNode {
 
     // Normal paragraph
     elements.push(
-      <p key={`p-${lineIdx}`} className="text-xs text-zinc-300 leading-relaxed my-1.5 font-sans">
+      <p key={`p-${lineIdx}`} className="text-sm md:text-[15px] text-zinc-200 leading-relaxed my-2 font-sans">
         {renderInlineStyled(line)}
       </p>
     );
   });
 
   flushList();
-  return <div className="space-y-1">{elements}</div>;
+  return <div className="space-y-1.5">{elements}</div>;
 }
 
 /**
@@ -196,7 +196,7 @@ function renderInlineStyled(text: string): React.ReactNode {
       parts.push(
         <code
           key={match.index}
-          className="px-1.5 py-0.5 mx-0.5 rounded-md bg-zinc-800/80 border border-zinc-700/60 text-zinc-200 text-[11.5px] font-mono tracking-tight shadow-2xs font-semibold inline-block"
+          className="px-2 py-0.5 mx-0.5 rounded-md bg-zinc-800/90 border border-zinc-700/70 text-cyan-200 text-[13px] font-mono tracking-tight shadow-2xs font-semibold inline-block"
         >
           {codeVal}
         </code>
@@ -249,11 +249,11 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
   }, [problem.example]);
 
   return (
-    <div className={`space-y-5 text-zinc-300 font-sans text-xs leading-relaxed ${className}`}>
+    <div className={`space-y-5 text-zinc-200 font-sans text-sm md:text-base leading-relaxed ${className}`}>
       {/* ── Problem Title & Metadata Bar ── */}
       <div className="flex items-start justify-between gap-3 flex-wrap border-b border-zinc-800/60 pb-4">
-        <div className="space-y-1.5 flex-1 min-w-[200px]">
-          <h2 className="text-xl font-bold text-zinc-100 tracking-tight font-display flex items-center gap-2.5">
+        <div className="space-y-2 flex-1 min-w-[200px]">
+          <h2 className="text-2xl font-bold text-zinc-100 tracking-tight font-display flex items-center gap-2.5">
             <span>{problem.title}</span>
           </h2>
           {(problem.tags || []).length > 0 && (
@@ -261,7 +261,7 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
               {problem.tags.map(tag => (
                 <span
                   key={tag}
-                  className="px-2 py-0.5 bg-zinc-900 border border-zinc-800 text-zinc-400 rounded-md text-[11px] font-mono hover:border-zinc-700 transition-colors"
+                  className="px-2.5 py-0.5 bg-zinc-900 border border-zinc-800 text-zinc-300 rounded-md text-xs font-mono hover:border-zinc-700 transition-colors"
                 >
                   {tag}
                 </span>
@@ -282,7 +282,7 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
           >
             {problem.difficulty}
           </span>
-          <span className="px-2.5 py-1 bg-purple-500/10 text-purple-400 rounded-full text-xs font-mono font-semibold border border-purple-500/20">
+          <span className="px-3 py-1 bg-purple-500/10 text-purple-300 rounded-full text-xs font-mono font-semibold border border-purple-500/20">
             {problem.points} pts
           </span>
         </div>
@@ -292,12 +292,13 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
       <div className="problem-content">
         {isHtml ? (
           <div
-            className="prose prose-invert prose-sm max-w-none text-zinc-300 leading-relaxed
-              [&>p]:mb-3.5 [&>p]:leading-relaxed [&>p]:text-zinc-300 [&>p]:text-[13px]
-              [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:mx-0.5 [&_code]:rounded-md [&_code]:bg-zinc-800/80 [&_code]:border [&_code]:border-zinc-700/60 [&_code]:text-zinc-200 [&_code]:text-[11.5px] [&_code]:font-mono [&_code]:font-semibold
+            className="prose prose-invert prose-base max-w-none text-zinc-200 leading-relaxed
+              [&>p]:mb-3.5 [&>p]:leading-relaxed [&>p]:text-zinc-200 [&>p]:text-[15px]
+              [&_code]:px-2 [&_code]:py-0.5 [&_code]:mx-0.5 [&_code]:rounded-md [&_code]:bg-zinc-800/90 [&_code]:border [&_code]:border-zinc-700/70 [&_code]:text-cyan-200 [&_code]:text-[13px] [&_code]:font-mono [&_code]:font-semibold
               [&_img]:max-w-full [&_img]:h-auto [&_img]:max-h-[360px] [&_img]:object-contain [&_img]:rounded-xl [&_img]:border [&_img]:border-zinc-800/80 [&_img]:bg-zinc-950/40 [&_img]:p-2 [&_img]:mx-auto [&_img]:my-4 [&_img]:shadow-md
-              [&_ul]:my-3 [&_ul]:space-y-1.5 [&_ul]:list-disc [&_ul]:pl-5
-              [&_li]:text-xs [&_li]:font-mono [&_li]:text-zinc-300 [&_li]:leading-relaxed
+              [&_ul]:my-3 [&_ul]:space-y-2 [&_ul]:list-disc [&_ul]:pl-5
+              [&_li]:text-sm md:[&_li]:text-[14.5px] [&_li]:font-mono [&_li]:text-zinc-200 [&_li]:leading-relaxed
+              [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_h4]:text-base
               [&_strong]:text-zinc-100 [&_strong]:font-semibold"
             dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
           />
@@ -308,28 +309,28 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
 
       {/* ── Examples Callout Boxes (LeetCode Style) ── */}
       {parsedExamples.length > 0 && (
-        <div className="space-y-3.5 mt-6">
+        <div className="space-y-4 mt-6">
           {parsedExamples.map((ex, idx) => (
             <div
               key={idx}
-              className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl overflow-hidden shadow-xs hover:border-zinc-700/80 transition-all duration-200"
+              className="bg-zinc-900/70 border border-zinc-800/90 rounded-xl overflow-hidden shadow-xs hover:border-zinc-700/80 transition-all duration-200"
             >
               {/* Example Header */}
-              <div className="px-3.5 py-2 bg-zinc-900/90 border-b border-zinc-800/60 flex items-center justify-between">
-                <span className="text-[11px] font-bold font-mono uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <div className="px-4 py-2.5 bg-zinc-900/90 border-b border-zinc-800/80 flex items-center justify-between">
+                <span className="text-xs font-bold font-mono uppercase tracking-wider text-zinc-200 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400" />
                   {ex.title}
                 </span>
               </div>
 
               {/* Example Body */}
-              <div className="p-3.5 space-y-2 font-mono text-xs">
+              <div className="p-4 space-y-2.5 font-mono text-sm">
                 {ex.input && (
                   <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
-                    <span className="text-zinc-500 font-sans font-semibold text-[11px] w-20 shrink-0 select-none">
+                    <span className="text-zinc-400 font-sans font-semibold text-xs w-20 shrink-0 select-none">
                       Input:
                     </span>
-                    <code className="text-zinc-200 bg-zinc-950/60 px-2 py-1 rounded border border-zinc-800/60 flex-1 whitespace-pre-wrap break-all">
+                    <code className="text-zinc-100 bg-zinc-950/80 px-2.5 py-1 rounded-md border border-zinc-800/80 flex-1 whitespace-pre-wrap break-all text-sm leading-relaxed">
                       {ex.input}
                     </code>
                   </div>
@@ -337,21 +338,21 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
 
                 {ex.output && (
                   <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
-                    <span className="text-zinc-500 font-sans font-semibold text-[11px] w-20 shrink-0 select-none">
+                    <span className="text-zinc-400 font-sans font-semibold text-xs w-20 shrink-0 select-none">
                       Output:
                     </span>
-                    <code className="text-emerald-400 bg-emerald-950/25 px-2 py-1 rounded border border-emerald-900/40 font-semibold flex-1 whitespace-pre-wrap break-all">
+                    <code className="text-emerald-300 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-900/50 font-semibold flex-1 whitespace-pre-wrap break-all text-sm leading-relaxed">
                       {ex.output}
                     </code>
                   </div>
                 )}
 
                 {ex.explanation && (
-                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2 pt-1 border-t border-zinc-800/40">
-                    <span className="text-zinc-500 font-sans font-semibold text-[11px] w-20 shrink-0 select-none">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2 pt-2 border-t border-zinc-800/60">
+                    <span className="text-zinc-400 font-sans font-semibold text-xs w-20 shrink-0 select-none">
                       Explanation:
                     </span>
-                    <span className="text-zinc-300 font-sans text-xs leading-relaxed flex-1">
+                    <span className="text-zinc-200 font-sans text-sm md:text-[14.5px] leading-relaxed flex-1">
                       {renderInlineStyled(ex.explanation)}
                     </span>
                   </div>

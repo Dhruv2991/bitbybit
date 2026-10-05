@@ -113,7 +113,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     navigate, signIn, signOut, switchAccount,
   } = useAppShell();
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -121,22 +121,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-
-  // Load sidebar collapsed preference
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("bb_sidebar_collapsed");
-      if (saved !== null) setSidebarCollapsed(saved === "true");
-    } catch {}
-  }, []);
-
-  function handleToggleSidebar() {
-    setSidebarCollapsed(prev => {
-      const next = !prev;
-      try { localStorage.setItem("bb_sidebar_collapsed", String(next)); } catch {}
-      return next;
-    });
-  }
 
   // Handle outside click for profile dropdown
   useEffect(() => {
@@ -286,64 +270,49 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-1 min-h-screen relative">
         {/* ========================================================================= */}
-        {/* DESKTOP SIDEBAR                                                           */}
+        {/* DESKTOP SIDEBAR — Compact w-20 by default, expands to w-64 on hover       */}
         {/* ========================================================================= */}
         <aside
-          className={`hidden md:flex flex-col fixed top-0 left-0 bottom-0 z-40 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] transition-all duration-300 ease-out select-none
-            ${sidebarCollapsed ? "w-[72px]" : "w-[260px]"}`}
+          onMouseEnter={() => setSidebarHovered(true)}
+          onMouseLeave={() => setSidebarHovered(false)}
+          className={`hidden md:flex flex-col fixed top-0 left-0 bottom-0 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] transition-all duration-300 ease-in-out select-none backdrop-blur-xl
+            ${sidebarHovered ? "w-64 z-50 shadow-2xl shadow-black/80 ring-1 ring-white/[0.05]" : "w-20 z-40"}`}
         >
           {/* Sidebar Header / Brand */}
-          <div className="h-16 px-4 flex items-center justify-between border-b border-[var(--sidebar-border)] shrink-0">
+          <div className="h-16 px-4 flex items-center border-b border-[var(--sidebar-border)] shrink-0 overflow-hidden">
             <button
               onClick={() => go("home")}
-              className="flex items-center gap-3 overflow-hidden text-left focus:outline-none group"
+              className="flex items-center gap-3 overflow-hidden text-left focus:outline-none group w-full"
               title="BitByBit Home"
             >
-              <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-700/90 p-1 flex items-center justify-center shrink-0 group-hover:border-cyan-500/60 shadow-md group-hover:shadow-[0_0_15px_rgba(0,229,255,0.3)] transition-all">
+              <div className="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-700/90 p-1.5 flex items-center justify-center shrink-0 group-hover:border-cyan-500/60 shadow-md group-hover:shadow-[0_0_15px_rgba(0,229,255,0.3)] transition-all">
                 <img src="/logo.png" alt="BitByBit" className="w-full h-full object-contain filter drop-shadow-sm" />
               </div>
-              {!sidebarCollapsed && (
-                <div className="flex flex-col min-w-0 transition-opacity duration-200">
-                  <div className="flex items-center gap-2">
-                    <span className="font-display font-bold text-[17px] tracking-tight text-white group-hover:text-cyan-300 transition-colors leading-tight">
-                      BitByBit
-                    </span>
-                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-500/30 leading-none">
-                      v3
-                    </span>
-                  </div>
-                  <span className="text-xs font-mono text-zinc-400 font-medium tracking-tight truncate mt-0.5">
-                    TeamCodeLocked
-                  </span>
-                </div>
-              )}
-            </button>
-
-            {!sidebarCollapsed && (
-              <button
-                onClick={handleToggleSidebar}
-                title="Collapse sidebar"
-                aria-label="Collapse sidebar"
-                className="w-7 h-7 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 flex items-center justify-center transition-colors"
+              <div
+                className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
+                  ${sidebarHovered ? "opacity-100 max-w-[170px] translate-x-0" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </button>
-            )}
+                <span className="font-display font-bold text-[17px] tracking-tight text-white group-hover:text-cyan-300 transition-colors leading-tight">
+                  BitByBit
+                </span>
+                <span className="text-xs font-mono text-zinc-400 font-medium tracking-tight truncate mt-0.5">
+                  TeamCodeLocked
+                </span>
+              </div>
+            </button>
           </div>
 
           {/* Sidebar Navigation */}
-          <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-4 space-y-5">
             {NAV_GROUPS.map((group, gIdx) => (
               <div key={group.group + gIdx} className="space-y-1">
-                {!sidebarCollapsed ? (
-                  <div className="px-3 pb-2 text-xs font-mono font-semibold tracking-wider uppercase text-zinc-400">
-                    {group.group}
-                  </div>
-                ) : (
-                  <div className="w-full h-px bg-[var(--sidebar-border)] my-2" />
-                )}
+                <div
+                  className={`transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
+                    ${sidebarHovered ? "px-3 pb-1.5 text-xs font-mono font-semibold tracking-wider uppercase text-zinc-400 opacity-100 max-h-6" : "w-8 h-px bg-zinc-800/80 my-2 mx-auto opacity-50 max-h-2"}`}
+                >
+                  {sidebarHovered ? group.group : ""}
+                </div>
+
                 {group.items.map(item => {
                   const isActive = page === item.id;
                   const Icon = item.icon;
@@ -351,22 +320,29 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     <button
                       key={item.id}
                       onClick={() => go(item.id)}
-                      title={sidebarCollapsed ? item.label : undefined}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-mono text-sm transition-colors group relative
+                      title={item.label}
+                      className={`w-full flex items-center rounded-xl font-mono text-sm transition-all duration-200 group relative
                         ${isActive
                           ? "bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/25 shadow-sm"
                           : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border border-transparent"
                         }
-                        ${sidebarCollapsed ? "justify-center px-0" : ""}`}
+                        ${sidebarHovered ? "px-3 py-2.5 gap-3" : "px-0 py-2.5 justify-center"}`}
                     >
-                      <div className={`shrink-0 ${isActive ? "text-cyan-400" : "text-zinc-400 group-hover:text-zinc-200"}`}>
-                        <Icon className="w-[18px] h-[18px]" />
+                      <div className={`shrink-0 w-6 h-6 flex items-center justify-center ${isActive ? "text-cyan-400" : "text-zinc-400 group-hover:text-zinc-200"}`}>
+                        <Icon className="w-[19px] h-[19px]" />
                       </div>
-                      {!sidebarCollapsed && (
-                        <span className="flex-1 text-left truncate font-medium">{item.label}</span>
-                      )}
-                      {!sidebarCollapsed && item.badge && (
-                        <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${item.badgeColor || "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}>
+                      <span
+                        className={`text-left truncate font-medium transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
+                          ${sidebarHovered ? "opacity-100 max-w-[130px] translate-x-0 flex-1" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
+                      >
+                        {item.label}
+                      </span>
+                      {item.badge && (
+                        <span
+                          className={`text-xs font-mono px-2 py-0.5 rounded-full shrink-0 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
+                            ${item.badgeColor || "bg-zinc-800 text-zinc-400 border border-zinc-700"}
+                            ${sidebarHovered ? "opacity-100 max-w-[80px] scale-100" : "opacity-0 max-w-0 scale-75 pointer-events-none"}`}
+                        >
                           {item.badge}
                         </span>
                       )}
@@ -377,31 +353,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </div>
 
-          {/* Sidebar Collapse Expand Button (When collapsed) */}
-          {sidebarCollapsed && (
-            <div className="p-2 border-t border-[var(--sidebar-border)] flex justify-center">
-              <button
-                onClick={handleToggleSidebar}
-                title="Expand sidebar"
-                aria-label="Expand sidebar"
-                className="w-8 h-8 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 flex items-center justify-center transition-colors"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </button>
-            </div>
-          )}
-
           {/* Sidebar Footer User Card */}
-          <div className="p-3 border-t border-[var(--sidebar-border)] shrink-0">
+          <div className="p-2.5 border-t border-[var(--sidebar-border)] shrink-0 overflow-hidden">
             {!authChecked ? (
               <div className="h-10 rounded-lg bg-zinc-900 animate-pulse" />
             ) : user ? (
               <button
                 onClick={() => go("profile")}
-                className={`w-full flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-zinc-800/60 transition-colors group text-left
-                  ${sidebarCollapsed ? "justify-center p-1" : ""}`}
+                className={`w-full flex items-center rounded-lg hover:bg-zinc-800/60 transition-colors group text-left
+                  ${sidebarHovered ? "p-2 gap-2.5" : "p-1.5 justify-center"}`}
                 title={user.name}
               >
                 <div className="relative shrink-0">
@@ -417,24 +377,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     </span>
                   )}
                 </div>
-                {!sidebarCollapsed && (
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-mono font-medium text-zinc-200 truncate">{user.name}</p>
-                    <p className="text-xs font-mono text-zinc-500 truncate">@{user.github}</p>
-                  </div>
-                )}
+                <div
+                  className={`min-w-0 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
+                    ${sidebarHovered ? "opacity-100 max-w-[150px] translate-x-0 flex-1" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
+                >
+                  <p className="text-sm font-mono font-medium text-zinc-200 truncate">{user.name}</p>
+                  <p className="text-xs font-mono text-zinc-500 truncate">@{user.github}</p>
+                </div>
               </button>
             ) : (
               <button
                 onClick={signIn}
                 className={`w-full btn-primary text-sm py-2 flex items-center justify-center gap-2
-                  ${sidebarCollapsed ? "px-0" : ""}`}
+                  ${sidebarHovered ? "px-3" : "px-0"}`}
                 title="Sign in with GitHub"
               >
                 <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
                 </svg>
-                {!sidebarCollapsed && <span>Sign In</span>}
+                <span
+                  className={`transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
+                    ${sidebarHovered ? "opacity-100 max-w-[100px] translate-x-0" : "opacity-0 max-w-0 pointer-events-none"}`}
+                >
+                  Sign In
+                </span>
               </button>
             )}
           </div>
@@ -443,10 +409,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* ========================================================================= */}
         {/* MAIN LAYOUT WRAPPER                                                       */}
         {/* ========================================================================= */}
-        <div
-          className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-out
-            ${sidebarCollapsed ? "md:pl-[72px]" : "md:pl-[260px]"}`}
-        >
+        <div className="flex-1 flex flex-col min-w-0 transition-all duration-300 ease-out md:pl-20">
           {/* TOPBAR / HEADER */}
           <header
             className="sticky top-0 z-30 h-16 border-b border-[var(--topbar-border)] bg-[var(--topbar-bg)] backdrop-blur-xl flex items-center justify-between px-4 sm:px-6 lg:px-8"
@@ -474,14 +437,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <img src="/logo.png" alt="BitByBit" className="w-full h-full object-contain" />
                 </div>
                 <div className="flex flex-col">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-display font-bold text-base tracking-tight text-white leading-tight">
-                      BitByBit
-                    </span>
-                    <span className="text-[9px] font-mono font-semibold uppercase bg-cyan-500/20 text-cyan-300 px-1 py-0.2 rounded border border-cyan-500/30 leading-none">
-                      v3
-                    </span>
-                  </div>
+                  <span className="font-display font-bold text-base tracking-tight text-white leading-tight">
+                    BitByBit
+                  </span>
                   <span className="text-[10px] font-mono text-zinc-400 font-medium leading-tight">
                     TeamCodeLocked
                   </span>
@@ -714,14 +672,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <img src="/logo.png" alt="BitByBit" className="w-full h-full object-contain filter drop-shadow-sm" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-display font-bold text-[17px] tracking-tight text-white leading-tight">
-                      BitByBit
-                    </span>
-                    <span className="text-[10px] font-mono font-semibold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-500/30 leading-none">
-                      v3
-                    </span>
-                  </div>
+                  <span className="font-display font-bold text-[17px] tracking-tight text-white leading-tight">
+                    BitByBit
+                  </span>
                   <span className="text-xs font-mono text-zinc-400 font-medium tracking-tight truncate mt-0.5">
                     TeamCodeLocked
                   </span>

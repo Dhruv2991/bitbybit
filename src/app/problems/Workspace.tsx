@@ -644,11 +644,22 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   const [confirmDialog, setConfirmDialog] = useState<{ message: string; resolve: (v: boolean) => void } | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [copiedCode,    setCopiedCode]    = useState(false);
+  const [isEditorExpanded, setIsEditorExpanded] = useState(false);
   const [mobileTab,     setMobileTab]     = useState<'problem' | 'editor'>('problem');
   const [hintsRevealed, setHintsRevealed] = useState(0);
   const [hintCooldown,  setHintCooldown]  = useState(false);
   const [hintTimer,     setHintTimer]     = useState(0);
   const hintTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Restore split view on Escape key
+  useEffect(() => {
+    if (!isEditorExpanded) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsEditorExpanded(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isEditorExpanded]);
 
   // ── AI state ──────────────────────────────────────────────────────────────
   const [aiExplanation,    setAiExplanation]    = useState('');
@@ -1108,7 +1119,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   const hintStatus = usage.getHintStatus(problem.id);
 
   return (
-    <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-screen">
+    <div className={`relative grid gap-4 min-h-screen ${isEditorExpanded ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-2'}`}>
 
       {/* Toasts */}
       <div className="fixed bottom-6 right-4 md:right-6 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
@@ -1155,8 +1166,8 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
               {[
                 { keys: ['Ctrl', 'Enter'], desc: 'Run test cases' },
                 { keys: ['Ctrl', 'Shift', 'Enter'], desc: 'Submit solution' },
-                { keys: ['?'], desc: 'Toggle this menu' },
-                { keys: ['Esc'], desc: 'Close dialogs' },
+                { keys: ['Esc'], desc: 'Exit fullscreen / close dialogs' },
+                { keys: ['?'], desc: 'Toggle shortcuts menu' },
               ].map((row, i) => (
                 <div key={i} className="flex items-center justify-between">
                   <span className="text-[var(--text2)]">{row.desc}</span>
@@ -1174,51 +1185,53 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
       )}
 
       {/* Mobile tabs */}
-      <div className="lg:hidden col-span-full sticky top-0 z-40 flex bg-[var(--bg)] border-b border-[var(--card)]">
-        {(['problem', 'editor'] as const).map(tab => (
-          <button key={tab} onClick={() => setMobileTab(tab)}
-            className={`flex-1 py-3 text-xs font-mono font-bold uppercase tracking-widest transition-colors
-              ${mobileTab === tab ? 'text-[var(--acc)] border-b-2 border-[var(--acc)]' : 'text-[var(--muted)] hover:text-[var(--text2)]'}`}>
-            {tab}
-          </button>
-        ))}
-      </div>
+      {!isEditorExpanded && (
+        <div className="lg:hidden col-span-full sticky top-0 z-40 flex bg-[var(--bg)] border-b border-[var(--card)]">
+          {(['problem', 'editor'] as const).map(tab => (
+            <button key={tab} onClick={() => setMobileTab(tab)}
+              className={`flex-1 py-3 text-xs font-mono font-bold uppercase tracking-widest transition-colors
+                ${mobileTab === tab ? 'text-[var(--acc)] border-b-2 border-[var(--acc)]' : 'text-[var(--muted)] hover:text-[var(--text2)]'}`}>
+              {tab}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── Left: Problem description ── */}
       <div className={`bg-[var(--bg)] border-r border-[var(--card)] p-5 md:p-6 overflow-y-auto
-        ${mobileTab === 'editor' ? 'hidden lg:block' : 'block'}`}>
+        ${isEditorExpanded ? 'hidden' : mobileTab === 'editor' ? 'hidden lg:block' : 'block'}`}>
         <button onClick={onClose}
-          className="mb-5 text-xs text-[var(--muted)] hover:text-[var(--acc)] font-mono transition-colors flex items-center gap-1.5 group">
+          className="mb-5 text-sm text-[var(--muted)] hover:text-[var(--acc)] font-mono transition-colors flex items-center gap-1.5 group">
           <span className="group-hover:-translate-x-0.5 transition-transform duration-150 inline-block">←</span>
           <span>{isWeekly ? 'Weekly Challenge' : practiceMode ? 'Practice (ended)' : 'Problems'}</span>
         </button>
 
         <button onClick={() => setShortcutsOpen(true)}
-          className="hidden lg:inline-flex items-center gap-1.5 mb-5 ml-3 text-[10px] text-[var(--muted)] hover:text-[var(--text)] font-mono transition-colors">
-          <kbd className="px-1.5 py-0.5 bg-[var(--card3)] border border-[var(--border2)] rounded text-[9px]">?</kbd>
+          className="hidden lg:inline-flex items-center gap-1.5 mb-5 ml-3 text-xs text-[var(--muted)] hover:text-[var(--text)] font-mono transition-colors">
+          <kbd className="px-1.5 py-0.5 bg-[var(--card3)] border border-[var(--border2)] rounded text-[10px]">?</kbd>
           <span>shortcuts</span>
         </button>
 
         {practiceMode && (
-          <div className="mb-4 flex items-center gap-2 bg-[rgba(var(--purple-rgb),0.031)] border border-[rgba(var(--purple-rgb),0.082)] rounded-xl px-3 py-2">
-            <span className="text-sm">🏁</span>
-            <span className="text-xs font-mono text-[var(--purple)]">Practice mode — no points awarded.</span>
+          <div className="mb-4 flex items-center gap-2 bg-[rgba(var(--purple-rgb),0.031)] border border-[rgba(var(--purple-rgb),0.082)] rounded-xl px-3.5 py-2.5">
+            <span className="text-base">🏁</span>
+            <span className="text-sm font-mono text-[var(--purple)]">Practice mode — no points awarded.</span>
           </div>
         )}
 
         {practiceMode && (
           <div className="flex gap-1 mb-4 bg-[var(--card2)] border border-[var(--border)] rounded-xl p-1">
             <button onClick={() => setLeftTab('problem')}
-              className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold transition-all
+              className={`flex-1 py-2 rounded-lg text-sm font-mono font-bold transition-all
                 ${leftTab === 'problem' ? 'bg-[var(--card)] text-[var(--text)]' : 'text-[var(--muted)] hover:text-[var(--text2)]'}`}>
               Problem
             </button>
             <button onClick={() => setLeftTab('editorial')}
-              className={`flex-1 py-2 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center gap-1.5
+              className={`flex-1 py-2 rounded-lg text-sm font-mono font-bold transition-all flex items-center justify-center gap-1.5
                 ${leftTab === 'editorial' ? 'bg-[rgba(var(--purple-rgb),0.12)] text-[var(--purple)]' : 'text-[var(--muted)] hover:text-[var(--text2)]'}`}>
               ✦ AI Editorial
               {!editorial && (
-                <span className="text-[9px] opacity-70">({usage.editorial.remaining}/{usage.editorial.limit} left today)</span>
+                <span className="text-[10px] opacity-70">({usage.editorial.remaining}/{usage.editorial.limit} left today)</span>
               )}
             </button>
           </div>
@@ -1228,27 +1241,27 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         <ProblemDescription problem={problem} />
 
         {(problem.test_cases || []).length > 0 && (
-          <div className="mt-6">
-            <div className="text-[10px] text-zinc-400 font-mono mb-3 uppercase tracking-widest flex items-center gap-1.5">
-              <span>🧪</span>
+          <div className="mt-7">
+            <div className="text-xs text-zinc-300 font-mono mb-3 uppercase tracking-widest flex items-center gap-2 font-semibold">
+              <span className="text-cyan-400">🧪</span>
               <span>Sample Test Cases</span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {problem.test_cases.slice(0, 3).map((tc, i) => (
-                <div key={i} className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl px-3.5 py-2.5 text-xs font-mono hover:border-zinc-700 transition-colors shadow-2xs">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-zinc-500 font-sans font-semibold text-[11px] w-14 shrink-0">Input:</span>
-                    <code className="text-zinc-200 break-all flex-1">{formatTestCaseInput(tc.input, problem)}</code>
+                <div key={i} className="bg-zinc-900/70 border border-zinc-800/90 rounded-xl p-3.5 text-sm font-mono hover:border-zinc-700 transition-colors shadow-2xs">
+                  <div className="flex items-baseline gap-2.5">
+                    <span className="text-zinc-400 font-sans font-semibold text-xs w-16 shrink-0 select-none">Input:</span>
+                    <code className="text-zinc-100 break-all flex-1 text-sm leading-relaxed">{formatTestCaseInput(tc.input, problem)}</code>
                   </div>
-                  <div className="flex items-baseline gap-2 mt-1.5 pt-1.5 border-t border-zinc-800/40">
-                    <span className="text-zinc-500 font-sans font-semibold text-[11px] w-14 shrink-0">Output:</span>
-                    <code className="text-emerald-400 font-semibold break-all flex-1">{tc.expected}</code>
+                  <div className="flex items-baseline gap-2.5 mt-2 pt-2 border-t border-zinc-800/50">
+                    <span className="text-zinc-400 font-sans font-semibold text-xs w-16 shrink-0 select-none">Output:</span>
+                    <code className="text-emerald-300 font-semibold break-all flex-1 text-sm leading-relaxed">{tc.expected}</code>
                   </div>
                 </div>
               ))}
               {problem.test_cases.length > 3 && (
-                <div className="text-xs text-zinc-500 font-mono pl-1 pt-1 flex items-center gap-1">
-                  <span>🔒</span>
+                <div className="text-sm text-zinc-400 font-mono pl-1 pt-1 flex items-center gap-1.5">
+                  <span className="text-zinc-500">🔒</span>
                   <span>+{problem.test_cases.length - 3} hidden test cases (tested on submission)</span>
                 </div>
               )}
@@ -1271,21 +1284,21 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
         {/* Static admin hints */}
         {!onArenaSubmit && (problem.hints || []).filter(Boolean).length > 0 && (
-          <div className="mt-5 border-t border-[var(--card)] pt-5">
-            <div className="text-[10px] text-[var(--text3)] font-mono mb-3 uppercase tracking-widest">💡 Admin Hints</div>
-            <div className="space-y-2 mb-3">
+          <div className="mt-6 border-t border-[var(--card)] pt-6">
+            <div className="text-xs text-[var(--text3)] font-mono mb-3 uppercase tracking-widest font-semibold">💡 Admin Hints</div>
+            <div className="space-y-2.5 mb-3">
               {(problem.hints || []).filter(Boolean).slice(0, hintsRevealed).map((hint, i) => (
-                <div key={i} className="flex gap-2.5 bg-[var(--bg2)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 animate-fade-up">
-                  <span className="text-[var(--warn)] text-xs font-mono shrink-0 mt-0.5">#{i + 1}</span>
-                  <p className="text-[var(--text-soft)] text-xs font-mono leading-relaxed">{hint}</p>
+                <div key={i} className="flex gap-3 bg-[var(--bg2)] border border-[var(--border)] rounded-xl px-4 py-3 animate-fade-up">
+                  <span className="text-[var(--warn)] text-sm font-mono shrink-0 mt-0.5 font-bold">#{i + 1}</span>
+                  <p className="text-[var(--text)] text-sm font-mono leading-relaxed">{hint}</p>
                 </div>
               ))}
             </div>
             {hintsRevealed < (problem.hints || []).filter(Boolean).length && (
               <div>
-                {hintsRevealed === 0 && <p className="text-[10px] text-[var(--muted)] font-mono mb-2">Stuck? Try on your own first.</p>}
+                {hintsRevealed === 0 && <p className="text-xs text-[var(--muted)] font-mono mb-2">Stuck? Try on your own first.</p>}
                 <button onClick={revealNextHint} disabled={hintCooldown}
-                  className={`w-full py-2 rounded-xl text-xs font-mono font-bold border transition-all
+                  className={`w-full py-2.5 rounded-xl text-sm font-mono font-bold border transition-all
                     ${hintCooldown ? 'bg-[var(--bg2)] border-[var(--border)] text-[var(--muted)] cursor-not-allowed'
                     : 'bg-[rgba(var(--warn-rgb),0.031)] border-[rgba(var(--warn-rgb),0.125)] text-[var(--warn)] hover:bg-[rgba(var(--warn-rgb),0.071)]'}`}>
                   {hintCooldown ? `Next hint in ${hintTimer}s…` : hintsRevealed === 0 ? '💡 Show Hint 1' : `💡 Show Hint ${hintsRevealed + 1}`}
@@ -1293,7 +1306,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
               </div>
             )}
             {hintsRevealed >= (problem.hints || []).filter(Boolean).length && hintsRevealed > 0 && (
-              <p className="text-[10px] text-[var(--muted)] font-mono text-center">All hints revealed</p>
+              <p className="text-xs text-[var(--muted)] font-mono text-center">All hints revealed</p>
             )}
           </div>
         )}
@@ -1304,8 +1317,8 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
             {!editorial ? (
               <div className="flex flex-col items-center justify-center text-center py-16 px-4">
                 <span className="text-4xl mb-4">✦</span>
-                <h3 className="font-display font-bold text-[var(--text)] text-lg mb-2">AI Editorial</h3>
-                <p className="text-sm font-mono text-[var(--text2)] max-w-sm mb-1">
+                <h3 className="font-display font-bold text-[var(--text)] text-xl mb-2">AI Editorial</h3>
+                <p className="text-sm md:text-base font-mono text-[var(--text2)] max-w-sm mb-1">
                   Get a full walkthrough for "{problem.title}" — approach, complexity, common mistakes,
                   and complete solutions in Python and JavaScript.
                 </p>
@@ -1323,23 +1336,23 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">✦</span>
-                  <h4 className="font-display font-bold text-base text-[var(--text)]">Editorial</h4>
+                  <span className="text-xl">✦</span>
+                  <h4 className="font-display font-bold text-lg text-[var(--text)]">Editorial Walkthrough</h4>
                 </div>
                 <div>
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] mb-1">Approach</p>
-                  <p className="text-sm font-mono text-[var(--text-soft)] leading-relaxed">{editorial.approach}</p>
+                  <p className="text-xs font-mono uppercase tracking-wider text-[var(--muted)] mb-1 font-semibold">Approach</p>
+                  <p className="text-sm md:text-base font-mono text-[var(--text-soft)] leading-relaxed">{editorial.approach}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] mb-1">Complexity</p>
-                  <p className="text-sm font-mono text-[var(--purple)]">{editorial.complexity}</p>
+                  <p className="text-xs font-mono uppercase tracking-wider text-[var(--muted)] mb-1 font-semibold">Complexity</p>
+                  <p className="text-sm md:text-base font-mono text-[var(--purple)] font-medium">{editorial.complexity}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] mb-1">Common Mistakes</p>
-                  <p className="text-sm font-mono text-[var(--text-soft)] leading-relaxed">{editorial.commonMistakes}</p>
+                  <p className="text-xs font-mono uppercase tracking-wider text-[var(--muted)] mb-1 font-semibold">Common Mistakes</p>
+                  <p className="text-sm md:text-base font-mono text-[var(--text-soft)] leading-relaxed">{editorial.commonMistakes}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-mono uppercase tracking-wider text-[var(--muted)] mb-2">Full Solution</p>
+                  <p className="text-xs font-mono uppercase tracking-wider text-[var(--muted)] mb-2 font-semibold">Full Solution</p>
                   <div className="flex gap-1 mb-2">
                     {(['python', 'javascript'] as const).map(t => (
                       <button key={t} onClick={() => setEditorialTab(t)}
@@ -1349,12 +1362,12 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
                       </button>
                     ))}
                   </div>
-                  <pre className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 overflow-x-auto text-xs font-mono text-[var(--text-soft)] leading-relaxed">
+                  <pre className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 overflow-x-auto text-sm font-mono text-[var(--text-soft)] leading-relaxed">
                     {editorialTab === 'python' ? editorial.solutionPython : editorial.solutionJs}
                   </pre>
                 </div>
                 {usage.editorial.remaining > 0 && (
-                  <p className="text-[10px] font-mono text-[var(--muted)] text-center pt-2">
+                  <p className="text-xs font-mono text-[var(--muted)] text-center pt-2">
                     {usage.editorial.remaining} of {usage.editorial.limit} editorial generations left today
                   </p>
                 )}
@@ -1365,12 +1378,12 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
       </div>
 
       {/* ── Right: Editor + controls ── */}
-      <div className={`flex flex-col gap-3 ${mobileTab === 'problem' ? 'hidden lg:flex' : 'flex'}`}>
+      <div className={`flex flex-col gap-3 ${isEditorExpanded ? 'col-span-full w-full' : mobileTab === 'problem' ? 'hidden lg:flex' : 'flex'}`}>
 
         <div className="card p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-mono text-[var(--text3)] uppercase tracking-widest">Choose Language</span>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <span className="text-xs font-mono text-[var(--text3)] uppercase tracking-widest font-semibold">Choose Language</span>
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={async () => {
                   try {
@@ -1383,20 +1396,48 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
                   }
                 }}
                 title="Copy code to clipboard"
-                className="text-[10px] font-mono px-2 py-0.5 rounded-lg border border-[var(--border2)] text-[var(--text3)] hover:text-[var(--text)] hover:border-[var(--acc)] transition-colors flex items-center gap-1"
+                className="text-xs font-mono px-2.5 py-1 rounded-lg border border-[var(--border2)] text-[var(--text3)] hover:text-[var(--text)] hover:border-[var(--acc)] transition-colors flex items-center gap-1.5"
               >
                 {copiedCode ? '✓ Copied!' : '📋 Copy'}
               </button>
               {code !== STARTER_CODE[lang](problem) && (
                 <>
-                  <span className="text-[10px] font-mono text-[var(--text3)] px-2 py-0.5 rounded-lg border border-[var(--border2)] bg-[var(--card3)]">draft saved</span>
+                  <span className="text-xs font-mono text-[var(--text3)] px-2.5 py-1 rounded-lg border border-[var(--border2)] bg-[var(--card3)]">draft saved</span>
                   <button onClick={resetEditor} title="Reset to starter code"
-                    className="text-[10px] font-mono px-2 py-0.5 rounded-lg border border-[var(--border2)] text-[var(--text3)] hover:text-[var(--danger)] hover:border-[rgba(255,92,108,0.3)] transition-colors flex items-center gap-1">
+                    className="text-xs font-mono px-2.5 py-1 rounded-lg border border-[var(--border2)] text-[var(--text3)] hover:text-[var(--danger)] hover:border-[rgba(255,92,108,0.3)] transition-colors flex items-center gap-1.5">
                     ↺ Reset
                   </button>
                 </>
               )}
-              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border ${execBadge.cls}`}>{execBadge.label}</span>
+              <span className={`text-xs font-mono px-2.5 py-1 rounded-lg border ${execBadge.cls}`}>{execBadge.label}</span>
+
+              {/* Maximize / Fullscreen Editor Toggle Button */}
+              <button
+                onClick={() => setIsEditorExpanded(prev => !prev)}
+                title={isEditorExpanded ? "Restore split view (Esc)" : "Maximize editor / Fullscreen mode"}
+                aria-label={isEditorExpanded ? "Restore split view" : "Maximize editor"}
+                className={`text-xs font-mono px-2.5 py-1 rounded-lg border transition-all flex items-center gap-1.5 font-medium
+                  ${isEditorExpanded
+                    ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300 shadow-[0_0_12px_rgba(0,229,255,0.25)]'
+                    : 'border-[var(--border2)] text-[var(--text3)] hover:text-[var(--text)] hover:border-cyan-500/60 bg-[var(--card2)]/40'
+                  }`}
+              >
+                {isEditorExpanded ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M4 14h6v6m10-10h-6V4m0 6l7-7M10 14l-7 7" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>Restore View</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>Expand Editor</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
           <LangTabs current={lang} onChange={handleLangChange} />
@@ -1406,7 +1447,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           value={code}
           language={lang}
           onChange={handleCodeChange}
-          height="380px"
+          height={isEditorExpanded ? "calc(100vh - 280px)" : "420px"}
           activeLine={activeLine}
           onRun={() => { if (!running) { setMobileTab('editor'); runTests(); } }}
           onSubmit={() => {
@@ -1506,17 +1547,17 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         {!onArenaSubmit && !isWeekly && !practiceMode && (
           <div className="card p-4">
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-[10px] text-[var(--text3)] font-mono uppercase tracking-widest">
+              <label className="block text-xs text-[var(--text3)] font-mono uppercase tracking-widest font-semibold">
                 Approach or GitHub PR link <span className="text-[var(--danger)] font-bold">* (required)</span>
               </label>
-              <span className="text-[10px] font-mono text-[var(--muted)]">Required to submit</span>
+              <span className="text-xs font-mono text-[var(--muted)]">Required to submit</span>
             </div>
             <textarea value={approach} onChange={e => { setApproach(e.target.value); setApproachResult(null); }}
               placeholder="Describe your approach before writing code — e.g. I'll use a hashmap to store each number's complement… (required to submit)" rows={3}
               className="w-full bg-[var(--bg2)] border border-[var(--card)] rounded-xl px-3.5 py-2.5
-                text-[var(--text)] text-sm font-mono placeholder-[var(--border2)] resize-none
+                text-[var(--text)] text-sm md:text-base font-mono placeholder-[var(--border2)] resize-none
                 focus:outline-none focus:border-[rgba(var(--acc-rgb),0.188)] transition-colors" />
-            <p className="text-[11px] text-[var(--muted2)] font-mono mt-1 mb-2">
+            <p className="text-xs text-[var(--muted2)] font-mono mt-1 mb-2">
               Describe your approach or link a GitHub PR (required to submit your solution).
             </p>
             <ApproachPanel

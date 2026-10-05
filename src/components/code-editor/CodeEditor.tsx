@@ -131,7 +131,8 @@ export default function CodeEditor({
         }
         options={{
           readOnly,
-          fontSize:                   14,
+          fontSize:                   15.5,
+          lineHeight:                 24,
           fontFamily:                 '"JetBrains Mono", "Fira Code", "Cascadia Code", Consolas, monospace',
           fontLigatures:              true,
           minimap:                    { enabled: false },
