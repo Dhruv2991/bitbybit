@@ -80,7 +80,33 @@ export function parseExecutionStdout(rawStdout: string): ParsedTraceOutput {
           formattedVars[k] = typeof v === 'string' ? v : formatVariableValue(v);
         }
 
-        steps.push({ line: lineNum, variables: formattedVars, stdout: cumulativeStdout });
+        const rawStack = Array.isArray(parsed.stack) ? parsed.stack : undefined;
+        let formattedStack = undefined;
+        if (rawStack) {
+          formattedStack = rawStack.map((f: any, idx: number) => {
+            const fVars: Record<string, string> = {};
+            for (const [k, v] of Object.entries(f.variables || f.vars || {})) {
+              if (!k.startsWith('__')) {
+                fVars[k] = typeof v === 'string' ? v : formatVariableValue(v);
+              }
+            }
+            return {
+              id: f.id || `${f.functionName || 'frame'}_${idx}`,
+              functionName: f.functionName || f.fn || 'function',
+              line: Number(f.line || lineNum),
+              variables: fVars,
+            };
+          });
+        }
+
+        steps.push({
+          line: lineNum,
+          variables: formattedVars,
+          stdout: cumulativeStdout,
+          stack: formattedStack,
+          functionName: parsed.functionName || parsed.fn,
+          event: parsed.event,
+        });
       } catch {
         // Skip malformed trace lines gracefully
       }

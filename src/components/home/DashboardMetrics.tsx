@@ -114,14 +114,14 @@ export default function DashboardMetrics({
         <SpotlightCard
           key={m.id}
           spotlightColor={m.spotlight}
-          className="p-6 rounded-2xl hover:border-white/[0.15] transition-all duration-200"
+          className="p-6 rounded-2xl transition-all duration-200"
         >
           <div className="flex items-center justify-between mb-3.5">
-            <span className="text-sm font-sans text-zinc-300 font-medium">
+            <span className="text-sm font-sans text-slate-700 dark:text-zinc-300 font-medium">
               {m.label}
             </span>
             <div
-              className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border border-white/[0.08]"
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border border-slate-200/80 dark:border-white/[0.08]"
               style={{ background: m.accentBg }}
             >
               {m.icon}
@@ -130,15 +130,15 @@ export default function DashboardMetrics({
 
           <div className="flex flex-col">
             {loading ? (
-              <div className="h-8 w-24 rounded-lg bg-zinc-800/60 animate-pulse mb-1" />
+              <div className="h-8 w-24 rounded-lg bg-slate-200 dark:bg-zinc-800/60 animate-pulse mb-1" />
             ) : (
               <span
-                className="text-3xl font-sans font-bold text-zinc-100 tracking-tight tabular-nums"
+                className="text-3xl font-sans font-bold text-slate-900 dark:text-zinc-100 tracking-tight tabular-nums"
               >
                 {m.value}
               </span>
             )}
-            <span className="text-xs font-sans text-zinc-400 mt-1.5 truncate">
+            <span className="text-xs font-sans text-slate-500 dark:text-zinc-400 mt-1.5 truncate">
               {m.subtext}
             </span>
           </div>

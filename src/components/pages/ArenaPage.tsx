@@ -527,14 +527,13 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
 
               {/* Strike counter */}
               <div className={`hidden sm:flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-lg transition-all duration-300
-                ${strikes > 0 ? 'text-[var(--danger)] bg-[rgba(var(--danger-rgb),0.063)] border border-[rgba(var(--danger-rgb),0.125)]' + (strikes >= 2 ? ' animate-pulse' : '') : 'text-[var(--text3)] bg-[var(--bg2)] border border-[var(--card2)]'}`}>
+                ${strikes > 0 ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20' + (strikes >= 2 ? ' animate-pulse' : '') : 'text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800'}`}>
                 <span>⚠</span>
                 <span>{strikes}/3 warnings</span>
               </div>
 
               <button onClick={() => endContest('submitted')}
-                className="px-3 py-1.5 bg-[var(--surface)] border border-[var(--border)] text-[var(--text3)]
-                  hover:text-[var(--danger)] hover:border-[rgba(var(--danger-rgb),0.145)] text-xs font-mono rounded-xl transition-all duration-200">
+                className="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 dark:bg-zinc-900 dark:hover:bg-rose-950/40 border border-slate-200 dark:border-zinc-800 text-slate-700 hover:text-rose-600 dark:text-zinc-300 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-800/60 text-xs font-mono rounded-xl transition-all duration-200 shadow-xs">
                 Submit & Exit
               </button>
             </div>
@@ -547,10 +546,10 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                 <button key={id} onClick={() => switchProblem(activeContest, i)}
                   className={`px-3 py-1 rounded-lg text-xs font-mono whitespace-nowrap transition-colors shrink-0
                     ${problemIndex === i
-                      ? 'bg-zinc-800 text-zinc-100 font-semibold border border-zinc-700'
+                      ? 'bg-slate-900 text-white dark:bg-zinc-800 dark:text-zinc-100 font-semibold border border-slate-800 dark:border-zinc-700 shadow-xs'
                       : solved.has(id)
-                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                        : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'}`}>
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 font-medium'
+                        : 'bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-zinc-700'}`}>
                   {solved.has(id) ? '✓ ' : ''}Problem {i + 1}
                   {arenaProblems[id] ? ` — ${arenaProblems[id].title}` : ''}
                 </button>
@@ -594,9 +593,9 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="font-display font-bold text-xl md:text-2xl mb-1 text-[var(--text)]">Proctored Arena 🏟️</h1>
-        <p className="text-xs font-mono text-[var(--muted)] mb-5">Supervised coding contests. Prizes for top finishers. No shortcuts.</p>
-        <p className="text-[var(--text2)] text-sm font-mono">
+        <h1 className="font-display font-bold text-xl md:text-2xl mb-1 text-slate-900 dark:text-zinc-100">Proctored Arena 🏟️</h1>
+        <p className="text-xs font-mono text-slate-500 dark:text-zinc-500 mb-2">Supervised coding contests. Prizes for top finishers. No shortcuts.</p>
+        <p className="text-slate-600 dark:text-zinc-400 text-sm font-mono">
           Free for subscribers · get confirmed · compete in a supervised contest
         </p>
       </div>
@@ -608,23 +607,23 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
         const urgent = secs < 3600; // less than 1 hour
         return (
           <div key={contestId}
-            className={`flex items-center justify-between gap-4 px-4 py-3 rounded-2xl mb-4 border
+            className={`flex items-center justify-between gap-4 px-4 py-3 rounded-2xl mb-4 border shadow-xs
               ${urgent
-                ? 'bg-[rgba(var(--warn-rgb),0.031)] border-[rgba(var(--warn-rgb),0.145)]'
-                : 'bg-[rgba(var(--acc-rgb),0.024)] border-[rgba(var(--acc-rgb),0.125)]'}`}>
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-700 dark:text-cyan-300'}`}>
             <div className="flex items-center gap-3 min-w-0">
               <span className={`text-lg shrink-0 ${urgent ? 'animate-pulse' : ''}`}>
                 {urgent ? '⚡' : '🏟️'}
               </span>
               <div className="min-w-0">
-                <div className={`text-xs font-mono font-bold ${urgent ? 'text-[var(--warn)]' : 'text-[var(--acc)]'}`}>
+                <div className={`text-xs font-mono font-bold ${urgent ? 'text-amber-600 dark:text-amber-400' : 'text-cyan-700 dark:text-cyan-300'}`}>
                   {urgent ? 'Starting soon!' : 'Your contest is coming up'}
                 </div>
-                <div className="text-[10px] font-mono text-[var(--text3)] truncate">{ct.name}</div>
+                <div className="text-[10px] font-mono text-slate-500 dark:text-zinc-400 truncate">{ct.name}</div>
               </div>
             </div>
             <div className={`shrink-0 font-mono font-bold text-lg tabular-nums
-              ${urgent ? 'text-[var(--warn)]' : 'text-[var(--acc)]'}`}>
+              ${urgent ? 'text-amber-600 dark:text-amber-400' : 'text-cyan-700 dark:text-cyan-300'}`}>
               {fmtCountdown(secs)}
             </div>
           </div>
@@ -632,12 +631,12 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
       })}
 
       {/* Proctoring notice */}
-      <div className="card p-4 mb-6 border-[rgba(var(--warn-rgb),0.125)] bg-[rgba(var(--warn-rgb),0.024)]">
+      <div className="rounded-2xl p-4 mb-6 border border-amber-500/20 bg-amber-500/5 dark:bg-amber-500/10">
         <div className="flex gap-3">
           <span className="text-lg shrink-0">🛡️</span>
           <div>
-            <div className="font-mono font-bold text-[var(--warn)] text-sm mb-1">Contest runs in supervised mode</div>
-            <div className="text-xs font-mono text-[var(--text-soft)] leading-relaxed">
+            <div className="font-mono font-bold text-amber-700 dark:text-amber-400 text-sm mb-1">Contest runs in supervised mode</div>
+            <div className="text-xs font-mono text-slate-600 dark:text-zinc-400 leading-relaxed">
               Once you enter, the contest runs fullscreen. Switching tabs or exiting fullscreen counts as a violation. 
               3 violations = disqualification. You can only enter each contest once.
             </div>
@@ -646,11 +645,11 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
       </div>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[var(--text2)] font-mono text-sm py-12">
+        <div className="flex items-center gap-2 text-slate-600 dark:text-zinc-400 font-mono text-sm py-12">
           <div className="spinner" /> Loading contests…
         </div>
       ) : contests.length === 0 ? (
-        <div className="text-center py-20 text-[var(--text2)] font-mono">
+        <div className="text-center py-20 text-slate-500 dark:text-zinc-500 font-mono">
           <div className="text-4xl mb-4 opacity-30">🏆</div>
           <div className="text-sm">No contests right now. Check back soon!</div>
         </div>
@@ -661,24 +660,24 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
             const outcome = contestOutcomes.get(ct.id);
             return (
               <div key={ct.id}
-                className={`flex flex-col gap-4 p-5 rounded-2xl border transition-all duration-300
+                className={`flex flex-col gap-4 p-5 rounded-2xl border transition-all duration-300 shadow-xs
                   ${ct.status === 'live'
-                    ? 'bg-zinc-900/70 border-emerald-500/30'
+                    ? 'bg-white dark:bg-zinc-900/70 border-emerald-500/30'
                     : ct.status === 'ended'
-                    ? 'bg-zinc-900/30 border-zinc-800/40 opacity-50'
-                    : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'}`}>
+                    ? 'bg-slate-50/50 dark:bg-zinc-900/30 border-slate-200/60 dark:border-zinc-800/40 opacity-60'
+                    : 'bg-white dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700'}`}>
 
                 {/* Status + price */}
                 <div className="flex items-center justify-between">
                   {ct.status === 'live'     ? <span className="badge-live flex items-center gap-1.5"><span className="live-dot" /> LIVE</span> :
                    ct.status === 'upcoming' ? <span className="badge-upcoming">◌ Upcoming</span> :
                                               <span className="badge-ended">✓ Ended</span>}
-                  <span className="text-emerald-400 font-mono font-medium text-xs">Free for subscribers</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-mono font-medium text-xs">Free for subscribers</span>
                 </div>
 
                 {/* Contest info */}
                 <div>
-                  <div className="font-semibold text-zinc-100 text-base mb-1">{ct.name}</div>
+                  <div className="font-semibold text-slate-900 dark:text-zinc-100 text-base mb-1">{ct.name}</div>
                 </div>
 
                 {/* Stats grid */}
@@ -696,9 +695,9 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                     },
                     { val: ct.status === 'live' ? 'Active' : ct.status === 'ended' ? 'Done' : 'Open', label: 'Phase' },
                   ].map(item => (
-                    <div key={item.label} className="bg-zinc-950/60 rounded-xl p-2.5 text-center border border-zinc-800/80">
-                      <div className="text-zinc-200 font-mono font-bold text-xs">{item.val}</div>
-                      <div className="text-[10px] text-zinc-500 font-mono mt-0.5">{item.label}</div>
+                    <div key={item.label} className="bg-slate-50 dark:bg-zinc-950/60 rounded-xl p-2.5 text-center border border-slate-200/80 dark:border-zinc-800/80">
+                      <div className="text-slate-900 dark:text-zinc-200 font-mono font-bold text-xs">{item.val}</div>
+                      <div className="text-[10px] text-slate-500 dark:text-zinc-500 font-mono mt-0.5">{item.label}</div>
                     </div>
                   ))}
                 </div>
@@ -710,15 +709,15 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                       {outcome ? (
                         <div className={`text-center text-xs font-mono py-2.5 px-3 rounded-xl
                           ${outcome === 'disqualified'
-                            ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                            : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
+                            ? 'bg-rose-500/10 text-rose-500 dark:text-rose-400 border border-rose-500/20'
+                            : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'}`}>
                           {outcome === 'disqualified' ? '❌ Disqualified' : '✅ Submitted — awaiting results'}
                         </div>
                       ) : (
-                        <div className="text-center text-xs text-zinc-500 font-mono py-2.5">Contest ended</div>
+                        <div className="text-center text-xs text-slate-500 dark:text-zinc-500 font-mono py-2.5">Contest ended</div>
                       )}
                       <button onClick={() => setResultsContest(ct)}
-                        className="w-full py-2 bg-zinc-900 border border-cyan-500/30 text-cyan-400
+                        className="w-full py-2 bg-slate-50 dark:bg-zinc-900 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400
                           font-mono text-xs rounded-xl hover:bg-cyan-500/10 transition-colors">
                         🏁 View Results
                       </button>
@@ -726,47 +725,47 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                   ) : reg ? (
                     <>
                       <div className={`text-xs font-mono mb-3 px-3 py-2 rounded-xl text-center
-                        ${reg.status === 'confirmed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                          reg.status === 'pending'   ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                                       'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                        ${reg.status === 'confirmed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' :
+                          reg.status === 'pending'   ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' :
+                                                       'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'}`}>
                         {reg.status === 'confirmed' ? '✓ Registered & confirmed' :
                          reg.status === 'pending'   ? '⏳ Registration pending'  :
                                                       '✗ Registration rejected — please re-apply'}
                       </div>
                       {/* Countdown for confirmed upcoming */}
                       {reg.status === 'confirmed' && ct.status === 'upcoming' && countdowns[ct.id] > 0 && (
-                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 mb-3">
-                          <span className="text-[10px] font-mono text-zinc-500">Starts in</span>
+                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 mb-3">
+                          <span className="text-[10px] font-mono text-slate-500 dark:text-zinc-500">Starts in</span>
                           <span className={`font-mono font-bold text-sm tabular-nums
-                            ${countdowns[ct.id] < 3600 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            ${countdowns[ct.id] < 3600 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                             {fmtCountdown(countdowns[ct.id])}
                           </span>
                         </div>
                       )}
                       {reg.status === 'confirmed' && ct.status === 'live' && (
                         outcome === 'disqualified' ? (
-                          <div className="w-full py-2.5 bg-rose-500/10 text-rose-400 font-mono text-xs rounded-xl text-center border border-rose-500/20">
+                          <div className="w-full py-2.5 bg-rose-500/10 text-rose-500 dark:text-rose-400 font-mono text-xs rounded-xl text-center border border-rose-500/20">
                             ❌ Disqualified
                           </div>
                         ) : outcome === 'submitted' ? (
-                          <div className="w-full py-2.5 bg-zinc-800 text-zinc-300 font-mono text-xs rounded-xl text-center border border-zinc-700">
+                          <div className="w-full py-2.5 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-mono text-xs rounded-xl text-center border border-slate-200 dark:border-zinc-700">
                             ✓ Submitted — contest locked
                           </div>
                         ) : (
                           <button onClick={() => startContest(ct)}
-                            className="w-full py-2.5 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 font-mono font-bold text-xs rounded-xl
-                              hover:opacity-90 transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(0,229,255,0.25)]">
+                            className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 font-mono font-bold text-xs rounded-xl
+                              hover:opacity-95 transition-all active:scale-[0.98] shadow-xs">
                             Enter Live Arena →
                           </button>
                         )
                       )}
                     </>
                   ) : ct.status === 'live' ? (
-                    <button disabled className="w-full py-2.5 bg-[var(--border)] text-[var(--text-soft)] font-mono text-sm rounded-xl cursor-not-allowed border border-[var(--border)]">
+                    <button disabled className="w-full py-2.5 bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 font-mono text-sm rounded-xl cursor-not-allowed border border-slate-200 dark:border-zinc-700">
                       Registration closed
                     </button>
                   ) : !user ? (
-                    <button disabled className="w-full py-2.5 bg-[var(--border)] text-[var(--text-soft)] font-mono text-sm rounded-xl cursor-not-allowed border border-[var(--border)]">
+                    <button disabled className="w-full py-2.5 bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 font-mono text-sm rounded-xl cursor-not-allowed border border-slate-200 dark:border-zinc-700">
                       Sign in to register
                     </button>
                   ) : (
@@ -815,57 +814,57 @@ function ContestRulesModal({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-lg bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl animate-fade-up max-h-[85vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[300] bg-black/60 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-lg bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-2xl animate-fade-up max-h-[85vh] overflow-y-auto">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-xl">🏁</span>
-          <h3 className="font-display font-bold text-lg text-[var(--text)]">{contest.name}</h3>
+          <h3 className="font-display font-bold text-lg text-slate-900 dark:text-zinc-100">{contest.name}</h3>
         </div>
-        <p className="text-xs font-mono text-[var(--text3)] mb-5">Rules & Format — read before you start</p>
+        <p className="text-xs font-mono text-slate-500 dark:text-zinc-400 mb-5">Rules & Format — read before you start</p>
 
         <div className="grid grid-cols-2 gap-3 mb-5">
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-widest mb-1">Duration</div>
-            <div className="font-mono font-bold text-[var(--text)]">{contest.duration_mins} minutes</div>
+          <div className="bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/80 dark:border-zinc-800/80 rounded-xl p-3">
+            <div className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Duration</div>
+            <div className="font-mono font-bold text-slate-900 dark:text-zinc-100">{contest.duration_mins} minutes</div>
           </div>
-          <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3">
-            <div className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-widest mb-1">Problems</div>
-            <div className="font-mono font-bold text-[var(--text)]">{problemCount}</div>
+          <div className="bg-slate-50 dark:bg-zinc-950/60 border border-slate-200/80 dark:border-zinc-800/80 rounded-xl p-3">
+            <div className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-1">Problems</div>
+            <div className="font-mono font-bold text-slate-900 dark:text-zinc-100">{problemCount}</div>
           </div>
         </div>
 
-        <div className="flex gap-2 items-start bg-[rgba(var(--warn-rgb),0.08)] border border-[rgba(var(--warn-rgb),0.2)] rounded-xl px-3.5 py-2.5 mb-5">
+        <div className="flex gap-2 items-start bg-amber-500/10 border border-amber-500/20 rounded-xl px-3.5 py-2.5 mb-5">
           <span className="text-sm">🏆</span>
-          <p className="text-xs font-mono text-[var(--warn)] leading-relaxed">
+          <p className="text-xs font-mono text-amber-700 dark:text-amber-400 leading-relaxed">
             Top finishers may receive a prize, arranged and given separately by the organizer — not processed through Razorpay or this platform.
           </p>
         </div>
 
         <div className="space-y-3 mb-6">
-          <h4 className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-widest">Format</h4>
-          <ul className="space-y-2 text-sm font-mono text-[var(--text-soft)]">
-            <li className="flex gap-2"><span className="text-[var(--acc)] shrink-0">•</span>Solve as many of the {problemCount} problem{problemCount === 1 ? '' : 's'} as you can before the timer runs out.</li>
-            <li className="flex gap-2"><span className="text-[var(--acc)] shrink-0">•</span>Points per problem = base points × (tests passed ÷ total tests) × a time factor × a strike penalty.</li>
-            <li className="flex gap-2"><span className="text-[var(--acc)] shrink-0">•</span>Submitting earlier and with fewer strikes earns more points — the clock and your strikes both scale down your score.</li>
-            <li className="flex gap-2"><span className="text-[var(--acc)] shrink-0">•</span>You can resubmit — your latest submission per problem is what counts.</li>
+          <h4 className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 uppercase tracking-widest">Format</h4>
+          <ul className="space-y-2 text-sm font-mono text-slate-600 dark:text-zinc-300">
+            <li className="flex gap-2"><span className="text-cyan-500 shrink-0">•</span>Solve as many of the {problemCount} problem{problemCount === 1 ? '' : 's'} as you can before the timer runs out.</li>
+            <li className="flex gap-2"><span className="text-cyan-500 shrink-0">•</span>Points per problem = base points × (tests passed ÷ total tests) × a time factor × a strike penalty.</li>
+            <li className="flex gap-2"><span className="text-cyan-500 shrink-0">•</span>Submitting earlier and with fewer strikes earns more points — the clock and your strikes both scale down your score.</li>
+            <li className="flex gap-2"><span className="text-cyan-500 shrink-0">•</span>You can resubmit — your latest submission per problem is what counts.</li>
           </ul>
 
-          <h4 className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-widest pt-2">Rules</h4>
-          <ul className="space-y-2 text-sm font-mono text-[var(--text-soft)]">
-            <li className="flex gap-2"><span className="text-[var(--danger)] shrink-0">•</span>The contest runs in fullscreen. Exiting fullscreen or switching tabs counts as a strike.</li>
-            <li className="flex gap-2"><span className="text-[var(--danger)] shrink-0">•</span>3 strikes and you're automatically disqualified.</li>
-            <li className="flex gap-2"><span className="text-[var(--danger)] shrink-0">•</span>Once the timer hits zero, your current code is auto-submitted as-is.</li>
-            <li className="flex gap-2"><span className="text-[var(--danger)] shrink-0">•</span>No AI hints or external help during the contest — this is a timed, closed-book round.</li>
+          <h4 className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 uppercase tracking-widest pt-2">Rules</h4>
+          <ul className="space-y-2 text-sm font-mono text-slate-600 dark:text-zinc-300">
+            <li className="flex gap-2"><span className="text-rose-500 shrink-0">•</span>The contest runs in fullscreen. Exiting fullscreen or switching tabs counts as a strike.</li>
+            <li className="flex gap-2"><span className="text-rose-500 shrink-0">•</span>3 strikes and you're automatically disqualified.</li>
+            <li className="flex gap-2"><span className="text-rose-500 shrink-0">•</span>Once the timer hits zero, your current code is auto-submitted as-is.</li>
+            <li className="flex gap-2"><span className="text-rose-500 shrink-0">•</span>No AI hints or external help during the contest — this is a timed, closed-book round.</li>
           </ul>
         </div>
 
         <div className="flex gap-2">
           <button onClick={onCancel}
-            className="flex-1 py-2.5 bg-[var(--card2)] text-[var(--text-soft)] font-mono text-sm font-bold rounded-xl hover:bg-[var(--border2)] hover:text-[var(--text)] transition-all">
+            className="flex-1 py-2.5 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-mono text-sm font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition-all">
             Not yet
           </button>
           <button onClick={onConfirm}
-            className="flex-1 py-2.5 bg-[var(--acc)] text-black font-mono text-sm font-bold rounded-xl hover:bg-[var(--acc-bright)] transition-all active:scale-[0.98]">
+            className="flex-1 py-2.5 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 font-mono text-sm font-bold rounded-xl transition-all active:scale-[0.98] shadow-xs">
             I Understand — Start Contest
           </button>
         </div>
@@ -916,25 +915,25 @@ function ContestFeedbackModal({
 
   if (submitted) {
     return (
-      <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="w-full max-w-sm bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-8 shadow-2xl animate-fade-up text-center">
+      <div className="fixed inset-0 z-[300] bg-black/60 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-8 shadow-2xl animate-fade-up text-center">
           <span className="text-3xl block mb-3">🙌</span>
-          <p className="font-mono text-sm text-[var(--text)]">Thanks for the feedback!</p>
+          <p className="font-mono text-sm text-slate-900 dark:text-zinc-100 font-semibold">Thanks for the feedback!</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 shadow-2xl animate-fade-up">
-        <h3 className="font-display font-bold text-lg text-[var(--text)] mb-1">
+    <div className="fixed inset-0 z-[300] bg-black/60 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-2xl animate-fade-up">
+        <h3 className="font-display font-bold text-lg text-slate-900 dark:text-zinc-100 mb-1">
           {outcome === 'disqualified' ? 'Sorry that ended in a DQ' : 'How was the contest?'}
         </h3>
-        <p className="text-xs font-mono text-[var(--text3)] mb-5">{contest.name} — your feedback helps us improve future contests.</p>
+        <p className="text-xs font-mono text-slate-500 dark:text-zinc-400 mb-5">{contest.name} — your feedback helps us improve future contests.</p>
 
         <div className="mb-5">
-          <p className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-widest mb-2">Overall experience</p>
+          <p className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Overall experience</p>
           <div className="flex gap-1.5">
             {[1, 2, 3, 4, 5].map(n => (
               <button key={n} onClick={() => setRating(n)}
@@ -946,7 +945,7 @@ function ContestFeedbackModal({
         </div>
 
         <div className="mb-5">
-          <p className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-widest mb-2">Difficulty</p>
+          <p className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Difficulty</p>
           <div className="flex gap-2">
             {([
               { key: 'easy', label: 'Too easy' },
@@ -956,8 +955,8 @@ function ContestFeedbackModal({
               <button key={opt.key} onClick={() => setDifficulty(opt.key)}
                 className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold border transition-all
                   ${difficulty === opt.key
-                    ? 'bg-[rgba(var(--acc-rgb),0.12)] text-[var(--acc)] border-[rgba(var(--acc-rgb),0.3)]'
-                    : 'bg-[var(--card)] text-[var(--text2)] border-[var(--border)] hover:border-[var(--border2)]'}`}>
+                    ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30'
+                    : 'bg-slate-50 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-slate-300 dark:hover:border-zinc-600'}`}>
                 {opt.label}
               </button>
             ))}
@@ -965,14 +964,14 @@ function ContestFeedbackModal({
         </div>
 
         <div className="mb-5">
-          <p className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-widest mb-2">Would you join another contest like this?</p>
+          <p className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Would you join another contest like this?</p>
           <div className="flex gap-2">
             {([{ v: true, label: '👍 Yes' }, { v: false, label: '👎 Not really' }] as const).map(opt => (
               <button key={String(opt.v)} onClick={() => setRecommend(opt.v)}
                 className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold border transition-all
                   ${recommend === opt.v
-                    ? 'bg-[rgba(var(--acc-rgb),0.12)] text-[var(--acc)] border-[rgba(var(--acc-rgb),0.3)]'
-                    : 'bg-[var(--card)] text-[var(--text2)] border-[var(--border)] hover:border-[var(--border2)]'}`}>
+                    ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30'
+                    : 'bg-slate-50 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 border-slate-200 dark:border-zinc-700 hover:border-slate-300 dark:hover:border-zinc-600'}`}>
                 {opt.label}
               </button>
             ))}
@@ -980,19 +979,19 @@ function ContestFeedbackModal({
         </div>
 
         <div className="mb-6">
-          <p className="text-[10px] font-mono text-[var(--muted)] uppercase tracking-widest mb-2">Anything else? (optional)</p>
+          <p className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Anything else? (optional)</p>
           <textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={3} maxLength={500}
             placeholder="Bugs, problem quality, timing, anything…"
-            className="input-base w-full resize-none" />
+            className="input-base w-full resize-none border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800/80 text-slate-900 dark:text-zinc-100 rounded-xl p-3 text-xs font-mono focus:outline-hidden focus:border-cyan-500" />
         </div>
 
         <div className="flex gap-2">
           <button onClick={onDone} disabled={submitting}
-            className="flex-1 py-2.5 bg-[var(--card2)] text-[var(--text-soft)] font-mono text-sm font-bold rounded-xl hover:bg-[var(--border2)] hover:text-[var(--text)] transition-all disabled:opacity-50">
+            className="flex-1 py-2.5 bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-mono text-sm font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition-all disabled:opacity-50">
             Skip
           </button>
           <button onClick={submitFeedback} disabled={submitting || (!rating && !difficulty && recommend === null && !comments.trim())}
-            className="flex-1 py-2.5 bg-[var(--acc)] text-black font-mono text-sm font-bold rounded-xl hover:bg-[var(--acc-bright)] transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed">
+            className="flex-1 py-2.5 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 font-mono text-sm font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed shadow-xs">
             {submitting ? 'Sending…' : 'Send Feedback'}
           </button>
         </div>
@@ -1029,20 +1028,20 @@ function ContestResultsModal({ contest, onClose }: { contest: Contest; onClose: 
   const medals = ['🥇', '🥈', '🥉'];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+    <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-[var(--bg2)] border border-[var(--border)] rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
+        className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-zinc-800">
           <div>
-            <h3 className="font-display font-bold text-[var(--text)] text-base">🏁 {contest.name}</h3>
-            <p className="text-[10px] text-[var(--text3)] font-mono mt-0.5">
+            <h3 className="font-display font-bold text-slate-900 dark:text-zinc-100 text-base">🏁 {contest.name}</h3>
+            <p className="text-[10px] text-slate-500 dark:text-zinc-400 font-mono mt-0.5">
               {tab === 'final' ? 'Final results' : 'Rank replay'}
             </p>
           </div>
-          <button onClick={onClose} className="text-[var(--text3)] hover:text-[var(--text)] transition-colors text-lg">✕</button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-zinc-100 transition-colors text-lg">✕</button>
         </div>
 
         {/* Tabs */}
@@ -1052,8 +1051,8 @@ function ContestResultsModal({ contest, onClose }: { contest: Contest; onClose: 
               onClick={() => setTab('final')}
               className={`text-[10px] font-mono px-3 py-1.5 rounded-lg border transition-all
                 ${tab === 'final'
-                  ? 'bg-[var(--acc)] text-black border-[var(--acc)] font-bold'
-                  : 'bg-[var(--surface2)] text-[var(--text3)] border-[var(--border)] hover:text-[var(--text)]'}`}
+                  ? 'bg-cyan-600 text-white dark:bg-cyan-500 dark:text-zinc-950 border-cyan-600 dark:border-cyan-500 font-bold'
+                  : 'bg-slate-50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700 hover:text-slate-900 dark:hover:text-zinc-100'}`}
             >
               🏁 Final Results
             </button>
@@ -1061,8 +1060,8 @@ function ContestResultsModal({ contest, onClose }: { contest: Contest; onClose: 
               onClick={() => setTab('replay')}
               className={`text-[10px] font-mono px-3 py-1.5 rounded-lg border transition-all
                 ${tab === 'replay'
-                  ? 'bg-[var(--acc)] text-black border-[var(--acc)] font-bold'
-                  : 'bg-[var(--surface2)] text-[var(--text3)] border-[var(--border)] hover:text-[var(--text)]'}`}
+                  ? 'bg-cyan-600 text-white dark:bg-cyan-500 dark:text-zinc-950 border-cyan-600 dark:border-cyan-500 font-bold'
+                  : 'bg-slate-50 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200 dark:border-zinc-700 hover:text-slate-900 dark:hover:text-zinc-100'}`}
             >
               👻 Ghost Replay
             </button>
@@ -1075,17 +1074,17 @@ function ContestResultsModal({ contest, onClose }: { contest: Contest; onClose: 
               <div className="spinner" />
             </div>
           ) : rows.length === 0 ? (
-            <div className="text-center py-12 text-[var(--text2)] font-mono text-sm">
+            <div className="text-center py-12 text-slate-500 dark:text-zinc-400 font-mono text-sm">
               No submissions were recorded for this contest.
             </div>
           ) : tab === 'final' ? (
             rows.map((r, i) => (
               <div key={`${r.github}-${i}`}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border
-                  ${i < 3 ? 'bg-[rgba(var(--purple-rgb),0.031)] border-[rgba(var(--purple-rgb),0.125)]' : 'bg-[var(--surface2)] border-[var(--border)]'}
+                  ${i < 3 ? 'bg-purple-500/5 dark:bg-purple-500/10 border-purple-500/20' : 'bg-slate-50 dark:bg-zinc-950/60 border-slate-200/80 dark:border-zinc-800/80'}
                   ${r.status === 'disqualified' ? 'opacity-50' : ''}`}
               >
-                <div className="w-7 text-center shrink-0 font-mono text-xs text-[var(--text2)]">
+                <div className="w-7 text-center shrink-0 font-mono text-xs text-slate-600 dark:text-zinc-400">
                   {i < 3 ? medals[i] : `#${i + 1}`}
                 </div>
                 <img
@@ -1095,12 +1094,12 @@ function ContestResultsModal({ contest, onClose }: { contest: Contest; onClose: 
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-mono font-bold text-[var(--text)] truncate">{r.name || r.github}</div>
-                  <div className="text-[10px] font-mono text-[var(--text3)]">
+                  <div className="text-xs font-mono font-bold text-slate-900 dark:text-zinc-100 truncate">{r.name || r.github}</div>
+                  <div className="text-[10px] font-mono text-slate-500 dark:text-zinc-400">
                     {r.status === 'disqualified' ? '❌ Disqualified' : `${r.tests_passed}/${r.tests_total} tests`}
                   </div>
                 </div>
-                <div className="text-sm font-mono font-bold text-[var(--purple)] shrink-0">
+                <div className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400 shrink-0">
                   {(r.points_awarded ?? 0).toLocaleString()} pts
                 </div>
               </div>
@@ -1153,7 +1152,7 @@ function ContestReplay({ rows }: { rows: any[] }) {
   }, [playing, i, timeline.length]);
 
   if (timeline.length === 0) {
-    return <div className="text-center py-12 text-[var(--text2)] font-mono text-sm">Not enough data to replay.</div>;
+    return <div className="text-center py-12 text-slate-500 dark:text-zinc-400 font-mono text-sm">Not enough data to replay.</div>;
   }
 
   const step = timeline[i];
@@ -1165,7 +1164,7 @@ function ContestReplay({ rows }: { rows: any[] }) {
       <div className="flex items-center gap-3 mb-4">
         <button
           onClick={() => { if (i >= timeline.length - 1) setI(0); setPlaying(p => !p); }}
-          className="w-9 h-9 shrink-0 rounded-full bg-[var(--acc)] text-black flex items-center justify-center font-bold text-xs"
+          className="w-9 h-9 shrink-0 rounded-full bg-gradient-to-r from-cyan-600 to-sky-600 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 flex items-center justify-center font-bold text-xs shadow-xs hover:opacity-90"
         >
           {playing ? '⏸' : '▶'}
         </button>
@@ -1175,13 +1174,13 @@ function ContestReplay({ rows }: { rows: any[] }) {
           max={timeline.length - 1}
           value={i}
           onChange={(e) => { setPlaying(false); setI(Number(e.target.value)); }}
-          className="flex-1 accent-[var(--acc)]"
+          className="flex-1 accent-cyan-500"
         />
-        <span className="text-[10px] font-mono text-[var(--text3)] shrink-0 w-10 text-right">
+        <span className="text-[10px] font-mono text-slate-500 dark:text-zinc-400 shrink-0 w-10 text-right">
           {i + 1}/{timeline.length}
         </span>
       </div>
-      <p className="text-[10px] font-mono text-[var(--text3)] mb-3">
+      <p className="text-[10px] font-mono text-slate-500 dark:text-zinc-400 mb-3">
         {new Date(step.at).toLocaleTimeString()} — {step.justMoved} just submitted
       </p>
 
@@ -1191,15 +1190,15 @@ function ContestReplay({ rows }: { rows: any[] }) {
           <div
             key={r.github}
             className={`flex items-center gap-3 px-3 py-2 rounded-xl border transition-all duration-300
-              ${r.github === step.justMoved ? 'bg-[rgba(var(--acc-rgb),0.078)] border-[rgba(var(--acc-rgb),0.2)]' : 'bg-[var(--surface2)] border-[var(--border)]'}`}
+              ${r.github === step.justMoved ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-slate-50 dark:bg-zinc-950/60 border-slate-200/80 dark:border-zinc-800/80'}`}
           >
-            <div className="w-6 text-center shrink-0 font-mono text-xs text-[var(--text2)]">
+            <div className="w-6 text-center shrink-0 font-mono text-xs text-slate-600 dark:text-zinc-400">
               {idx < 3 ? medals[idx] : `#${idx + 1}`}
             </div>
-            <div className="flex-1 min-w-0 text-xs font-mono font-bold text-[var(--text)] truncate">
+            <div className="flex-1 min-w-0 text-xs font-mono font-bold text-slate-900 dark:text-zinc-100 truncate">
               {r.name || r.github}
             </div>
-            <div className="text-sm font-mono font-bold text-[var(--purple)] shrink-0">
+            <div className="text-sm font-mono font-bold text-purple-600 dark:text-purple-400 shrink-0">
               {(r.points_awarded ?? 0).toLocaleString()} pts
             </div>
           </div>

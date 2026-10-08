@@ -52,6 +52,7 @@ interface PayOptions {
   name:         string;        // Razorpay checkout display name, e.g. "BitByBit"
   description:  string;        // Razorpay checkout description
   prefillName?: string;
+  couponCode?:  string;        // Optional promo/coupon code to apply discount server-side
   onSuccess: (paymentId: string, currentPeriodEnd?: string) => void;
   onFailure: (msg: string) => void;
 }
@@ -77,7 +78,10 @@ export async function payWithRazorpay(opts: PayOptions) {
         'Content-Type':  'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ purpose: opts.purpose }),
+      body: JSON.stringify({
+        purpose: opts.purpose,
+        couponCode: opts.couponCode ? opts.couponCode.trim().toUpperCase() : undefined,
+      }),
     });
     order = await orderRes.json();
     if (!orderRes.ok) throw new Error(order.error || 'Order creation failed');

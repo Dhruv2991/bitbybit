@@ -31,8 +31,8 @@ export default function LangTabs({ current, onChange, allowedLangs }: LangTabsPr
               flex items-center justify-center sm:justify-start gap-1.5 px-3 py-1.5 rounded-lg
               text-xs font-mono font-medium transition-all duration-150 border
               ${isActive
-                ? 'bg-zinc-800 text-zinc-100 border-zinc-700 font-semibold shadow-sm'
-                : 'bg-zinc-900/50 text-zinc-400 border-zinc-800/80 hover:text-zinc-200 hover:border-zinc-700 hover:bg-zinc-800/40'}
+                ? 'bg-slate-900 text-white border-slate-800 dark:bg-zinc-800 dark:text-zinc-100 dark:border-zinc-700 font-semibold shadow-xs'
+                : 'bg-slate-100/70 text-slate-600 border-slate-200 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-100 dark:bg-zinc-900/50 dark:text-zinc-400 dark:border-zinc-800/80 dark:hover:text-zinc-200 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/40'}
             `}
           >
             <span className="text-sm leading-none">{icon}</span>

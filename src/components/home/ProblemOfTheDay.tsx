@@ -59,40 +59,40 @@ export default function ProblemOfTheDay({
 
   const diffBadge =
     problem.difficulty === 'Easy'
-      ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+      ? 'diff-easy'
       : problem.difficulty === 'Medium'
-      ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
-      : 'text-rose-400 bg-rose-500/10 border-rose-500/20';
+      ? 'diff-medium'
+      : 'diff-hard';
 
   return (
     <SpotlightCard
       spotlightColor="rgba(245, 158, 11, 0.08)"
-      className="p-6 flex flex-col justify-between h-full hover:border-white/[0.15] transition-all group"
+      className="p-6 flex flex-col justify-between h-full transition-all group"
     >
       <div>
         {/* Top metadata bar */}
         <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
           <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 text-xs font-mono font-semibold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+            <span className="flex items-center gap-1.5 text-xs font-mono font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-500/20">
               <span>⭐</span> Problem of the Day
             </span>
-            <span className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-full border ${diffBadge}`}>
+            <span className={diffBadge}>
               {problem.difficulty}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs font-mono text-zinc-300">
+          <div className="flex items-center gap-1.5 text-xs font-mono text-slate-500 dark:text-zinc-300">
             <span>⏳ Resets in</span>
-            <span className="text-zinc-100 font-semibold">{timeLeft}</span>
+            <span className="text-slate-900 dark:text-zinc-100 font-semibold">{timeLeft}</span>
           </div>
         </div>
 
         {/* Problem Title & Description Preview */}
-        <h2 className="font-semibold text-lg sm:text-xl text-zinc-100 mb-2 group-hover:text-cyan-300 transition-colors line-clamp-1">
+        <h2 className="font-semibold text-lg sm:text-xl text-slate-900 dark:text-zinc-100 mb-2 group-hover:text-sky-600 dark:group-hover:text-cyan-300 transition-colors line-clamp-1">
           {problem.title}
         </h2>
 
-        <p className="font-sans text-sm text-zinc-300 line-clamp-2 leading-relaxed mb-4">
+        <p className="font-sans text-sm text-slate-600 dark:text-zinc-300 line-clamp-2 leading-relaxed mb-4">
           {problem.description?.replace(/<[^>]*>?/gm, '').slice(0, 160) || 'Solve this algorithmic challenge to earn points and maintain your daily coding streak.'}
         </p>
 
@@ -102,13 +102,13 @@ export default function ProblemOfTheDay({
             {problem.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
-                className="text-xs font-mono px-2.5 py-0.5 rounded bg-zinc-950/60 text-zinc-300 border border-white/[0.06]"
+                className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-950/60 text-slate-700 dark:text-zinc-300 border border-slate-200 dark:border-white/[0.06]"
               >
                 #{tag}
               </span>
             ))}
             {problem.points ? (
-              <span className="text-xs font-mono px-2.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-medium border border-cyan-500/20">
+              <span className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-700 dark:bg-cyan-500/10 dark:text-cyan-400 font-medium border border-sky-200 dark:border-cyan-500/20">
                 +{problem.points} pts
               </span>
             ) : null}
@@ -117,18 +117,18 @@ export default function ProblemOfTheDay({
       </div>
 
       {/* Footer & CTA */}
-      <div className="pt-4 border-t border-white/[0.06] flex items-center justify-between flex-wrap gap-3">
+      <div className="pt-4 border-t border-slate-200 dark:border-white/[0.06] flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           {solvedToday ? (
-            <span className="inline-flex items-center gap-1.5 text-sm font-mono font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg">
+            <span className="inline-flex items-center gap-1.5 text-sm font-mono font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-3 py-1.5 rounded-lg">
               <span>✓</span> Solved Today
             </span>
           ) : solverCount !== null && solverCount > 0 ? (
-            <span className="text-sm font-mono text-zinc-300 flex items-center gap-1">
+            <span className="text-sm font-mono text-slate-600 dark:text-zinc-300 flex items-center gap-1">
               <span>🔥</span> {solverCount} {solverCount === 1 ? 'coder' : 'coders'} solved
             </span>
           ) : (
-            <span className="text-xs font-mono text-zinc-400">
+            <span className="text-xs font-mono text-slate-500 dark:text-zinc-400">
               Be the first to solve today!
             </span>
           )}

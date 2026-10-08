@@ -277,8 +277,30 @@ export interface Database {
 
         Update: Partial<ArenaSubmission>;
       };
+
+      coupons: {
+        Row: Coupon;
+
+        Insert: Omit<Coupon, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+
+        Update: Partial<Omit<Coupon, 'id' | 'created_at'>>;
+      };
     };
   };
+}
+
+export type DiscountType = 'fixed' | 'percentage';
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discount_type: DiscountType;
+  discount_value: number;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface User {

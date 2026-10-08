@@ -48,12 +48,32 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: '#0b0d12',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f8fafc' },
+    { media: '(prefers-color-scheme: dark)', color: '#08090d' },
+  ],
 };
+
+const themeScript = `
+(function() {
+  try {
+    var stored = localStorage.getItem('bb_theme');
+    var isDark = stored ? stored === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var theme = isDark ? 'dark' : 'light';
+    var root = document.documentElement;
+    root.classList.remove('dark', 'light');
+    root.classList.add(theme);
+    root.setAttribute('data-theme', theme);
+  } catch (e) {}
+})();
+`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="dark" className={`dark ${jetbrainsMono.variable} ${syne.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${jetbrainsMono.variable} ${syne.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="bg-[var(--bg)] text-[var(--text)] min-h-screen antialiased">
         {children}
         <Analytics />

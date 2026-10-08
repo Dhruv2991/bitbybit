@@ -8,6 +8,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { isActiveSubscription } from "@/lib/subscription";
 import { effectiveStreak, calendarDaysBetween } from "@/lib/streak";
 import CertificatesTab from "@/components/admin/CertificatesTab";
+import CouponsTab from "@/components/admin/CouponsTab";
 import type {
   User,
   Submission,
@@ -115,6 +116,7 @@ type Section =
   | "feedback"
   | "weekly"
   | "subscribers"
+  | "coupons"
   | "certificates"
   | "ai-generate"
   | "announcements";
@@ -1905,6 +1907,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     { id: "feedback", label: "💬 Feedback" },
     { id: "weekly", label: "🏅 Weekly" },
     { id: "subscribers", label: "⭐ Subscribers" },
+    { id: "coupons", label: "🏷 Coupons" },
     { id: "certificates", label: "📜 Certificates" },
     { id: "ai-generate", label: "✦ AI Generate" },
     { id: "announcements", label: "📣 Announcements" },
@@ -3113,6 +3116,7 @@ export default function AdminPage({ user }: AdminPageProps) {
         {section === "feedback" && <FeedbackAdminSection />}
         {section === "weekly" && <WeeklyAdminSection user={user} />}
         {section === "subscribers" && <SubscriberAdminSection />}
+        {section === "coupons" && <CouponsTab />}
         {section === "certificates" && (
           <CertificatesTab members={members} showToast={showToast} />
         )}

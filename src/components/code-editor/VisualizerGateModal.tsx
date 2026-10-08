@@ -48,19 +48,19 @@ export default function VisualizerGateModal({
 
   return (
     <div
-      className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md animate-fade-in"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md bg-zinc-950 border border-zinc-800/90 rounded-2xl shadow-2xl overflow-hidden animate-fade-up text-zinc-100"
+        className="w-full max-w-md bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800/90 rounded-2xl shadow-xl overflow-hidden animate-fade-up text-slate-900 dark:text-zinc-100"
       >
         {/* Accent Bar */}
         <div
           className={`h-1.5 w-full ${
             isProLimit
               ? 'bg-gradient-to-r from-amber-500 to-orange-500'
-              : 'bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-500'
+              : 'bg-gradient-to-r from-cyan-500 via-sky-500 to-blue-500'
           }`}
         />
 
@@ -77,10 +77,10 @@ export default function VisualizerGateModal({
               {isProLimit ? <IconClock /> : <IconFlash />}
             </div>
             <div>
-              <h2 className="font-display font-bold text-lg text-zinc-100 mb-1">
+              <h2 className="font-display font-bold text-lg text-slate-900 dark:text-zinc-100 mb-1">
                 {isProLimit ? 'Daily Pro Limit Reached' : 'Daily Free Runs Exhausted'}
               </h2>
-              <p className="text-xs font-mono text-zinc-400 leading-relaxed">
+              <p className="text-xs font-mono text-slate-600 dark:text-zinc-400 leading-relaxed">
                 {isProLimit
                   ? `You have reached the fair-use limit of ${limit} Pro visualizer runs for today.`
                   : `You've used all ${limit} free visualizer runs for today. Upgrade to Pro for 50 runs/day.`}
@@ -89,25 +89,25 @@ export default function VisualizerGateModal({
           </div>
 
           {/* Quota tracker */}
-          <div className="mb-5 bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-4">
+          <div className="mb-5 bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/60 rounded-xl p-4">
             <div className="flex justify-between items-center mb-2 font-mono text-xs">
-              <span className="text-zinc-400">Runs used today</span>
-              <span className={`font-bold ${isProLimit ? 'text-amber-400' : 'text-cyan-400'}`}>
+              <span className="text-slate-600 dark:text-zinc-400">Runs used today</span>
+              <span className={`font-bold ${isProLimit ? 'text-amber-600 dark:text-amber-400' : 'text-cyan-600 dark:text-cyan-400'}`}>
                 {used} / {limit}
               </span>
             </div>
-            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   isProLimit
                     ? 'bg-gradient-to-r from-amber-500 to-orange-500 w-full'
-                    : 'bg-gradient-to-r from-cyan-400 to-cyan-500 w-full'
+                    : 'bg-gradient-to-r from-cyan-500 to-sky-500 w-full'
                 }`}
               />
             </div>
-            <p className="font-mono text-[10.5px] text-zinc-500 mt-2">
+            <p className="font-mono text-[10.5px] text-slate-500 dark:text-zinc-500 mt-2">
               Credits automatically refill in{' '}
-              <span className="text-zinc-300 font-bold">{resetsIn}</span> (at midnight).
+              <span className="text-slate-800 dark:text-zinc-300 font-bold">{resetsIn}</span> (at midnight).
             </p>
           </div>
 
@@ -115,10 +115,10 @@ export default function VisualizerGateModal({
           {!isProLimit && (
             <div className="mb-5 bg-cyan-500/5 border border-cyan-500/20 rounded-xl p-4 space-y-2.5">
               <div className="flex items-center justify-between mb-1">
-                <span className="font-mono text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
+                <span className="font-mono text-[11px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">
                   ✦ BitByBit Pro Tier
                 </span>
-                <span className="font-mono text-xs font-bold text-cyan-200 bg-cyan-500/20 px-2 py-0.5 rounded-full border border-cyan-500/30">
+                <span className="font-mono text-xs font-bold text-cyan-700 dark:text-cyan-200 bg-cyan-500/15 px-2 py-0.5 rounded-full border border-cyan-500/30">
                   ₹39 / mo
                 </span>
               </div>
@@ -129,8 +129,8 @@ export default function VisualizerGateModal({
                 'Permanent free entry to all weekly contests & arenas',
               ].map((perk, i) => (
                 <div key={i} className="flex items-start gap-2">
-                  <span className="text-cyan-400 text-xs mt-0.5 shrink-0">✓</span>
-                  <span className="font-mono text-xs text-zinc-300 leading-snug">{perk}</span>
+                  <span className="text-cyan-600 dark:text-cyan-400 text-xs mt-0.5 shrink-0 font-bold">✓</span>
+                  <span className="font-mono text-xs text-slate-700 dark:text-zinc-300 leading-snug">{perk}</span>
                 </div>
               ))}
             </div>
@@ -140,7 +140,7 @@ export default function VisualizerGateModal({
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl font-mono text-xs font-semibold text-zinc-400 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 hover:text-zinc-200 transition-all"
+              className="flex-1 py-2.5 rounded-xl font-mono text-xs font-semibold text-slate-700 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:border-slate-300 dark:hover:border-zinc-700 hover:text-slate-900 dark:hover:text-zinc-200 transition-all"
             >
               {isProLimit ? 'Understood' : 'Maybe Later'}
             </button>
@@ -148,7 +148,7 @@ export default function VisualizerGateModal({
               <button
                 id="modal-upgrade-btn"
                 onClick={onUpgrade}
-                className="flex-1 py-2.5 rounded-xl font-mono text-xs font-bold bg-cyan-400 hover:bg-cyan-300 active:bg-cyan-500 text-zinc-950 transition-all shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 rounded-xl font-mono text-xs font-bold bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 transition-all shadow-xs flex items-center justify-center gap-1.5"
               >
                 <span>⚡ Get Pro — ₹39</span>
               </button>

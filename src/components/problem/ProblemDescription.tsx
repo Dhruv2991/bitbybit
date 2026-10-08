@@ -78,11 +78,18 @@ function parseExampleText(exampleText: string): ParsedExample[] {
   }];
 }
 
+type ImageContrastMode = 'auto' | 'high-contrast' | 'invert';
+
 /**
- * Resilient image renderer that automatically resolves Supabase storage URLs
- * and falls back to the /api/images proxy if direct CDN access fails.
+ * Resilient image renderer that automatically resolves Supabase storage URLs,
+ * adapts contrast seamlessly when switching between light and dark modes,
+ * and provides interactive high-contrast and color-inversion switches.
  */
-function ProblemImage({ src, alt, className = '' }: { src: string; alt: string; className?: string }) {
+function ProblemImageCard({ src, alt }: { src: string; alt: string }) {
+  const [contrastMode, setContrastMode] = React.useState<ImageContrastMode>('auto');
+  const [isZoomed, setIsZoomed] = React.useState(false);
+  const cleanAlt = (alt || 'Problem illustration').trim();
+
   const [imgSrc, setImgSrc] = React.useState(() => {
     const clean = (src || '').trim().replace(/^['"]|['"]$/g, '');
     if (clean.includes('/storage/v1/object/public/problem-images/')) {
@@ -119,22 +126,148 @@ function ProblemImage({ src, alt, className = '' }: { src: string; alt: string; 
     setLoadError(true);
   };
 
+  const getContrastClasses = (mode: ImageContrastMode) => {
+    switch (mode) {
+      case 'high-contrast':
+        return 'bg-white p-3 filter-none rounded-xl text-slate-900 border border-slate-300 shadow-md';
+      case 'invert':
+        return 'bg-zinc-950 p-2.5 invert hue-rotate-180 brightness-95 contrast-110 rounded-xl border border-zinc-800 shadow-md';
+      case 'auto':
+      default:
+        return 'bg-white dark:bg-zinc-950/70 p-2.5 dark:contrast-[1.06] dark:brightness-[0.98] rounded-xl border border-slate-200 dark:border-zinc-800 shadow-xs';
+    }
+  };
+
   if (loadError) {
     return (
-      <div className="my-3 p-3 rounded-xl border border-zinc-800 bg-zinc-950/60 text-center font-mono text-xs text-zinc-400">
-        <span className="text-zinc-500">🖼️ Image unavailable</span>
+      <div className="my-3 p-3 rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950/60 text-center font-mono text-xs text-slate-500 dark:text-zinc-400">
+        <span>🖼️ Image unavailable</span>
       </div>
     );
   }
 
   return (
-    <img
-      src={imgSrc}
-      alt={alt}
-      className={className}
-      loading="lazy"
-      onError={handleError}
-    />
+    <div className="my-4 group relative inline-block max-w-full w-full text-center">
+      {/* Container with contrast and hover toolbar */}
+      <div className="relative inline-block max-w-full rounded-2xl overflow-hidden">
+        <div className={`transition-all duration-200 ${getContrastClasses(contrastMode)}`}>
+          <img
+            src={imgSrc}
+            alt={cleanAlt}
+            loading="lazy"
+            onError={handleError}
+            onClick={() => setIsZoomed(true)}
+            className="max-w-full w-auto max-h-[380px] object-contain mx-auto cursor-pointer transition-transform hover:scale-[1.01]"
+          />
+        </div>
+
+        {/* Contrast / Invert Toolbar on Hover */}
+        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/85 dark:bg-zinc-900/95 backdrop-blur-md px-2 py-1 rounded-lg border border-slate-700/50 dark:border-zinc-700 text-[10px] font-mono shadow-md text-white">
+          <span className="text-slate-300 mr-1 select-none">Contrast:</span>
+          <button
+            type="button"
+            onClick={() => setContrastMode('auto')}
+            title="Auto adaptive theme mode"
+            className={`px-1.5 py-0.5 rounded transition-colors ${
+              contrastMode === 'auto'
+                ? 'bg-cyan-500 text-zinc-950 font-bold'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            Auto
+          </button>
+          <button
+            type="button"
+            onClick={() => setContrastMode('high-contrast')}
+            title="High contrast white canvas (ideal for black diagrams / transparent PNGs)"
+            className={`px-1.5 py-0.5 rounded transition-colors ${
+              contrastMode === 'high-contrast'
+                ? 'bg-cyan-500 text-zinc-950 font-bold'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            Light Canvas
+          </button>
+          <button
+            type="button"
+            onClick={() => setContrastMode('invert')}
+            title="Invert colors (dark diagram mode)"
+            className={`px-1.5 py-0.5 rounded transition-colors ${
+              contrastMode === 'invert'
+                ? 'bg-cyan-500 text-zinc-950 font-bold'
+                : 'text-slate-300 hover:text-white hover:bg-slate-700'
+            }`}
+          >
+            Invert
+          </button>
+        </div>
+      </div>
+
+      {cleanAlt && cleanAlt !== 'Problem illustration' && (
+        <p className="text-xs text-slate-500 dark:text-zinc-400 font-mono mt-1.5 italic">{cleanAlt}</p>
+      )}
+
+      {/* Zoom Modal */}
+      {isZoomed && (
+        <div
+          className="fixed inset-0 z-[400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setIsZoomed(false)}
+        >
+          <div
+            className="relative max-w-4xl w-full bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 shadow-2xl space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-2">
+              <span className="text-xs font-mono text-slate-800 dark:text-zinc-200 font-semibold truncate">
+                {cleanAlt}
+              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 px-2 py-0.5 rounded-lg text-xs font-mono">
+                  <span className="text-slate-500 dark:text-zinc-400 text-[11px]">Contrast:</span>
+                  <button
+                    onClick={() => setContrastMode('auto')}
+                    className={`px-1.5 py-0.5 rounded text-[11px] ${
+                      contrastMode === 'auto' ? 'bg-cyan-600 dark:bg-cyan-400 text-white dark:text-zinc-950 font-bold' : 'text-slate-600 dark:text-zinc-400'
+                    }`}
+                  >
+                    Auto
+                  </button>
+                  <button
+                    onClick={() => setContrastMode('high-contrast')}
+                    className={`px-1.5 py-0.5 rounded text-[11px] ${
+                      contrastMode === 'high-contrast' ? 'bg-cyan-600 dark:bg-cyan-400 text-white dark:text-zinc-950 font-bold' : 'text-slate-600 dark:text-zinc-400'
+                    }`}
+                  >
+                    Light Canvas
+                  </button>
+                  <button
+                    onClick={() => setContrastMode('invert')}
+                    className={`px-1.5 py-0.5 rounded text-[11px] ${
+                      contrastMode === 'invert' ? 'bg-cyan-600 dark:bg-cyan-400 text-white dark:text-zinc-950 font-bold' : 'text-slate-600 dark:text-zinc-400'
+                    }`}
+                  >
+                    Invert
+                  </button>
+                </div>
+                <button
+                  onClick={() => setIsZoomed(false)}
+                  className="px-2 py-1 text-xs font-mono rounded-lg bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white"
+                >
+                  ✕ Close
+                </button>
+              </div>
+            </div>
+            <div className={`max-h-[75vh] overflow-auto flex items-center justify-center rounded-xl p-4 ${getContrastClasses(contrastMode)}`}>
+              <img
+                src={imgSrc}
+                alt={cleanAlt}
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -142,20 +275,7 @@ function ProblemImage({ src, alt, className = '' }: { src: string; alt: string; 
  * Renders an image element with graceful fallback and responsive styling
  */
 function renderImageBlock(src: string, alt = '', key: string | number) {
-  const cleanAlt = (alt || 'Problem illustration').trim();
-
-  return (
-    <div key={key} className="my-4 text-center">
-      <ProblemImage
-        src={src}
-        alt={cleanAlt}
-        className="max-w-full w-full max-h-[380px] object-contain rounded-xl border border-zinc-800 bg-zinc-950/40 p-2.5 mx-auto shadow-md transition-transform hover:scale-[1.01]"
-      />
-      {cleanAlt && cleanAlt !== 'Problem illustration' && (
-        <p className="text-xs text-zinc-400 font-mono mt-1.5 italic">{cleanAlt}</p>
-      )}
-    </div>
-  );
+  return <ProblemImageCard key={key} src={src} alt={alt} />;
 }
 
 /**
@@ -212,8 +332,8 @@ function renderMarkdownRich(content: string): React.ReactNode {
     if (bulletMatch) {
       inList = true;
       listItems.push(
-        <li key={`li-${lineIdx}`} className="flex items-start gap-2.5 text-sm md:text-[14.5px] text-zinc-200 font-mono leading-relaxed">
-          <span className="text-cyan-400 font-bold select-none text-[15px] leading-none mt-1">•</span>
+        <li key={`li-${lineIdx}`} className="flex items-start gap-2.5 text-sm md:text-[14.5px] text-slate-800 dark:text-zinc-200 font-mono leading-relaxed">
+          <span className="text-cyan-600 dark:text-cyan-400 font-bold select-none text-[15px] leading-none mt-1">•</span>
           <span className="flex-1">{renderInlineStyled(bulletMatch[1])}</span>
         </li>
       );
@@ -236,10 +356,10 @@ function renderMarkdownRich(content: string): React.ReactNode {
         <h4
           key={`h-${lineIdx}`}
           className={`font-semibold tracking-wide my-4 font-mono flex items-center gap-2 ${
-            isConstraints ? 'text-cyan-400 text-sm md:text-base uppercase tracking-wider font-bold' : 'text-zinc-100 text-base md:text-lg font-bold'
+            isConstraints ? 'text-cyan-600 dark:text-cyan-400 text-sm md:text-base uppercase tracking-wider font-bold' : 'text-slate-900 dark:text-zinc-100 text-base md:text-lg font-bold'
           }`}
         >
-          {isConstraints && <span className="text-cyan-400">⚡</span>}
+          {isConstraints && <span className="text-cyan-600 dark:text-cyan-400">⚡</span>}
           {headingText}
         </h4>
       );
@@ -248,7 +368,7 @@ function renderMarkdownRich(content: string): React.ReactNode {
 
     // Normal paragraph
     elements.push(
-      <p key={`p-${lineIdx}`} className="text-sm md:text-[15px] text-zinc-200 leading-relaxed my-2 font-sans">
+      <p key={`p-${lineIdx}`} className="text-sm md:text-[15px] text-slate-700 dark:text-zinc-200 leading-relaxed my-2 font-sans">
         {renderInlineStyled(line)}
       </p>
     );
@@ -294,7 +414,7 @@ function renderInlineStyled(text: string): React.ReactNode {
       parts.push(
         <code
           key={match.index}
-          className="px-2 py-0.5 mx-0.5 rounded-md bg-zinc-800/90 border border-zinc-700/70 text-cyan-200 text-[13px] font-mono tracking-tight shadow-2xs font-semibold inline-block"
+          className="px-2 py-0.5 mx-0.5 rounded-md bg-slate-100 dark:bg-zinc-800/90 border border-slate-200 dark:border-zinc-700/70 text-cyan-700 dark:text-cyan-200 text-[13px] font-mono tracking-tight font-semibold inline-block"
         >
           {codeVal}
         </code>
@@ -303,7 +423,7 @@ function renderInlineStyled(text: string): React.ReactNode {
     // Bold text: **...**
     else if (token.startsWith('**') && token.endsWith('**')) {
       parts.push(
-        <strong key={match.index} className="text-zinc-100 font-semibold">
+        <strong key={match.index} className="text-slate-900 dark:text-zinc-100 font-semibold">
           {token.slice(2, -2)}
         </strong>
       );
@@ -318,7 +438,7 @@ function renderInlineStyled(text: string): React.ReactNode {
           href={linkUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition-colors"
+          className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 underline underline-offset-2 transition-colors"
         >
           {linkText}
         </a>
@@ -347,7 +467,7 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
     // If description has markdown images ![alt](url) alongside HTML, convert them to <img> tags
     raw = raw.replace(/!\[(.*?)\]\((.*?)\)/g, (_m, alt, src) => {
       const urlPart = (src || '').split(/\s+/)[0];
-      return `<img src="${urlPart}" alt="${alt || ''}" class="max-w-full w-full max-h-[380px] object-contain rounded-xl border border-zinc-800 bg-zinc-950/40 p-2.5 my-4 shadow-md mx-auto block" />`;
+      return `<img src="${urlPart}" alt="${alt || ''}" class="max-w-full w-full max-h-[380px] object-contain rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950/40 p-2.5 my-4 shadow-xs mx-auto block" />`;
     });
     // Route any Supabase storage problem-images URLs through universal /api/images/ proxy
     raw = raw.replace(/https?:\/\/[^"'\s]+\/storage\/v1\/object\/public\/problem-images\/([^"'\s>]+)/gi, '/api/images/$1');
@@ -359,11 +479,11 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
   }, [problem.example]);
 
   return (
-    <div className={`space-y-5 text-zinc-200 font-sans text-sm md:text-base leading-relaxed ${className}`}>
+    <div className={`space-y-5 text-slate-800 dark:text-zinc-200 font-sans text-sm md:text-base leading-relaxed ${className}`}>
       {/* ── Problem Title & Metadata Bar ── */}
-      <div className="flex items-start justify-between gap-3 flex-wrap border-b border-zinc-800/60 pb-4">
+      <div className="flex items-start justify-between gap-3 flex-wrap border-b border-slate-200 dark:border-zinc-800/60 pb-4">
         <div className="space-y-2 flex-1 min-w-[200px]">
-          <h2 className="text-2xl font-bold text-zinc-100 tracking-tight font-display flex items-center gap-2.5">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-zinc-100 tracking-tight font-display flex items-center gap-2.5">
             <span>{problem.title}</span>
           </h2>
           {(problem.tags || []).length > 0 && (
@@ -371,7 +491,7 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
               {problem.tags.map(tag => (
                 <span
                   key={tag}
-                  className="px-2.5 py-0.5 bg-zinc-900 border border-zinc-800 text-zinc-300 rounded-md text-xs font-mono hover:border-zinc-700 transition-colors"
+                  className="px-2.5 py-0.5 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-700 dark:text-zinc-300 rounded-md text-xs font-mono hover:border-slate-300 dark:hover:border-zinc-700 transition-colors"
                 >
                   {tag}
                 </span>
@@ -392,7 +512,7 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
           >
             {problem.difficulty}
           </span>
-          <span className="px-3 py-1 bg-purple-500/10 text-purple-300 rounded-full text-xs font-mono font-semibold border border-purple-500/20">
+          <span className="px-3 py-1 bg-purple-500/10 text-purple-700 dark:text-purple-300 rounded-full text-xs font-mono font-semibold border border-purple-500/20">
             {problem.points} pts
           </span>
         </div>
@@ -402,15 +522,15 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
       <div className="problem-content">
         {isHtml ? (
           <div
-            className="prose prose-invert prose-base max-w-none text-zinc-200 leading-relaxed
-              [&>p]:mb-3.5 [&>p]:leading-relaxed [&>p]:text-zinc-200 [&>p]:text-[15px]
-              [&_code]:px-2 [&_code]:py-0.5 [&_code]:mx-0.5 [&_code]:rounded-md [&_code]:bg-zinc-800/90 [&_code]:border [&_code]:border-zinc-700/70 [&_code]:text-cyan-200 [&_code]:text-[13px] [&_code]:font-mono [&_code]:font-semibold
-              [&_img]:max-w-full [&_img]:w-full [&_img]:max-h-[380px] [&_img]:object-contain [&_img]:rounded-xl [&_img]:border [&_img]:border-zinc-800 [&_img]:bg-zinc-950/40 [&_img]:p-2.5 [&_img]:mx-auto [&_img]:my-4 [&_img]:shadow-md
-              [&_svg]:max-w-full [&_svg]:max-h-[380px] [&_svg]:mx-auto [&_svg]:my-4 [&_svg]:rounded-xl [&_svg]:border [&_svg]:border-zinc-800 [&_svg]:bg-zinc-950/40 [&_svg]:p-2.5
+            className="prose max-w-none text-slate-800 dark:text-zinc-200 leading-relaxed
+              [&>p]:mb-3.5 [&>p]:leading-relaxed [&>p]:text-slate-700 dark:[&>p]:text-zinc-200 [&>p]:text-[15px]
+              [&_code]:px-2 [&_code]:py-0.5 [&_code]:mx-0.5 [&_code]:rounded-md [&_code]:bg-slate-100 dark:[&_code]:bg-zinc-800/90 [&_code]:border [&_code]:border-slate-200 dark:[&_code]:border-zinc-700/70 [&_code]:text-cyan-700 dark:[&_code]:text-cyan-200 [&_code]:text-[13px] [&_code]:font-mono [&_code]:font-semibold
+              [&_img]:max-w-full [&_img]:w-full [&_img]:max-h-[380px] [&_img]:object-contain [&_img]:rounded-xl [&_img]:border [&_img]:border-slate-200 dark:[&_img]:border-zinc-800 [&_img]:bg-white dark:[&_img]:bg-zinc-950/70 dark:[&_img]:contrast-[1.06] dark:[&_img]:brightness-[0.98] [&_img]:p-2.5 [&_img]:mx-auto [&_img]:my-4 [&_img]:shadow-xs
+              [&_svg]:max-w-full [&_svg]:max-h-[380px] [&_svg]:mx-auto [&_svg]:my-4 [&_svg]:rounded-xl [&_svg]:border [&_svg]:border-slate-200 dark:[&_svg]:border-zinc-800 [&_svg]:bg-white dark:[&_svg]:bg-zinc-950/70 [&_svg]:p-2.5
               [&_ul]:my-3 [&_ul]:space-y-2 [&_ul]:list-disc [&_ul]:pl-5
-              [&_li]:text-sm md:[&_li]:text-[14.5px] [&_li]:font-mono [&_li]:text-zinc-200 [&_li]:leading-relaxed
-              [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_h4]:text-base
-              [&_strong]:text-zinc-100 [&_strong]:font-semibold"
+              [&_li]:text-sm md:[&_li]:text-[14.5px] [&_li]:font-mono [&_li]:text-slate-700 dark:[&_li]:text-zinc-200 [&_li]:leading-relaxed
+              [&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_h4]:text-base [&_h1]:text-slate-900 dark:[&_h1]:text-zinc-100 [&_h2]:text-slate-900 dark:[&_h2]:text-zinc-100 [&_h3]:text-slate-900 dark:[&_h3]:text-zinc-100
+              [&_strong]:text-slate-900 dark:[&_strong]:text-zinc-100 [&_strong]:font-semibold"
             dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
           />
         ) : (
@@ -424,12 +544,12 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
           {parsedExamples.map((ex, idx) => (
             <div
               key={idx}
-              className="bg-zinc-900/70 border border-zinc-800/90 rounded-xl overflow-hidden shadow-xs hover:border-zinc-700/80 transition-all duration-200"
+              className="bg-slate-50/70 dark:bg-zinc-900/70 border border-slate-200 dark:border-zinc-800/90 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 dark:hover:border-zinc-700/80 transition-all duration-200"
             >
               {/* Example Header */}
-              <div className="px-4 py-2.5 bg-zinc-900/90 border-b border-zinc-800/80 flex items-center justify-between">
-                <span className="text-xs font-bold font-mono uppercase tracking-wider text-zinc-200 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400" />
+              <div className="px-4 py-2.5 bg-slate-100/80 dark:bg-zinc-900/90 border-b border-slate-200 dark:border-zinc-800/80 flex items-center justify-between">
+                <span className="text-xs font-bold font-mono uppercase tracking-wider text-slate-800 dark:text-zinc-200 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-500" />
                   {ex.title}
                 </span>
               </div>
@@ -438,10 +558,10 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
               <div className="p-4 space-y-2.5 font-mono text-sm">
                 {ex.input && (
                   <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
-                    <span className="text-zinc-400 font-sans font-semibold text-xs w-20 shrink-0 select-none">
+                    <span className="text-slate-500 dark:text-zinc-400 font-sans font-semibold text-xs w-20 shrink-0 select-none">
                       Input:
                     </span>
-                    <code className="text-zinc-100 bg-zinc-950/80 px-2.5 py-1 rounded-md border border-zinc-800/80 flex-1 whitespace-pre-wrap break-all text-sm leading-relaxed">
+                    <code className="text-slate-900 dark:text-zinc-100 bg-white dark:bg-zinc-950/80 px-2.5 py-1 rounded-md border border-slate-200 dark:border-zinc-800/80 flex-1 whitespace-pre-wrap break-all text-sm leading-relaxed">
                       {ex.input}
                     </code>
                   </div>
@@ -449,21 +569,21 @@ export default function ProblemDescription({ problem, className = '' }: ProblemD
 
                 {ex.output && (
                   <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2">
-                    <span className="text-zinc-400 font-sans font-semibold text-xs w-20 shrink-0 select-none">
+                    <span className="text-slate-500 dark:text-zinc-400 font-sans font-semibold text-xs w-20 shrink-0 select-none">
                       Output:
                     </span>
-                    <code className="text-emerald-300 bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-900/50 font-semibold flex-1 whitespace-pre-wrap break-all text-sm leading-relaxed">
+                    <code className="text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 rounded-md border border-emerald-200 dark:border-emerald-900/50 font-semibold flex-1 whitespace-pre-wrap break-all text-sm leading-relaxed">
                       {ex.output}
                     </code>
                   </div>
                 )}
 
                 {ex.explanation && (
-                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2 pt-2 border-t border-zinc-800/60">
-                    <span className="text-zinc-400 font-sans font-semibold text-xs w-20 shrink-0 select-none">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-2 pt-2 border-t border-slate-200 dark:border-zinc-800/60">
+                    <span className="text-slate-500 dark:text-zinc-400 font-sans font-semibold text-xs w-20 shrink-0 select-none">
                       Explanation:
                     </span>
-                    <span className="text-zinc-200 font-sans text-sm md:text-[14.5px] leading-relaxed flex-1">
+                    <span className="text-slate-700 dark:text-zinc-200 font-sans text-sm md:text-[14.5px] leading-relaxed flex-1">
                       {renderInlineStyled(ex.explanation)}
                     </span>
                   </div>

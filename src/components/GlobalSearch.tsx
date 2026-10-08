@@ -24,15 +24,16 @@ interface GlobalSearchProps {
 }
 
 const PAGES: { id: PageId; label: string; icon: string; color: string; adminOnly?: boolean }[] = [
-  { id: 'home',        label: 'Home',             icon: '⌂',   color: '#a1a1aa' },
-  { id: 'problems',    label: 'Problems',         icon: '{ }', color: '#00E5FF' },
-  { id: 'leaderboard', label: 'Leaderboard',      icon: '⚡',  color: '#f59e0b' },
-  { id: 'arena',       label: 'Arena',            icon: '🏆',  color: '#f43f5e' },
-  { id: 'weekly',      label: 'Weekly Challenge', icon: '🏅',  color: '#00E5FF' },
-  { id: 'subscribe',   label: 'Subscribe (Pro)',  icon: '⭐',  color: '#00E5FF' },
-  { id: 'profile',     label: 'My Profile',       icon: '👤',  color: '#00E5FF' },
-  { id: 'about',       label: 'About',            icon: 'ℹ️',  color: '#a1a1aa' },
-  { id: 'admin',       label: 'Admin',            icon: '⚙️',  color: '#00E5FF', adminOnly: true },
+  { id: 'home',        label: 'Dashboard',        icon: '⌂',   color: '#0284c7' },
+  { id: 'problems',    label: 'Problem Set',      icon: '{ }', color: '#0284c7' },
+  { id: 'leaderboard', label: 'Leaderboard',      icon: '⚡',  color: '#d97706' },
+  { id: 'arena',       label: 'Arena Contests',   icon: '🏆',  color: '#e11d48' },
+  { id: 'weekly',      label: 'Weekly DSA',       icon: '🏅',  color: '#0284c7' },
+  { id: 'subscribe',   label: 'Monthly Access',   icon: '⭐',  color: '#0284c7' },
+  { id: 'profile',     label: 'My Profile',       icon: '👤',  color: '#0284c7' },
+  { id: 'collaborations', label: 'Collaborations', icon: '🤝', color: '#9333ea' },
+  { id: 'about',       label: 'About & Docs',     icon: 'ℹ️',  color: '#64748b' },
+  { id: 'admin',       label: 'Admin Console',    icon: '⚙️',  color: '#9333ea', adminOnly: true },
 ];
 
 function Highlight({ text, q }: { text: string; q: string }) {
@@ -42,7 +43,9 @@ function Highlight({ text, q }: { text: string; q: string }) {
   return (
     <>
       {text.slice(0, idx)}
-      <span className="text-cyan-400 bg-cyan-500/20 font-medium px-0.5 rounded">{text.slice(idx, idx + q.length)}</span>
+      <span className="text-sky-700 dark:text-cyan-400 bg-sky-100 dark:bg-cyan-500/20 font-medium px-0.5 rounded">
+        {text.slice(idx, idx + q.length)}
+      </span>
       {text.slice(idx + q.length)}
     </>
   );
@@ -142,24 +145,24 @@ export default function GlobalSearch({ user, navigate, open, onOpenChange }: Glo
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[400] flex items-start justify-center pt-[12vh] px-4 bg-zinc-950/80 backdrop-blur-sm animate-fade-in"
+    <div className="fixed inset-0 z-[400] flex items-start justify-center pt-[12vh] px-4 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm animate-fade-in"
       onClick={close}>
       <div onClick={e => e.stopPropagation()}
-        className="bg-zinc-950 border border-zinc-800 w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl animate-slide-down">
+        className="bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 w-full max-w-xl rounded-2xl overflow-hidden shadow-2xl animate-slide-down">
 
         {/* Input */}
-        <div className="flex items-center gap-3 px-5 py-3.5 border-b border-zinc-800">
-          <Search className="w-4 h-4 text-zinc-400 shrink-0" />
+        <div className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-200 dark:border-zinc-800">
+          <Search className="w-4 h-4 text-slate-400 dark:text-zinc-400 shrink-0" />
           <input
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search problems, jump to a page…"
-            className="flex-1 bg-transparent text-sm font-mono text-zinc-100 placeholder-zinc-500 focus:outline-none"
+            className="flex-1 bg-transparent text-sm font-mono text-slate-900 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 focus:outline-none"
           />
           {query && (
-            <button onClick={() => setQuery('')} className="text-zinc-500 hover:text-zinc-300 text-xs px-1">
+            <button onClick={() => setQuery('')} className="text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 text-xs px-1">
               ✕
             </button>
           )}
@@ -169,14 +172,14 @@ export default function GlobalSearch({ user, navigate, open, onOpenChange }: Glo
         <div ref={listRef} className="max-h-[50vh] overflow-y-auto py-2 px-2">
           {results.length === 0 ? (
             <div className="px-4 py-10 text-center">
-              <p className="text-zinc-500 font-mono text-xs">
+              <p className="text-slate-400 dark:text-zinc-500 font-mono text-xs">
                 {q ? `No matches for "${query}"` : 'Start typing to search'}
               </p>
             </div>
           ) : (
             <>
               {pageResults.length > 0 && (
-                <div className="px-3 pt-2 pb-1 text-[10px] font-mono font-medium text-zinc-500 uppercase tracking-wider">
+                <div className="px-3 pt-2 pb-1 text-[10px] font-mono font-medium text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
                   Pages
                 </div>
               )}
@@ -184,7 +187,7 @@ export default function GlobalSearch({ user, navigate, open, onOpenChange }: Glo
                 <ResultRow key={r.id} result={r} q={q} active={i === activeIdx} idx={i} onHover={setActiveIdx} />
               ))}
               {problemResults.length > 0 && (
-                <div className="px-3 pt-3 pb-1 text-[10px] font-mono font-medium text-zinc-500 uppercase tracking-wider">
+                <div className="px-3 pt-3 pb-1 text-[10px] font-mono font-medium text-slate-400 dark:text-zinc-500 uppercase tracking-wider">
                   Problems
                 </div>
               )}
@@ -196,17 +199,17 @@ export default function GlobalSearch({ user, navigate, open, onOpenChange }: Glo
         </div>
 
         {/* Footer hint bar */}
-        <div className="flex items-center justify-between gap-4 px-5 py-2.5 border-t border-zinc-800/80 bg-zinc-900/40">
-          <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-500">
+        <div className="flex items-center justify-between gap-4 px-5 py-2.5 border-t border-slate-200 dark:border-zinc-800/80 bg-slate-50 dark:bg-zinc-900/40">
+          <div className="flex items-center gap-3 text-[10px] font-mono text-slate-500 dark:text-zinc-500">
             <span className="flex items-center gap-1">
-              <kbd className="bg-zinc-900 border border-zinc-700/80 rounded px-1.5 py-0.5 text-zinc-400">↑↓</kbd> navigate
+              <kbd className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded px-1.5 py-0.5 text-slate-600 dark:text-zinc-400">↑↓</kbd> navigate
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="bg-zinc-900 border border-zinc-700/80 rounded px-1.5 py-0.5 text-zinc-400">↵</kbd> select
+              <kbd className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded px-1.5 py-0.5 text-slate-600 dark:text-zinc-400">↵</kbd> select
             </span>
           </div>
-          <span className="flex items-center gap-1 text-[10px] font-mono text-zinc-500">
-            <kbd className="bg-zinc-900 border border-zinc-700/80 rounded px-1.5 py-0.5 text-zinc-400">esc</kbd> close
+          <span className="flex items-center gap-1 text-[10px] font-mono text-slate-500 dark:text-zinc-500">
+            <kbd className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 rounded px-1.5 py-0.5 text-slate-600 dark:text-zinc-400">esc</kbd> close
           </span>
         </div>
       </div>
@@ -221,7 +224,7 @@ function ResultRow({ result, q, active, idx, onHover }: { result: SearchResult; 
       onMouseEnter={() => onHover(idx)}
       onClick={result.action}
       className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors duration-100
-        ${active ? 'bg-zinc-800/70 border border-zinc-700/50' : 'hover:bg-zinc-800/40 border border-transparent'}`}
+        ${active ? 'bg-slate-100 dark:bg-zinc-800/70 border border-slate-200 dark:border-zinc-700/50' : 'hover:bg-slate-50 dark:hover:bg-zinc-800/40 border border-transparent'}`}
     >
       <span
         className="w-7 h-7 rounded-lg flex items-center justify-center text-xs shrink-0"
@@ -233,7 +236,7 @@ function ResultRow({ result, q, active, idx, onHover }: { result: SearchResult; 
       >
         {result.icon}
       </span>
-      <span className={`text-xs font-mono flex-1 truncate ${active ? 'text-zinc-100 font-medium' : 'text-zinc-300'}`}>
+      <span className={`text-xs font-mono flex-1 truncate ${active ? 'text-slate-900 dark:text-zinc-100 font-medium' : 'text-slate-700 dark:text-zinc-300'}`}>
         <Highlight text={result.title} q={q} />
       </span>
       {result.subtitle && (
@@ -242,7 +245,7 @@ function ResultRow({ result, q, active, idx, onHover }: { result: SearchResult; 
           {result.subtitle}
         </span>
       )}
-      {active && <span className="text-[11px] font-mono text-zinc-400 shrink-0">↵</span>}
+      {active && <span className="text-[11px] font-mono text-slate-400 dark:text-zinc-400 shrink-0">↵</span>}
     </button>
   );
 }

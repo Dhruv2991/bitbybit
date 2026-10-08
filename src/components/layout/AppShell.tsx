@@ -88,6 +88,17 @@ function IconAbout({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
+function IconCollab({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
 function IconAdmin({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -98,10 +109,10 @@ function IconAdmin({ className = "w-4 h-4" }: { className?: string }) {
 }
 
 const toastColors: Record<string, string> = {
-  ok: "bg-zinc-900 border border-emerald-500/30 text-emerald-400 shadow-xl",
-  err: "bg-zinc-900 border border-rose-500/30 text-rose-400 shadow-xl",
-  warn: "bg-zinc-900 border border-amber-500/30 text-amber-400 shadow-xl",
-  info: "bg-zinc-900 border border-zinc-700 text-zinc-200 shadow-xl",
+  ok: "bg-white dark:bg-zinc-900 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shadow-xl",
+  err: "bg-white dark:bg-zinc-900 border border-rose-500/40 text-rose-600 dark:text-rose-400 shadow-xl",
+  warn: "bg-white dark:bg-zinc-900 border border-amber-500/40 text-amber-600 dark:text-amber-400 shadow-xl",
+  info: "bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 shadow-xl",
 };
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -110,6 +121,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const isFullBleed = pathname === "/problems" || pathname.startsWith("/problems/") || pathname === "/arena" || pathname.startsWith("/arena/");
   const {
     user, authChecked, toasts, liveItems, userStreak,
+    theme, toggleTheme,
     navigate, signIn, signOut, switchAccount,
   } = useAppShell();
 
@@ -172,7 +184,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       items: [
         { id: "home", label: "Dashboard", icon: IconHome },
         { id: "problems", label: "Problem Set", icon: IconProblems },
-        { id: "weekly", label: "Weekly DSA", icon: IconWeekly, badge: "New", badgeColor: "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20" },
+        { id: "weekly", label: "Weekly DSA", icon: IconWeekly, badge: "New", badgeColor: "bg-sky-100 text-sky-700 border border-sky-200 dark:bg-cyan-500/10 dark:text-cyan-400 dark:border-cyan-500/20" },
       ],
     },
     {
@@ -183,7 +195,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           label: "Arena Contests",
           icon: IconArena,
           badge: liveCount > 0 ? `${liveCount} Live` : undefined,
-          badgeColor: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium",
+          badgeColor: "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 font-medium",
         },
         { id: "leaderboard", label: "Leaderboard", icon: IconLeaderboard },
       ],
@@ -192,6 +204,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       group: "General",
       items: [
         { id: "profile", label: "My Profile", icon: IconProfile },
+        { id: "collaborations", label: "Collaborations", icon: IconCollab },
         { id: "about", label: "About & Docs", icon: IconAbout },
       ],
     },
@@ -201,7 +214,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     NAV_GROUPS.push({
       group: "Management",
       items: [
-        { id: "admin", label: "Admin Console", icon: IconAdmin, badge: "Admin", badgeColor: "bg-purple-500/10 text-purple-400 border border-purple-500/20" },
+        { id: "admin", label: "Admin Console", icon: IconAdmin, badge: "Admin", badgeColor: "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20" },
       ],
     });
   }
@@ -209,44 +222,44 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const activeEntry = NAV_GROUPS.flatMap(g => g.items).find(i => i.id === page) || { label: page.toUpperCase() };
 
   const bellDropdown = notifOpen && (
-    <div className="absolute right-0 top-12 w-80 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl overflow-hidden z-[100] animate-slide-down">
-      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/60">
+    <div className="absolute right-0 top-12 w-80 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down">
+      <div className="px-4 py-3 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-slate-50/80 dark:bg-zinc-950/60">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-mono font-medium text-zinc-100">Contests & Challenges</span>
+          <span className="text-xs font-mono font-medium text-slate-800 dark:text-zinc-100">Contests & Challenges</span>
           {liveCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
         </div>
         <div className="flex items-center gap-1.5">
-          {liveCount > 0 && <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md font-medium border border-emerald-500/20">{liveCount} live</span>}
-          {upcomingCount > 0 && <span className="text-[10px] font-mono bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-md font-medium border border-amber-500/20">{upcomingCount} soon</span>}
+          {liveCount > 0 && <span className="text-[10px] font-mono bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-md font-medium border border-emerald-200 dark:border-emerald-500/20">{liveCount} live</span>}
+          {upcomingCount > 0 && <span className="text-[10px] font-mono bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-md font-medium border border-amber-200 dark:border-amber-500/20">{upcomingCount} soon</span>}
         </div>
       </div>
       {liveItems.length === 0 ? (
-        <div className="px-4 py-8 text-center text-zinc-400 font-mono text-xs">
+        <div className="px-4 py-8 text-center text-slate-500 dark:text-zinc-400 font-mono text-xs">
           No live contests right now. Check back soon!
         </div>
       ) : (
-        <div className="divide-y divide-zinc-800 max-h-80 overflow-y-auto">
+        <div className="divide-y divide-slate-100 dark:divide-zinc-800 max-h-80 overflow-y-auto">
           {liveItems.map(item => (
             <button key={item.id + item.status} onClick={() => { setNotifOpen(false); go(item.page); }}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/50 transition-all text-left group">
-              <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-zinc-700/60 flex items-center justify-center shrink-0 text-sm">
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-all text-left group">
+              <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700/60 flex items-center justify-center shrink-0 text-sm">
                 {item.type === "arena" ? "🏆" : "🏅"}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-mono font-medium text-zinc-200 group-hover:text-zinc-100 transition-colors truncate">{item.label}</p>
-                <p className="text-[10px] font-mono text-zinc-400 mt-0.5 flex items-center gap-1.5">
+                <p className="text-xs font-mono font-medium text-slate-800 dark:text-zinc-200 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors truncate">{item.label}</p>
+                <p className="text-[10px] font-mono text-slate-500 dark:text-zinc-400 mt-0.5 flex items-center gap-1.5">
                   <span>{item.type === "arena" ? "Arena Contest" : "Weekly DSA"}</span>
                   <span>·</span>
                   {item.status === "live" ? (
-                    <span className="text-emerald-400 font-medium flex items-center gap-1">
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> LIVE
                     </span>
                   ) : (
-                    <span className="text-amber-400">UPCOMING</span>
+                    <span className="text-amber-600 dark:text-amber-400">UPCOMING</span>
                   )}
                 </p>
               </div>
-              <span className="text-xs font-mono text-zinc-500 group-hover:text-zinc-300 group-hover:translate-x-0.5 transition-all shrink-0">→</span>
+              <span className="text-xs font-mono text-slate-400 dark:text-zinc-500 group-hover:text-slate-700 dark:group-hover:text-zinc-300 group-hover:translate-x-0.5 transition-all shrink-0">→</span>
             </button>
           ))}
         </div>
@@ -255,14 +268,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col antialiased selection:bg-cyan-500/20 selection:text-cyan-300">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex flex-col antialiased selection:bg-sky-500/20 selection:text-sky-800 dark:selection:bg-cyan-500/20 dark:selection:text-cyan-300">
       <AnimatedBackground />
       <GlobalSearch user={user} navigate={(id: string) => go(id as PageId)} open={searchOpen} onOpenChange={setSearchOpen} />
 
-      {/* Floating Toast notifications container */}
+      {/* Floating Toast notifications */}
       <div className="fixed top-5 right-5 z-[300] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
         {toasts.map(t => (
-          <div key={t.id} className={`${toastColors[t.type]} px-3.5 py-2.5 rounded-lg font-mono text-xs shadow-xl pointer-events-auto animate-slide-down flex items-center justify-between`}>
+          <div key={t.id} className={`${toastColors[t.type]} px-3.5 py-2.5 rounded-xl font-mono text-xs shadow-xl pointer-events-auto animate-slide-down flex items-center justify-between`}>
             <span>{t.msg}</span>
           </div>
         ))}
@@ -270,13 +283,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-1 min-h-screen relative">
         {/* ========================================================================= */}
-        {/* DESKTOP SIDEBAR — Compact w-20 by default, expands to w-64 on hover       */}
+        {/* DESKTOP SIDEBAR                                                           */}
         {/* ========================================================================= */}
         <aside
           onMouseEnter={() => setSidebarHovered(true)}
           onMouseLeave={() => setSidebarHovered(false)}
           className={`hidden md:flex flex-col fixed top-0 left-0 bottom-0 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] transition-all duration-300 ease-in-out select-none backdrop-blur-xl
-            ${sidebarHovered ? "w-64 z-50 shadow-2xl shadow-black/80 ring-1 ring-white/[0.05]" : "w-20 z-40"}`}
+            ${sidebarHovered ? "w-64 z-50 shadow-2xl ring-1 ring-black/[0.05] dark:ring-white/[0.05]" : "w-20 z-40"}`}
         >
           {/* Sidebar Header / Brand */}
           <div className="h-16 px-4 flex items-center border-b border-[var(--sidebar-border)] shrink-0 overflow-hidden">
@@ -285,17 +298,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               className="flex items-center gap-3 overflow-hidden text-left focus:outline-none group w-full"
               title="BitByBit Home"
             >
-              <div className="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-700/90 p-1.5 flex items-center justify-center shrink-0 group-hover:border-cyan-500/60 shadow-md group-hover:shadow-[0_0_15px_rgba(0,229,255,0.3)] transition-all">
+              <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/90 p-1 flex items-center justify-center shrink-0 shadow-sm group-hover:border-sky-500/60 dark:group-hover:border-cyan-500/60 transition-all">
                 <img src="/logo.png" alt="BitByBit" className="w-full h-full object-contain filter drop-shadow-sm" />
               </div>
               <div
                 className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
                   ${sidebarHovered ? "opacity-100 max-w-[170px] translate-x-0" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
               >
-                <span className="font-display font-bold text-[17px] tracking-tight text-white group-hover:text-cyan-300 transition-colors leading-tight">
+                <span className="font-display font-bold text-[17px] tracking-tight text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-cyan-300 transition-colors leading-tight">
                   BitByBit
                 </span>
-                <span className="text-xs font-mono text-zinc-400 font-medium tracking-tight truncate mt-0.5">
+                <span className="text-xs font-mono text-slate-500 dark:text-zinc-400 font-medium tracking-tight truncate mt-0.5">
                   TeamCodeLocked
                 </span>
               </div>
@@ -308,7 +321,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div key={group.group + gIdx} className="space-y-1">
                 <div
                   className={`transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
-                    ${sidebarHovered ? "px-3 pb-1.5 text-xs font-mono font-semibold tracking-wider uppercase text-zinc-400 opacity-100 max-h-6" : "w-8 h-px bg-zinc-800/80 my-2 mx-auto opacity-50 max-h-2"}`}
+                    ${sidebarHovered ? "px-3 pb-1.5 text-xs font-mono font-semibold tracking-wider uppercase text-slate-400 dark:text-zinc-400 opacity-100 max-h-6" : "w-8 h-px bg-slate-200 dark:bg-zinc-800/80 my-2 mx-auto opacity-50 max-h-2"}`}
                 >
                   {sidebarHovered ? group.group : ""}
                 </div>
@@ -323,12 +336,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       title={item.label}
                       className={`w-full flex items-center rounded-xl font-mono text-sm transition-all duration-200 group relative
                         ${isActive
-                          ? "bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/25 shadow-sm"
-                          : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40 border border-transparent"
+                          ? "bg-sky-50 text-sky-700 font-semibold border border-sky-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/25 shadow-xs"
+                          : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100/80 dark:hover:bg-zinc-800/40 border border-transparent"
                         }
                         ${sidebarHovered ? "px-3 py-2.5 gap-3" : "px-0 py-2.5 justify-center"}`}
                     >
-                      <div className={`shrink-0 w-6 h-6 flex items-center justify-center ${isActive ? "text-cyan-400" : "text-zinc-400 group-hover:text-zinc-200"}`}>
+                      <div className={`shrink-0 w-6 h-6 flex items-center justify-center ${isActive ? "text-sky-600 dark:text-cyan-400" : "text-slate-500 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200"}`}>
                         <Icon className="w-[19px] h-[19px]" />
                       </div>
                       <span
@@ -340,7 +353,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       {item.badge && (
                         <span
                           className={`text-xs font-mono px-2 py-0.5 rounded-full shrink-0 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
-                            ${item.badgeColor || "bg-zinc-800 text-zinc-400 border border-zinc-700"}
+                            ${item.badgeColor || "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700"}
                             ${sidebarHovered ? "opacity-100 max-w-[80px] scale-100" : "opacity-0 max-w-0 scale-75 pointer-events-none"}`}
                         >
                           {item.badge}
@@ -353,14 +366,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </div>
 
-          {/* Sidebar Footer User Card */}
-          <div className="p-2.5 border-t border-[var(--sidebar-border)] shrink-0 overflow-hidden">
+          {/* Sidebar Footer */}
+          <div className="p-2.5 border-t border-[var(--sidebar-border)] shrink-0 overflow-hidden space-y-2">
             {!authChecked ? (
-              <div className="h-10 rounded-lg bg-zinc-900 animate-pulse" />
+              <div className="h-10 rounded-xl bg-slate-100 dark:bg-zinc-900 animate-pulse" />
             ) : user ? (
               <button
                 onClick={() => go("profile")}
-                className={`w-full flex items-center rounded-lg hover:bg-zinc-800/60 transition-colors group text-left
+                className={`w-full flex items-center rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800/60 transition-colors group text-left
                   ${sidebarHovered ? "p-2 gap-2.5" : "p-1.5 justify-center"}`}
                 title={user.name}
               >
@@ -368,11 +381,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <img
                     src={`https://github.com/${user.github}.png?size=64`}
                     alt={user.name}
-                    className="w-8 h-8 rounded-full object-cover ring-1 ring-zinc-700 group-hover:ring-zinc-500"
+                    className="w-8 h-8 rounded-full object-cover ring-1 ring-slate-300 dark:ring-zinc-700 group-hover:ring-slate-400 dark:group-hover:ring-zinc-500"
                     onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                   />
                   {userStreak > 0 && (
-                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-zinc-900 text-[10px] flex items-center justify-center font-bold text-amber-400 border border-amber-500/30">
+                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-100 dark:bg-zinc-900 text-[10px] flex items-center justify-center font-bold text-amber-500 border border-amber-500/30">
                       🔥
                     </span>
                   )}
@@ -381,8 +394,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   className={`min-w-0 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
                     ${sidebarHovered ? "opacity-100 max-w-[150px] translate-x-0 flex-1" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
                 >
-                  <p className="text-sm font-mono font-medium text-zinc-200 truncate">{user.name}</p>
-                  <p className="text-xs font-mono text-zinc-500 truncate">@{user.github}</p>
+                  <p className="text-sm font-mono font-medium text-slate-800 dark:text-zinc-200 truncate">{user.name}</p>
+                  <p className="text-xs font-mono text-slate-500 dark:text-zinc-500 truncate">@{user.github}</p>
                 </div>
               </button>
             ) : (
@@ -418,7 +431,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setMobileDrawerOpen(true)}
-                className="md:hidden p-2 text-zinc-400 hover:text-zinc-100 rounded-lg hover:bg-zinc-800/60 transition-colors"
+                className="md:hidden p-2 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800/60 transition-colors"
                 aria-label="Open menu"
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -433,14 +446,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={() => go("home")}
                 className="md:hidden flex items-center gap-2.5 text-left focus:outline-none"
               >
-                <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-700/90 p-1 flex items-center justify-center shrink-0 shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/90 p-1 flex items-center justify-center shrink-0 shadow-sm">
                   <img src="/logo.png" alt="BitByBit" className="w-full h-full object-contain" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="font-display font-bold text-base tracking-tight text-white leading-tight">
+                  <span className="font-display font-bold text-base tracking-tight text-slate-900 dark:text-white leading-tight">
                     BitByBit
                   </span>
-                  <span className="text-[10px] font-mono text-zinc-400 font-medium leading-tight">
+                  <span className="text-[10px] font-mono text-slate-500 dark:text-zinc-400 font-medium leading-tight">
                     TeamCodeLocked
                   </span>
                 </div>
@@ -448,9 +461,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
               {/* Dynamic Breadcrumbs */}
               <div className="hidden sm:flex items-center gap-2 text-sm font-mono">
-                <span className="text-zinc-500">~</span>
-                <span className="text-zinc-600">/</span>
-                <span className="text-zinc-100 font-semibold flex items-center gap-1.5">
+                <span className="text-slate-400 dark:text-zinc-500">~</span>
+                <span className="text-slate-300 dark:text-zinc-600">/</span>
+                <span className="text-slate-800 dark:text-zinc-100 font-semibold flex items-center gap-1.5">
                   {activeEntry.label}
                 </span>
               </div>
@@ -460,26 +473,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="hidden sm:flex items-center max-w-xs w-full mx-4">
               <button
                 onClick={() => setSearchOpen(true)}
-                className="w-full flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-zinc-900/40 backdrop-blur-md border border-white/[0.08] text-zinc-400 hover:border-white/[0.16] hover:text-zinc-200 transition-colors text-sm font-mono shadow-sm group"
+                className="w-full flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-slate-100/80 dark:bg-zinc-900/40 backdrop-blur-md border border-slate-200 dark:border-white/[0.08] text-slate-500 dark:text-zinc-400 hover:border-slate-300 dark:hover:border-white/[0.16] hover:text-slate-800 dark:hover:text-zinc-200 transition-colors text-sm font-mono shadow-xs group"
               >
                 <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="w-4 h-4 text-slate-400 dark:text-zinc-500 group-hover:text-slate-600 dark:group-hover:text-zinc-300 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="11" cy="11" r="8" />
                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                   </svg>
                   <span>Quick search...</span>
                 </div>
-                <kbd className="text-xs font-mono bg-zinc-800/80 px-2 py-0.5 rounded-md border border-zinc-700 text-zinc-300 shadow-xs">
+                <kbd className="text-xs font-mono bg-white dark:bg-zinc-800/80 px-2 py-0.5 rounded-md border border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 shadow-2xs">
                   ⌘K
                 </kbd>
               </button>
             </div>
 
-            {/* Right: Quick actions (Streak, Notifications, User Profile) */}
+            {/* Right: Quick actions (Theme Toggle, Streak, Notifications, User Profile) */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSearchOpen(true)}
-                className="sm:hidden p-2 text-zinc-400 hover:text-zinc-100 rounded-lg hover:bg-zinc-800/60 transition-colors"
+                className="sm:hidden p-2 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800/60 transition-colors"
                 title="Search"
                 aria-label="Search"
               >
@@ -489,11 +502,37 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </svg>
               </button>
 
+              {/* Theme Toggle Button */}
+              <button
+                onClick={toggleTheme}
+                aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+                title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+                className="p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
+              >
+                {theme === "dark" ? (
+                  <svg className="w-4 h-4 text-amber-400 transition-transform duration-200 hover:rotate-45" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 text-slate-700 transition-transform duration-200 hover:-rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                )}
+              </button>
+
               {/* Streak Badge */}
               {userStreak > 0 && (
                 <div
                   title={`${userStreak}-day coding streak!`}
-                  className="flex items-center gap-1.5 text-xs font-mono font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg shadow-sm"
+                  className="flex items-center gap-1.5 text-xs font-mono font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-2.5 py-1 rounded-xl shadow-2xs"
                 >
                   <span>🔥</span>
                   <span>{userStreak}d</span>
@@ -505,7 +544,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   onClick={() => setNotifOpen(o => !o)}
                   aria-label="Notifications"
-                  className="relative p-2 text-zinc-400 hover:text-zinc-100 rounded-lg hover:bg-zinc-800/60 transition-colors"
+                  className="relative p-2 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800/60 transition-colors"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -520,7 +559,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
               {/* User profile dropdown button */}
               {!authChecked ? (
-                <div className="w-7 h-7 rounded-full bg-zinc-800 animate-pulse" />
+                <div className="w-7 h-7 rounded-full bg-slate-200 dark:bg-zinc-800 animate-pulse" />
               ) : user ? (
                 <div className="relative" ref={profileRef}>
                   <button
@@ -528,15 +567,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     aria-haspopup="menu"
                     aria-expanded={profileOpen}
                     aria-label="User menu"
-                    className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-zinc-800/60 transition-colors"
+                    className="flex items-center gap-1.5 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800/60 transition-colors"
                   >
                     <img
                       src={`https://github.com/${user.github}.png?size=64`}
                       alt={user.name}
-                      className="w-7 h-7 rounded-full object-cover ring-1 ring-zinc-700"
+                      className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-300 dark:ring-zinc-700"
                       onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
-                    <svg className={`w-3 h-3 text-zinc-400 transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg className={`w-3 h-3 text-slate-500 dark:text-zinc-400 transition-transform duration-200 ${profileOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polyline points="6 9 12 15 18 9" />
                     </svg>
                   </button>
@@ -545,28 +584,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   {profileOpen && (
                     <div
                       role="menu"
-                      className="absolute right-0 top-11 w-60 bg-zinc-900/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down"
+                      className="absolute right-0 top-11 w-64 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl border border-slate-200 dark:border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down"
                     >
-                      <div className="px-4 py-3 border-b border-white/[0.06] bg-zinc-950/40">
-                        <p className="text-xs font-mono font-medium text-zinc-100 truncate">{user.name}</p>
-                        <p className="text-[10px] font-mono text-zinc-400 truncate">@{user.github}</p>
+                      <div className="px-4 py-3 border-b border-slate-200 dark:border-white/[0.06] bg-slate-50/80 dark:bg-zinc-950/40">
+                        <p className="text-xs font-mono font-medium text-slate-900 dark:text-zinc-100 truncate">{user.name}</p>
+                        <p className="text-[10px] font-mono text-slate-500 dark:text-zinc-400 truncate">@{user.github}</p>
                       </div>
 
                       <div className="py-1">
                         <button
                           role="menuitem"
                           onClick={() => { setProfileOpen(false); go("profile"); }}
-                          className="w-full text-left px-4 py-2 text-xs font-mono text-zinc-300 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors flex items-center gap-2.5"
+                          className="w-full text-left px-4 py-2 text-xs font-mono text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors flex items-center gap-2.5"
                         >
-                          <IconProfile className="w-3.5 h-3.5 text-zinc-400" />
+                          <IconProfile className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-400" />
                           <span>My Profile & Stats</span>
                         </button>
                         <button
                           role="menuitem"
                           onClick={() => { setProfileOpen(false); go("profile"); }}
-                          className="w-full text-left px-4 py-2 text-xs font-mono text-zinc-300 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors flex items-center gap-2.5"
+                          className="w-full text-left px-4 py-2 text-xs font-mono text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors flex items-center gap-2.5"
                         >
-                          <svg className="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <svg className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
                             <line x1="8" y1="21" x2="16" y2="21" />
                             <line x1="12" y1="17" x2="12" y2="21" />
@@ -575,10 +614,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         </button>
                         <button
                           role="menuitem"
-                          onClick={() => { setProfileOpen(false); switchAccount(); }}
-                          className="w-full text-left px-4 py-2 text-xs font-mono text-zinc-300 hover:text-zinc-100 hover:bg-white/[0.04] transition-colors flex items-center gap-2.5"
+                          onClick={() => { toggleTheme(); }}
+                          className="w-full text-left px-4 py-2 text-xs font-mono text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors flex items-center justify-between"
                         >
-                          <svg className="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <div className="flex items-center gap-2.5">
+                            <span>{theme === "dark" ? "☀️" : "🌙"}</span>
+                            <span>Theme</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-slate-500 uppercase">{theme}</span>
+                        </button>
+                        <button
+                          role="menuitem"
+                          onClick={() => { setProfileOpen(false); switchAccount(); }}
+                          className="w-full text-left px-4 py-2 text-xs font-mono text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-white/[0.04] transition-colors flex items-center gap-2.5"
+                        >
+                          <svg className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M21 2v6h-6" />
                             <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
                             <path d="M3 22v-6h6" />
@@ -588,11 +638,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         </button>
                       </div>
 
-                      <div className="border-t border-white/[0.06] pt-1">
+                      <div className="border-t border-slate-200 dark:border-white/[0.06] pt-1">
                         <button
                           role="menuitem"
                           onClick={() => { setProfileOpen(false); signOut(); }}
-                          className="w-full text-left px-4 py-2.5 text-xs font-mono text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2.5"
+                          className="w-full text-left px-4 py-2.5 text-xs font-mono text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors flex items-center gap-2.5"
                         >
                           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -616,7 +666,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          {/* MAIN CONTENT AREA — full-bleed for workspace, padded for all other pages */}
+          {/* MAIN CONTENT AREA */}
           {isFullBleed ? (
             <main className="flex-1 w-full min-h-0">
               {children}
@@ -628,27 +678,28 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           )}
 
           {/* FOOTER */}
-          <footer className="border-t border-zinc-800/80 bg-zinc-950/60 py-6 px-4 sm:px-6 lg:px-8 mt-auto">
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono text-zinc-400">
+          <footer className="border-t border-slate-200/80 dark:border-zinc-800/80 bg-slate-100/60 dark:bg-zinc-950/60 py-6 px-4 sm:px-6 lg:px-8 mt-auto">
+            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500 dark:text-zinc-400">
               <div className="flex items-center gap-2">
                 <img src="/logo.png" alt="BitByBit" className="w-5 h-5 object-contain opacity-70" />
                 <span>
                   © {new Date().getFullYear()} TeamCodeLocked · BMS College of Engineering
                 </span>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap justify-center">
                 <a
                   href="https://www.instagram.com/teamcodelocked/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-zinc-200 transition-colors"
+                  className="hover:text-slate-800 dark:hover:text-zinc-200 transition-colors"
                 >
                   Instagram
                 </a>
-                <button onClick={() => go("about")} className="hover:text-zinc-200 transition-colors">About & Legal</button>
-                <button onClick={() => go("privacy")} className="hover:text-zinc-200 transition-colors">Privacy</button>
-                <button onClick={() => go("terms")} className="hover:text-zinc-200 transition-colors">Terms</button>
-                <button onClick={() => go("refunds")} className="hover:text-zinc-200 transition-colors">Refunds</button>
+                <button onClick={() => go("collaborations")} className="hover:text-slate-800 dark:hover:text-zinc-200 transition-colors">Collaborations</button>
+                <button onClick={() => go("about")} className="hover:text-slate-800 dark:hover:text-zinc-200 transition-colors">About & Legal</button>
+                <button onClick={() => go("privacy")} className="hover:text-slate-800 dark:hover:text-zinc-200 transition-colors">Privacy</button>
+                <button onClick={() => go("terms")} className="hover:text-slate-800 dark:hover:text-zinc-200 transition-colors">Terms</button>
+                <button onClick={() => go("refunds")} className="hover:text-slate-800 dark:hover:text-zinc-200 transition-colors">Refunds</button>
               </div>
             </div>
           </footer>
@@ -661,29 +712,36 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {mobileDrawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm animate-fade-in"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
             onClick={() => setMobileDrawerOpen(false)}
           />
-          <div className="relative w-72 max-w-[85vw] bg-zinc-950 border-r border-zinc-800 h-full flex flex-col z-10 animate-slide-right shadow-2xl">
+          <div className="relative w-72 max-w-[85vw] bg-white dark:bg-zinc-950 border-r border-slate-200 dark:border-zinc-800 h-full flex flex-col z-10 animate-slide-right shadow-2xl">
             {/* Drawer Header */}
-            <div className="h-16 px-4 flex items-center justify-between border-b border-zinc-800 bg-zinc-950">
+            <div className="h-16 px-4 flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-950">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-zinc-700/90 p-1 flex items-center justify-center shrink-0 shadow-md">
+                <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/90 p-1 flex items-center justify-center shrink-0 shadow-sm">
                   <img src="/logo.png" alt="BitByBit" className="w-full h-full object-contain filter drop-shadow-sm" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="font-display font-bold text-[17px] tracking-tight text-white leading-tight">
+                  <span className="font-display font-bold text-[17px] tracking-tight text-slate-900 dark:text-white leading-tight">
                     BitByBit
                   </span>
-                  <span className="text-xs font-mono text-zinc-400 font-medium tracking-tight truncate mt-0.5">
+                  <span className="text-xs font-mono text-slate-500 dark:text-zinc-400 font-medium tracking-tight truncate mt-0.5">
                     TeamCodeLocked
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-1">
                 <button
+                  onClick={toggleTheme}
+                  className="p-2 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800/60 transition-colors font-mono text-xs"
+                  aria-label="Toggle theme"
+                >
+                  {theme === "dark" ? "☀️" : "🌙"}
+                </button>
+                <button
                   onClick={() => setMobileDrawerOpen(false)}
-                  className="p-2 text-zinc-400 hover:text-zinc-100 rounded-lg hover:bg-zinc-800/60 transition-colors font-mono text-sm"
+                  className="p-2 text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800/60 transition-colors font-mono text-sm"
                   aria-label="Close menu"
                 >
                   ✕
@@ -695,7 +753,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
               {NAV_GROUPS.map((group, gIdx) => (
                 <div key={group.group + gIdx} className="space-y-1">
-                  <div className="px-3 pb-1 text-[10px] font-mono font-medium uppercase tracking-wider text-zinc-500">
+                  <div className="px-3 pb-1 text-[10px] font-mono font-medium uppercase tracking-wider text-slate-400 dark:text-zinc-500">
                     {group.group}
                   </div>
                   {group.items.map(item => {
@@ -705,16 +763,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       <button
                         key={item.id}
                         onClick={() => go(item.id)}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg font-mono text-xs transition-colors
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl font-mono text-xs transition-colors
                           ${isActive
-                            ? "bg-cyan-500/10 text-cyan-300 font-medium border border-cyan-500/25"
-                            : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/40"
+                            ? "bg-sky-50 text-sky-700 border border-sky-200 font-medium dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/25"
+                            : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-800/40"
                           }`}
                       >
                         <Icon className="w-4 h-4" />
                         <span className="flex-1 text-left">{item.label}</span>
                         {item.badge && (
-                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${item.badgeColor || "bg-zinc-800 text-zinc-400 border border-zinc-700"}`}>
+                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md ${item.badgeColor || "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700"}`}>
                             {item.badge}
                           </span>
                         )}
@@ -726,31 +784,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             {/* Drawer Footer */}
-            <div className="p-4 border-t border-zinc-800 bg-zinc-900/50">
+            <div className="p-4 border-t border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/50">
               {user ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2.5">
                     <img
                       src={`https://github.com/${user.github}.png?size=64`}
                       alt={user.name}
-                      className="w-7 h-7 rounded-full object-cover ring-1 ring-zinc-700"
+                      className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-300 dark:ring-zinc-700"
                       onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
                     <div className="min-w-0">
-                      <p className="text-xs font-mono font-medium text-zinc-100 truncate">{user.name}</p>
-                      <p className="text-[10px] font-mono text-zinc-500 truncate">@{user.github}</p>
+                      <p className="text-xs font-mono font-medium text-slate-900 dark:text-zinc-100 truncate">{user.name}</p>
+                      <p className="text-[10px] font-mono text-slate-500 dark:text-zinc-500 truncate">@{user.github}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 pt-2">
                     <button
                       onClick={() => { setMobileDrawerOpen(false); switchAccount(); }}
-                      className="py-1.5 px-2 rounded-lg font-mono text-[10px] border border-zinc-800 text-zinc-400 hover:text-zinc-200 bg-transparent text-center"
+                      className="py-1.5 px-2 rounded-xl font-mono text-[10px] border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 bg-transparent text-center"
                     >
                       Switch
                     </button>
                     <button
                       onClick={() => { setMobileDrawerOpen(false); signOut(); }}
-                      className="py-1.5 px-2 rounded-lg font-mono text-[10px] border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 text-center"
+                      className="py-1.5 px-2 rounded-xl font-mono text-[10px] border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 text-center"
                     >
                       Sign Out
                     </button>
@@ -772,7 +830,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* ========================================================================= */}
       {/* MOBILE BOTTOM THUMB BAR                                                   */}
       {/* ========================================================================= */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800 flex items-center justify-around px-2 py-1.5 shadow-2xl">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-zinc-950/95 backdrop-blur-xl border-t border-slate-200 dark:border-zinc-800 flex items-center justify-around px-2 py-1.5 shadow-2xl">
         {[
           { id: "home" as PageId, label: "Home", icon: IconHome },
           { id: "problems" as PageId, label: "Problems", icon: IconProblems },
@@ -786,8 +844,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <button
               key={item.id}
               onClick={() => go(item.id)}
-              className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-lg transition-all relative font-mono text-[10px]
-                ${isActive ? "text-cyan-400 font-medium" : "text-zinc-400 hover:text-zinc-200"}`}
+              className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-xl transition-all relative font-mono text-[10px]
+                ${isActive ? "text-sky-600 dark:text-cyan-400 font-medium" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"}`}
             >
               <div className="relative">
                 <Icon className="w-5 h-5" />

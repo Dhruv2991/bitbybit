@@ -19,28 +19,28 @@ export default function AboutPage({ onNavigate }: Props) {
       {/* Hero */}
       <div className="text-center mb-12">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 mb-5">
-          <span className="text-3xl font-mono font-bold text-cyan-400">{'{ }'}</span>
+          <span className="text-3xl font-mono font-bold text-cyan-600 dark:text-cyan-400">{'{ }'}</span>
         </div>
-        <h1 className="font-bold text-3xl md:text-4xl text-zinc-100 mb-3 tracking-tight">
+        <h1 className="font-bold text-3xl md:text-4xl text-slate-900 dark:text-zinc-100 mb-3 tracking-tight">
           BitByBit
         </h1>
-        <p className="text-zinc-400 font-mono text-sm max-w-md mx-auto leading-relaxed">
+        <p className="text-slate-600 dark:text-zinc-400 font-mono text-sm max-w-md mx-auto leading-relaxed">
           An AI-powered coding practice and interview preparation platform built for students and developers to improve one problem at a time.
         </p>
       </div>
 
       {/* About the platform */}
-      <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 mb-5">
-        <h2 className="font-semibold text-zinc-100 text-base mb-3 flex items-center gap-2">
-          <span className="text-cyan-400">✦</span> What is BitByBit?
+      <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-6 mb-5 shadow-xs">
+        <h2 className="font-semibold text-slate-900 dark:text-zinc-100 text-base mb-3 flex items-center gap-2">
+          <span className="text-cyan-600 dark:text-cyan-400">✦</span> What is BitByBit?
         </h2>
-        <p className="text-zinc-400 font-mono text-xs leading-relaxed mb-3">
+        <p className="text-slate-600 dark:text-zinc-400 font-mono text-xs leading-relaxed mb-3">
           BitByBit is an AI-powered coding practice and interview preparation platform featuring
           real-time code execution, curated programming challenges, proctored coding assessments,
           AI-assisted learning tools, and community leaderboards designed to help learners improve
           their programming skills.
         </p>
-        <p className="text-zinc-400 font-mono text-xs leading-relaxed">
+        <p className="text-slate-600 dark:text-zinc-400 font-mono text-xs leading-relaxed">
           Problems are executed securely in-browser or within isolated server environments.
           Subscribers get monthly access (₹39/month) to premium challenges, AI-powered learning features,
           advanced analytics, and proctored coding assessments.
@@ -48,9 +48,9 @@ export default function AboutPage({ onNavigate }: Props) {
       </div>
 
       {/* Built by */}
-      <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 mb-5">
-        <h2 className="font-semibold text-zinc-100 text-base mb-4 flex items-center gap-2">
-          <span className="text-cyan-400">✦</span> Built by
+      <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-6 mb-5 shadow-xs">
+        <h2 className="font-semibold text-slate-900 dark:text-zinc-100 text-base mb-4 flex items-center gap-2">
+          <span className="text-cyan-600 dark:text-cyan-400">✦</span> Built by
         </h2>
         <div className="flex items-center gap-4 mb-4">
           <a
@@ -70,31 +70,31 @@ export default function AboutPage({ onNavigate }: Props) {
             />
           </a>
           <div>
-            <div className="font-mono font-bold text-zinc-200 text-sm">Dhruv G Nayak</div>
-            <div className="text-zinc-500 font-mono text-[10px] mt-0.5">Dhruv2991</div>
+            <div className="font-mono font-bold text-slate-900 dark:text-zinc-200 text-sm">Dhruv G Nayak</div>
+            <div className="text-slate-400 dark:text-zinc-500 font-mono text-[10px] mt-0.5">Dhruv2991</div>
             <a
               href="mailto:ddhruvgnayak@gmail.com"
-              className="text-cyan-400 font-mono text-[11px] hover:text-cyan-300 transition-colors mt-0.5 block"
+              className="text-cyan-600 dark:text-cyan-400 font-mono text-[11px] hover:text-cyan-500 dark:hover:text-cyan-300 transition-colors mt-0.5 block"
             >
               ddhruvgnayak@gmail.com
             </a>
           </div>
         </div>
-        <div className="border-t border-zinc-800/80 pt-4">
+        <div className="border-t border-slate-200 dark:border-zinc-800/80 pt-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
-              <span className="text-amber-400 text-sm">🏛</span>
+              <span className="text-amber-500 dark:text-amber-400 text-sm">🏛</span>
             </div>
             <div>
-              <div className="font-mono font-semibold text-zinc-200 text-sm">TeamCodeLocked</div>
-              <div className="text-zinc-500 font-mono text-[10px]">BMS College of Engineering, Bengaluru</div>
+              <div className="font-mono font-semibold text-slate-800 dark:text-zinc-200 text-sm">TeamCodeLocked</div>
+              <div className="text-slate-500 dark:text-zinc-500 font-mono text-[10px]">BMS College of Engineering, Bengaluru</div>
             </div>
             <a
               href="https://www.instagram.com/teamcodelocked/"
               target="_blank"
               rel="noopener noreferrer"
               className="ml-auto flex items-center gap-1.5 text-[10px] font-mono px-3 py-1.5
-                bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-lg
+                bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg
                 hover:bg-amber-500/20 transition-colors"
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -107,9 +107,9 @@ export default function AboutPage({ onNavigate }: Props) {
       </div>
 
       {/* Features */}
-      <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 mb-5">
-        <h2 className="font-semibold text-zinc-100 text-base mb-4 flex items-center gap-2">
-          <span className="text-emerald-400">✦</span> Platform features
+      <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-6 mb-5 shadow-xs">
+        <h2 className="font-semibold text-slate-900 dark:text-zinc-100 text-base mb-4 flex items-center gap-2">
+          <span className="text-emerald-500 dark:text-emerald-400">✦</span> Platform features
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
@@ -122,11 +122,11 @@ export default function AboutPage({ onNavigate }: Props) {
             ["⚡",  "Leaderboard",           "Real-time rankings by points and streak"],
             ["🔒",  "Secure execution",      "Code runs in browser or sandboxed server"],
           ].map(([icon, title, desc]) => (
-            <div key={title} className="flex gap-3 items-start p-3 bg-zinc-900/30 rounded-xl border border-zinc-800/60">
+            <div key={title} className="flex gap-3 items-start p-3 bg-slate-50 dark:bg-zinc-900/30 rounded-xl border border-slate-200/80 dark:border-zinc-800/60">
               <span className="text-base shrink-0 mt-0.5 w-5 text-center">{icon}</span>
               <div>
-                <div className="text-xs font-mono font-semibold text-zinc-200">{title}</div>
-                <div className="text-[10px] font-mono text-zinc-500 mt-0.5">{desc}</div>
+                <div className="text-xs font-mono font-semibold text-slate-800 dark:text-zinc-200">{title}</div>
+                <div className="text-[10px] font-mono text-slate-500 dark:text-zinc-500 mt-0.5">{desc}</div>
               </div>
             </div>
           ))}
@@ -134,12 +134,12 @@ export default function AboutPage({ onNavigate }: Props) {
       </div>
 
       {/* Payments & Subscription */}
-      <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 mb-5">
-        <h2 className="font-semibold text-zinc-100 text-base mb-3 flex items-center gap-2">
-          <span className="text-cyan-400">✦</span> Payments &amp; Subscription
+      <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-6 mb-5 shadow-xs">
+        <h2 className="font-semibold text-slate-900 dark:text-zinc-100 text-base mb-3 flex items-center gap-2">
+          <span className="text-cyan-600 dark:text-cyan-400">✦</span> Payments &amp; Subscription
         </h2>
 
-        <div className="space-y-2 text-zinc-400 font-mono text-xs leading-relaxed">
+        <div className="space-y-2 text-slate-600 dark:text-zinc-400 font-mono text-xs leading-relaxed">
           <p>
             BitByBit offers a monthly subscription (₹39/month) that unlocks premium educational
             features including weekly coding challenges, AI-powered tools, the complete
@@ -167,25 +167,25 @@ export default function AboutPage({ onNavigate }: Props) {
       </div>
 
       {/* Legal / Copyright */}
-      <div className="bg-zinc-900/50 border border-rose-500/20 rounded-2xl p-6 mb-5">
-        <h2 className="font-semibold text-zinc-100 text-base mb-4 flex items-center gap-2">
-          <span className="text-rose-400">✦</span> Copyright & Legal
+      <div className="bg-white dark:bg-zinc-900/50 border border-rose-500/30 dark:border-rose-500/20 rounded-2xl p-6 mb-5 shadow-xs">
+        <h2 className="font-semibold text-slate-900 dark:text-zinc-100 text-base mb-4 flex items-center gap-2">
+          <span className="text-rose-500 dark:text-rose-400">✦</span> Copyright & Legal
         </h2>
 
-        <div className="space-y-3 text-zinc-400 font-mono text-xs leading-relaxed">
+        <div className="space-y-3 text-slate-600 dark:text-zinc-400 font-mono text-xs leading-relaxed">
           <p>
-            <span className="text-zinc-200 font-semibold">
+            <span className="text-slate-900 dark:text-zinc-200 font-semibold">
               © {YEAR} Dhruv G Nayak. All rights reserved.
             </span>
           </p>
           <p>
             BitByBit &mdash; including its source code, design, problem content, UI components,
             AI integration, scoring system, and all associated intellectual property &mdash; is the
-            exclusive property of <span className="text-zinc-200">Dhruv G Nayak</span> and
-            <span className="text-zinc-200"> TeamCodeLocked, BMS College of Engineering</span>.
+            exclusive property of <span className="text-slate-900 dark:text-zinc-200 font-medium">Dhruv G Nayak</span> and
+            <span className="text-slate-900 dark:text-zinc-200 font-medium"> TeamCodeLocked, BMS College of Engineering</span>.
           </p>
           <p>
-            <span className="text-rose-400 font-semibold">Unauthorized copying, reproduction, modification,
+            <span className="text-rose-600 dark:text-rose-400 font-semibold">Unauthorized copying, reproduction, modification,
             distribution, or use of this platform or any part of it &mdash; in whole or in part &mdash;
             is strictly prohibited</span> without prior written permission from the author.
           </p>
@@ -197,23 +197,25 @@ export default function AboutPage({ onNavigate }: Props) {
           <p>
             Violations may be subject to legal action under applicable intellectual property laws.
           </p>
-          <div className="border-t border-zinc-800/80 pt-3 mt-3">
-            <p className="text-zinc-500">
-              For licensing inquiries, collaborations, or permissions:
-              {" "}<a href="mailto:ddhruvgnayak@gmail.com"
-                className="text-cyan-400 hover:text-cyan-300 transition-colors">
-                ddhruvgnayak@gmail.com
-              </a>
+          <div className="border-t border-slate-200 dark:border-zinc-800/80 pt-3 mt-3">
+            <p className="text-slate-500 dark:text-zinc-500">
+              For licensing inquiries, institutional partnerships, or club collaborations:
+              {" "}<button onClick={() => onNavigate("collaborations")} className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 underline underline-offset-2 transition-colors">
+                View Collaborations &amp; Partnerships
+              </button>
             </p>
           </div>
-          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-zinc-800/80">
-            <button onClick={() => onNavigate("privacy")} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors">
+          <div className="flex items-center gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-zinc-800/80 flex-wrap">
+            <button onClick={() => onNavigate("collaborations")} className="text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 transition-colors">
+              Collaborations
+            </button>
+            <button onClick={() => onNavigate("privacy")} className="text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 transition-colors">
               Privacy Policy
             </button>
-            <button onClick={() => onNavigate("terms")} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors">
+            <button onClick={() => onNavigate("terms")} className="text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 transition-colors">
               Terms &amp; Conditions
             </button>
-            <button onClick={() => onNavigate("refunds")} className="text-xs font-mono text-cyan-400 hover:text-cyan-300 transition-colors">
+            <button onClick={() => onNavigate("refunds")} className="text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 transition-colors">
               Refund Policy
             </button>
           </div>
@@ -221,21 +223,20 @@ export default function AboutPage({ onNavigate }: Props) {
       </div>
 
       {/* Contact */}
-      <div className="bg-zinc-900/50 border border-zinc-800/80 rounded-2xl p-6 mb-8">
-        <h2 className="font-semibold text-zinc-100 text-base mb-4 flex items-center gap-2">
-          <span className="text-cyan-400">✦</span> Contact & Support
+      <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-6 mb-8 shadow-xs">
+        <h2 className="font-semibold text-slate-900 dark:text-zinc-100 text-base mb-4 flex items-center gap-2">
+          <span className="text-cyan-600 dark:text-cyan-400">✦</span> Contact & Support
         </h2>
         <div className="space-y-3">
           {[
-            { label: "General enquiries", value: "ddhruvgnayak@gmail.com", href: "mailto:ddhruvgnayak@gmail.com", color: "#00E5FF" },
-            { label: "Instagram",         value: "@teamcodelocked",        href: "https://www.instagram.com/teamcodelocked/", color: "#f59e0b" },
-            { label: "GitHub",            value: "@Dhruv2991",            href: "https://github.com/Dhruv2991", color: "#e4e4e7" },
-          ].map(({ label, value, href, color }) => (
-            <div key={label} className="flex items-center justify-between py-2 border-b border-zinc-800/60 last:border-0">
-              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">{label}</span>
+            { label: "General enquiries", value: "ddhruvgnayak@gmail.com", href: "mailto:ddhruvgnayak@gmail.com", lightColor: "#0284c7", darkColor: "#00E5FF" },
+            { label: "Instagram",         value: "@teamcodelocked",        href: "https://www.instagram.com/teamcodelocked/", lightColor: "#d97706", darkColor: "#f59e0b" },
+            { label: "GitHub",            value: "@Dhruv2991",            href: "https://github.com/Dhruv2991", lightColor: "#334155", darkColor: "#e4e4e7" },
+          ].map(({ label, value, href, lightColor, darkColor }) => (
+            <div key={label} className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-zinc-800/60 last:border-0">
+              <span className="text-[10px] font-mono text-slate-500 dark:text-zinc-500 uppercase tracking-widest">{label}</span>
               <a href={href} target="_blank" rel="noopener noreferrer"
-                style={{ color }}
-                className="text-xs font-mono hover:opacity-80 transition-opacity">
+                className="text-xs font-mono text-slate-700 dark:text-zinc-200 hover:opacity-80 transition-opacity">
                 {value}
               </a>
             </div>
@@ -247,7 +248,7 @@ export default function AboutPage({ onNavigate }: Props) {
       <div className="text-center">
         <button
           onClick={() => onNavigate("home")}
-          className="text-xs font-mono text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="text-xs font-mono text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 transition-colors"
         >
           ← Back to home
         </button>

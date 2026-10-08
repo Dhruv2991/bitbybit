@@ -19,6 +19,7 @@ import Razorpay from 'razorpay';
 
 interface Body {
   purpose: 'subscription';
+  couponCode?: string;
 }
 
 async function getVerifiedUser(req: NextRequest) {
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     const { github, name, email } = authUser;
 
     const body: Body = await req.json();
-    const { purpose } = body;
+    const { purpose, couponCode } = body;
 
     if (purpose !== 'subscription') {
       return NextResponse.json({ error: 'Invalid purpose' }, { status: 400 });
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
-    let amountInr: number;
+    let baseAmount: number = 199;
     const notes: Record<string, string> = { type: purpose, github, name, email };
 
     // eslint-disable-next-line
@@ -74,12 +75,43 @@ export async function POST(req: NextRequest) {
       .eq('key', 'subscription_fee')
       .maybeSingle();
 
-    if (!config?.value) {
-      return NextResponse.json({ error: 'Subscription fee not configured' }, { status: 500 });
+    if (config?.value && !isNaN(Number(config.value))) {
+      baseAmount = Number(config.value);
     }
-    amountInr = Number(config.value);
 
-    if (!amountInr || amountInr <= 0) {
+    let finalAmount = baseAmount;
+
+    // Handle coupon verification securely server-side if couponCode provided
+    if (couponCode) {
+      const cleanCode = couponCode.trim().toUpperCase();
+      // eslint-disable-next-line
+      const { data: coupon, error: couponErr } = await (db.from('coupons') as any)
+        .select('*')
+        .eq('code', cleanCode)
+        .maybeSingle();
+
+      if (couponErr || !coupon) {
+        return NextResponse.json({ error: `Coupon code "${cleanCode}" is invalid` }, { status: 400 });
+      }
+
+      if (!coupon.is_active) {
+        return NextResponse.json({ error: `Coupon code "${cleanCode}" is inactive or expired` }, { status: 400 });
+      }
+
+      const discountVal = Number(coupon.discount_value) || 0;
+      let discountAmt = 0;
+      if (coupon.discount_type === 'percentage') {
+        discountAmt = Math.round(((baseAmount * discountVal) / 100) * 100) / 100;
+      } else {
+        discountAmt = Math.min(baseAmount, discountVal);
+      }
+
+      finalAmount = Math.max(1, Math.round((baseAmount - discountAmt) * 100) / 100);
+      notes.coupon_code = coupon.code;
+      notes.discount_applied = String(discountAmt);
+    }
+
+    if (!finalAmount || finalAmount <= 0) {
       return NextResponse.json({ error: 'Invalid amount configured' }, { status: 500 });
     }
 
@@ -89,7 +121,7 @@ export async function POST(req: NextRequest) {
     });
 
     const order = await razorpay.orders.create({
-      amount:   Math.round(amountInr * 100), // paise
+      amount:   Math.round(finalAmount * 100), // paise / cents
       currency: 'INR',
       notes,
       receipt: `${purpose}_${github}_${Date.now()}`.slice(0, 40),
@@ -100,6 +132,7 @@ export async function POST(req: NextRequest) {
       amount:   order.amount,
       currency: order.currency,
       keyId:    process.env.RAZORPAY_KEY_ID,
+      finalAmount,
     });
   } catch (err: any) {
     console.error('[/api/razorpay/create-order]', err);

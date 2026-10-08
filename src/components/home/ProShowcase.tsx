@@ -8,23 +8,20 @@ interface ProShowcaseProps {
   isSubscriber?: boolean;
 }
 
-/* ── Animated aurora blobs inside the CTA card ─────────────────────────── */
+/* ── Subtle ambient illumination inside the CTA card ─────────────────── */
 function AuroraBg() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
       <div
-        className="absolute -top-20 -left-20 w-64 h-64 rounded-full opacity-25 blur-3xl animate-pulse"
+        className="absolute -top-16 -left-16 w-56 h-56 rounded-full opacity-15 dark:opacity-20 blur-3xl pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, rgba(0,229,255,0.45) 0%, rgba(56,189,248,0.25) 55%, transparent 75%)',
-          animationDuration: '4s',
+          background: 'radial-gradient(circle, rgba(6,182,212,0.3) 0%, rgba(14,165,233,0.15) 60%, transparent 80%)',
         }}
       />
       <div
-        className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full opacity-20 blur-3xl"
+        className="absolute -bottom-16 -right-16 w-56 h-56 rounded-full opacity-10 dark:opacity-15 blur-3xl pointer-events-none"
         style={{
-          background: 'radial-gradient(circle, rgba(0,229,255,0.3) 0%, rgba(8,145,178,0.2) 60%, transparent 80%)',
-          animation: 'pulse 6s ease-in-out infinite',
-          animationDelay: '2s',
+          background: 'radial-gradient(circle, rgba(14,165,233,0.25) 0%, rgba(59,130,246,0.1) 60%, transparent 80%)',
         }}
       />
     </div>
@@ -65,19 +62,19 @@ function PerkCard({ icon, title, desc, badge, accentHex, spotlightColor, delay =
         transitionDelay: `${delay}ms`,
       }}
     >
-      <SpotlightCard spotlightColor={spotlightColor} className="p-5 rounded-2xl h-full group cursor-default flex flex-col gap-3.5">
+      <SpotlightCard spotlightColor={spotlightColor} className="p-5 rounded-2xl h-full group cursor-default flex flex-col gap-3.5 border border-slate-200/90 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/40">
         {/* Icon + badge */}
         <div className="flex items-start justify-between">
           <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-white/[0.07] group-hover:scale-105 transition-transform duration-200"
-            style={{ background: `${accentHex}1a` }}
+            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-slate-200/80 dark:border-white/[0.07] group-hover:scale-105 transition-transform duration-200"
+            style={{ background: `${accentHex}14` }}
           >
             {icon}
           </div>
           {badge && (
             <span
-              className="text-[10px] font-mono font-semibold tracking-widest uppercase px-2 py-0.5 rounded-full border"
-              style={{ color: accentHex, background: `${accentHex}14`, borderColor: `${accentHex}30` }}
+              className="text-[10px] font-mono font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full border"
+              style={{ color: accentHex, background: `${accentHex}10`, borderColor: `${accentHex}30` }}
             >
               {badge}
             </span>
@@ -85,10 +82,10 @@ function PerkCard({ icon, title, desc, badge, accentHex, spotlightColor, delay =
         </div>
 
         <div>
-          <h3 className="font-sans font-semibold text-[14px] text-zinc-100 mb-1.5 leading-snug group-hover:text-white transition-colors">
+          <h3 className="font-sans font-semibold text-[14px] text-slate-900 dark:text-zinc-100 mb-1.5 leading-snug group-hover:text-cyan-600 dark:group-hover:text-white transition-colors">
             {title}
           </h3>
-          <p className="text-[12px] text-zinc-400 leading-relaxed">{desc}</p>
+          <p className="text-[12px] text-slate-600 dark:text-zinc-400 leading-relaxed">{desc}</p>
         </div>
 
         {/* Hover accent bar */}
@@ -104,13 +101,13 @@ function PerkCard({ icon, title, desc, badge, accentHex, spotlightColor, delay =
 /* ── Comparison table row ───────────────────────────────────────────────── */
 function FeatureRow({ label, free, pro }: { label: string; free: string | boolean; pro: string | boolean }) {
   function Cell({ val }: { val: string | boolean }) {
-    if (val === true)  return <span className="text-emerald-400 text-[16px] leading-none font-semibold">✓</span>;
-    if (val === false) return <span className="text-zinc-600 text-[16px] leading-none">—</span>;
-    return <span className="text-[11px] font-mono text-zinc-300 text-center">{val}</span>;
+    if (val === true)  return <span className="text-emerald-600 dark:text-emerald-400 text-[15px] leading-none font-semibold">✓</span>;
+    if (val === false) return <span className="text-slate-400 dark:text-zinc-600 text-[15px] leading-none">—</span>;
+    return <span className="text-[11px] font-mono text-slate-700 dark:text-zinc-300 text-center font-medium">{val}</span>;
   }
   return (
-    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 py-2.5 border-b border-white/[0.04] last:border-0 px-2 -mx-2 rounded-lg hover:bg-white/[0.025] transition-colors group">
-      <span className="text-[13px] font-sans text-zinc-400 group-hover:text-zinc-200 transition-colors">{label}</span>
+    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-4 py-2.5 border-b border-slate-200/70 dark:border-white/[0.04] last:border-0 px-2 -mx-2 rounded-lg hover:bg-slate-100/60 dark:hover:bg-white/[0.025] transition-colors group">
+      <span className="text-[13px] font-sans text-slate-700 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">{label}</span>
       <div className="w-14 flex justify-center"><Cell val={free} /></div>
       <div className="w-14 flex justify-center"><Cell val={pro} /></div>
     </div>
@@ -123,19 +120,19 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
   const perks: PerkCardProps[] = [
     {
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#00E5FF" strokeWidth="1.7">
+        <svg className="w-5 h-5 text-cyan-600 dark:text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
           <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18" />
         </svg>
       ),
       title: 'Line-by-Line Logic Visualizer',
       desc: 'Step through every execution tick — variables, call stack, and stdout — to understand exactly why your code fails.',
       badge: 'Interactive',
-      accentHex: '#00E5FF',
-      spotlightColor: 'rgba(0,229,255,0.09)',
+      accentHex: '#0891b2',
+      spotlightColor: 'rgba(8,145,178,0.08)',
     },
     {
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.7">
+        <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
           <rect x="2" y="3" width="20" height="14" rx="2" />
           <path d="M8 21h8M12 17v4M7 8l2 2 4-4" />
         </svg>
@@ -143,24 +140,24 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
       title: 'BMSCE & CodeLocked Certificates',
       desc: 'Auto-generated PDFs with unique QR-verified IDs — officially recognized by BMSCE for activity points.',
       badge: 'Official',
-      accentHex: '#f59e0b',
-      spotlightColor: 'rgba(245,158,11,0.09)',
+      accentHex: '#d97706',
+      spotlightColor: 'rgba(217,119,6,0.08)',
     },
     {
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.7">
+        <svg className="w-5 h-5 text-sky-600 dark:text-sky-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
         </svg>
       ),
       title: 'Priority Arena Access',
       desc: 'Free contest entry, real-time leaderboard, and post-contest analytics — no separate fee, ever.',
       badge: 'Pro',
-      accentHex: '#38bdf8',
-      spotlightColor: 'rgba(56,189,248,0.09)',
+      accentHex: '#0284c7',
+      spotlightColor: 'rgba(2,132,199,0.08)',
     },
     {
       icon: (
-        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#00E5FF" strokeWidth="1.7">
+        <svg className="w-5 h-5 text-teal-600 dark:text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
           <path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
           <path d="m4.93 10.93 1.41 1.41M2 18h2M20 18h2m-1.93-7.07-1.41 1.41M22 22H2m6-4 4-10 4 10" />
         </svg>
@@ -168,8 +165,8 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
       title: 'Advanced AI Code Coach',
       desc: 'Higher daily limits for hints, code reviews, editorial generation, and approach validation — all powered by Groq LLM.',
       badge: 'AI Powered',
-      accentHex: '#00E5FF',
-      spotlightColor: 'rgba(0,229,255,0.09)',
+      accentHex: '#0d9488',
+      spotlightColor: 'rgba(13,148,136,0.08)',
     },
   ];
 
@@ -207,20 +204,20 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
       <div className="flex items-start sm:items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold tracking-widest uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold tracking-wider uppercase bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
               ✦ BitByBit Pro
             </span>
             {isSubscriber && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
                 Active
               </span>
             )}
           </div>
-          <h2 className="font-display font-medium text-base sm:text-lg text-zinc-100 tracking-tight">
+          <h2 className="font-display font-medium text-base sm:text-lg text-slate-900 dark:text-zinc-100 tracking-tight">
             Everything you need to level up
           </h2>
-          <p className="font-sans text-xs text-zinc-500 mt-0.5">₹39/month · cancel anytime · all features, no hidden fees</p>
+          <p className="font-sans text-xs text-slate-500 dark:text-zinc-500 mt-0.5">₹39/month · cancel anytime · all features, no hidden fees</p>
         </div>
 
         {/* Header CTA — only shown to non-subscribers */}
@@ -228,29 +225,19 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
           <button
             id="pro-upgrade-header-btn"
             onClick={() => onNavigate('subscribe')}
-            className="group relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono font-bold text-[13px] text-zinc-950 overflow-hidden shrink-0 hover:scale-[1.02] active:scale-[0.98] transition-transform duration-150"
-            style={{
-              background: 'linear-gradient(135deg, #00E5FF 0%, #0891b2 100%)',
-              boxShadow: '0 0 24px rgba(0,229,255,0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
-            }}
+            className="group relative inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono font-semibold text-[13px] text-white bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 dark:from-cyan-500 dark:dark:to-cyan-600 dark:text-slate-950 shadow-sm transition-all duration-150 shrink-0 active:scale-[0.98]"
           >
-            <svg className="w-3.5 h-3.5 shrink-0 text-zinc-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
             Upgrade to Pro
-            {/* Shimmer sweep */}
-            <span
-              aria-hidden="true"
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-              style={{ background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.2) 50%, transparent 65%)' }}
-            />
           </button>
         )}
 
         {isSubscriber && (
           <button
             onClick={() => onNavigate('profile')}
-            className="btn-ghost text-xs px-4 py-2 flex items-center gap-2 shrink-0"
+            className="btn-ghost text-xs px-4 py-2 flex items-center gap-2 shrink-0 border border-slate-200 dark:border-slate-800"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
@@ -272,15 +259,15 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
 
         {/* Comparison table */}
         <div className="lg:col-span-3">
-          <SpotlightCard spotlightColor="rgba(0,229,255,0.06)" className="p-5 sm:p-6 rounded-2xl h-full">
+          <SpotlightCard spotlightColor="rgba(8,145,178,0.05)" className="p-5 sm:p-6 rounded-2xl h-full border border-slate-200/90 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/40">
             {/* Table header */}
-            <div className="grid grid-cols-[1fr_auto_auto] gap-4 pb-2.5 mb-1 border-b border-white/[0.06]">
-              <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider font-semibold">Feature</span>
+            <div className="grid grid-cols-[1fr_auto_auto] gap-4 pb-2.5 mb-1 border-b border-slate-200/80 dark:border-white/[0.06]">
+              <span className="text-[11px] font-mono text-slate-500 dark:text-zinc-500 uppercase tracking-wider font-semibold">Feature</span>
               <div className="w-14 text-center">
-                <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider font-semibold">Free</span>
+                <span className="text-[11px] font-mono text-slate-500 dark:text-zinc-500 uppercase tracking-wider font-semibold">Free</span>
               </div>
               <div className="w-14 text-center">
-                <span className="text-[11px] font-mono text-cyan-400 uppercase tracking-wider font-semibold">Pro</span>
+                <span className="text-[11px] font-mono text-cyan-600 dark:text-cyan-400 uppercase tracking-wider font-semibold">Pro</span>
               </div>
             </div>
             {features.map((f) => (
@@ -291,20 +278,20 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
 
         {/* Pricing CTA card */}
         <div className="lg:col-span-2">
-          <SpotlightCard spotlightColor="rgba(0,229,255,0.12)" className="p-5 sm:p-6 rounded-2xl h-full flex flex-col relative overflow-hidden">
+          <SpotlightCard spotlightColor="rgba(8,145,178,0.08)" className="p-5 sm:p-6 rounded-2xl h-full flex flex-col relative overflow-hidden border border-slate-200/90 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/40">
             <AuroraBg />
 
             <div className="relative z-10 flex flex-col h-full">
               {/* Badge + price */}
               <div className="mb-5">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-mono text-cyan-400 font-semibold tracking-widest uppercase mb-4">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[10px] font-mono text-cyan-600 dark:text-cyan-400 font-semibold tracking-wider uppercase mb-4">
                   ✦ BitByBit Pro
                 </div>
                 <div className="flex items-end gap-1 mb-1">
-                  <span className="font-display font-bold text-5xl text-zinc-100 tracking-tight leading-none">₹39</span>
-                  <span className="text-zinc-400 font-sans text-sm mb-1.5">/month</span>
+                  <span className="font-display font-bold text-4xl sm:text-5xl text-slate-900 dark:text-zinc-100 tracking-tight leading-none">₹39</span>
+                  <span className="text-slate-500 dark:text-zinc-400 font-sans text-sm mb-1.5">/month</span>
                 </div>
-                <p className="text-xs text-zinc-500 font-sans">Billed monthly · cancel anytime</p>
+                <p className="text-xs text-slate-500 dark:text-zinc-500 font-sans">Billed monthly · cancel anytime</p>
               </div>
 
               {/* Feature list */}
@@ -318,7 +305,7 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
                 ].map((item) => (
                   <li key={item.text} className="flex items-center gap-2.5">
                     <span className="text-[15px] leading-none shrink-0">{item.icon}</span>
-                    <span className="text-[12.5px] font-sans text-zinc-300">{item.text}</span>
+                    <span className="text-[12.5px] font-sans text-slate-700 dark:text-zinc-300">{item.text}</span>
                   </li>
                 ))}
               </ul>
@@ -326,36 +313,25 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
               {/* CTA buttons */}
               <div className="flex flex-col gap-2.5">
                 {isSubscriber ? (
-                  <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/8 border border-emerald-500/20">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                    <span className="text-xs font-mono text-emerald-400 font-medium">Pro subscription is active</span>
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse shrink-0" />
+                    <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 font-medium">Pro subscription is active</span>
                   </div>
                 ) : (
                   <>
                     <button
                       id="pro-upgrade-cta"
                       onClick={() => onNavigate('subscribe')}
-                      className="group relative w-full py-3 rounded-xl font-mono font-bold text-sm text-zinc-950 overflow-hidden hover:scale-[1.015] active:scale-[0.98] transition-transform duration-150"
-                      style={{
-                        background: 'linear-gradient(135deg, #00E5FF 0%, #0891b2 100%)',
-                        boxShadow: '0 0 30px rgba(0,229,255,0.35), inset 0 1px 0 rgba(255,255,255,0.2)',
-                      }}
+                      className="w-full py-3 rounded-xl font-mono font-semibold text-sm text-white bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 dark:from-cyan-500 dark:to-cyan-600 dark:text-slate-950 shadow-sm transition-all duration-150 active:scale-[0.98] flex items-center justify-center gap-2"
                     >
-                      <span className="relative z-10 flex items-center justify-center gap-2">
-                        <svg className="w-4 h-4 text-zinc-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                        </svg>
-                        Get BitByBit Pro
-                      </span>
-                      <span
-                        aria-hidden="true"
-                        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-                        style={{ background: 'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.2) 50%, transparent 65%)' }}
-                      />
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                      </svg>
+                      Get BitByBit Pro
                     </button>
                     <button
                       onClick={() => onNavigate('subscribe')}
-                      className="w-full py-2.5 rounded-xl font-mono text-xs text-zinc-500 hover:text-zinc-300 border border-zinc-800/50 hover:border-zinc-700/60 bg-transparent hover:bg-zinc-800/30 transition-all"
+                      className="w-full py-2.5 rounded-xl font-mono text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 border border-slate-200 dark:border-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700 bg-transparent hover:bg-slate-100/60 dark:hover:bg-zinc-800/30 transition-all"
                     >
                       View pricing details →
                     </button>
@@ -369,4 +345,5 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
     </div>
   );
 }
+
 

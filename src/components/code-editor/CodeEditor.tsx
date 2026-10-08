@@ -53,12 +53,12 @@ export default function CodeEditor({
 
   useEffect(() => {
     const updateTheme = () => {
-      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-      setTheme(isLight ? 'vs' : 'vs-dark');
+      const isDark = document.documentElement.classList.contains('dark') || document.documentElement.getAttribute('data-theme') === 'dark';
+      setTheme(isDark ? 'vs-dark' : 'vs');
     };
     updateTheme();
     const observer = new MutationObserver(updateTheme);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
     return () => observer.disconnect();
   }, []);
 
@@ -110,7 +110,7 @@ export default function CodeEditor({
   }, [activeLine]);
 
   return (
-    <div className="rounded-xl overflow-hidden border border-[var(--border)] shadow-md bg-[#1e1e1e] relative">
+    <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-zinc-800 shadow-xs bg-white dark:bg-[#1e1e1e] relative">
       <style jsx global>{`
         .monaco-viz-active-line {
           background: rgba(0, 229, 255, 0.15) !important;
@@ -125,7 +125,7 @@ export default function CodeEditor({
         onMount={handleMount}
         onChange={(v) => onChange(v ?? '')}
         loading={
-          <div className="h-full flex items-center justify-center text-sm font-mono text-gray-400 bg-[#1e1e1e]">
+          <div className="h-full flex items-center justify-center text-sm font-mono text-slate-500 dark:text-zinc-400 bg-slate-50 dark:bg-[#1e1e1e]">
             Loading editor...
           </div>
         }

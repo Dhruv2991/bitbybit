@@ -21,13 +21,27 @@ import {
   buildRustTraceProgram,
 } from '@/lib/visualizerInstrumenter';
 
+export interface StackFrame {
+  id: string;
+  functionName: string;
+  line: number;
+  variables: Record<string, string>;
+  args?: Record<string, string>;
+}
+
 export interface ExecStep {
   /** 1-based line number in the user's original code */
-  line:      number;
+  line:          number;
   /** Snapshot of local variables at this step */
-  variables: Record<string, string>;
+  variables:     Record<string, string>;
   /** stdout captured up to this step */
-  stdout?:   string;
+  stdout?:       string;
+  /** Active call stack frames (deepest frame at top index 0) */
+  stack?:        StackFrame[];
+  /** Function name active at this step */
+  functionName?: string;
+  /** Event tag for this step */
+  event?:        'call' | 'return' | 'mutation' | 'step' | 'exception' | 'line';
 }
 
 export interface TraceResult {
@@ -194,14 +208,34 @@ def __safe_repr__(v):
 
 def __tracer__(frame, event, arg):
     if event == 'line' and frame.f_code.co_filename == '<user>':
-        snap = {}
-        for k, v in frame.f_locals.items():
-            if not k.startswith('__'):
-                snap[k] = __safe_repr__(v)
+        curr = frame
+        stack_frames = []
+        depth = 0
+        while curr and curr.f_code.co_filename == '<user>':
+            f_locals = {}
+            for k, v in curr.f_locals.items():
+                if not k.startswith('__'):
+                    f_locals[k] = __safe_repr__(v)
+            fn_name = curr.f_code.co_name
+            if fn_name == '<module>':
+                fn_name = 'global'
+            stack_frames.append({
+                'id': f"{fn_name}_{depth}_{curr.f_lineno}",
+                'functionName': fn_name,
+                'line': curr.f_lineno,
+                'variables': f_locals
+            })
+            curr = curr.f_back
+            depth += 1
+
+        top_frame = stack_frames[0] if stack_frames else None
         __trace_steps__.append({
             'line': frame.f_lineno,
-            'variables': snap,
+            'variables': top_frame['variables'] if top_frame else {},
+            'stack': stack_frames,
+            'functionName': top_frame['functionName'] if top_frame else 'global',
             'stdout': __cap_stdout__.getvalue(),
+            'event': event,
         })
     return __tracer__
 

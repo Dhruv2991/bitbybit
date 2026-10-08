@@ -56,23 +56,23 @@ export default function ProgressOverview({
   return (
     <SpotlightCard
       spotlightColor="rgba(16, 185, 129, 0.08)"
-      className="p-6 flex flex-col justify-between h-full hover:border-white/[0.15] transition-all"
+      className="p-6 flex flex-col justify-between h-full transition-all"
     >
       <div>
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-base text-zinc-100">
+          <h2 className="font-semibold text-base text-slate-900 dark:text-zinc-100">
             Your Progress
           </h2>
-          <span className="text-xs font-mono font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-mono font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-2 py-0.5 rounded-full">
             {overallPercent}% Solved
           </span>
         </div>
 
         {/* Overall Progress Bar */}
-        <div className="w-full bg-zinc-950/60 h-2 rounded-full overflow-hidden mb-5 border border-white/[0.06] flex">
+        <div className="w-full bg-slate-100 dark:bg-zinc-950/60 h-2 rounded-full overflow-hidden mb-5 border border-slate-200 dark:border-white/[0.06] flex">
           {loading ? (
-            <div className="w-full h-full bg-zinc-800 animate-pulse" />
+            <div className="w-full h-full bg-slate-200 dark:bg-zinc-800 animate-pulse" />
           ) : (
             <>
               <div
@@ -96,15 +96,15 @@ export default function ProgressOverview({
           {difficulties.map((d) => (
             <div key={d.label} className="space-y-1.5">
               <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-zinc-200 font-medium flex items-center gap-1.5">
+                <span className="text-slate-800 dark:text-zinc-200 font-medium flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${d.barClass}`} />
                   {d.label}
                 </span>
-                <span className="text-zinc-400 tabular-nums text-[11px]">
+                <span className="text-slate-500 dark:text-zinc-400 tabular-nums text-[11px]">
                   {loading ? '...' : `${d.solved} / ${d.total}`} ({d.percent}%)
                 </span>
               </div>
-              <div className="w-full bg-zinc-950/60 h-1.5 rounded-full overflow-hidden border border-white/[0.04]">
+              <div className="w-full bg-slate-100 dark:bg-zinc-950/60 h-1.5 rounded-full overflow-hidden border border-slate-200/80 dark:border-white/[0.04]">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${d.barClass}`}
                   style={{ width: `${d.percent}%` }}
@@ -116,13 +116,13 @@ export default function ProgressOverview({
       </div>
 
       {/* Footer */}
-      <div className="pt-4 mt-2 border-t border-white/[0.06] flex items-center justify-between">
-        <span className="text-[11px] font-mono text-zinc-500">
+      <div className="pt-4 mt-2 border-t border-slate-200 dark:border-white/[0.06] flex items-center justify-between">
+        <span className="text-[11px] font-mono text-slate-500 dark:text-zinc-500">
           {totalSolved} of {totalAvailable} problems
         </span>
         <button
           onClick={onExplore}
-          className="text-xs font-mono text-cyan-400 hover:text-cyan-300 font-medium transition-colors"
+          className="text-xs font-mono text-sky-600 dark:text-cyan-400 hover:text-sky-700 dark:hover:text-cyan-300 font-medium transition-colors"
         >
           View all →
         </button>

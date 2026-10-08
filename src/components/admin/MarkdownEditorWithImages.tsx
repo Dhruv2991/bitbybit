@@ -223,14 +223,14 @@ export default function MarkdownEditorWithImages({
     <div className="space-y-2">
       {/* ── Header Toolbar & Tabs ── */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-1 bg-zinc-950 border border-zinc-800 rounded-lg p-0.5">
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg p-0.5">
           <button
             type="button"
             onClick={() => setTab('write')}
             className={`px-3 py-1 rounded-md text-xs font-mono font-medium transition-all ${
               tab === 'write'
-                ? 'bg-zinc-800 text-zinc-100 shadow-xs'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 shadow-xs'
+                : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
             }`}
           >
             ✏️ Write (Markdown/HTML)
@@ -240,13 +240,13 @@ export default function MarkdownEditorWithImages({
             onClick={() => setTab('preview')}
             className={`px-3 py-1 rounded-md text-xs font-mono font-medium transition-all flex items-center gap-1.5 ${
               tab === 'preview'
-                ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-xs'
-                : 'text-zinc-400 hover:text-cyan-300'
+                ? 'bg-cyan-50 dark:bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/30 shadow-xs'
+                : 'text-slate-600 dark:text-zinc-400 hover:text-cyan-600 dark:hover:text-cyan-300'
             }`}
           >
             <span>👁️ Live Preview</span>
             {detectedImages.length > 0 && (
-              <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.2 rounded-full font-mono">
+              <span className="text-[10px] bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 px-1.5 py-0.2 rounded-full font-mono">
                 {detectedImages.length} img
               </span>
             )}
@@ -267,12 +267,12 @@ export default function MarkdownEditorWithImages({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="flex items-center gap-1 text-[11px] font-mono px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-700/80 text-zinc-300 hover:text-zinc-100 hover:border-cyan-500/60 disabled:opacity-50 transition-colors shadow-xs"
+            className="flex items-center gap-1 text-[11px] font-mono px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/80 text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-zinc-100 hover:border-cyan-500/60 disabled:opacity-50 transition-colors shadow-xs"
             title="Upload and insert image"
           >
             {uploading ? (
               <>
-                <span className="w-2.5 h-2.5 border border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                <span className="w-2.5 h-2.5 border border-cyan-500 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
                 <span>Uploading…</span>
               </>
             ) : (
@@ -289,7 +289,7 @@ export default function MarkdownEditorWithImages({
               onClick={onAiImprove}
               disabled={improvingAi || !value.trim()}
               className="flex items-center gap-1.5 text-[11px] font-mono px-2.5 py-1 rounded-lg
-                bg-purple-500/10 border border-purple-500/25 text-purple-400
+                bg-purple-500/10 border border-purple-500/25 text-purple-600 dark:text-purple-400
                 hover:bg-purple-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             >
               {improvingAi ? (
@@ -306,7 +306,7 @@ export default function MarkdownEditorWithImages({
       </div>
 
       {uploadError && (
-        <div className="text-[11px] text-rose-400 font-mono bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg">
+        <div className="text-[11px] text-rose-600 dark:text-rose-400 font-mono bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg">
           ⚠️ {uploadError}
         </div>
       )}
@@ -337,10 +337,10 @@ export default function MarkdownEditorWithImages({
               onPaste={handlePaste}
               rows={rows}
               placeholder={placeholder}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3.5 py-2.5 text-sm font-mono text-zinc-200 placeholder-zinc-600 resize-y focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/40 leading-relaxed"
+              className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg px-3.5 py-2.5 text-sm font-mono text-slate-900 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-600 resize-y focus:outline-none focus:border-cyan-500/60 focus:ring-1 focus:ring-cyan-500/40 leading-relaxed"
             />
 
-            <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono mt-1 px-1">
+            <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-zinc-500 font-mono mt-1 px-1">
               <span>💡 Tip: Paste (Ctrl+V) or Drag & Drop images directly into editor</span>
               <span>{value.length} characters</span>
             </div>
@@ -348,16 +348,16 @@ export default function MarkdownEditorWithImages({
 
           {/* Attached images gallery chip bar */}
           {detectedImages.length > 0 && (
-            <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-3 space-y-2">
+            <div className="bg-slate-50 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-xl p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-medium text-zinc-300 flex items-center gap-1.5">
+                <span className="text-xs font-mono font-medium text-slate-700 dark:text-zinc-300 flex items-center gap-1.5">
                   <span>🖼️</span>
                   <span>Attached Images ({detectedImages.length})</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setTab('preview')}
-                  className="text-[11px] font-mono text-cyan-400 hover:text-cyan-300 hover:underline"
+                  className="text-[11px] font-mono text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 hover:underline"
                 >
                   View in Live Preview →
                 </button>
@@ -367,11 +367,11 @@ export default function MarkdownEditorWithImages({
                 {detectedImages.map((img, idx) => (
                   <div
                     key={idx}
-                    className="flex items-center gap-2.5 p-2 rounded-lg bg-zinc-950/80 border border-zinc-800/80 hover:border-zinc-700 transition-colors group"
+                    className="flex items-center gap-2.5 p-2 rounded-lg bg-white dark:bg-zinc-950/80 border border-slate-200 dark:border-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700 transition-colors group"
                   >
                     <div
                       onClick={() => setPreviewModalImg(img)}
-                      className="w-12 h-12 rounded-md bg-zinc-900 border border-zinc-800 overflow-hidden shrink-0 cursor-pointer relative group-hover:ring-1 ring-cyan-500/50 flex items-center justify-center p-1"
+                      className="w-12 h-12 rounded-md bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 overflow-hidden shrink-0 cursor-pointer relative group-hover:ring-1 ring-cyan-500/50 flex items-center justify-center p-1"
                       title="Click to view full image"
                     >
                       <img
@@ -391,25 +391,25 @@ export default function MarkdownEditorWithImages({
                       />
                     </div>
                     <div className="flex-1 min-w-0 text-left">
-                      <p className="text-xs font-mono text-zinc-200 truncate font-medium">
+                      <p className="text-xs font-mono text-slate-800 dark:text-zinc-200 truncate font-medium">
                         {img.alt || 'Problem image'}
                       </p>
-                      <p className="text-[10px] font-mono text-zinc-500 truncate mt-0.5">
+                      <p className="text-[10px] font-mono text-slate-500 dark:text-zinc-500 truncate mt-0.5">
                         {img.src}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <button
                           type="button"
                           onClick={() => setPreviewModalImg(img)}
-                          className="text-[10px] font-mono text-cyan-400 hover:underline"
+                          className="text-[10px] font-mono text-cyan-600 dark:text-cyan-400 hover:underline"
                         >
                           Zoom
                         </button>
-                        <span className="text-zinc-700">·</span>
+                        <span className="text-slate-300 dark:text-zinc-700">·</span>
                         <button
                           type="button"
                           onClick={() => removeImageFromText(img.fullMatch)}
-                          className="text-[10px] font-mono text-rose-400 hover:underline"
+                          className="text-[10px] font-mono text-rose-500 dark:text-rose-400 hover:underline"
                         >
                           Remove
                         </button>
@@ -422,16 +422,16 @@ export default function MarkdownEditorWithImages({
           )}
         </div>
       ) : (
-        <div className="bg-zinc-950/90 border border-zinc-800 rounded-xl p-5 max-h-[600px] overflow-y-auto space-y-4">
-          <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2 mb-2">
-            <span className="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+        <div className="bg-white dark:bg-zinc-950/90 border border-slate-200 dark:border-zinc-800 rounded-xl p-5 max-h-[600px] overflow-y-auto space-y-4">
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800/60 pb-2 mb-2">
+            <span className="text-xs font-mono text-slate-600 dark:text-zinc-400 flex items-center gap-1.5">
               <span>👁️</span>
               <span>LeetCode-Grade Problem Description Preview</span>
             </span>
             <button
               type="button"
               onClick={() => setTab('write')}
-              className="text-xs font-mono text-cyan-400 hover:underline"
+              className="text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:underline"
             >
               ← Back to Edit
             </button>
@@ -447,22 +447,22 @@ export default function MarkdownEditorWithImages({
           onClick={() => setPreviewModalImg(null)}
         >
           <div
-            className="relative max-w-3xl w-full bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl p-4 space-y-3"
+            className="relative max-w-3xl w-full bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-2xl p-4 space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-              <span className="text-xs font-mono text-zinc-300 font-semibold truncate">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-zinc-800 pb-2">
+              <span className="text-xs font-mono text-slate-900 dark:text-zinc-300 font-semibold truncate">
                 {previewModalImg.alt || 'Uploaded Image Preview'}
               </span>
               <button
                 type="button"
                 onClick={() => setPreviewModalImg(null)}
-                className="text-xs font-mono px-2 py-1 bg-zinc-800 text-zinc-400 hover:text-white rounded-md"
+                className="text-xs font-mono px-2 py-1 bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white rounded-md"
               >
                 ✕ Close
               </button>
             </div>
-            <div className="max-h-[70vh] overflow-auto flex items-center justify-center bg-zinc-900/50 rounded-xl p-2 border border-zinc-800/60">
+            <div className="max-h-[70vh] overflow-auto flex items-center justify-center bg-slate-50 dark:bg-zinc-900/50 rounded-xl p-2 border border-slate-200 dark:border-zinc-800/60">
               <img
                 src={previewModalImg.src}
                 alt={previewModalImg.alt}
@@ -478,14 +478,14 @@ export default function MarkdownEditorWithImages({
                 }}
               />
             </div>
-            <div className="flex items-center justify-between text-xs font-mono text-zinc-400 pt-1">
+            <div className="flex items-center justify-between text-xs font-mono text-slate-500 dark:text-zinc-400 pt-1">
               <span className="truncate flex-1 mr-2">{previewModalImg.src}</span>
               <button
                 type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(`![${previewModalImg.alt}](${previewModalImg.src})`);
                 }}
-                className="text-xs font-mono text-cyan-400 hover:underline shrink-0"
+                className="text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:underline shrink-0"
               >
                 📋 Copy Markdown Tag
               </button>

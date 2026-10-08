@@ -1242,26 +1242,26 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
         {(problem.test_cases || []).length > 0 && (
           <div className="mt-7">
-            <div className="text-xs text-zinc-300 font-mono mb-3 uppercase tracking-widest flex items-center gap-2 font-semibold">
-              <span className="text-cyan-400">🧪</span>
+            <div className="text-xs text-slate-700 dark:text-zinc-300 font-mono mb-3 uppercase tracking-widest flex items-center gap-2 font-semibold">
+              <span className="text-cyan-600 dark:text-cyan-400">🧪</span>
               <span>Sample Test Cases</span>
             </div>
             <div className="space-y-3">
               {problem.test_cases.slice(0, 3).map((tc, i) => (
-                <div key={i} className="bg-zinc-900/70 border border-zinc-800/90 rounded-xl p-3.5 text-sm font-mono hover:border-zinc-700 transition-colors shadow-2xs">
+                <div key={i} className="bg-slate-50/70 dark:bg-zinc-900/70 border border-slate-200 dark:border-zinc-800/90 rounded-xl p-3.5 text-sm font-mono hover:border-slate-300 dark:hover:border-zinc-700 transition-colors shadow-2xs">
                   <div className="flex items-baseline gap-2.5">
-                    <span className="text-zinc-400 font-sans font-semibold text-xs w-16 shrink-0 select-none">Input:</span>
-                    <code className="text-zinc-100 break-all flex-1 text-sm leading-relaxed">{formatTestCaseInput(tc.input, problem)}</code>
+                    <span className="text-slate-500 dark:text-zinc-400 font-sans font-semibold text-xs w-16 shrink-0 select-none">Input:</span>
+                    <code className="text-slate-900 dark:text-zinc-100 break-all flex-1 text-sm leading-relaxed">{formatTestCaseInput(tc.input, problem)}</code>
                   </div>
-                  <div className="flex items-baseline gap-2.5 mt-2 pt-2 border-t border-zinc-800/50">
-                    <span className="text-zinc-400 font-sans font-semibold text-xs w-16 shrink-0 select-none">Output:</span>
-                    <code className="text-emerald-300 font-semibold break-all flex-1 text-sm leading-relaxed">{tc.expected}</code>
+                  <div className="flex items-baseline gap-2.5 mt-2 pt-2 border-t border-slate-200 dark:border-zinc-800/50">
+                    <span className="text-slate-500 dark:text-zinc-400 font-sans font-semibold text-xs w-16 shrink-0 select-none">Output:</span>
+                    <code className="text-emerald-700 dark:text-emerald-300 font-semibold break-all flex-1 text-sm leading-relaxed">{tc.expected}</code>
                   </div>
                 </div>
               ))}
               {problem.test_cases.length > 3 && (
-                <div className="text-sm text-zinc-400 font-mono pl-1 pt-1 flex items-center gap-1.5">
-                  <span className="text-zinc-500">🔒</span>
+                <div className="text-sm text-slate-500 dark:text-zinc-400 font-mono pl-1 pt-1 flex items-center gap-1.5">
+                  <span className="text-slate-400 dark:text-zinc-500">🔒</span>
                   <span>+{problem.test_cases.length - 3} hidden test cases (tested on submission)</span>
                 </div>
               )}
@@ -1459,14 +1459,14 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         <div className="flex gap-2">
           <button onClick={() => { setMobileTab('editor'); runTests(); }} disabled={running}
             title={`Run tests (${shortcutLabel('Enter')})`}
-            className="flex-1 py-2.5 bg-[var(--bg2)] border border-[var(--card)] hover:border-[rgba(var(--acc-rgb),0.125)]
-              text-[var(--acc)] font-mono text-sm font-bold rounded-xl transition-all duration-200 hover:bg-[rgba(var(--acc-rgb),0.02)]
-              disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            className="flex-1 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:border-cyan-500/50 dark:hover:border-cyan-500/50
+              text-cyan-700 dark:text-cyan-400 font-mono text-sm font-bold rounded-xl transition-all duration-200 hover:bg-cyan-50/50 dark:hover:bg-cyan-500/10
+              disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-xs active:scale-[0.99]">
             {running ? (
               <span className="flex items-center gap-2">
-                <span className="w-3.5 h-3.5 border-2 border-[var(--acc)] border-t-transparent rounded-full animate-spin" />
+                <span className="w-3.5 h-3.5 border-2 border-cyan-600 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
                 {runStatus || 'Running…'}
-                {progress && <span className="text-[rgba(var(--acc-rgb),0.251)] text-xs">{progress.done}/{progress.total}</span>}
+                {progress && <span className="text-slate-400 dark:text-zinc-500 text-xs">{progress.done}/{progress.total}</span>}
               </span>
             ) : '▶ Run Tests'}
           </button>
@@ -1480,25 +1480,25 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
               className={`px-3.5 py-2.5 rounded-xl font-mono text-xs font-bold border transition-all duration-200
                 flex items-center gap-1.5 shrink-0
                 ${vizLoading
-                  ? 'bg-cyan-500/10 border-cyan-500/20 text-cyan-300 cursor-wait'
+                  ? 'bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/20 text-cyan-700 dark:text-cyan-300 cursor-wait'
                   : isSubscriber
-                    ? 'bg-cyan-500/10 border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/20 hover:border-cyan-400/40 shadow-xs'
-                    : 'bg-zinc-900 border-zinc-700/60 text-zinc-300 hover:text-white hover:border-zinc-500'}`}
+                    ? 'bg-cyan-50 dark:bg-cyan-500/10 border-cyan-200 dark:border-cyan-500/25 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-500/20 hover:border-cyan-300 dark:hover:border-cyan-400/40 shadow-xs'
+                    : 'bg-slate-100 dark:bg-zinc-900 border-slate-200 dark:border-zinc-700/60 text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white hover:border-slate-300 dark:hover:border-zinc-500 shadow-xs'}`}
             >
               {vizLoading ? (
                 <>
-                  <span className="w-3 h-3 border-[1.5px] border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="w-3 h-3 border-[1.5px] border-cyan-600 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
                   {vizProgress || 'Tracing…'}
                 </>
               ) : (
                 <>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5 text-cyan-400">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400">
                     <circle cx="11" cy="11" r="8" />
                     <path d="M21 21l-4.35-4.35" />
                     <path d="M11 8v6M8 11h6" />
                   </svg>
                   <span>Visualize</span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/20 font-bold">
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-500/15 text-cyan-800 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-500/20 font-bold">
                     {getVisualizerQuota(isSubscriber, user?.github).remaining}
                   </span>
                 </>
@@ -1508,7 +1508,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         </div>
 
         {runError && (
-          <div className="text-xs text-[var(--warn)] font-mono bg-[rgba(var(--warn-rgb),0.031)] border border-[rgba(var(--warn-rgb),0.094)] rounded-xl px-3.5 py-2.5">
+          <div className="text-xs text-amber-700 dark:text-amber-400 font-mono bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl px-3.5 py-2.5">
             ⚠ {runError}
           </div>
         )}
@@ -1545,19 +1545,19 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
         {/* Approach field + validator */}
         {!onArenaSubmit && !isWeekly && !practiceMode && (
-          <div className="card p-4">
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs text-[var(--text3)] font-mono uppercase tracking-widest font-semibold">
-                Approach or GitHub PR link <span className="text-[var(--danger)] font-bold">* (required)</span>
+          <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800 rounded-2xl p-4 shadow-xs space-y-3">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs text-slate-700 dark:text-zinc-300 font-mono uppercase tracking-widest font-semibold">
+                Approach or GitHub PR link <span className="text-rose-600 dark:text-rose-400 font-bold">* (required)</span>
               </label>
-              <span className="text-xs font-mono text-[var(--muted)]">Required to submit</span>
+              <span className="text-xs font-mono text-slate-400 dark:text-zinc-500">Required to submit</span>
             </div>
             <textarea value={approach} onChange={e => { setApproach(e.target.value); setApproachResult(null); }}
               placeholder="Describe your approach before writing code — e.g. I'll use a hashmap to store each number's complement… (required to submit)" rows={3}
-              className="w-full bg-[var(--bg2)] border border-[var(--card)] rounded-xl px-3.5 py-2.5
-                text-[var(--text)] text-sm md:text-base font-mono placeholder-[var(--border2)] resize-none
-                focus:outline-none focus:border-[rgba(var(--acc-rgb),0.188)] transition-colors" />
-            <p className="text-xs text-[var(--muted2)] font-mono mt-1 mb-2">
+              className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl px-3.5 py-2.5
+                text-slate-900 dark:text-zinc-100 text-sm md:text-base font-mono placeholder-slate-400 dark:placeholder-zinc-600 resize-none
+                focus:outline-none focus:border-cyan-500/80 transition-colors" />
+            <p className="text-xs text-slate-500 dark:text-zinc-400 font-mono mt-1 mb-2">
               Describe your approach or link a GitHub PR (required to submit your solution).
             </p>
             <ApproachPanel
@@ -1570,18 +1570,22 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         )}
 
         {!onArenaSubmit && (
-          <div className="text-xs text-[var(--text3)] font-mono px-1 animate-fade-in">{statusMsg}</div>
+          <div className="text-xs text-slate-500 dark:text-zinc-400 font-mono px-1 animate-fade-in">{statusMsg}</div>
         )}
 
         <button onClick={submitSolution}
           title={`Submit (${shortcutLabel('Enter', true)})`}
           disabled={submitting || submitBlocked || !user || (!!isWeekly && !testResult && !practiceMode) || (!!practiceMode && !testResult)}
-          className={`w-full py-3 rounded-xl font-mono font-bold text-sm transition-all
-            ${submitBlocked || !user ? 'bg-[var(--border)] text-[var(--muted2)] cursor-not-allowed border border-[var(--border)]'
-            : (isWeekly || practiceMode) && !testResult ? 'bg-[var(--border)] text-[var(--muted2)] cursor-not-allowed border border-[var(--border)]'
-            : submitting ? 'bg-[rgba(var(--acc-rgb),0.188)] text-[rgba(var(--acc-rgb),0.376)] cursor-not-allowed'
-            : practiceMode ? 'bg-[rgba(var(--purple-rgb),0.063)] text-[var(--purple)] border border-[rgba(var(--purple-rgb),0.125)] hover:bg-[rgba(var(--purple-rgb),0.094)]'
-            : 'btn-primary'}`}>
+          className={`w-full py-3 rounded-xl font-mono font-bold text-sm transition-all duration-150
+            ${submitBlocked || !user
+              ? 'bg-slate-100 text-slate-400 dark:bg-zinc-800/60 dark:text-zinc-500 cursor-not-allowed border border-slate-200 dark:border-zinc-800'
+              : (isWeekly || practiceMode) && !testResult
+              ? 'bg-slate-100 text-slate-400 dark:bg-zinc-800/60 dark:text-zinc-500 cursor-not-allowed border border-slate-200 dark:border-zinc-800'
+              : submitting
+              ? 'bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 cursor-wait border border-cyan-500/30'
+              : practiceMode
+              ? 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20 hover:bg-purple-100 dark:hover:bg-purple-500/20'
+              : 'bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 shadow-md hover:shadow-lg dark:shadow-cyan-950/40 active:scale-[0.99] border border-cyan-500/30 dark:border-cyan-400/40'}`}>
           {!user                      ? 'Sign in to submit'           :
            submitBlocked              ? 'Already submitted'           :
            (isWeekly || practiceMode) && !testResult ? '▶ Run tests first' :

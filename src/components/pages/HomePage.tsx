@@ -9,7 +9,6 @@ import WelcomeHero from '@/components/home/WelcomeHero';
 import DashboardMetrics from '@/components/home/DashboardMetrics';
 import ProblemOfTheDay from '@/components/home/ProblemOfTheDay';
 import ProgressOverview from '@/components/home/ProgressOverview';
-import ContinueLearning from '@/components/home/ContinueLearning';
 import RecentActivity from '@/components/home/RecentActivity';
 import LeaderboardPreview from '@/components/home/LeaderboardPreview';
 import QuickActions from '@/components/home/QuickActions';
@@ -19,23 +18,6 @@ interface HomePageProps {
   user: User | null;
   onNavigate: (page: any) => void;
 }
-
-const TOPIC_ICONS: Record<string, string> = {
-  Arrays: '📦',
-  'Arrays & Matrix': '📦',
-  Strings: '🔤',
-  'Linked List': '🔗',
-  'Trees & BST': '🌳',
-  Trees: '🌳',
-  Graphs: '🕸️',
-  'Dynamic Programming': '⚡',
-  DP: '⚡',
-  'Binary Search': '🔍',
-  Math: '📐',
-  Recursion: '🔄',
-  Greedy: '🎯',
-  'Bit Manipulation': '💻',
-};
 
 export default function HomePage({ user, onNavigate }: HomePageProps) {
   const [loading, setLoading] = useState(true);
@@ -62,9 +44,6 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
     medium: { solved: 0, total: 0 },
     hard: { solved: 0, total: 0 },
   });
-
-  // Topics & Continue Learning
-  const [topics, setTopics] = useState<any[]>([]);
 
   // Recent Activity
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
@@ -271,45 +250,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
         hard: { solved: userHardSolved, total: hardTotal },
       });
 
-      // 4. Topic-based progress calculation
-      const topicMap = new Map<string, { total: number; solved: number }>();
-      const defaultTopics = ['Arrays', 'Strings', 'Trees', 'Graphs', 'Dynamic Programming', 'Linked List', 'Binary Search', 'Recursion'];
-      for (const t of defaultTopics) topicMap.set(t, { total: 0, solved: 0 });
-
-      for (const p of regularProblems) {
-        const tags = p.tags || [];
-        for (const tag of tags) {
-          const normalizedTag =
-            tag.includes('Array') ? 'Arrays' :
-            tag.includes('String') ? 'Strings' :
-            tag.includes('Tree') ? 'Trees' :
-            tag.includes('Graph') ? 'Graphs' :
-            tag.includes('DP') || tag.includes('Dynamic') ? 'Dynamic Programming' :
-            tag.includes('Linked') ? 'Linked List' :
-            tag.includes('Binary Search') ? 'Binary Search' :
-            tag;
-
-          const stat = topicMap.get(normalizedTag) || { total: 0, solved: 0 };
-          stat.total += 1;
-          if (solvedProblemIds.has(p.id)) stat.solved += 1;
-          topicMap.set(normalizedTag, stat);
-        }
-      }
-
-      const formattedTopics = Array.from(topicMap.entries())
-        .filter(([_, stat]) => stat.total > 0)
-        .slice(0, 8)
-        .map(([name, stat]) => ({
-          id: name.toLowerCase().replace(/\s+/g, '-'),
-          name,
-          solved: stat.solved,
-          total: stat.total,
-          icon: TOPIC_ICONS[name] || '📌',
-        }));
-
-      setTopics(formattedTopics);
-
-      // 5. Leaderboard Top 5 & User Rank
+      // 4. Leaderboard Top 5 & User Rank
       const [{ data: normalAll }, { data: arenaAll }, { data: weeklyAll }, { data: membersAll }] =
         await Promise.all([
           db.from('submissions').select('github, name, points_awarded, problem_id').eq('status', 'approved').limit(4000),
@@ -373,11 +314,6 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
     onNavigate('problems');
   }
 
-  // Handle topic click
-  function handleSelectTopic(topicName: string) {
-    onNavigate('problems');
-  }
-
   return (
     <div className="space-y-8 animate-fade-up">
       {/* 1. Welcome & Personalized Hero */}
@@ -422,15 +358,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
         </div>
       </div>
 
-      {/* 4. Continue Learning (Topic tracks) */}
-      <ContinueLearning
-        topics={topics}
-        loading={loading}
-        onSelectTopic={handleSelectTopic}
-        onViewAllTopics={() => onNavigate('problems')}
-      />
-
-      {/* 5. BitByBit Pro Showcase & Comparison */}
+      {/* 4. BitByBit Pro Showcase & Comparison */}
       <ProShowcase
         onNavigate={onNavigate}
         isSubscriber={user?.is_subscriber}

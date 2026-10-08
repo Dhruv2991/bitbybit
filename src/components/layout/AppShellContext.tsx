@@ -10,7 +10,7 @@ import { isActiveSubscription } from "@/lib/subscription";
 
 export type PageId =
   | "home" | "problems" | "leaderboard" | "arena" | "weekly"
-  | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe";
+  | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe" | "collaborations";
 
 export type ToastType = "ok" | "err" | "warn" | "info";
 export interface Toast { id: number; msg: string; type: ToastType; }
@@ -34,12 +34,14 @@ export const ROUTE_TO_PAGE: Record<string, PageId> = {
   "/refunds": "refunds",
   "/profile": "profile",
   "/subscribe": "subscribe",
+  "/collaborations": "collaborations",
 };
 
 export const PAGE_TO_ROUTE: Record<PageId, string> = {
   home: "/", problems: "/problems", leaderboard: "/leaderboard", arena: "/arena",
   weekly: "/weekly", admin: "/admin", about: "/about", privacy: "/privacy",
   terms: "/terms", refunds: "/refunds", profile: "/profile", subscribe: "/subscribe",
+  collaborations: "/collaborations",
 };
 
 interface AppShellContextValue {
@@ -127,19 +129,38 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [liveItems, setLiveItems] = useState<LiveItem[]>([]);
   const [userStreak, setUserStreak] = useState(0);
-  const [theme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   const toastCounter = useRef(0);
   const resolving = useRef(false);
 
+  // Sync theme with localStorage & system preference on mount
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", "dark");
-    document.documentElement.classList.remove("light");
-    document.documentElement.classList.add("dark");
+    try {
+      const stored = localStorage.getItem("bb_theme") as "dark" | "light" | null;
+      const initial = stored || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "dark");
+      setTheme(initial);
+      applyThemeToDOM(initial);
+    } catch {}
   }, []);
 
+  function applyThemeToDOM(t: "dark" | "light") {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    root.classList.remove("dark", "light");
+    root.classList.add(t);
+    root.setAttribute("data-theme", t);
+  }
+
   function toggleTheme() {
-    // Light mode removed permanently per design requirements
+    setTheme((prev) => {
+      const next = prev === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem("bb_theme", next);
+      } catch {}
+      applyThemeToDOM(next);
+      return next;
+    });
   }
 
   function showToast(msg: string, type: ToastType = "info") {

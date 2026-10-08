@@ -42,12 +42,12 @@ function ShareButton() {
           setTimeout(() => setCopied(false), 2000);
         });
       }}
-      className="flex items-center gap-2 px-3 py-2 bg-zinc-900/60 border border-zinc-800/80
-        rounded-xl font-mono text-xs text-zinc-400 hover:text-zinc-200 hover:border-zinc-700
-        transition-all duration-150"
+      className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80
+        rounded-xl font-mono text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-zinc-700
+        transition-all duration-150 shadow-xs"
     >
       {copied ? (
-        <><span className="text-emerald-400">✓</span><span className="text-emerald-400">Link copied</span></>
+        <><span className="text-emerald-600 dark:text-emerald-400">✓</span><span className="text-emerald-600 dark:text-emerald-400">Link copied</span></>
       ) : (
         <><span>🔗</span><span>Share</span></>
       )}
@@ -489,13 +489,13 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
 
       {/* Locked toast — unpaid */}
       {lockedToast && (
-        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-zinc-900 border border-amber-500/30 rounded-xl font-mono text-sm shadow-xl max-w-xs animate-slide-down backdrop-blur-xl">
+        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-white dark:bg-slate-900 border border-amber-500/40 rounded-xl font-mono text-sm shadow-xl max-w-xs animate-slide-down backdrop-blur-xl">
           <span className="text-lg">🔒</span>
           <div>
-            <p className="text-amber-400 font-semibold text-xs">Subscriber-only Problem</p>
-            <p className="text-zinc-400 text-[11px] mt-0.5">
+            <p className="text-amber-600 dark:text-amber-400 font-semibold text-xs">Subscriber-only Problem</p>
+            <p className="text-slate-600 dark:text-zinc-400 text-[11px] mt-0.5">
               <button onClick={() => { setLockedToast(false); onNavigate('weekly'); }}
-                className="text-cyan-400 underline underline-offset-2 hover:text-cyan-300">
+                className="text-cyan-600 dark:text-cyan-400 underline underline-offset-2 hover:opacity-80">
                 Subscribe ⭐
               </button>
               {' '}to unlock all weekly challenges.
@@ -506,11 +506,11 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
 
       {/* Not-started toast — paid but waiting */}
       {notStartedToast && (
-        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-zinc-900 border border-cyan-500/30 rounded-xl font-mono text-sm shadow-xl max-w-xs animate-slide-down backdrop-blur-xl">
+        <div className="fixed top-20 right-4 z-[200] flex items-center gap-2.5 px-4 py-3 bg-white dark:bg-slate-900 border border-cyan-500/40 rounded-xl font-mono text-sm shadow-xl max-w-xs animate-slide-down backdrop-blur-xl">
           <span className="text-lg">⏳</span>
           <div>
-            <p className="text-cyan-400 font-semibold text-xs">Not Started Yet</p>
-            <p className="text-zinc-400 text-[11px] mt-0.5">{notStartedToast}</p>
+            <p className="text-cyan-600 dark:text-cyan-400 font-semibold text-xs">Not Started Yet</p>
+            <p className="text-slate-600 dark:text-zinc-400 text-[11px] mt-0.5">{notStartedToast}</p>
           </div>
         </div>
       )}
@@ -532,13 +532,13 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           <div className="flex items-center gap-2">
             {/* Tab switcher — only for logged-in users */}
             {user && (
-              <div className="flex bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-1 gap-1">
+              <div className="flex bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-xl p-1 gap-1 shadow-xs">
                 <button
                   onClick={() => handleTabChange('problems')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all
                     ${pageView === 'problems'
-                      ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200'}`}
+                      ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30 shadow-xs'
+                      : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'}`}
                 >
                   Problems
                 </button>
@@ -546,8 +546,8 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                   onClick={() => handleTabChange('submissions')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all
                     ${pageView === 'submissions'
-                      ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-xs'
-                      : 'text-zinc-400 hover:text-zinc-200'}`}
+                      ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30 shadow-xs'
+                      : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'}`}
                 >
                   My Submissions
                 </button>
@@ -562,19 +562,19 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         <div className="flex flex-col sm:flex-row gap-3">
           {/* Search */}
           <div className="relative flex-1">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs pointer-events-none">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 text-xs pointer-events-none">🔍</span>
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search problems or tags…"
-              className="w-full bg-zinc-950/40 backdrop-blur-md border border-white/[0.08] rounded-xl pl-8 pr-10 py-2
-                text-sm font-mono text-zinc-200 placeholder-zinc-500
-                focus:outline-none focus:border-white/[0.18] transition-colors shadow-xs"
+              className="w-full bg-white dark:bg-slate-950/40 backdrop-blur-md border border-slate-200 dark:border-white/[0.08] rounded-xl pl-8 pr-10 py-2
+                text-sm font-mono text-slate-900 dark:text-zinc-200 placeholder-slate-400 dark:placeholder-zinc-500
+                focus:outline-none focus:border-cyan-500/40 dark:focus:border-white/[0.18] transition-colors shadow-xs"
             />
             {search && (
               <button
                 onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 text-xs transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 hover:text-slate-700 dark:hover:text-zinc-300 text-xs transition-colors"
               >
                 ✕
               </button>
@@ -589,11 +589,11 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                 <button key={d} onClick={() => setFilter(d)}
                   className={`px-3 py-2 rounded-xl text-xs font-mono font-medium transition-all duration-150 flex items-center gap-1.5 border
                     ${filter === d
-                      ? d === 'Easy'   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-medium'
-                      : d === 'Medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 font-medium'
-                      : d === 'Hard'   ? 'bg-rose-500/10 text-rose-400 border-rose-500/30 font-medium'
-                      : 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30 font-medium shadow-xs'
-                      : 'bg-zinc-900/50 border-zinc-800/80 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700/80 shadow-xs'}`}>
+                      ? d === 'Easy'   ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-medium'
+                      : d === 'Medium' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 font-medium'
+                      : d === 'Hard'   ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 font-medium'
+                      : 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border-cyan-500/30 font-medium shadow-xs'
+                      : 'bg-slate-100 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800/80 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-zinc-700/80 shadow-xs'}`}>
                   {d === 'all' ? 'All' : d}
                   {count > 0 && (
                     <span className="opacity-60 text-[10px] tabular-nums">{count}</span>
@@ -604,7 +604,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           </div>
 
           {/* Free vs Weekly (paid) filter */}
-          <div className="flex bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-1 gap-1 shrink-0">
+          <div className="flex bg-slate-100 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-xl p-1 gap-1 shrink-0 shadow-xs">
             {([
               { id: 'all',    label: 'All' },
               { id: 'free',   label: '🔓 Free' },
@@ -613,8 +613,8 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               <button key={opt.id} onClick={() => setAccessFilter(opt.id)}
                 className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-150 whitespace-nowrap
                   ${accessFilter === opt.id
-                    ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-xs'
-                    : 'text-zinc-400 hover:text-zinc-200 border border-transparent'}`}>
+                    ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30 shadow-xs'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 border border-transparent'}`}>
                 {opt.label}
               </button>
             ))}
@@ -625,13 +625,13 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
             <select
               value={allTags.includes(filter) ? filter : ''}
               onChange={e => setFilter(e.target.value || 'all')}
-              className="shrink-0 bg-zinc-900/40 backdrop-blur-md border border-white/[0.08] rounded-xl px-3 py-2
-                text-xs font-mono text-zinc-400 focus:outline-none focus:border-white/[0.18] transition-colors
-                hover:text-zinc-200 hover:border-white/[0.14] cursor-pointer shadow-xs"
+              className="shrink-0 bg-white dark:bg-zinc-900/40 backdrop-blur-md border border-slate-200 dark:border-white/[0.08] rounded-xl px-3 py-2
+                text-xs font-mono text-slate-700 dark:text-zinc-400 focus:outline-none focus:border-cyan-500/40 dark:focus:border-white/[0.18] transition-colors
+                hover:text-slate-900 dark:hover:text-zinc-200 hover:border-slate-300 dark:hover:border-white/[0.14] cursor-pointer shadow-xs"
             >
-              <option value="" className="bg-zinc-900 text-zinc-400">#tag</option>
+              <option value="" className="bg-white dark:bg-zinc-900 text-slate-600 dark:text-zinc-400">#tag</option>
               {allTags.map(tag => (
-                <option key={tag} value={tag} className="bg-zinc-900 text-zinc-200">#{tag}</option>
+                <option key={tag} value={tag} className="bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-200">#{tag}</option>
               ))}
             </select>
           )}
@@ -640,25 +640,25 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       </div>
 
       {pageView === 'problems' && (recLoading || recommended.length > 0) && (
-        <div className="mb-6 px-5 py-4 bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl">
+        <div className="mb-6 px-5 py-4 bg-slate-100/70 dark:bg-zinc-900/40 backdrop-blur-xl border border-slate-200 dark:border-white/[0.06] rounded-2xl">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-sm text-cyan-400">✦</span>
-            <span className="text-xs font-mono font-medium text-cyan-400 uppercase tracking-wider">Based on your activity</span>
+            <span className="text-sm text-cyan-600 dark:text-cyan-400">✦</span>
+            <span className="text-xs font-mono font-medium text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">Based on your activity</span>
           </div>
           {recLoading ? (
-            <div className="flex items-center gap-2 text-zinc-400 font-mono text-xs py-2">
-              <div className="w-3 h-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" /> Finding problems for you…
+            <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-400 font-mono text-xs py-2">
+              <div className="w-3 h-3 border-2 border-cyan-500 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" /> Finding problems for you…
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {recommended.map((p) => (
                 <button key={p.id} onClick={() => handleRowClick(p)}
-                  className="text-left p-3.5 bg-zinc-950/40 border border-white/[0.06] rounded-xl hover:border-cyan-500/30 hover:bg-zinc-900/40 transition-all">
-                  <div className="text-xs font-mono font-medium text-zinc-200 truncate mb-1.5">{p.title}</div>
+                  className="text-left p-3.5 bg-white dark:bg-zinc-950/40 border border-slate-200 dark:border-white/[0.06] rounded-xl hover:border-cyan-500/40 hover:bg-slate-50 dark:hover:bg-zinc-900/40 transition-all shadow-xs">
+                  <div className="text-xs font-mono font-medium text-slate-900 dark:text-zinc-200 truncate mb-1.5">{p.title}</div>
                   <span className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded-full border
-                    ${p.difficulty === 'Easy' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                      p.difficulty === 'Medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
-                      'text-rose-400 bg-rose-500/10 border-rose-500/20'}`}>
+                    ${p.difficulty === 'Easy' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                      p.difficulty === 'Medium' ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                      'text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20'}`}>
                     {p.difficulty}
                   </span>
                 </button>
@@ -672,19 +672,19 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         /* ── My Submissions view ─────────────────────────────── */
         subsLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <div className="w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-            <span className="text-zinc-400 text-xs font-mono">Loading submissions…</span>
+            <div className="w-6 h-6 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-slate-500 dark:text-zinc-400 text-xs font-mono">Loading submissions…</span>
           </div>
         ) : submissions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <div className="text-3xl opacity-30 text-zinc-500">{'{ }'}</div>
-            <div className="text-zinc-400 font-mono text-sm">No submissions yet — go solve something!</div>
+            <div className="text-3xl opacity-30 text-slate-400 dark:text-zinc-500">{'{ }'}</div>
+            <div className="text-slate-500 dark:text-zinc-400 font-mono text-sm">No submissions yet — go solve something!</div>
           </div>
         ) : (
-          <div className="w-full bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl overflow-hidden shadow-sm overflow-x-auto">
+          <div className="w-full bg-white dark:bg-zinc-900/40 backdrop-blur-xl border border-slate-200 dark:border-white/[0.06] rounded-2xl overflow-hidden shadow-xs overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[640px]">
               <thead>
-                <tr className="border-b border-white/[0.06] bg-zinc-950/40 text-xs text-zinc-400 font-mono font-semibold uppercase tracking-wider">
+                <tr className="border-b border-slate-200 dark:border-white/[0.06] bg-slate-100/70 dark:bg-zinc-950/40 text-xs text-slate-600 dark:text-zinc-400 font-mono font-semibold uppercase tracking-wider">
                   <th className="py-3.5 pl-6 pr-4">Problem</th>
                   <th className="py-3.5 px-4 w-24">Lang</th>
                   <th className="py-3.5 px-4 w-28">Type</th>
@@ -693,12 +693,12 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                   <th className="py-3.5 pl-4 pr-6 w-36 text-right">Submitted</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.04]">
+              <tbody className="divide-y divide-slate-200/80 dark:divide-white/[0.04]">
                 {submissions.map(s => {
                   const statusColor =
-                    s.status === 'approved'  ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                    s.status === 'rejected'  ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' :
-                                               'text-amber-400 bg-amber-500/10 border-amber-500/20';
+                    s.status === 'approved'  ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                    s.status === 'rejected'  ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20' :
+                                               'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20';
                   const statusLabel =
                     s.status === 'approved' ? '✓ Approved' :
                     s.status === 'rejected' ? '✗ Rejected' : '⏳ Pending';
@@ -710,25 +710,25 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                     <tr
                       key={s.id}
                       onClick={() => s.code && setViewingCode(s)}
-                      className={`hover:bg-white/[0.03] transition-colors ${s.code ? 'cursor-pointer' : ''}`}
+                      className={`hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors ${s.code ? 'cursor-pointer' : ''}`}
                     >
                       <td className="py-4 pl-6 pr-4">
-                        <div className="text-zinc-200 font-mono text-sm font-medium flex items-center gap-2">
+                        <div className="text-slate-900 dark:text-zinc-200 font-mono text-sm font-medium flex items-center gap-2">
                           <span className="truncate">{s.problem_title}</span>
-                          {s.code && <span className="text-xs text-cyan-400 shrink-0 font-mono" title="View submitted code">{'</>'}</span>}
+                          {s.code && <span className="text-xs text-cyan-600 dark:text-cyan-400 shrink-0 font-mono" title="View submitted code">{'</>'}</span>}
                         </div>
                         {s.status === 'rejected' && s.review_notes && (
-                          <div className="text-xs text-rose-400/80 font-mono mt-0.5">{s.review_notes}</div>
+                          <div className="text-xs text-rose-600 dark:text-rose-400/80 font-mono mt-0.5">{s.review_notes}</div>
                         )}
                       </td>
-                      <td className="py-4 px-4 text-xs font-mono text-zinc-300">
+                      <td className="py-4 px-4 text-xs font-mono text-slate-700 dark:text-zinc-300">
                         {s.lang}
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap">
                         <span className={`text-xs font-mono px-2 py-0.5 rounded-full border ${
                           s.type === 'weekly'
-                            ? 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
-                            : 'text-zinc-400 bg-white/[0.04] border-white/[0.06]'
+                            ? 'text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border-cyan-500/20'
+                            : 'text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-white/[0.04] border-slate-200 dark:border-white/[0.06]'
                         }`}>
                           {s.type === 'weekly' ? 'Weekly' : 'Normal'}
                         </span>
@@ -738,12 +738,12 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                           {statusLabel}
                         </span>
                       </td>
-                      <td className="py-4 px-4 text-right text-sm font-mono font-semibold text-cyan-400 whitespace-nowrap">
+                      <td className="py-4 px-4 text-right text-sm font-mono font-semibold text-cyan-600 dark:text-cyan-400 whitespace-nowrap">
                         {s.status === 'approved' ? `${s.points_awarded}` : '—'}
                       </td>
                       <td className="py-4 pl-4 pr-6 text-right whitespace-nowrap">
-                        <div className="text-zinc-300 text-xs font-mono">{dateStr}</div>
-                        <div className="text-zinc-500 text-[11px] font-mono">{timeStr}</div>
+                        <div className="text-slate-900 dark:text-zinc-300 text-xs font-mono">{dateStr}</div>
+                        <div className="text-slate-500 dark:text-zinc-500 text-[11px] font-mono">{timeStr}</div>
                       </td>
                     </tr>
                   );
@@ -756,20 +756,20 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         <div className="flex flex-col items-center justify-center py-24 gap-3">
           <div className="md:hidden space-y-2 w-full animate-pulse">
             {[1, 2, 3, 4, 5, 6].map(k => (
-              <div key={k} className="px-4 py-3.5 bg-zinc-900/50 border border-zinc-800/80 rounded-xl flex items-center gap-3">
-                <div className="w-5 h-4 bg-zinc-800 rounded" />
+              <div key={k} className="px-4 py-3.5 bg-slate-100 dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800/80 rounded-xl flex items-center gap-3">
+                <div className="w-5 h-4 bg-slate-200 dark:bg-zinc-800 rounded" />
                 <div className="flex-1 space-y-2">
-                  <div className="w-2/3 h-4 bg-zinc-800 rounded" />
+                  <div className="w-2/3 h-4 bg-slate-200 dark:bg-zinc-800 rounded" />
                   <div className="flex gap-2">
-                    <div className="w-12 h-3 bg-zinc-800/60 rounded" />
-                    <div className="w-10 h-3 bg-zinc-800/60 rounded" />
+                    <div className="w-12 h-3 bg-slate-200 dark:bg-zinc-800/60 rounded" />
+                    <div className="w-10 h-3 bg-slate-200 dark:bg-zinc-800/60 rounded" />
                   </div>
                 </div>
               </div>
             ))}
           </div>
-          <div className="hidden md:block w-full bg-zinc-900/50 border border-zinc-800/80 rounded-2xl overflow-hidden animate-pulse">
-            <div className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-3 border-b border-zinc-800/80 text-[10px] text-zinc-500 font-mono uppercase tracking-widest bg-zinc-950/60">
+          <div className="hidden md:block w-full bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800/80 rounded-2xl overflow-hidden animate-pulse">
+            <div className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-3 border-b border-slate-200 dark:border-zinc-800/80 text-[10px] text-slate-500 dark:text-zinc-500 font-mono uppercase tracking-widest bg-slate-100/70 dark:bg-zinc-950/60">
               <div>#</div>
               <div>Title</div>
               <div>Difficulty</div>
@@ -778,13 +778,13 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
               <div>Status</div>
             </div>
             {[1, 2, 3, 4, 5, 6, 7, 8].map(k => (
-              <div key={k} className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-4 border-b border-zinc-800/60 last:border-0 items-center">
-                <div className="w-4 h-4 bg-zinc-800 rounded" />
-                <div className="w-2/5 h-4 bg-zinc-800 rounded" />
-                <div className="w-14 h-5 bg-zinc-800/60 rounded-lg" />
-                <div className="w-10 h-4 bg-zinc-800/60 rounded" />
-                <div className="w-12 h-4 bg-zinc-800/60 rounded" />
-                <div className="w-16 h-5 bg-zinc-800/60 rounded-lg" />
+              <div key={k} className="grid grid-cols-[2.5rem_1fr_7rem_5rem_6rem_6rem] gap-4 px-5 py-4 border-b border-slate-200/80 dark:border-zinc-800/60 last:border-0 items-center">
+                <div className="w-4 h-4 bg-slate-200 dark:bg-zinc-800 rounded" />
+                <div className="w-2/5 h-4 bg-slate-200 dark:bg-zinc-800 rounded" />
+                <div className="w-14 h-5 bg-slate-200 dark:bg-zinc-800/60 rounded-lg" />
+                <div className="w-10 h-4 bg-slate-200 dark:bg-zinc-800/60 rounded" />
+                <div className="w-12 h-4 bg-slate-200 dark:bg-zinc-800/60 rounded" />
+                <div className="w-16 h-5 bg-slate-200 dark:bg-zinc-800/60 rounded-lg" />
               </div>
             ))}
           </div>
@@ -792,18 +792,18 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="text-3xl opacity-30 text-zinc-500">{ '{  }' }</div>
-          <div className="text-zinc-400 font-mono text-sm">
+          <div className="text-3xl opacity-30 text-slate-400 dark:text-zinc-500">{ '{  }' }</div>
+          <div className="text-slate-500 dark:text-zinc-400 font-mono text-sm">
             {problems.length === 0 ? 'No problems yet — check back soon!' : 'Nothing matches this filter.'}
           </div>
         </div>
       ) : (
         <>
           {/* Enterprise-grade Problems Table */}
-          <div className="w-full bg-zinc-900/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl overflow-hidden shadow-none overflow-x-auto">
+          <div className="w-full bg-white dark:bg-zinc-900/40 backdrop-blur-xl border border-slate-200 dark:border-white/[0.06] rounded-2xl overflow-hidden shadow-xs overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[640px]">
               <thead>
-                <tr className="border-b border-white/[0.06] bg-zinc-950/40 text-xs text-zinc-400 font-mono font-semibold uppercase tracking-wider">
+                <tr className="border-b border-slate-200 dark:border-white/[0.06] bg-slate-100/70 dark:bg-zinc-950/40 text-xs text-slate-600 dark:text-zinc-400 font-mono font-semibold uppercase tracking-wider">
                   <th className="py-3.5 pl-6 pr-3 w-12 text-center">#</th>
                   <th className="py-3.5 px-4">Title</th>
                   <th className="py-3.5 px-4 w-32">Difficulty</th>
@@ -812,7 +812,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                   <th className="py-3.5 pl-4 pr-6 w-32 text-right">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.04]">
+              <tbody className="divide-y divide-slate-200/80 dark:divide-white/[0.04]">
                 {filtered.map((p, i) => {
                   const isSolved   = solved.includes(p.id);
                   const isWeekly   = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
@@ -825,29 +825,29 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                       onClick={() => handleRowClick(p)}
                       className={`cursor-pointer transition-colors duration-150 group ${
                         isLocked
-                          ? 'hover:bg-amber-500/5 opacity-75'
-                          : 'hover:bg-white/[0.03]'
+                          ? 'hover:bg-amber-500/5 opacity-80'
+                          : 'hover:bg-slate-50 dark:hover:bg-white/[0.03]'
                       }`}
                     >
-                      <td className="py-4 pl-6 pr-3 text-center text-sm font-mono text-zinc-500 font-medium">
+                      <td className="py-4 pl-6 pr-3 text-center text-sm font-mono text-slate-500 dark:text-zinc-500 font-medium">
                         {i + 1}
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                           <span className={`font-mono text-[15px] transition-colors ${
                             isLocked
-                              ? 'text-zinc-400 group-hover:text-amber-400'
-                              : 'text-zinc-100 group-hover:text-cyan-300 font-medium'
+                              ? 'text-slate-600 dark:text-zinc-400 group-hover:text-amber-600 dark:group-hover:text-amber-400'
+                              : 'text-slate-900 dark:text-zinc-100 group-hover:text-cyan-600 dark:group-hover:text-cyan-300 font-medium'
                           }`}>
                             {p.title}
                           </span>
                           {isLocked && (
-                            <span className="text-xs font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-medium">
+                            <span className="text-xs font-mono text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-medium">
                               🔒 Weekly
                             </span>
                           )}
                           {isPaidEndedP && !isSolved && (
-                            <span className="text-xs font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 font-medium">
+                            <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 font-medium">
                               🏁 Practice
                             </span>
                           )}
@@ -855,7 +855,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                         {p.tags && p.tags.length > 0 && (
                           <div className="flex gap-1.5 flex-wrap">
                             {p.tags.map(t => (
-                              <span key={t} className="text-xs text-zinc-400 bg-zinc-800/60 px-2 py-0.5 rounded-md font-mono border border-zinc-700/60">
+                              <span key={t} className="text-xs text-slate-600 dark:text-zinc-400 bg-slate-100 dark:bg-zinc-800/60 px-2 py-0.5 rounded-md font-mono border border-slate-200 dark:border-zinc-700/60">
                                 {t}
                               </span>
                             ))}
@@ -864,38 +864,38 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                       </td>
                       <td className="py-4 px-4 whitespace-nowrap">
                         <span className={`text-xs font-mono font-semibold px-2.5 py-1 rounded-full border inline-block ${
-                          p.difficulty === 'Easy' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-                          p.difficulty === 'Medium' ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' :
-                          'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                          p.difficulty === 'Easy' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                          p.difficulty === 'Medium' ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20' :
+                          'text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20'
                         }`}>
                           {p.difficulty}
                         </span>
                       </td>
                       <td className="py-4 px-4 text-right whitespace-nowrap">
-                        <span className="text-cyan-400 text-sm font-mono font-semibold">
+                        <span className="text-cyan-600 dark:text-cyan-400 text-sm font-mono font-semibold">
                           {p.points}
                         </span>
                       </td>
                       <td className="py-4 px-4 text-center whitespace-nowrap">
-                        <span className="text-zinc-300 text-sm font-mono">
+                        <span className="text-slate-700 dark:text-zinc-300 text-sm font-mono">
                           {attemptCounts[p.id] || 0}
                         </span>
                       </td>
                       <td className="py-4 pl-4 pr-6 text-right whitespace-nowrap">
                         {isSolved ? (
-                          <span className="inline-flex items-center gap-1.5 text-emerald-400 text-sm font-mono font-semibold">
+                          <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 text-sm font-mono font-semibold">
                             <span>✓</span> Solved
                           </span>
                         ) : isLocked ? (
-                          <span className="text-amber-400 text-sm font-mono font-medium group-hover:text-amber-300 transition-colors">
+                          <span className="text-amber-600 dark:text-amber-400 text-sm font-mono font-medium group-hover:opacity-80 transition-colors">
                             Unlock →
                           </span>
                         ) : isPaidEndedP ? (
-                          <span className="text-cyan-400 text-sm font-mono font-medium group-hover:text-cyan-300 transition-colors">
+                          <span className="text-cyan-600 dark:text-cyan-400 text-sm font-mono font-medium group-hover:opacity-80 transition-colors">
                             Practice →
                           </span>
                         ) : (
-                          <span className="text-zinc-400 text-sm font-mono group-hover:text-zinc-200 transition-colors font-medium">
+                          <span className="text-slate-600 dark:text-zinc-400 text-sm font-mono group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors font-medium">
                             Solve →
                           </span>
                         )}
@@ -938,9 +938,9 @@ function SubmittedCodeModal({ submission, onClose }: { submission: SubmissionRow
 
   const date = new Date(submission.submitted_at);
   const statusColor =
-    submission.status === 'approved' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
-    submission.status === 'rejected' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' :
-                                        'text-amber-400 bg-amber-500/10 border-amber-500/20';
+    submission.status === 'approved' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+    submission.status === 'rejected' ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10 border-rose-500/20' :
+                                        'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20';
   const statusLabel =
     submission.status === 'approved' ? '✓ Approved' :
     submission.status === 'rejected' ? '✗ Rejected' : '⏳ Pending';
@@ -953,44 +953,44 @@ function SubmittedCodeModal({ submission, onClose }: { submission: SubmissionRow
   }
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/60 dark:bg-black/70 backdrop-blur-sm animate-fade-in"
       onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        className="w-full max-w-2xl max-h-[85vh] flex flex-col bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-slide-down">
-        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-zinc-800 shrink-0">
+        className="w-full max-w-2xl max-h-[85vh] flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden animate-slide-down">
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-zinc-800 shrink-0">
           <div className="min-w-0">
-            <h3 className="font-display font-semibold text-sm text-zinc-100 truncate">{submission.problem_title}</h3>
+            <h3 className="font-display font-semibold text-sm text-slate-900 dark:text-zinc-100 truncate">{submission.problem_title}</h3>
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md border ${statusColor}`}>{statusLabel}</span>
-              <span className="text-[10px] font-mono text-zinc-400">{submission.lang}</span>
-              <span className="text-[10px] font-mono text-zinc-500">
+              <span className="text-[10px] font-mono text-slate-600 dark:text-zinc-400">{submission.lang}</span>
+              <span className="text-[10px] font-mono text-slate-500 dark:text-zinc-500">
                 {date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })} · {date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
               </span>
               {submission.status === 'approved' && (
-                <span className="text-[10px] font-mono text-cyan-400 font-semibold">{submission.points_awarded} pts</span>
+                <span className="text-[10px] font-mono text-cyan-600 dark:text-cyan-400 font-semibold">{submission.points_awarded} pts</span>
               )}
             </div>
           </div>
           <button onClick={onClose} aria-label="Close"
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors">
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors">
             ✕
           </button>
         </div>
 
         {submission.status === 'rejected' && submission.review_notes && (
-          <div className="px-5 py-2.5 bg-rose-500/10 border-b border-rose-500/20 text-xs font-mono text-rose-400 shrink-0">
+          <div className="px-5 py-2.5 bg-rose-500/10 border-b border-rose-500/20 text-xs font-mono text-rose-600 dark:text-rose-400 shrink-0">
             {submission.review_notes}
           </div>
         )}
 
-        <pre className="flex-1 overflow-auto px-5 py-4 text-xs font-mono text-zinc-200 leading-relaxed bg-zinc-950">
+        <pre className="flex-1 overflow-auto px-5 py-4 text-xs font-mono text-slate-800 dark:text-zinc-200 leading-relaxed bg-slate-50 dark:bg-zinc-950">
           {submission.code || '// No code recorded for this submission.'}
         </pre>
 
-        <div className="px-5 py-3 border-t border-zinc-800 shrink-0 flex justify-end">
+        <div className="px-5 py-3 border-t border-slate-200 dark:border-zinc-800 shrink-0 flex justify-end">
           <button onClick={copyCode}
-            className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg font-mono text-xs text-zinc-300 hover:text-zinc-100 hover:border-zinc-600 transition-all">
-            {copied ? (<><span className="text-emerald-400">✓</span><span className="text-emerald-400">Copied</span></>) : (<><span>📋</span><span>Copy code</span></>)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 rounded-lg font-mono text-xs text-slate-700 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-zinc-100 hover:border-slate-300 dark:hover:border-zinc-600 transition-all shadow-xs">
+            {copied ? (<><span className="text-emerald-600 dark:text-emerald-400">✓</span><span className="text-emerald-600 dark:text-emerald-400">Copied</span></>) : (<><span>📋</span><span>Copy code</span></>)}
           </button>
         </div>
       </div>
@@ -1132,22 +1132,22 @@ function ShareCardModal({ card, onClose }: { card: ShareCard; onClose: () => voi
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-slide-down">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-          <h3 className="font-display font-semibold text-zinc-100 text-base">🎉 Nice solve!</h3>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-200 transition-colors text-lg">✕</button>
+    <div className="fixed inset-0 z-50 bg-slate-950/60 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-slide-down">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-zinc-800">
+          <h3 className="font-display font-semibold text-slate-900 dark:text-zinc-100 text-base">🎉 Nice solve!</h3>
+          <button onClick={onClose} className="text-slate-400 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200 transition-colors text-lg">✕</button>
         </div>
         <div className="p-4">
-          <canvas ref={canvasRef} className="w-full rounded-xl border border-zinc-800"/>
+          <canvas ref={canvasRef} className="w-full rounded-xl border border-slate-200 dark:border-zinc-800"/>
         </div>
         <div className="flex gap-2.5 px-4 pb-4">
           <button onClick={handleShare}
-            className="flex-1 py-2 bg-gradient-to-r from-cyan-400 to-cyan-500 text-zinc-950 font-mono font-bold text-xs rounded-lg hover:opacity-90 shadow-[0_0_15px_rgba(0,229,255,0.25)] transition-all">
+            className="flex-1 py-2 bg-gradient-to-r from-cyan-600 to-sky-600 text-white font-mono font-semibold text-xs rounded-lg hover:opacity-90 shadow-xs transition-all">
             📤 Share
           </button>
           <button onClick={handleDownload}
-            className="flex-1 py-2 bg-zinc-800 border border-zinc-700 text-zinc-200 font-mono text-xs rounded-lg hover:bg-zinc-700/80 transition-all">
+            className="flex-1 py-2 bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-200 font-mono text-xs rounded-lg hover:bg-slate-200 dark:hover:bg-zinc-700/80 transition-all">
             ⬇ Download
           </button>
         </div>

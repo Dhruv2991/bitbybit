@@ -20,17 +20,17 @@ export default function TermsPage({ onNavigate }: Props) {
   return (
     <div className="max-w-3xl mx-auto animate-fade-up py-4 pb-20">
       <div className="text-center mb-10">
-        <h1 className="font-display font-black text-3xl md:text-4xl text-[#e2e2e2] mb-2 tracking-tight">
+        <h1 className="font-display font-black text-3xl md:text-4xl text-slate-900 dark:text-zinc-100 mb-2 tracking-tight">
           Terms &amp; Conditions
         </h1>
-        <p className="text-[#666] font-mono text-xs">
+        <p className="text-slate-500 dark:text-zinc-500 font-mono text-xs">
           Last updated: {LAST_UPDATED}
         </p>
       </div>
 
-      <div className="bg-[#0a0a0a] border border-[#161616] rounded-2xl p-6 mb-5 space-y-5 text-[#888] font-mono text-xs leading-relaxed">
+      <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-6 md:p-8 mb-5 space-y-6 text-slate-600 dark:text-zinc-400 font-mono text-xs leading-relaxed shadow-xs">
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">
             1. Acceptance of terms
           </h2>
           <p>
@@ -41,7 +41,7 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">
             2. What BitByBit is
           </h2>
           <p>
@@ -57,7 +57,7 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">
             3. Coding Challenges
           </h2>
           <p>
@@ -81,7 +81,7 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">4. Payments</h2>
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">4. Payments</h2>
           <p>
             Payments are securely processed through our authorized payment
             gateway partner.
@@ -121,7 +121,7 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">
             5. Account & eligibility
           </h2>
           <p>
@@ -133,7 +133,7 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">
             6. Acceptable use
           </h2>
           <p>
@@ -149,7 +149,7 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">
             7. Intellectual property
           </h2>
           <p>
@@ -162,7 +162,7 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">
             8. AI features
           </h2>
           <p>
@@ -174,7 +174,7 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">
             9. Availability & changes
           </h2>
           <p>
@@ -186,7 +186,7 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">
             10. Limitation of liability
           </h2>
           <p>
@@ -198,12 +198,12 @@ export default function TermsPage({ onNavigate }: Props) {
         </section>
 
         <section>
-          <h2 className="text-[#e0e0e0] font-bold text-sm mb-2">11. Contact</h2>
+          <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">11. Contact</h2>
           <p>
             Questions about these terms?{" "}
             <a
               href="mailto:ddhruvgnayak@gmail.com"
-              className="text-[#a78bfa] hover:text-[#c4b5fd] transition-colors"
+              className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 underline underline-offset-2 transition-colors"
             >
               ddhruvgnayak@gmail.com
             </a>
@@ -214,7 +214,7 @@ export default function TermsPage({ onNavigate }: Props) {
       <div className="text-center">
         <button
           onClick={() => onNavigate("about")}
-          className="text-xs font-mono text-zinc-500 hover:text-cyan-400 transition-colors"
+          className="text-xs font-mono text-slate-500 dark:text-zinc-500 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
         >
           ← Back to About
         </button>
