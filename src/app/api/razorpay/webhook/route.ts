@@ -5,20 +5,17 @@
 // Safety net: if the browser tab closes right after payment but
 // before our client-side /api/razorpay/verify call fires, this
 // webhook still confirms the payment server-side using Razorpay's
-// own signed event.
+// own signed event directly in our self-hosted PostgreSQL DB.
 //
 // Configure in Razorpay Dashboard → Settings → Webhooks:
 //   URL:     https://yourdomain.com/api/razorpay/webhook
-//   Secret: any string you choose — put it in RAZORPAY_WEBHOOK_SECRET
-//   Events: payment.captured (required), payment.failed (optional),
-//           refund.processed (required — without this checked,
-//           refunding someone in the Razorpay dashboard will NOT
-//           revoke their access automatically).
+//   Secret:  RAZORPAY_WEBHOOK_SECRET
+//   Events:  payment.captured, refund.processed
 // ════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { prisma } from '@/lib/prisma';
 import { computeNewPeriodEnd } from '@/lib/subscription';
 import { sendEmailDetailed, subscriptionConfirmedEmail, subscriptionRevokedEmail } from '@/lib/email';
 
@@ -56,50 +53,57 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, ignored: 'no payment_id' });
       }
 
-      const db = createServerSupabaseClient();
-
-      // eslint-disable-next-line
-      const { data: sub } = await (db.from('subscribers') as any)
-        .select('id, github, name, email, status')
-        .eq('razorpay_payment_id', paymentId)
-        .maybeSingle();
+      const sub = await prisma.subscriber.findFirst({
+        where: { razorpayPaymentId: paymentId },
+        include: { user: true },
+      });
 
       if (!sub) {
         console.warn('[razorpay/webhook] refund for unknown payment_id', paymentId);
         return NextResponse.json({ success: true, ignored: 'no matching subscriber' });
       }
 
-      if (sub.status !== 'rejected') {
-        // eslint-disable-next-line
-        const { error } = await (db.from('subscribers') as any)
-          .update({ status: 'rejected' })
-          .eq('id', sub.id);
-        if (error) console.error('[razorpay/webhook] revoke on refund failed:', error);
+      if (sub.status !== 'CANCELLED') {
+        await prisma.subscriber.update({
+          where: { id: sub.id },
+          data: { status: 'CANCELLED' },
+        });
       }
 
-      if (sub.email) {
-        // eslint-disable-next-line
-        const { data: logged } = await (db.from('email_log') as any)
-          .upsert(
-            { github: sub.github, email: sub.email, kind: 'subscription_refunded', ref_id: paymentId },
-            { onConflict: 'github,kind,ref_id', ignoreDuplicates: true },
-          )
-          .select('github')
-          .maybeSingle();
-        if (logged) {
-          const { subject, html } = subscriptionRevokedEmail(sub.name || sub.github);
-          const result = await sendEmailDetailed(sub.email, subject, html);
+      if (sub.user.email) {
+        const existingLog = await prisma.emailLog.findFirst({
+          where: {
+            email: sub.user.email,
+            kind: 'subscription_refunded',
+            refId: paymentId,
+          },
+        });
+
+        if (!existingLog) {
+          await prisma.emailLog.create({
+            data: {
+              email: sub.user.email,
+              kind: 'subscription_refunded',
+              refId: paymentId,
+            },
+          });
+
+          const { subject, html } = subscriptionRevokedEmail(sub.user.name || sub.user.githubUsername);
+          const result = await sendEmailDetailed(sub.user.email, subject, html);
           if (!result.ok) {
-            console.error(`[razorpay/webhook] refund email to ${sub.email} FAILED:`, result.error);
-            // eslint-disable-next-line
-            await (db.from('email_log') as any)
-              .delete()
-              .eq('github', sub.github).eq('kind', 'subscription_refunded').eq('ref_id', paymentId);
+            console.error(`[razorpay/webhook] refund email to ${sub.user.email} FAILED:`, result.error);
+            await prisma.emailLog.deleteMany({
+              where: {
+                email: sub.user.email,
+                kind: 'subscription_refunded',
+                refId: paymentId,
+              },
+            });
           }
         }
       }
 
-      return NextResponse.json({ success: true, revoked: sub.github });
+      return NextResponse.json({ success: true, revoked: sub.user.githubUsername });
     }
 
     if (event.event !== 'payment.captured') {
@@ -113,71 +117,90 @@ export async function POST(req: NextRequest) {
 
     const notes = payment.notes || {};
     const paymentId = payment.id as string;
-    const db = createServerSupabaseClient();
+    const orderId = payment.order_id as string | undefined;
 
-    if (notes.type === 'subscription' && notes.github) {
-      // eslint-disable-next-line
-      const { data: existingSub } = await (db.from('subscribers') as any)
-        .select('status, current_period_end, razorpay_payment_id')
-        .eq('github', notes.github)
-        .maybeSingle();
+    if (notes.type === 'subscription' && (notes.userId || notes.github)) {
+      // Find user by userId or githubUsername
+      const user = notes.userId
+        ? await prisma.user.findUnique({ where: { id: notes.userId } })
+        : await prisma.user.findUnique({ where: { githubUsername: notes.github } });
 
-      // ── Idempotency Check ──────────────────────────────────────
-      // If client-side /verify route already processed this payment,
-      // acknowledge and exit without re-calculating or double-stacking dates.
-      if (existingSub?.razorpay_payment_id === paymentId) {
+      if (!user) {
+        console.warn('[razorpay/webhook] User not found for notes:', notes);
+        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      }
+
+      const existingSub = await prisma.subscriber.findUnique({
+        where: { userId: user.id },
+      });
+
+      // Idempotency check: already processed
+      if (existingSub?.razorpayPaymentId === paymentId) {
         return NextResponse.json({ success: true, alreadyProcessed: true });
       }
 
-      // ── Prior Payment Check ────────────────────────────────────
-      // A prior payment MUST exist, start with 'pay_', and NOT be equal to the current payment.
-      const previousPaymentId = existingSub?.razorpay_payment_id;
+      const previousPaymentId = existingSub?.razorpayPaymentId;
       const hasPriorPayment =
         typeof previousPaymentId === 'string' &&
         previousPaymentId.startsWith('pay_') &&
         previousPaymentId !== paymentId;
 
-      const newPeriodEnd = computeNewPeriodEnd(
-        existingSub?.status,
-        existingSub?.current_period_end,
+      const newPeriodEndStr = computeNewPeriodEnd(
+        existingSub?.status === 'ACTIVE' ? 'confirmed' : 'pending',
+        existingSub?.currentPeriodEnd ? existingSub.currentPeriodEnd.toISOString() : null,
         hasPriorPayment,
       );
+      const newPeriodEndDate = new Date(newPeriodEndStr);
 
-      const email = notes.email || null;
-
-      // eslint-disable-next-line
-      const { error } = await (db.from('subscribers') as any).upsert(
-        {
-          github: notes.github,
-          name: notes.name || notes.github,
-          email,
-          txn_id: paymentId,
-          razorpay_payment_id: paymentId,
-          status: 'confirmed',
-          current_period_end: newPeriodEnd,
+      await prisma.subscriber.upsert({
+        where: { userId: user.id },
+        create: {
+          userId:             user.id,
+          txnId:              paymentId,
+          razorpayOrderId:    orderId || null,
+          razorpayPaymentId:  paymentId,
+          status:             'ACTIVE',
+          currentPeriodEnd:   newPeriodEndDate,
         },
-        { onConflict: 'github' },
-      );
-      if (error) console.error('[razorpay/webhook] subscribers upsert error:', error);
+        update: {
+          txnId:              paymentId,
+          razorpayOrderId:    orderId || null,
+          razorpayPaymentId:  paymentId,
+          status:             'ACTIVE',
+          currentPeriodEnd:   newPeriodEndDate,
+        },
+      });
 
-      if (email && !error) {
-        // eslint-disable-next-line
-        const { data: logged } = await (db.from('email_log') as any)
-          .upsert(
-            { github: notes.github, email, kind: 'subscription_confirmed', ref_id: paymentId },
-            { onConflict: 'github,kind,ref_id', ignoreDuplicates: true },
-          )
-          .select('github')
-          .maybeSingle();
-        if (logged) {
-          const { subject, html } = subscriptionConfirmedEmail(notes.name || notes.github, newPeriodEnd);
-          const result = await sendEmailDetailed(email, subject, html);
+      const recipientEmail = user.email || notes.email;
+      if (recipientEmail) {
+        const existingLog = await prisma.emailLog.findFirst({
+          where: {
+            email: recipientEmail,
+            kind: 'subscription_confirmed',
+            refId: paymentId,
+          },
+        });
+
+        if (!existingLog) {
+          await prisma.emailLog.create({
+            data: {
+              email: recipientEmail,
+              kind: 'subscription_confirmed',
+              refId: paymentId,
+            },
+          });
+
+          const { subject, html } = subscriptionConfirmedEmail(user.name || user.githubUsername, newPeriodEndStr);
+          const result = await sendEmailDetailed(recipientEmail, subject, html);
           if (!result.ok) {
-            console.error(`[razorpay/webhook] confirmation email to ${email} FAILED:`, result.error);
-            // eslint-disable-next-line
-            await (db.from('email_log') as any)
-              .delete()
-              .eq('github', notes.github).eq('kind', 'subscription_confirmed').eq('ref_id', paymentId);
+            console.error(`[razorpay/webhook] confirmation email to ${recipientEmail} FAILED:`, result.error);
+            await prisma.emailLog.deleteMany({
+              where: {
+                email: recipientEmail,
+                kind: 'subscription_confirmed',
+                refId: paymentId,
+              },
+            });
           }
         }
       }

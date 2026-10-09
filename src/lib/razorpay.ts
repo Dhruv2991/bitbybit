@@ -6,11 +6,9 @@
 //
 // SECURITY: this file does NOT send a client-chosen amount to the
 // server, and does NOT send the github username as the source of
-// truth — the server always resolves both from a verified Supabase
-// Auth session token attached to every request.
+// truth — the server always resolves both from our verified
+// session cookie.
 // ════════════════════════════════════════════════════════════
-
-import { getSupabaseClient } from './supabase';
 
 declare global {
   interface Window {
@@ -41,12 +39,6 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
-async function getAuthToken(): Promise<string | null> {
-  const supabase = getSupabaseClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.access_token || null;
-}
-
 interface PayOptions {
   purpose:      'subscription';
   name:         string;        // Razorpay checkout display name, e.g. "BitByBit"
@@ -58,12 +50,6 @@ interface PayOptions {
 }
 
 export async function payWithRazorpay(opts: PayOptions) {
-  const token = await getAuthToken();
-  if (!token) {
-    opts.onFailure('Please sign in again to continue.');
-    return;
-  }
-
   const scriptOk = await loadRazorpayScript();
   if (!scriptOk) {
     opts.onFailure('Failed to load Razorpay checkout. Check your connection and try again.');
@@ -75,8 +61,7 @@ export async function payWithRazorpay(opts: PayOptions) {
     const orderRes = await fetch('/api/razorpay/create-order', {
       method: 'POST',
       headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         purpose: opts.purpose,
@@ -104,14 +89,13 @@ export async function payWithRazorpay(opts: PayOptions) {
         const verifyRes = await fetch('/api/razorpay/verify', {
           method: 'POST',
           headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             razorpay_order_id:   response.razorpay_order_id,
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_signature:  response.razorpay_signature,
-            purpose:      opts.purpose,
+            purpose:             opts.purpose,
           }),
         });
         const verifyData = await verifyRes.json();

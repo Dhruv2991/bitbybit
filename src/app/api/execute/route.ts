@@ -2,10 +2,10 @@
 // src/app/api/execute/route.ts
 // POST /api/execute
 //
-// Secure Server-Side Execution Isolation:
+// Self-Hosted Server-Side Execution Isolation:
 // - If problem_id is provided, fetches authoritative test cases
-//   (both visible and hidden) directly from Supabase server-side.
-// - Executes user code against ALL test cases on Judge0 / Wandbox.
+//   (both visible and hidden) directly from PostgreSQL via Prisma.
+// - Executes user code against ALL test cases on Judge0.
 // - Sanitizes hidden test cases so input/expected values are
 //   NEVER returned in the JSON payload to the client.
 // - Supports Python, JavaScript, C++, Java, Go, and Rust.
@@ -13,8 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { runAgainstTestCases, type TestResult, type RunResult } from '@/lib/executor';
-import { createServerSupabaseClient, getSupabaseClient } from '@/lib/supabase';
-import type { TestCase, Problem } from '@/types/database';
+import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +25,12 @@ interface ExecuteBody {
   mode?: 'run' | 'submit';
 }
 
+interface LocalTestCase {
+  input: string;
+  expected: string;
+  is_hidden?: boolean;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body: ExecuteBody = await req.json();
@@ -35,35 +40,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required code or language' }, { status: 400 });
     }
 
-    let targetCases: TestCase[] = [];
+    let targetCases: LocalTestCase[] = [];
 
-    // ── 1. If problem_id is provided, load authoritative test cases from DB ──
+    // ── 1. If problem_id is provided, load authoritative test cases from PostgreSQL ──
     if (problem_id) {
-      let dbClient;
-      try {
-        dbClient = createServerSupabaseClient();
-      } catch {
-        dbClient = getSupabaseClient();
-      }
+      const problem = await prisma.problem.findUnique({
+        where: { id: problem_id },
+        include: {
+          testCases: {
+            orderBy: { orderIndex: 'asc' },
+          },
+        },
+      });
 
-      const { data: problem, error } = await dbClient
-        .from('problems')
-        .select('id, test_cases, starter_code')
-        .eq('id', problem_id)
-        .maybeSingle();
-
-      if (error || !problem) {
+      if (!problem) {
         return NextResponse.json({ error: 'Problem not found' }, { status: 404 });
       }
 
-      const allProblemCases: TestCase[] = (problem as Problem).test_cases || [];
+      const allProblemCases: LocalTestCase[] = problem.testCases.map((tc) => ({
+        input: tc.input,
+        expected: tc.expected,
+        is_hidden: tc.isHidden,
+      }));
 
       if (mode === 'run') {
         // "Run" mode: run against visible sample cases (or all cases if none marked hidden)
-        const visibleOnly = allProblemCases.filter(tc => !tc.is_hidden);
+        const visibleOnly = allProblemCases.filter((tc) => !tc.is_hidden);
         targetCases = visibleOnly.length > 0 ? visibleOnly : allProblemCases.slice(0, 3);
       } else {
-        // "Submit" or full execution mode: run against ALL test cases (visible + hidden)
+        // "Submit" mode: run against ALL test cases (visible + hidden)
         targetCases = allProblemCases;
       }
     } else if (Array.isArray(test_cases)) {
@@ -81,11 +86,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── 2. Run against all test cases on server ──────────────────────────────
+    // ── 2. Run against all test cases via Judge0 ─────────────────────────────
     const rawResult: RunResult = await runAgainstTestCases(
       code,
       language,
-      targetCases.map(tc => ({ input: tc.input, expected: tc.expected }))
+      targetCases.map((tc) => ({ input: tc.input, expected: tc.expected }))
     );
 
     // ── 3. Sanitize hidden test cases to eliminate network inspection leaks ──
@@ -100,7 +105,6 @@ export async function POST(req: NextRequest) {
           actual: '[Hidden]',
           ok: res.ok,
           time: res.time,
-          // Only show generic runtime/compilation error message if failed
           error: res.ok ? undefined : (res.error ? 'Test case failed' : undefined),
         };
       }
@@ -108,7 +112,7 @@ export async function POST(req: NextRequest) {
       return res;
     });
 
-    const hiddenTotal = targetCases.filter(tc => tc.is_hidden).length;
+    const hiddenTotal = targetCases.filter((tc) => tc.is_hidden).length;
     const hiddenPassed = targetCases
       .filter((tc, i) => tc.is_hidden && rawResult.results[i]?.ok)
       .length;

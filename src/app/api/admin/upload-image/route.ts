@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
-import fs from 'fs';
 import path from 'path';
+import { saveFile } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,11 +49,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Image file too large (max 10MB)' }, { status: 400 });
     }
 
-    // Determine clean file extension & explicit MIME type
+    // Determine clean file extension
     const lowerName = fileName.toLowerCase();
     const extFromName = path.extname(lowerName);
 
-    // Detect SVG content or extension
     const isSvg =
       extFromName === '.svg' ||
       rawContentType.includes('svg') ||
@@ -62,78 +60,32 @@ export async function POST(req: NextRequest) {
       fileBuffer.slice(0, 100).toString('utf8').toLowerCase().includes('<?xml');
 
     let ext = extFromName;
-    let contentType = 'image/png';
-
     if (isSvg) {
       ext = '.svg';
-      contentType = 'image/svg+xml';
     } else if (extFromName === '.png' || rawContentType === 'image/png') {
       ext = '.png';
-      contentType = 'image/png';
     } else if (extFromName === '.jpg' || extFromName === '.jpeg' || rawContentType === 'image/jpeg') {
       ext = '.jpg';
-      contentType = 'image/jpeg';
     } else if (extFromName === '.webp' || rawContentType === 'image/webp') {
       ext = '.webp';
-      contentType = 'image/webp';
     } else if (extFromName === '.gif' || rawContentType === 'image/gif') {
       ext = '.gif';
-      contentType = 'image/gif';
     } else if (extFromName === '.avif' || rawContentType === 'image/avif') {
       ext = '.avif';
-      contentType = 'image/avif';
     } else {
       ext = extFromName || '.png';
-      contentType = rawContentType || 'image/png';
     }
 
     const cleanBaseName = path.basename(fileName, extFromName || ext).replace(/[^a-zA-Z0-9_-]/g, '_') || 'image';
     const finalFileName = `${cleanBaseName}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}${ext}`;
 
-    // ── 1. Always save a local copy to public/uploads directory ──
-    try {
-      const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-      const localFilePath = path.join(uploadsDir, finalFileName);
-      fs.writeFileSync(localFilePath, fileBuffer);
-    } catch (fsErr) {
-      console.warn('Local file write warning:', fsErr);
-    }
+    // Save to local storage bucket 'problem-images'
+    const { publicUrl, size } = await saveFile('problem-images', finalFileName, fileBuffer);
 
-    // ── 2. Sync to Supabase Storage ───────────────────────────
-    try {
-      if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
-        const supabase = createServerSupabaseClient();
-        const bucketName = 'problem-images';
-
-        // Check/create and update bucket to ensure public read
-        try {
-          await supabase.storage.createBucket(bucketName, { public: true });
-        } catch {}
-
-        try {
-          await supabase.storage.updateBucket(bucketName, { public: true });
-        } catch {}
-
-        await supabase.storage
-          .from(bucketName)
-          .upload(finalFileName, fileBuffer, {
-            contentType,
-            upsert: true,
-          });
-      }
-    } catch (storageErr) {
-      console.warn('Supabase storage upload warning:', storageErr);
-    }
-
-    // Return the universal endpoint URL which guarantees image loads anywhere
-    const publicUrl = `/api/images/${finalFileName}`;
     return NextResponse.json({
       url: publicUrl,
       name: finalFileName,
-      size: fileBuffer.length,
+      size,
     });
   } catch (err: any) {
     console.error('[/api/admin/upload-image]', err);

@@ -1,22 +1,19 @@
 /**
- * gemini.ts — AI wrapper
+ * gemini.ts — 100% Local AI wrapper
  *
- * Routing: Groq (primary, fast) → Ollama (fallback, your Docker server)
- * Limits:  Stored in Supabase `ai_usage` table (per user account, bypass-proof)
- *          + localStorage cache (instant reads, no DB call on every render)
- * Access:  Subscribers only — non-subscribers get a friendly upgrade message
+ * Routing: Local Server AI (/api/ai) → Direct Local Ollama (qwen2.5-coder:3b)
+ * Zero third-party cloud dependencies.
  *
- * Groq free tier:  30 req/min, 14,400 req/day, ~1-3s response
- * Ollama fallback: your Docker server, handles overflow
+ * Local Ollama: http://localhost:11434 (qwen2.5-coder:3b)
  */
 
 import { getSupabaseClient } from '@/lib/supabase';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const AI_TIMEOUT    = 12000; // ms — fall back to Ollama after this
+const AI_TIMEOUT    = 30000; // ms for local model inference
 
-const OLLAMA_BASE   = process.env.NEXT_PUBLIC_OLLAMA_URL   ?? 'http://localhost:11434';
+const OLLAMA_BASE   = (process.env.NEXT_PUBLIC_OLLAMA_URL ?? 'http://localhost:11434').replace(/\/$/, '');
 const OLLAMA_MODEL  = process.env.NEXT_PUBLIC_OLLAMA_MODEL ?? 'qwen2.5-coder:3b';
 
 export const LIMITS = {
@@ -217,11 +214,11 @@ export function getUsageStatus(): UsageStatus {
   };
 }
 
-// ── Core: Server AI API (Groq) ────────────────────────────────────────────────
+// ── Core: Server AI API (Local Ollama / Server AI Route) ───────────────────────
 
 interface Msg { role: 'system' | 'user'; content: string; }
 
-async function callGroq(messages: Msg[], maxTokens: number): Promise<string> {
+async function callServerAI(messages: Msg[], maxTokens: number): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), AI_TIMEOUT);
   try {
@@ -231,7 +228,7 @@ async function callGroq(messages: Msg[], maxTokens: number): Promise<string> {
       body: JSON.stringify({ messages, maxTokens, temperature: 0.2 }),
       signal: controller.signal,
     });
-    if (res.status === 429) throw new Error('GROQ_RATE_LIMIT');
+    if (res.status === 429) throw new Error('AI_RATE_LIMIT');
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
       throw new Error(errData.error || `AI error ${res.status}`);
@@ -241,42 +238,61 @@ async function callGroq(messages: Msg[], maxTokens: number): Promise<string> {
   } finally { clearTimeout(timer); }
 }
 
-// ── Core: Ollama fallback ─────────────────────────────────────────────────────
+// ── Core: Ollama client-side fallback ─────────────────────────────────────────
 
 async function callOllama(messages: Msg[], maxTokens: number): Promise<string> {
-  const res = await fetch(`${OLLAMA_BASE}/v1/chat/completions`, {
+  try {
+    const res = await fetch(`${OLLAMA_BASE}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: OLLAMA_MODEL, messages, max_tokens: maxTokens, temperature: 0.2, stream: false }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content?.trim();
+      if (content) return content;
+    }
+  } catch {}
+
+  // Fallback to native /api/chat
+  const nativeRes = await fetch(`${OLLAMA_BASE}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: OLLAMA_MODEL, messages, max_tokens: maxTokens, temperature: 0.2, stream: false }),
+    body: JSON.stringify({
+      model: OLLAMA_MODEL,
+      messages,
+      options: { num_predict: maxTokens, temperature: 0.2 },
+      stream: false,
+    }),
   });
-  if (!res.ok) throw new Error(`Ollama ${res.status}`);
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() ?? '';
+  if (!nativeRes.ok) throw new Error(`Ollama ${nativeRes.status}`);
+  const data = await nativeRes.json();
+  return data.message?.content?.trim() ?? '';
 }
 
-// ── Core: router — Groq → Ollama ─────────────────────────────────────────────
+// ── Core: router — Server API (Ollama) → Direct Local Ollama ──────────────────
 
 async function callAI(userPrompt: string, maxTokens: number, systemPrompt?: string): Promise<string> {
   const messages: Msg[] = [];
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
   messages.push({ role: 'user', content: userPrompt });
 
-  // 1. Try server AI endpoint (Groq)
+  // 1. Try server AI endpoint (/api/ai)
   try {
-    const result = await callGroq(messages, maxTokens);
+    const result = await callServerAI(messages, maxTokens);
     if (result) return result;
   } catch (e: any) {
-    console.warn('AI endpoint failed, trying Ollama fallback:', e.message);
+    console.warn('Server AI endpoint failed, trying direct Ollama fallback:', e.message);
   }
 
-  // 2. Fallback: Ollama
+  // 2. Fallback: Direct Local Ollama
   try {
     const result = await callOllama(messages, maxTokens);
     if (result) return result;
     return 'No response from AI.';
   } catch (e: any) {
     if (e.message?.includes('fetch failed') || e.message?.includes('ECONNREFUSED'))
-      return '⚠️ AI is unavailable right now. Try again in a moment.';
+      return '⚠️ AI is unavailable right now. Please ensure local Ollama is running (`ollama run qwen2.5-coder:3b`).';
     return `AI error: ${e.message}`;
   }
 }
