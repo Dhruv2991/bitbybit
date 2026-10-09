@@ -1,0 +1,542 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ── Enums ──────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum Difficulty {
+  Easy
+  Medium
+  Hard
+}
+
+enum ProblemVisibility {
+  PUBLIC
+  ARENA
+  WEEKLY
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum JobMode {
+  RUN
+  SUBMIT
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ContestStatus {
+  UPCOMING
+  LIVE
+  ENDED
+}
+
+enum RegistrationStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum ArenaStatus {
+  SUBMITTED
+  DISQUALIFIED
+  REVIEWED
+}
+
+enum SubscriberStatus {
+  ACTIVE
+  CONFIRMED
+  PENDING
+  EXPIRED
+  CANCELLED
+}
+
+enum DiscountType {
+  FIXED
+  PERCENTAGE
+}
+
+enum CertificateStatus {
+  ISSUED
+  REVOKED
+}
+
+enum EmailDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum AiFeature {
+  HINT
+  EXPLAIN_FAILURE
+  REVIEW_CODE
+  VALIDATE_APPROACH
+  EDITORIAL
+  RECOMMENDATION
+}
+
+// ── Auth & Users (GitHub OAuth Only) ───────────────────────────────
+
+model User {
+  id             String    @id @default(uuid()) @db.Uuid
+  githubId       String?   @unique @map("github_id")        // Numeric GitHub ID (e.g. "12345678")
+  githubUsername String    @unique @map("github_username")  // Current GitHub handle
+  name           String
+  email          String?   @unique
+  avatarUrl      String?   @map("avatar_url")
+  role           UserRole  @default(USER)
+  totalPoints    Int       @default(0) @map("total_points")
+  problemsSolved Int       @default(0) @map("problems_solved")
+  streak         Int       @default(0)
+  lastSolvedAt   DateTime? @map("last_solved_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  sessions             Session[]
+  submissions          Submission[]
+  userProblemBests     UserProblemBest[]
+  submissionJobs       SubmissionJob[]
+  contestRegistrations ContestRegistration[]
+  arenaSubmissions     ArenaSubmission[]
+  weeklyAccesses       WeeklyAccess[]
+  weeklySubmissions    WeeklySubmission[]
+  subscription         Subscriber?
+  certificates         Certificate[]
+  aiUsages             AiUsage[]
+  practiceAttempts     PracticeAttempt[]
+
+  @@index([githubUsername])
+  @@index([githubId])
+  @@index([role])
+  @@index([totalPoints(sort: Desc)])
+  @@map("users")
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  tokenHash  String   @unique @map("token_hash") // SHA-256 hash of random session secret
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([userId, expiresAt])
+  @@map("sessions")
+}
+
+// ── Problems, Relational Test Cases & Join Tables ──────────────────
+
+model Problem {
+  id               String            @id @default(uuid()) @db.Uuid
+  title            String
+  slug             String            @unique
+  difficulty       Difficulty
+  points           Int               @default(100)
+  tags             String[]          @default([])
+  description      String            @db.Text
+  example          String            @db.Text
+  starterCode      String            @map("starter_code") @db.Text
+  paramTypes       String[]          @map("param_types")
+  returnType       String            @map("return_type")
+  hints            String[]          @default([])
+  submissionCount  Int               @default(0) @map("submission_count")
+  isContestProblem Boolean           @default(false) @map("is_contest_problem")
+  visibility       ProblemVisibility @default(PUBLIC)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  testCases               TestCase[]
+  submissions             Submission[]
+  userProblemBests        UserProblemBest[]
+  submissionJobs          SubmissionJob[]
+  contestProblems         ContestProblem[]
+  arenaSubmissions        ArenaSubmission[]
+  weeklyChallengeProblems WeeklyChallengeProblem[]
+  weeklySubmissions       WeeklySubmission[]
+  practiceAttempts        PracticeAttempt[]
+
+  @@index([difficulty])
+  @@index([visibility])
+  @@map("problems")
+}
+
+model TestCase {
+  id          String   @id @default(uuid()) @db.Uuid
+  problemId   String   @map("problem_id") @db.Uuid
+  input       String   @db.Text
+  expected    String   @db.Text
+  isHidden    Boolean  @default(false) @map("is_hidden")
+  explanation String?  @db.Text
+  orderIndex  Int      @default(0) @map("order_index")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@index([problemId, isHidden, orderIndex])
+  @@map("test_cases")
+}
+
+// ── Submission Queue & Execution Records ───────────────────────────
+
+model SubmissionJob {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  problemId   String    @map("problem_id") @db.Uuid
+  language    String
+  code        String    @db.Text
+  approach    String?   @db.Text
+  mode        JobMode   @default(SUBMIT)
+  status      JobStatus @default(QUEUED)
+  priority    Int       @default(0)
+  retryCount  Int       @default(0) @map("retry_count")
+  lockedAt    DateTime? @map("locked_at") @db.Timestamptz
+  lockedBy    String?   @map("locked_by")
+  results     Json?
+  error       String?   @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem    Problem     @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  submission Submission?
+
+  @@index([status, priority(sort: Desc), createdAt(sort: Asc)])
+  @@index([userId, status])
+  @@index([lockedAt])
+  @@map("submission_jobs")
+}
+
+model Submission {
+  id            String           @id @default(uuid()) @db.Uuid
+  jobId         String?          @unique @map("job_id") @db.Uuid
+  problemId     String           @map("problem_id") @db.Uuid
+  userId        String           @map("user_id") @db.Uuid
+  lang          String
+  code          String           @db.Text
+  approach      String           @db.Text
+  status        SubmissionStatus @default(PENDING)
+  testsPassed   Int              @default(0) @map("tests_passed")
+  testsTotal    Int              @default(0) @map("tests_total")
+  pointsAwarded Int              @default(0) @map("points_awarded")
+  executionMs   Int?             @map("execution_ms")
+  memoryKb      Int?             @map("memory_kb")
+  rejectReason  String?          @map("reject_reason")
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  job     SubmissionJob? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  problem Problem        @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([problemId, userId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("submissions")
+}
+
+model UserProblemBest {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  problemId        String    @map("problem_id") @db.Uuid
+  bestSubmissionId String?   @map("best_submission_id") @db.Uuid
+  maxPoints        Int       @default(0) @map("max_points")
+  isSolved         Boolean   @default(false) @map("is_solved")
+  firstSolvedAt    DateTime? @map("first_solved_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, problemId], name: "unique_user_problem_best")
+  @@index([userId, isSolved])
+  @@map("user_problem_bests")
+}
+
+// ── Contests & Normalized Join Tables ──────────────────────────────
+
+model Contest {
+  id                  String        @id @default(uuid()) @db.Uuid
+  name                String
+  entryFee            Int           @default(0) @map("entry_fee")
+  durationMins        Int           @map("duration_mins")
+  upiId               String?       @map("upi_id")
+  leaderboardDiscount Int           @default(0) @map("leaderboard_discount")
+  status              ContestStatus @default(UPCOMING)
+  startsAt            DateTime?     @map("starts_at") @db.Timestamptz
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  contestProblems  ContestProblem[]
+  registrations    ContestRegistration[]
+  arenaSubmissions ArenaSubmission[]
+
+  @@index([status, startsAt])
+  @@map("contests")
+}
+
+model ContestProblem {
+  id         String @id @default(uuid()) @db.Uuid
+  contestId  String @map("contest_id") @db.Uuid
+  problemId  String @map("problem_id") @db.Uuid
+  orderIndex Int    @default(0) @map("order_index")
+  points     Int    @default(100)
+
+  contest Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([contestId, problemId], name: "unique_contest_problem")
+  @@map("contest_problems")
+}
+
+model ContestRegistration {
+  id                String             @id @default(uuid()) @db.Uuid
+  contestId         String             @map("contest_id") @db.Uuid
+  userId            String             @map("user_id") @db.Uuid
+  txnId             String?            @map("txn_id")
+  razorpayOrderId   String?            @unique @map("razorpay_order_id")
+  razorpayPaymentId String?            @unique @map("razorpay_payment_id")
+  status            RegistrationStatus @default(PENDING)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz
+
+  contest Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([contestId, userId], name: "unique_contest_registration")
+  @@index([userId])
+  @@map("contest_registrations")
+}
+
+model ArenaSubmission {
+  id                  String      @id @default(uuid()) @db.Uuid
+  contestId           String      @map("contest_id") @db.Uuid
+  problemId           String      @map("problem_id") @db.Uuid
+  userId              String      @map("user_id") @db.Uuid
+  lang                String
+  code                String      @db.Text
+  strikes             Int         @default(0)
+  status              ArenaStatus @default(SUBMITTED)
+  strikePenaltyFactor Float       @default(1.0) @map("strike_penalty_factor")
+  pointsAwarded       Int         @default(0) @map("points_awarded")
+  testsPassed         Int         @default(0) @map("tests_passed")
+  testsTotal          Int         @default(0) @map("tests_total")
+  createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  contest Contest @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([contestId, problemId, userId])
+  @@index([contestId, pointsAwarded(sort: Desc)])
+  @@map("arena_submissions")
+}
+
+// ── Weekly Challenges & Normalized Join Tables ─────────────────────
+
+model WeeklyChallenge {
+  id           String   @id @default(uuid()) @db.Uuid
+  title        String
+  description  String   @db.Text
+  entryFee     Int      @default(0) @map("entry_fee")
+  upiId        String?  @map("upi_id")
+  whatsappLink String?  @map("whatsapp_link")
+  startsAt     DateTime @map("starts_at") @db.Timestamptz
+  endsAt       DateTime @map("ends_at") @db.Timestamptz
+  status       String   @default("active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  challengeProblems WeeklyChallengeProblem[]
+  accesses          WeeklyAccess[]
+  submissions       WeeklySubmission[]
+
+  @@map("weekly_challenges")
+}
+
+model WeeklyChallengeProblem {
+  id                String @id @default(uuid()) @db.Uuid
+  weeklyChallengeId String @map("weekly_challenge_id") @db.Uuid
+  problemId         String @map("problem_id") @db.Uuid
+  orderIndex        Int    @default(0) @map("order_index")
+
+  weeklyChallenge WeeklyChallenge @relation(fields: [weeklyChallengeId], references: [id], onDelete: Cascade)
+  problem         Problem         @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@unique([weeklyChallengeId, problemId], name: "unique_weekly_problem")
+  @@map("weekly_challenge_problems")
+}
+
+model WeeklyAccess {
+  id                String   @id @default(uuid()) @db.Uuid
+  weeklyChallengeId String   @map("weekly_challenge_id") @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  txnId             String?  @map("txn_id")
+  status            String   @default("confirmed")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  weeklyChallenge WeeklyChallenge @relation(fields: [weeklyChallengeId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([weeklyChallengeId, userId], name: "unique_weekly_access")
+  @@map("weekly_access")
+}
+
+model WeeklySubmission {
+  id                String   @id @default(uuid()) @db.Uuid
+  weeklyChallengeId String   @map("weekly_challenge_id") @db.Uuid
+  problemId         String   @map("problem_id") @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  lang              String
+  code              String   @db.Text
+  status            String   @default("approved")
+  testsPassed       Int      @default(0) @map("tests_passed")
+  testsTotal        Int      @default(0) @map("tests_total")
+  pointsAwarded     Int      @default(0) @map("points_awarded")
+  submittedAt       DateTime @default(now()) @map("submitted_at") @db.Timestamptz
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  weeklyChallenge WeeklyChallenge @relation(fields: [weeklyChallengeId], references: [id], onDelete: Cascade)
+  problem         Problem         @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([weeklyChallengeId, userId])
+  @@map("weekly_submissions")
+}
+
+// ── Subscriptions & Coupons ────────────────────────────────────────
+
+model Subscriber {
+  id                String           @id @default(uuid()) @db.Uuid
+  userId            String           @unique @map("user_id") @db.Uuid
+  txnId             String?          @map("txn_id")
+  razorpayOrderId   String?          @unique @map("razorpay_order_id")
+  razorpayPaymentId String?          @unique @map("razorpay_payment_id")
+  status            SubscriberStatus @default(ACTIVE)
+  currentPeriodEnd  DateTime         @map("current_period_end") @db.Timestamptz
+  createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, currentPeriodEnd])
+  @@map("subscribers")
+}
+
+model Coupon {
+  id            String       @id @default(uuid()) @db.Uuid
+  code          String       @unique
+  discountType  DiscountType @default(FIXED) @map("discount_type")
+  discountValue Decimal      @default(160) @map("discount_value") @db.Decimal(10, 2)
+  isActive      Boolean      @default(true) @map("is_active")
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([code, isActive])
+  @@map("coupons")
+}
+
+// ── Certificates, Communications & Telemetry ───────────────────────
+
+model Certificate {
+  id                 String              @id @default(uuid()) @db.Uuid
+  certificateId      String              @unique @map("certificate_id")
+  userId             String?             @map("user_id") @db.Uuid
+  recipientName      String              @map("recipient_name")
+  recipientEmail     String              @map("recipient_email")
+  certificateType    String              @default("Certificate of Achievement") @map("certificate_type")
+  title              String              @default("CERTIFICATE OF ACHIEVEMENT")
+  achievementText    String              @map("achievement_text") @db.Text
+  eventName          String              @map("event_name")
+  organizationText   String              @default("from teamcodelocked club") @map("organization_text")
+  activityPointsText String?             @map("activity_points_text")
+  coordinatorNames   Json                @default("[]") @map("coordinator_names")
+  issuedAt           DateTime            @default(now()) @map("issued_at") @db.Timestamptz
+  issuedBy           String              @map("issued_by")
+  pdfPath            String              @map("pdf_path")
+  status             CertificateStatus   @default(ISSUED)
+  emailStatus        EmailDeliveryStatus @default(PENDING) @map("email_status")
+  emailError         String?             @map("email_error")
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([certificateId])
+  @@index([userId])
+  @@map("certificates")
+}
+
+model EmailLog {
+  id     String   @id @default(uuid()) @db.Uuid
+  email  String
+  kind   String
+  refId  String   @map("ref_id")
+  sentAt DateTime @default(now()) @map("sent_at") @db.Timestamptz
+
+  @@index([email, kind, refId])
+  @@map("email_log")
+}
+
+model AiUsage {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  feature    AiFeature
+  problemId  String    @default("") @map("problem_id")
+  used       Int       @default(1)
+  date       DateTime  @db.Date
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature, problemId, date], name: "unique_ai_usage_day")
+  @@index([userId, date])
+  @@map("ai_usage")
+}
+
+model PracticeAttempt {
+  id          String   @id @default(uuid()) @db.Uuid
+  problemId   String   @map("problem_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  lang        String
+  attemptedAt DateTime @default(now()) @map("attempted_at") @db.Timestamptz
+
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([problemId, userId])
+  @@map("practice_attempts")
+}
+
+model AppConfig {
+  key   String @id
+  value String
+
+  @@map("app_config")
+}
+
+model CollaborationPage {
+  id        String   @id @default(uuid()) @db.Uuid
+  title     String   @default("Our Collaborations")
+  content   String   @db.Text
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("collaborations_page")
+}
