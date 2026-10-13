@@ -10,17 +10,21 @@
 // Brevo dashboard) and BREVO_SENDER_EMAIL (must be a "Sender"
 // verified in Brevo — Settings → Senders & IP).
 //
-// Trade-offs:
-//   - Free tier: 300 emails/day, no credit card required.
-//   - Sending from a domain-verified sender lands in inboxes more
-//     reliably than a personal Gmail address did.
-//   - No daily send-rate footgun like Gmail's undocumented limits —
-//     Brevo enforces a clear, visible quota in its dashboard.
+// Compliant Unsubscribe Support:
+//   - Checks the user's `email_subscribed` flag before sending any
+//     promotional or marketing emails.
+//   - Appends a mandatory, clear unsubscribe footer to every outbound
+//     promotional email template linking to:
+//     `https://bitbybit-9h8e.vercel.app/unsubscribe?email=USER_EMAIL`
 //
 // Server-only — never import this from a client component.
 // ════════════════════════════════════════════════════════════
 
+import { createServerSupabaseClient } from '@/lib/supabase';
+
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+export const UNSUBSCRIBE_BASE_URL = 'https://bitbybit-9h8e.vercel.app/unsubscribe';
+
 const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const BREVO_SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL;
 const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || 'Bit by Bit';
@@ -32,6 +36,71 @@ function ready(): boolean {
     return false;
   }
   return true;
+}
+
+/**
+ * Generates the compliant unsubscribe URL with recipient email encoded.
+ * Fallback to direct placeholder URL format per specification.
+ */
+export function getUnsubscribeUrl(email?: string): string {
+  if (!email || !email.trim()) {
+    return `${UNSUBSCRIBE_BASE_URL}?email=USER_EMAIL`;
+  }
+  return `${UNSUBSCRIBE_BASE_URL}?email=${encodeURIComponent(email.trim().toLowerCase())}`;
+}
+
+/**
+ * Checks whether an email address is subscribed to promotional communications.
+ * Respects opt-out across members, subscribers, and email_unsubscribes tables.
+ */
+export async function isEmailSubscribed(email: string): Promise<boolean> {
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return false;
+  }
+
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    const db = createServerSupabaseClient();
+
+    // 1. Check dedicated email_unsubscribes opt-out table
+    // eslint-disable-next-line
+    const { data: optOut, error: optErr } = await (db.from('email_unsubscribes') as any)
+      .select('email')
+      .ilike('email', cleanEmail)
+      .maybeSingle();
+
+    if (!optErr && optOut) {
+      return false;
+    }
+
+    // 2. Check members table (user accounts/profiles)
+    // eslint-disable-next-line
+    const { data: member, error: memberErr } = await (db.from('members') as any)
+      .select('email_subscribed')
+      .ilike('email', cleanEmail)
+      .maybeSingle();
+
+    if (!memberErr && member && member.email_subscribed === false) {
+      return false;
+    }
+
+    // 3. Check subscribers table (paid subscribers)
+    // eslint-disable-next-line
+    const { data: subscriber, error: subErr } = await (db.from('subscribers') as any)
+      .select('email_subscribed')
+      .ilike('email', cleanEmail)
+      .maybeSingle();
+
+    if (!subErr && subscriber && subscriber.email_subscribed === false) {
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('[email] Warning checking email subscription status for', email, err);
+    // If Supabase check fails unexpectedly, do not block critical operations
+    return true;
+  }
 }
 
 async function brevoSend(to: string, subject: string, html: string): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -63,72 +132,161 @@ async function brevoSend(to: string, subject: string, html: string): Promise<{ o
   }
 }
 
-function wrap(bodyHtml: string) {
+export interface WrapOptions {
+  isPromotional?: boolean;
+  recipientEmail?: string;
+}
+
+/**
+ * Standard unsubscribe footer renderer for marketing & broadcast messages.
+ */
+export function renderUnsubscribeFooter(recipientEmail?: string): string {
+  const unsubscribeUrl = getUnsubscribeUrl(recipientEmail);
+  return `
+    <div style="margin-top:32px;padding-top:18px;border-top:1px solid #222;font-size:11px;color:#777;line-height:1.6;">
+      <p style="margin:0 0 6px 0;color:#888;">
+        You're receiving this promotional update because you have an account with Bit by Bit.
+      </p>
+      <p style="margin:0;color:#666;">
+        Don't want to receive promotional notifications? 
+        <a href="${unsubscribeUrl}" style="color:#00e87a;text-decoration:underline;font-weight:600;" target="_blank" rel="noopener noreferrer">
+          Unsubscribe here
+        </a>
+      </p>
+    </div>
+  `;
+}
+
+function wrap(bodyHtml: string, options?: WrapOptions) {
+  const footerHtml = options?.isPromotional
+    ? renderUnsubscribeFooter(options?.recipientEmail)
+    : `
+      <div style="margin-top:32px;padding-top:16px;border-top:1px solid #222;font-size:11px;color:#666;">
+        You're receiving this transactional notice because you have an account on Bit by Bit.
+      </div>
+    `;
+
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#0a0a0a;padding:32px 0;">
     <div style="max-width:480px;margin:0 auto;background:#111;border:1px solid #222;border-radius:16px;padding:32px;color:#e0e0e0;">
       <div style="font-family:monospace;font-weight:bold;color:#00e87a;font-size:14px;margin-bottom:24px;">Bit by Bit</div>
       ${bodyHtml}
-      <div style="margin-top:32px;padding-top:16px;border-top:1px solid #222;font-size:11px;color:#666;">
-        You're receiving this because you have an account on Bit by Bit.
-      </div>
+      ${footerHtml}
     </div>
   </div>`;
 }
 
+export interface SendEmailOptions {
+  isPromotional?: boolean;
+}
+
 /**
- * Single transactional send (confirmations, receipts). Never throws —
- * logs and returns false on failure so a failed email can't take
- * down a payment-verification request.
+ * Single transactional or promotional send (confirmations, receipts, nudges).
+ * If `options?.isPromotional` is set, verifies that the user is subscribed
+ * before dispatching. Logs and returns false on failure or opt-out.
  */
-export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+export async function sendEmail(
+  to: string,
+  subject: string,
+  html: string,
+  options?: SendEmailOptions
+): Promise<boolean> {
   if (!ready() || !to) return false;
+
+  if (options?.isPromotional) {
+    const subscribed = await isEmailSubscribed(to);
+    if (!subscribed) {
+      console.log(`[email] Skipping promotional send to ${to}: user has opted out.`);
+      return false;
+    }
+  }
+
   const result = await brevoSend(to, subject, html);
   return result.ok;
 }
 
 /**
- * Same as sendEmail but also returns the failure reason — used by
- * the broadcast route so a failed send can show *why* in the admin
- * toast instead of just a bare failed count.
+ * Same as sendEmail but also returns detailed status and failure reasons.
+ * Verifies `isEmailSubscribed` before sending promotional emails.
  */
-export async function sendEmailDetailed(to: string, subject: string, html: string): Promise<{ ok: boolean; error?: string }> {
+export async function sendEmailDetailed(
+  to: string,
+  subject: string,
+  html: string,
+  options?: SendEmailOptions
+): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   if (!ready()) return { ok: false, error: 'BREVO_API_KEY / BREVO_SENDER_EMAIL not set' };
   if (!to) return { ok: false, error: 'No recipient email' };
+
+  if (options?.isPromotional) {
+    const subscribed = await isEmailSubscribed(to);
+    if (!subscribed) {
+      console.log(`[email] Skipping promotional send to ${to}: user has opted out.`);
+      return { ok: false, skipped: true, error: 'Recipient has opted out of promotional emails.' };
+    }
+  }
+
   return brevoSend(to, subject, html);
+}
+
+/**
+ * Dedicated dispatch helper for promotional or marketing emails.
+ * Explicitly guards against opt-out requests.
+ */
+export async function sendPromotionalEmail(
+  to: string,
+  subject: string,
+  html: string
+): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  return sendEmailDetailed(to, subject, html, { isPromotional: true });
 }
 
 export interface BatchRecipient {
   to: string;
   subject: string;
   html: string;
+  isPromotional?: boolean;
 }
 
 /**
  * Batch send for broadcasts (contest live, weekly challenge,
- * subscribe nudge). Brevo's API is per-recipient like Gmail's SMTP
- * was, so this still sends sequentially with a small delay between
- * each — gentler on rate limits than firing everything at once, and
- * keeps a single bad recipient from aborting the rest.
- *
- * Note: on Vercel's default (10s) function timeout, this comfortably
- * handles dozens of recipients. If your subscriber list grows into
- * the hundreds, this will need chunking across multiple requests —
- * flag it if you get there.
+ * subscribe nudge). Checks opt-out status for promotional recipients
+ * and paces sends sequentially with a small delay.
  */
-export async function sendBatch(recipients: BatchRecipient[]): Promise<{ sent: number; failed: number; lastError?: string }> {
-  if (!ready()) return { sent: 0, failed: recipients.length, lastError: 'BREVO_API_KEY / BREVO_SENDER_EMAIL not set' };
+export async function sendBatch(
+  recipients: BatchRecipient[]
+): Promise<{ sent: number; failed: number; skipped: number; lastError?: string }> {
+  if (!ready()) {
+    return { sent: 0, failed: recipients.length, skipped: 0, lastError: 'BREVO_API_KEY / BREVO_SENDER_EMAIL not set' };
+  }
 
-  let sent = 0, failed = 0;
+  let sent = 0;
+  let failed = 0;
+  let skipped = 0;
   let lastError: string | undefined;
+
   for (const r of recipients) {
+    if (r.isPromotional) {
+      const subscribed = await isEmailSubscribed(r.to);
+      if (!subscribed) {
+        console.log(`[email/batch] Skipping promotional send to ${r.to}: user opted out.`);
+        skipped++;
+        continue;
+      }
+    }
+
     const result = await brevoSend(r.to, r.subject, r.html);
-    if (result.ok) sent++;
-    else { failed++; lastError = result.error; }
+    if (result.ok) {
+      sent++;
+    } else {
+      failed++;
+      lastError = result.error;
+    }
     // Gentle pacing to avoid tripping Brevo's per-second rate limit.
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  return { sent, failed, lastError };
+
+  return { sent, failed, skipped, lastError };
 }
 
 function he(str: any): string {
@@ -142,9 +300,10 @@ function he(str: any): string {
 }
 
 // ────────────────────────────────────────────────────────────
-// Templates (unchanged — same output regardless of provider)
+// Templates
 // ────────────────────────────────────────────────────────────
 
+// 1. Transactional: Subscription Confirmed
 export function subscriptionConfirmedEmail(name: string, periodEnd: string) {
   const safeName = he(name);
   const until = he(new Date(periodEnd).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }));
@@ -164,6 +323,7 @@ export function subscriptionConfirmedEmail(name: string, periodEnd: string) {
   };
 }
 
+// 2. Transactional: Subscription Revoked / Refunded
 export function subscriptionRevokedEmail(name: string) {
   const safeName = he(name);
   return {
@@ -179,7 +339,8 @@ export function subscriptionRevokedEmail(name: string) {
   };
 }
 
-export function contestLiveEmail(name: string, contestName: string) {
+// 3. Promotional: Contest Live Announcement
+export function contestLiveEmail(name: string, contestName: string, recipientEmail?: string) {
   const safeName = he(name);
   const safeContest = he(contestName);
   return {
@@ -194,11 +355,12 @@ export function contestLiveEmail(name: string, contestName: string) {
         padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:13px;">
         Enter the Arena →
       </a>
-    `),
+    `, { isPromotional: true, recipientEmail }),
   };
 }
 
-export function weeklyChallengeEmail(name: string, title: string) {
+// 4. Promotional: Weekly Challenge Drop
+export function weeklyChallengeEmail(name: string, title: string, recipientEmail?: string) {
   const safeName = he(name);
   const safeTitle = he(title);
   return {
@@ -213,11 +375,12 @@ export function weeklyChallengeEmail(name: string, title: string) {
         padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:13px;">
         View challenge →
       </a>
-    `),
+    `, { isPromotional: true, recipientEmail }),
   };
 }
 
-export function inactivityNudgeEmail(name: string, daysInactive: number) {
+// 5. Promotional: Inactivity Nudge
+export function inactivityNudgeEmail(name: string, daysInactive: number, recipientEmail?: string) {
   const safeName = he(name);
   const safeDays = he(daysInactive);
   return {
@@ -233,11 +396,12 @@ export function inactivityNudgeEmail(name: string, daysInactive: number) {
         padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:13px;">
         Solve a problem →
       </a>
-    `),
+    `, { isPromotional: true, recipientEmail }),
   };
 }
 
-export function subscribeNudgeEmail(name: string) {
+// 6. Promotional: Subscribe Nudge
+export function subscribeNudgeEmail(name: string, recipientEmail?: string) {
   const safeName = he(name);
   return {
     subject: "You're missing out on this week's challenge",
@@ -251,10 +415,11 @@ export function subscribeNudgeEmail(name: string) {
         padding:10px 20px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:13px;">
         Subscribe now →
       </a>
-    `),
+    `, { isPromotional: true, recipientEmail }),
   };
 }
 
+// 7. Transactional: Certificate Issued
 export function certificateIssuedEmail(
   name: string,
   certificateTitle: string,
@@ -294,4 +459,3 @@ export function certificateIssuedEmail(
     `),
   };
 }
-

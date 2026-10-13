@@ -104,7 +104,7 @@ async function sendInactivityNudges() {
 
   const [{ data: members }, { data: alreadyLogged }] = await Promise.all([
     // eslint-disable-next-line
-    (db.from('members') as any).select('github, name, email, last_solved_at, joined_at'),
+    (db.from('members') as any).select('github, name, email, last_solved_at, joined_at, email_subscribed'),
     // eslint-disable-next-line
     (db.from('email_log') as any).select('github').eq('kind', 'inactivity_nudge').eq('ref_id', monthKey),
   ]);
@@ -112,7 +112,7 @@ async function sendInactivityNudges() {
   const alreadyGithubs = new Set((alreadyLogged || []).map((r: any) => r.github));
 
   const targets = (members || []).filter((m: any) => {
-    if (!m.email || alreadyGithubs.has(m.github)) return false;
+    if (!m.email || m.email_subscribed === false || alreadyGithubs.has(m.github)) return false;
     const lastActive = m.last_solved_at || m.joined_at;
     return lastActive && lastActive < cutoff;
   });
@@ -121,8 +121,8 @@ async function sendInactivityNudges() {
   for (const m of targets) {
     const lastActive = new Date(m.last_solved_at || m.joined_at);
     const daysInactive = Math.floor((Date.now() - lastActive.getTime()) / (24 * 60 * 60 * 1000));
-    const { subject, html } = inactivityNudgeEmail(m.name, daysInactive);
-    const ok = await sendEmail(m.email, subject, html);
+    const { subject, html } = inactivityNudgeEmail(m.name, daysInactive, m.email);
+    const ok = await sendEmail(m.email, subject, html, { isPromotional: true });
     if (ok) {
       sent++;
       // eslint-disable-next-line

@@ -1,4 +1,4 @@
-﻿# BitByBit — Data Model
+# BitByBit — Data Model
 
 > Source of truth: src/types/database.ts for TypeScript types; supabase/migrations/20261001_certificates_schema.sql for DDL. Other tables inferred from query patterns in source code (no additional migrations were found in the repo).
 
@@ -248,10 +248,10 @@ Used by all admin routes as the authorization gate.
 |---|---|---|
 | id | UUID | Auto-generated |
 | github | TEXT UNIQUE | GitHub username (identity key) |
-| 
-ame | TEXT | Full name from GitHub |
+| name | TEXT | Full name from GitHub |
 | email | TEXT NULLABLE | Populated by /api/auth/sync |
-| 	otal_points | INT | Sum of points_awarded from all approved submissions |
+| email_subscribed | BOOL | Default true; opt-out flag for promotional emails |
+| total_points | INT | Sum of points_awarded from all approved submissions |
 | problems_solved | INT | Count of distinct problems with approved submission |
 | streak | INT | Consecutive-day solve count |
 | last_solved_at | TIMESTAMPTZ | Updated on every successful submit |
@@ -386,9 +386,23 @@ ame | TEXT | |
 | azorpay_order_id | TEXT NULLABLE | |
 | azorpay_payment_id | TEXT NULLABLE | |
 | email | TEXT NULLABLE | From auth/sync |
+| email_subscribed | BOOL | Default true; opt-out flag for promotional emails |
 | status | TEXT | 'pending' or 'confirmed' or 'rejected' |
 | current_period_end | TIMESTAMPTZ NULLABLE | Access active while status='confirmed' AND this > now() |
 | created_at | TIMESTAMPTZ | |
+
+---
+
+### email_unsubscribes
+
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID | Primary key |
+| email | TEXT UNIQUE | Unsubscribed email address |
+| reason | TEXT NULLABLE | Optional reason / feedback provided |
+| source | TEXT | 'web_page', 'direct_link', or 'api' |
+| unsubscribed_at | TIMESTAMPTZ | Timestamp of opt-out request |
+| created_at | TIMESTAMPTZ | Row creation |
 
 **Active subscription check** (src/lib/subscription.ts:isActiveSubscription):
 `

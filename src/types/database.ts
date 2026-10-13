@@ -53,6 +53,7 @@ export interface Member {
   github: string;
   name: string;
   email?: string | null;
+  email_subscribed?: boolean;
 
   total_points: number;
   problems_solved: number;
@@ -287,6 +288,44 @@ export interface Database {
         };
 
         Update: Partial<Omit<Coupon, 'id' | 'created_at'>>;
+      };
+
+      subscribers: {
+        Row: Subscriber;
+
+        Insert: Omit<Subscriber, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+
+        Update: Partial<Subscriber>;
+      };
+
+      email_unsubscribes: {
+        Row: {
+          id: string;
+          email: string;
+          reason: string | null;
+          source: string;
+          unsubscribed_at: string;
+          created_at: string;
+        };
+
+        Insert: {
+          id?: string;
+          email: string;
+          reason?: string | null;
+          source?: string;
+          unsubscribed_at?: string;
+          created_at?: string;
+        };
+
+        Update: Partial<{
+          email: string;
+          reason: string | null;
+          source: string;
+          unsubscribed_at: string;
+        }>;
       };
     };
   };
@@ -607,6 +646,7 @@ export interface Subscriber {
   razorpay_order_id?:   string | null;
   razorpay_payment_id?: string | null;
   email?:     string | null;
+  email_subscribed?:    boolean;
   status:     SubscriberStatus;
   // ISO timestamp the current paid month runs until. Access is only
   // active while status === 'confirmed' AND this is in the future.

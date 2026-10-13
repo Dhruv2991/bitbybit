@@ -10,7 +10,7 @@ import { isActiveSubscription } from "@/lib/subscription";
 
 export type PageId =
   | "home" | "problems" | "leaderboard" | "arena" | "weekly"
-  | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe" | "collaborations";
+  | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe" | "collaborations" | "unsubscribe";
 
 export type ToastType = "ok" | "err" | "warn" | "info";
 export interface Toast { id: number; msg: string; type: ToastType; }
@@ -35,13 +35,14 @@ export const ROUTE_TO_PAGE: Record<string, PageId> = {
   "/profile": "profile",
   "/subscribe": "subscribe",
   "/collaborations": "collaborations",
+  "/unsubscribe": "unsubscribe",
 };
 
 export const PAGE_TO_ROUTE: Record<PageId, string> = {
   home: "/", problems: "/problems", leaderboard: "/leaderboard", arena: "/arena",
   weekly: "/weekly", admin: "/admin", about: "/about", privacy: "/privacy",
   terms: "/terms", refunds: "/refunds", profile: "/profile", subscribe: "/subscribe",
-  collaborations: "/collaborations",
+  collaborations: "/collaborations", unsubscribe: "/unsubscribe",
 };
 
 interface AppShellContextValue {

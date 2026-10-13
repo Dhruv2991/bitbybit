@@ -88,9 +88,9 @@ async function runNudge() {
 
     const [{ data: members }, { data: subs }, { data: alreadyLogged }] = await Promise.all([
       // eslint-disable-next-line
-      (db.from('members') as any).select('github, name, email'),
+      (db.from('members') as any).select('github, name, email, email_subscribed'),
       // eslint-disable-next-line
-      (db.from('subscribers') as any).select('github, status, current_period_end'),
+      (db.from('subscribers') as any).select('github, status, current_period_end, email_subscribed'),
       // eslint-disable-next-line
       (db.from('email_log') as any).select('github').eq('kind', 'subscribe_nudge').eq('ref_id', monthKey),
     ]);
@@ -100,7 +100,9 @@ async function runNudge() {
     );
     const alreadyGithubs = new Set((alreadyLogged || []).map((r: any) => r.github));
 
-    const targets = (members || []).filter((m: any) => m.email && !activeGithubs.has(m.github) && !alreadyGithubs.has(m.github));
+    const targets = (members || []).filter(
+      (m: any) => m.email && m.email_subscribed !== false && !activeGithubs.has(m.github) && !alreadyGithubs.has(m.github),
+    );
     const alreadySent = (members || []).filter((m: any) => alreadyGithubs.has(m.github)).length;
 
     if (targets.length === 0) {
@@ -112,8 +114,8 @@ async function runNudge() {
 
     let sent = 0, failed = 0;
     for (const m of targets) {
-      const { subject, html } = subscribeNudgeEmail(m.name);
-      const ok = await sendEmail(m.email, subject, html);
+      const { subject, html } = subscribeNudgeEmail(m.name, m.email);
+      const ok = await sendEmail(m.email, subject, html, { isPromotional: true });
       if (ok) {
         sent++;
         // eslint-disable-next-line

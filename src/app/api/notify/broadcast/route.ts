@@ -66,46 +66,51 @@ export async function POST(req: NextRequest) {
 
     const [{ data: subs }, { data: alreadyLogged }] = await Promise.all([
       // eslint-disable-next-line
-      (db.from('subscribers') as any).select('github, name, email, status, current_period_end'),
+      (db.from('subscribers') as any).select('github, name, email, status, current_period_end, email_subscribed'),
       // eslint-disable-next-line
       (db.from('email_log') as any).select('github').eq('kind', kind).eq('ref_id', refId),
     ]);
 
     const alreadyGithubs = new Set((alreadyLogged || []).map((r: any) => r.github));
     const active = (subs || []).filter((s: any) =>
-      isActiveSubscription(s.status, s.current_period_end) && s.email && !alreadyGithubs.has(s.github),
+      isActiveSubscription(s.status, s.current_period_end) &&
+      s.email &&
+      s.email_subscribed !== false &&
+      !alreadyGithubs.has(s.github),
     );
     const alreadySent = (subs || []).filter((s: any) => alreadyGithubs.has(s.github)).length;
 
     if (active.length === 0) {
       return NextResponse.json({
         sent: 0, failed: 0, skipped: alreadySent, total: 0,
-        message: alreadySent > 0 ? 'Everyone eligible was already notified' : 'No active subscribers with an email on file',
+        message: alreadySent > 0 ? 'Everyone eligible was already notified' : 'No active subscribed users with an email on file',
       });
     }
 
     // Send one at a time so we know exactly who succeeded — only
     // those get logged, so a failed send is automatically retried
     // on the next click instead of silently disappearing.
-    let sent = 0, failed = 0;
+    let sent = 0, failed = 0, optOutSkipped = 0;
     let lastError: string | undefined;
     for (const s of active) {
       const { subject, html } = kind === 'contest_live'
-        ? contestLiveEmail(s.name, title)
-        : weeklyChallengeEmail(s.name, title);
-      const result = await sendEmailDetailed(s.email, subject, html);
+        ? contestLiveEmail(s.name, title, s.email)
+        : weeklyChallengeEmail(s.name, title, s.email);
+      const result = await sendEmailDetailed(s.email, subject, html, { isPromotional: true });
       if (result.ok) {
         sent++;
         // eslint-disable-next-line
         await (db.from('email_log') as any)
           .upsert({ github: s.github, email: s.email, kind, ref_id: refId }, { onConflict: 'github,kind,ref_id' });
+      } else if (result.skipped) {
+        optOutSkipped++;
       } else {
         failed++;
         lastError = result.error;
       }
     }
 
-    return NextResponse.json({ sent, failed, skipped: alreadySent, total: active.length, lastError });
+    return NextResponse.json({ sent, failed, skipped: alreadySent + optOutSkipped, total: active.length, lastError });
   } catch (err: any) {
     console.error('[/api/notify/broadcast]', err);
     return NextResponse.json({ error: err.message || 'Broadcast failed' }, { status: 500 });
