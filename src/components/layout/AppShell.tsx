@@ -99,6 +99,17 @@ function IconCollab({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
+function IconDuel({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
+      <path d="m13 19 6 2 3-3-2-6" />
+      <path d="m5 13-2 6 3 3 6-2" />
+      <path d="M9.5 6.5 21 18v3h-3L6.5 9.5" />
+    </svg>
+  );
+}
+
 function IconAdmin({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -196,6 +207,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           icon: IconArena,
           badge: liveCount > 0 ? `${liveCount} Live` : undefined,
           badgeColor: "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 font-medium",
+        },
+        {
+          id: "duels",
+          label: "1v1 Code Duels",
+          icon: IconDuel,
+          badge: "Live 1v1",
+          badgeColor: "bg-cyan-100 text-cyan-700 border border-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/20 font-medium",
         },
         { id: "leaderboard", label: "Leaderboard", icon: IconLeaderboard },
       ],

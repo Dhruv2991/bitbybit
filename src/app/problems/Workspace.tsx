@@ -45,6 +45,8 @@ import type { VisualizerGateResult } from '@/lib/visualizer';
 const CodeEditor = dynamic(() => import('@/components/code-editor/CodeEditor'), { ssr: false });
 const LogicVisualizerDrawer = dynamic(() => import('@/components/code-editor/LogicVisualizerDrawer'), { ssr: false });
 const VisualizerGateModal   = dynamic(() => import('@/components/code-editor/VisualizerGateModal'),   { ssr: false });
+const ReplayPlayer          = dynamic(() => import('@/components/workspace/ReplayPlayer'),          { ssr: false });
+import { useTimelineCapture } from '@/lib/timelineCapture';
 
 // ── Draft persistence helpers ────────────────────────────────────────────────
 
@@ -651,6 +653,26 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   const [hintTimer,     setHintTimer]     = useState(0);
   const hintTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ── Algorithmic Thought-Process Time-Lapse Capture ──────────────────────────
+  const [replayModalOpen, setReplayModalOpen] = useState(false);
+  const {
+    snapshots: timelineSnapshots,
+    timelineId: savedTimelineId,
+    isSyncing: isTimelineSyncing,
+    recordCodeChange,
+    recordTestRun,
+    recordReset,
+    recordSubmission,
+    syncTimeline,
+    getSummary: getTimelineSummary,
+  } = useTimelineCapture({
+    problemId: problem.id,
+    problemTitle: problem.title,
+    initialCode: code,
+    initialLang: lang,
+    user,
+  });
+
   // Restore split view on Escape key
   useEffect(() => {
     if (!isEditorExpanded) return;
@@ -827,6 +849,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
   function handleCodeChange(newCode: string) {
     setCode(newCode);
+    recordCodeChange(newCode, lang);
     if (!onArenaSubmit) saveDraft(problem.id, lang, newCode);
     if (onArenaSubmit && contestId) saveArenaDraft(contestId, problem.id, lang, newCode);
     if (!onArenaCodeChange) return;
@@ -886,6 +909,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     if (onArenaSubmit && contestId) clearArenaDraft(contestId, problem.id, lang);
     if (!onArenaSubmit) clearDraft(problem.id, lang);
     setCode(starter);
+    recordReset(starter, lang);
     setTestResult(null); setRunError(null); setRunStatus(''); setProgress(null);
     setStatusMsg('Editor reset to starter code.');
     onArenaCodeChange?.(starter, lang);
@@ -965,6 +989,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         result = await runOnServer(code, lang, cases);
       }
       setTestResult(result);
+      recordTestRun(code, lang, result.passed, result.total);
       if (practiceMode && user) {
         (db.from('practice_attempts') as any).upsert(
           { problem_id: problem.id, github: user.github, name: user.name, lang },
@@ -1022,6 +1047,10 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
       const passed = finalTestResult?.passed ?? 0;
       const total  = finalTestResult?.total  ?? 0;
       const pointsAwarded = total > 0 ? Math.floor((problem.points || 100) * (passed / total)) : (problem.points || 100);
+
+      // Record final submission milestone and sync timeline
+      recordSubmission(code, lang, passed, total);
+      syncTimeline(code, lang).catch(() => {});
 
       if (onArenaSubmit) {
         if (contestId) clearArenaDraft(contestId, problem.id, lang);
@@ -1409,6 +1438,20 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
                   </button>
                 </>
               )}
+              {/* Time-Lapse Replay Modal Launcher */}
+              <button
+                onClick={() => setReplayModalOpen(true)}
+                title="View step-by-step logic evolution and time-lapse replay"
+                className="text-xs font-mono px-2.5 py-1 rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 transition-all flex items-center gap-1.5"
+              >
+                <span>▶ Time-Lapse</span>
+                {timelineSnapshots.length > 1 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-purple-500/20 text-[10px] font-bold">
+                    {timelineSnapshots.length}
+                  </span>
+                )}
+              </button>
+
               <span className={`text-xs font-mono px-2.5 py-1 rounded-lg border ${execBadge.cls}`}>{execBadge.label}</span>
 
               {/* Maximize / Fullscreen Editor Toggle Button */}
@@ -1639,6 +1682,32 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
             window.location.href = '/subscribe';
           }}
         />
+      )}
+
+      {/* ── Algorithmic Thought-Process Time-Lapse Replay Modal ── */}
+      {replayModalOpen && (
+        <div
+          className="fixed inset-0 z-[350] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 md:p-6 animate-fade-in"
+          onClick={() => setReplayModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-6xl h-[88vh] bg-white dark:bg-zinc-950 rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-zinc-800 flex flex-col animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ReplayPlayer
+              timeline={{
+                id: savedTimelineId || undefined,
+                problem_id: problem.id,
+                problem_title: problem.title,
+                user_github: user?.github,
+                user_name: user?.name,
+                snapshots: timelineSnapshots,
+                duration_seconds: getTimelineSummary().durationSeconds,
+              }}
+              onClose={() => setReplayModalOpen(false)}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

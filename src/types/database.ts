@@ -193,6 +193,24 @@ export interface Certificate {
 export interface Database {
   public: {
     Tables: {
+      code_duels: {
+        Row: import('@/types/duels').CodeDuel;
+        Insert: Omit<import('@/types/duels').CodeDuel, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<import('@/types/duels').CodeDuel>;
+      };
+
+      problem_timelines: {
+        Row: ProblemTimeline;
+        Insert: Omit<ProblemTimeline, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<ProblemTimeline>;
+      };
+
       certificates: {
         Row: Certificate;
         Insert: Omit<Certificate, 'id' | 'created_at' | 'updated_at'>;
@@ -682,4 +700,45 @@ export interface ContestFeedback {
 export interface AppConfig {
   key:   string;
   value: string;
+}
+
+// ════════════════════════════════════════════════════════════
+// Algorithmic Thought-Process Time-Lapse & Replay
+// ════════════════════════════════════════════════════════════
+
+export type TimelineEventType =
+  | 'initial'
+  | 'edit'
+  | 'test_run'
+  | 'test_passed'
+  | 'test_failed'
+  | 'reset'
+  | 'submission';
+
+export interface TimelineSnapshot {
+  id?: string;
+  timestamp: number; // Milliseconds elapsed since recording session start
+  wallClock?: string; // ISO timestamp
+  code: string;
+  language: SupportedLang;
+  eventType: TimelineEventType;
+  activeTestsPassed?: { passed: number; total: number } | null;
+  stats?: {
+    lines: number;
+    chars: number;
+    deltaChars?: number;
+  };
+  label?: string;
+}
+
+export interface ProblemTimeline {
+  id: string;
+  user_id: string | null;
+  problem_id: string;
+  problem_title?: string | null;
+  user_github?: string | null;
+  user_name?: string | null;
+  snapshots: TimelineSnapshot[];
+  duration_seconds: number;
+  created_at: string;
 }
