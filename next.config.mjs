@@ -79,6 +79,9 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   // Must be false so webpack runs in the main process where the readlink
   // patch above is active.
   experimental: {

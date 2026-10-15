@@ -190,7 +190,7 @@ export interface Certificate {
   updated_at: string;
 }
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       code_duels: {
@@ -200,6 +200,7 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<import('@/types/duels').CodeDuel>;
+        Relationships: [];
       };
 
       problem_timelines: {
@@ -209,12 +210,14 @@ export interface Database {
           created_at?: string;
         };
         Update: Partial<ProblemTimeline>;
+        Relationships: [];
       };
 
       certificates: {
         Row: Certificate;
         Insert: Omit<Certificate, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Certificate>;
+        Relationships: [];
       };
 
       admins: {
@@ -229,6 +232,7 @@ export interface Database {
         Update: {
           github?: string;
         };
+        Relationships: [];
       };
 
       members: {
@@ -240,6 +244,7 @@ export interface Database {
         >;
 
         Update: Partial<Member>;
+        Relationships: [];
       };
 
       problems: {
@@ -251,6 +256,7 @@ export interface Database {
         >;
 
         Update: Partial<Problem>;
+        Relationships: [];
       };
 
       submissions: {
@@ -262,6 +268,7 @@ export interface Database {
         >;
 
         Update: Partial<Submission>;
+        Relationships: [];
       };
 
       contests: {
@@ -273,6 +280,7 @@ export interface Database {
         >;
 
         Update: Partial<Contest>;
+        Relationships: [];
       };
 
       contest_registrations: {
@@ -284,6 +292,7 @@ export interface Database {
         >;
 
         Update: Partial<ContestRegistration>;
+        Relationships: [];
       };
 
       arena_submissions: {
@@ -295,6 +304,7 @@ export interface Database {
         >;
 
         Update: Partial<ArenaSubmission>;
+        Relationships: [];
       };
 
       coupons: {
@@ -306,6 +316,7 @@ export interface Database {
         };
 
         Update: Partial<Omit<Coupon, 'id' | 'created_at'>>;
+        Relationships: [];
       };
 
       subscribers: {
@@ -317,6 +328,7 @@ export interface Database {
         };
 
         Update: Partial<Subscriber>;
+        Relationships: [];
       };
 
       email_unsubscribes: {
@@ -344,8 +356,11 @@ export interface Database {
           source: string;
           unsubscribed_at: string;
         }>;
+        Relationships: [];
       };
     };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
   };
 }
 

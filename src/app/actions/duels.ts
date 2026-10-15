@@ -4,14 +4,20 @@
 // Server Actions for Real-Time 1v1 Code Duel Management
 // ════════════════════════════════════════════════════════════
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerSupabaseClient, getSupabaseClient } from "@/lib/supabase";
+import type { Database } from "@/types/database";
 import type { CodeDuel, CreateDuelInput, DuelProgress } from "@/types/duels";
 
-function getDbClient() {
+type CodeDuelRow = Database["public"]["Tables"]["code_duels"]["Row"];
+type CodeDuelInsert = Database["public"]["Tables"]["code_duels"]["Insert"];
+type CodeDuelUpdate = Database["public"]["Tables"]["code_duels"]["Update"];
+
+function getDbClient(): SupabaseClient {
   try {
-    return createServerSupabaseClient();
+    return createServerSupabaseClient() as unknown as SupabaseClient;
   } catch {
-    return getSupabaseClient();
+    return getSupabaseClient() as unknown as SupabaseClient;
   }
 }
 
@@ -38,14 +44,15 @@ export async function createDuelAction(input: CreateDuelInput): Promise<{
 
     // Resolve host member_id if member row exists
     let hostId: string | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: member } = await (db.from("members") as any)
+    const { data: memberData } = await db
+      .from("members")
       .select("id")
       .eq("github", host_github)
       .maybeSingle();
 
-    if (member && "id" in member) {
-      hostId = (member as { id: string }).id;
+    const member = memberData as { id: string } | null;
+    if (member?.id) {
+      hostId = member.id;
     }
 
     // Default progress state
@@ -63,30 +70,34 @@ export async function createDuelAction(input: CreateDuelInput): Promise<{
       lastUpdated: new Date().toISOString(),
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: duel, error } = await (db.from("code_duels") as any)
-      .insert({
-        problem_id: String(problem_id),
-        problem_title: problem_title || "Algorithmic Challenge",
-        time_limit_mins: Number(time_limit_mins) || 30,
-        host_id: hostId,
-        host_github,
-        host_name: host_name || host_github,
-        status: "waiting",
-        host_progress: initialHostProgress,
-        guest_progress: initialGuestProgress,
-      })
+    const newDuelPayload: CodeDuelInsert = {
+      problem_id: String(problem_id),
+      problem_title: problem_title || "Algorithmic Challenge",
+      time_limit_mins: Number(time_limit_mins) || 30,
+      host_id: hostId,
+      host_github,
+      host_name: host_name || host_github,
+      status: "waiting",
+      host_progress: initialHostProgress,
+      guest_progress: initialGuestProgress,
+    };
+
+    const { data: duelData, error } = await db
+      .from("code_duels")
+      .insert(newDuelPayload)
       .select("*")
       .single();
 
-    if (error) {
+    const duel = duelData as CodeDuelRow | null;
+
+    if (error || !duel) {
       console.error("[createDuelAction] Database insert error:", error);
-      return { success: false, error: error.message || "Failed to create duel room." };
+      return { success: false, error: error?.message || "Failed to create duel room." };
     }
 
     return {
       success: true,
-      duel: duel as CodeDuel,
+      duel,
       duelId: duel.id,
     };
   } catch (err: unknown) {
@@ -111,17 +122,19 @@ export async function getDuelAction(roomId: string): Promise<{
 
     const db = getDbClient();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: duel, error } = await (db.from("code_duels") as any)
+    const { data: duelData, error } = await db
+      .from("code_duels")
       .select("*")
       .eq("id", roomId)
       .maybeSingle();
+
+    const duel = duelData as CodeDuelRow | null;
 
     if (error || !duel) {
       return { success: false, error: "Duel room not found or expired." };
     }
 
-    return { success: true, duel: duel as CodeDuel };
+    return { success: true, duel };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to load duel.";
     console.error("[getDuelAction] Exception:", err);
@@ -149,11 +162,13 @@ export async function joinDuelAction(
     const db = getDbClient();
 
     // Fetch existing room
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: duel, error: fetchErr } = await (db.from("code_duels") as any)
+    const { data: duelData, error: fetchErr } = await db
+      .from("code_duels")
       .select("*")
       .eq("id", roomId)
       .maybeSingle();
+
+    const duel = duelData as CodeDuelRow | null;
 
     if (fetchErr || !duel) {
       return { success: false, error: "Duel room not found." };
@@ -161,12 +176,12 @@ export async function joinDuelAction(
 
     // If already the host, allow them back in without changes
     if (duel.host_github === guestGithub) {
-      return { success: true, duel: duel as CodeDuel };
+      return { success: true, duel };
     }
 
     // If already the guest, allow them in
     if (duel.guest_github === guestGithub) {
-      return { success: true, duel: duel as CodeDuel };
+      return { success: true, duel };
     }
 
     // Room is already occupied by someone else
@@ -180,14 +195,15 @@ export async function joinDuelAction(
 
     // Resolve guest member_id
     let guestId: string | null = null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: member } = await (db.from("members") as any)
+    const { data: memberData } = await db
+      .from("members")
       .select("id")
       .eq("github", guestGithub)
       .maybeSingle();
 
-    if (member && "id" in member) {
-      guestId = (member as { id: string }).id;
+    const member = memberData as { id: string } | null;
+    if (member?.id) {
+      guestId = member.id;
     }
 
     const now = new Date().toISOString();
@@ -198,25 +214,29 @@ export async function joinDuelAction(
       lastUpdated: now,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: updated, error: updateErr } = await (db.from("code_duels") as any)
-      .update({
-        guest_id: guestId,
-        guest_github: guestGithub,
-        guest_name: guestName || guestGithub,
-        status: "active",
-        guest_progress: guestProgress,
-        started_at: duel.started_at || now,
-      })
+    const updatePayload: CodeDuelUpdate = {
+      guest_id: guestId,
+      guest_github: guestGithub,
+      guest_name: guestName || guestGithub,
+      status: "active",
+      guest_progress: guestProgress,
+      started_at: duel.started_at || now,
+    };
+
+    const { data: updatedData, error: updateErr } = await db
+      .from("code_duels")
+      .update(updatePayload)
       .eq("id", roomId)
       .select("*")
       .single();
 
-    if (updateErr) {
-      return { success: false, error: updateErr.message || "Failed to join duel room." };
+    const updated = updatedData as CodeDuelRow | null;
+
+    if (updateErr || !updated) {
+      return { success: false, error: updateErr?.message || "Failed to join duel room." };
     }
 
-    return { success: true, duel: updated as CodeDuel };
+    return { success: true, duel: updated };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unexpected error joining duel.";
     console.error("[joinDuelAction] Exception:", err);
@@ -245,11 +265,13 @@ export async function updateDuelProgressAction(
 
     const db = getDbClient();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: duel, error: fetchErr } = await (db.from("code_duels") as any)
+    const { data: duelData, error: fetchErr } = await db
+      .from("code_duels")
       .select("*")
       .eq("id", roomId)
       .maybeSingle();
+
+    const duel = duelData as CodeDuelRow | null;
 
     if (fetchErr || !duel) {
       return { success: false, error: "Duel room not found." };
@@ -288,9 +310,8 @@ export async function updateDuelProgressAction(
       isVictory = true;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updatePayload: Record<string, any> = {
-      [isHost ? "host_progress" : "guest_progress"]: mergedProgress,
+    const updatePayload: CodeDuelUpdate = {
+      ...(isHost ? { host_progress: mergedProgress } : { guest_progress: mergedProgress }),
     };
 
     if (isVictory) {
@@ -300,20 +321,22 @@ export async function updateDuelProgressAction(
       updatePayload.ended_at = now;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: updated, error: updateErr } = await (db.from("code_duels") as any)
+    const { data: updatedData, error: updateErr } = await db
+      .from("code_duels")
       .update(updatePayload)
       .eq("id", roomId)
       .select("*")
       .single();
 
-    if (updateErr) {
-      return { success: false, error: updateErr.message };
+    const updated = updatedData as CodeDuelRow | null;
+
+    if (updateErr || !updated) {
+      return { success: false, error: updateErr?.message || "Failed to update duel telemetry." };
     }
 
     return {
       success: true,
-      duel: updated as CodeDuel,
+      duel: updated,
       isVictory,
     };
   } catch (err: unknown) {
@@ -333,11 +356,13 @@ export async function forfeitDuelAction(
   try {
     const db = getDbClient();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: duel, error: fetchErr } = await (db.from("code_duels") as any)
+    const { data: duelData, error: fetchErr } = await db
+      .from("code_duels")
       .select("*")
       .eq("id", roomId)
       .maybeSingle();
+
+    const duel = duelData as CodeDuelRow | null;
 
     if (fetchErr || !duel) {
       return { success: false, error: "Duel room not found." };
@@ -347,14 +372,16 @@ export async function forfeitDuelAction(
     const opponentGithub = isHost ? duel.guest_github : duel.host_github;
     const opponentId = isHost ? duel.guest_id : duel.host_id;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: updateErr } = await (db.from("code_duels") as any)
-      .update({
-        status: "completed",
-        winner_github: opponentGithub || null,
-        winner_id: opponentId || null,
-        ended_at: new Date().toISOString(),
-      })
+    const updatePayload: CodeDuelUpdate = {
+      status: "completed",
+      winner_github: opponentGithub || null,
+      winner_id: opponentId || null,
+      ended_at: new Date().toISOString(),
+    };
+
+    const { error: updateErr } = await db
+      .from("code_duels")
+      .update(updatePayload)
       .eq("id", roomId);
 
     if (updateErr) {

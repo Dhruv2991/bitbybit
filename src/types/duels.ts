@@ -20,7 +20,7 @@ export interface CodeDuel {
   problem_id: string;
   problem_title?: string | null;
   time_limit_mins: number;
-  host_id: string;
+  host_id?: string | null;
   host_github: string;
   host_name: string;
   guest_id?: string | null;
