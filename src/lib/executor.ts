@@ -144,11 +144,12 @@ function toNativeLiteral(value: any, lang: string): string {
       if (typeof first === "string") return `[]string{${items.join(", ")}}`;
       if (typeof first === "boolean") return `[]bool{${items.join(", ")}}`;
       if (Array.isArray(first)) {
+        const innerType = first.length > 0 && typeof first[0] === "string" ? "string" : "int";
         const inner = value.map(
           (row) =>
-            `[]int{${(row as any[]).map((v: any) => toNativeLiteral(v, lang)).join(", ")}}`,
+            `[]${innerType}{${(row as any[]).map((v: any) => toNativeLiteral(v, lang)).join(", ")}}`,
         );
-        return `[][]int{${inner.join(", ")}}`;
+        return `[][]${innerType}{${inner.join(", ")}}`;
       }
       return `[]interface{}{${items.join(", ")}}`;
     }
@@ -412,9 +413,17 @@ function buildBatchedProgram(
               if (typeof v[0] === "number") return `new int[]{${v.join(",")}}`;
               if (typeof v[0] === "string")
                 return `new String[]{${v.map((x) => JSON.stringify(x)).join(",")}}`;
+              if (typeof v[0] === "boolean")
+                return `new boolean[]{${v.join(",")}}`;
               if (Array.isArray(v[0])) {
+                if (v[0].length > 0 && typeof v[0][0] === "string") {
+                  const rows = v
+                    .map((row: any[]) => `new String[]{${row.map((x) => JSON.stringify(x)).join(", ")}}`)
+                    .join(", ");
+                  return `new String[][]{${rows}}`;
+                }
                 const rows = v
-                  .map((row: any[]) => `new int[]{${row.join(",")}}`)
+                  .map((row: any[]) => `new int[]{${row.join(", ")}}`)
                   .join(", ");
                 return `new int[][]{${rows}}`;
               }
@@ -615,6 +624,8 @@ function jsonEqual(a: string, b: string): boolean {
 
 // ── Judge0 execution ─────────────────────────────────────────
 
+let judge0OfflineUntil = 0;
+
 async function executeWithJudge0(
   fullCode: string,
   language: string,
@@ -623,39 +634,49 @@ async function executeWithJudge0(
   if (!languageId) throw new Error(`Unsupported language: ${language}`);
 
   const base = process.env.JUDGE0_URL || "http://localhost:2358";
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (process.env.JUDGE0_AUTH_TOKEN) {
-    headers["X-Auth-Token"] = process.env.JUDGE0_AUTH_TOKEN;
+
+  if (Date.now() < judge0OfflineUntil) {
+    throw new Error("Judge0 recently unreachable; circuit open");
   }
 
-  const submitRes = await fetch(`${base}/submissions?wait=true`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      source_code: fullCode,
-      language_id: languageId,
-      stdin: "",
-      cpu_time_limit: 10,
-      compile_timeout: 30,
-      wall_time_limit: 15,
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (process.env.JUDGE0_AUTH_TOKEN) {
+      headers["X-Auth-Token"] = process.env.JUDGE0_AUTH_TOKEN;
+    }
 
-  if (!submitRes.ok) {
-    const body = await submitRes.text();
-    throw new Error(`Judge0 error ${submitRes.status}: ${body}`);
+    const submitRes = await fetch(`${base}/submissions?wait=true`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        source_code: fullCode,
+        language_id: languageId,
+        stdin: "",
+        cpu_time_limit: 10,
+        compile_timeout: 30,
+        wall_time_limit: 15,
+      }),
+      signal: AbortSignal.timeout(2500),
+    });
+
+    if (!submitRes.ok) {
+      const body = await submitRes.text();
+      throw new Error(`Judge0 error ${submitRes.status}: ${body}`);
+    }
+
+    const data = await submitRes.json();
+    const stdout = data.stdout ?? "";
+    const stderr =
+      (data.stderr ?? "") +
+      (data.compile_output ?? "");
+
+    return { stdout, stderr };
+  } catch (err) {
+    judge0OfflineUntil = Date.now() + 60000;
+    throw err;
   }
-
-  const data = await submitRes.json();
-  const stdout = data.stdout ?? "";
-  const stderr =
-    (data.stderr ?? "") +
-    (data.compile_output ?? "");
-
-  return { stdout, stderr };
 }
 
 // ── Wandbox language compiler map ────────────────────────────
@@ -665,8 +686,8 @@ const WANDBOX_COMPILER: Record<string, string> = {
   java:       "openjdk-jdk-22+36",
   rust:       "rust-1.82.0",
   go:         "go-1.23.2",
-  python:     "cpython-3.12.0",
-  javascript: "nodejs-head",
+  python:     "cpython-3.12.7",
+  javascript: "nodejs-20.17.0",
 };
 
 // ── Wandbox fallback execution ────────────────────────────────
@@ -688,16 +709,23 @@ async function executeWithWandbox(
         signal: AbortSignal.timeout(30000),
       });
 
+      const bodyText = await res.text();
+
       if (!res.ok) {
-        const body = await res.text();
         if (res.status >= 500 && attempt < 3) {
           await new Promise((r) => setTimeout(r, attempt * 500));
           continue;
         }
-        throw new Error(`Wandbox error ${res.status}: ${body}`);
+        throw new Error(`Wandbox error ${res.status}: ${bodyText}`);
       }
 
-      const data = await res.json();
+      let data: any;
+      try {
+        data = JSON.parse(bodyText);
+      } catch {
+        throw new Error(`Wandbox invalid response: ${bodyText.slice(0, 200)}`);
+      }
+
       return {
         stdout: data.program_output ?? "",
         stderr: (data.compiler_error ?? "") + (data.program_error ?? ""),

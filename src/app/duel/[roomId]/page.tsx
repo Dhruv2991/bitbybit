@@ -17,6 +17,7 @@ import {
   updateDuelProgressAction,
   forfeitDuelAction,
 } from "@/app/actions/duels";
+import { getStrategy, runInBrowser } from "@/lib/browserExecutor";
 
 import ProblemStatement from "./ProblemStatement";
 
@@ -200,19 +201,51 @@ export default function DuelWarRoomPage() {
       status: "running_tests",
     });
 
+    const strategy = getStrategy(language);
     try {
-      const response = await fetch("/api/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code,
-          language,
-          problem_id: problem.id,
-          mode: "run",
-        }),
-      });
+      let data: any = null;
 
-      const data = await response.json();
+      if (strategy === "browser") {
+        // Python and JavaScript execute directly in the user's browser via Pyodide / Web Workers
+        const cases = (problem.test_cases || []).map((tc) => ({
+          input: tc.input,
+          expected: tc.expected,
+        }));
+        data = await runInBrowser(code, language, cases);
+      } else {
+        // Other languages (C++, Java, Go, Rust) execute on the server (Docker Judge0 with Wandbox fallback)
+        try {
+          const response = await fetch("/api/execute", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code,
+              language,
+              problem_id: problem.id,
+              mode: "submit",
+            }),
+          });
+
+          if (response.ok) {
+            data = await response.json();
+          } else {
+            const errData = await response.json().catch(() => ({}));
+            console.warn("[Duel] /api/execute returned error:", errData);
+            if (errData.error) {
+              setErrorBanner(`Execution error: ${errData.error}`);
+            }
+          }
+        } catch (fetchErr: any) {
+          console.warn("[Duel] Network fetch to /api/execute failed:", fetchErr);
+        }
+      }
+
+      if (!data) {
+        setErrorBanner("Execution server failed to respond. Please verify your code and retry.");
+        return;
+      }
+
+      setErrorBanner(null);
       const results: TestExecutionResult[] = data.results || [];
       setTestResults(results);
 
@@ -229,8 +262,9 @@ export default function DuelWarRoomPage() {
       if (updateRes.isVictory) {
         setShowVictoryModal(true);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("[Duel] Execution error:", err);
+      setErrorBanner(err?.message || "Execution error encountered.");
     } finally {
       setIsRunning(false);
     }
@@ -406,10 +440,15 @@ export default function DuelWarRoomPage() {
                       <span>Case {i + 1} {res.ok ? "✓ Passed" : "✗ Failed"}</span>
                       {res.time && <span className="text-[10px] text-slate-400">{res.time}</span>}
                     </div>
-                    <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                    {res.error && !res.ok && (
+                      <div className="p-2 rounded-lg bg-rose-100/70 dark:bg-rose-950/60 text-rose-800 dark:text-rose-200 font-mono text-[11px] whitespace-pre-wrap break-all border border-rose-200 dark:border-rose-900/40">
+                        {res.error}
+                      </div>
+                    )}
+                    <div className="text-[11px] text-slate-600 dark:text-slate-400 space-y-0.5">
                       <div>Input: <code className="text-slate-800 dark:text-slate-200">{res.input}</code></div>
                       <div>Expected: <code className="text-slate-800 dark:text-slate-200">{res.expected}</code></div>
-                      <div>Actual: <code className="text-slate-800 dark:text-slate-200">{res.actual}</code></div>
+                      <div>Actual: <code className="text-slate-800 dark:text-slate-200">{res.actual || (res.ok ? res.expected : (res.error ? "Error" : "None"))}</code></div>
                     </div>
                   </div>
                 ))}

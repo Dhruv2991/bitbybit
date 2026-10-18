@@ -55,17 +55,29 @@ export async function createDuelAction(input: CreateDuelInput): Promise<{
       hostId = member.id;
     }
 
+    // Query problem's total test cases so progress is accurate from the start
+    let totalTests = 0;
+    const { data: probData } = await db
+      .from("problems")
+      .select("test_cases")
+      .eq("id", String(problem_id))
+      .maybeSingle();
+
+    if (probData && Array.isArray((probData as any).test_cases)) {
+      totalTests = (probData as any).test_cases.length;
+    }
+
     // Default progress state
     const initialHostProgress: DuelProgress = {
       testsPassed: 0,
-      totalTests: 0,
+      totalTests,
       status: "coding",
       lastUpdated: new Date().toISOString(),
     };
 
     const initialGuestProgress: DuelProgress = {
       testsPassed: 0,
-      totalTests: 0,
+      totalTests,
       status: "waiting",
       lastUpdated: new Date().toISOString(),
     };
