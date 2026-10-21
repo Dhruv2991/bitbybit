@@ -357,7 +357,8 @@ function detectCppReturnType(code: string): string {
 function buildBatchedProgram(
   userCode: string,
   lang: string,
-  testCases: { input: string; expected: string }[],
+  testCases: { input: string; expected: string; is_hidden?: boolean }[],
+  includeSentinel = true,
 ): string {
   const fn = extractFuncName(userCode, lang);
 
@@ -399,7 +400,7 @@ function buildBatchedProgram(
           `    { // case ${idx}`,
           decls,
           printBlock,
-          `        cout << "${SENTINEL}" << endl;`,
+          ...(includeSentinel ? [`        cout << "${SENTINEL}" << endl;`] : []),
           `    }`,
         ].join("\n");
       });
@@ -460,7 +461,7 @@ function buildBatchedProgram(
           "          } else {",
           "              System.out.println(__r__);",
           "          }",
-          `          System.out.println("${SENTINEL}"); }`,
+          ...(includeSentinel ? [`          System.out.println("${SENTINEL}"); }`] : ["        }"]),
         ].join("\n");
       });
 
@@ -502,7 +503,7 @@ function buildBatchedProgram(
           decls,
           `        __out__, _ := json.Marshal(${fn}(${callArgs}))`,
           `        fmt.Println(string(__out__))`,
-          `        fmt.Println("${SENTINEL}")`,
+          ...(includeSentinel ? [`        fmt.Println("${SENTINEL}")`] : []),
           `    }`,
         ].join("\n");
       });
@@ -550,7 +551,7 @@ function buildBatchedProgram(
           `    { // case ${idx}`,
           decls,
           `        println!(${printFmt}, ${fn}(${callArgs}));`,
-          `        println!("${SENTINEL}");`,
+          ...(includeSentinel ? [`        println!("${SENTINEL}");`] : []),
           `    }`,
         ].join("\n");
       });
@@ -572,7 +573,7 @@ function buildBatchedProgram(
           `__args__ = json.loads(${argsJson})`,
           `__res__ = ${fn}(*(__args__ if isinstance(__args__, list) else [__args__]))`,
           `print(json.dumps(__res__, separators=(",", ":")))`,
-          `print("${SENTINEL}")`,
+          ...(includeSentinel ? [`print("${SENTINEL}")`] : []),
         ].join("\n");
       });
 
@@ -596,7 +597,7 @@ function buildBatchedProgram(
           `  const __fn__ = typeof ${fn} !== 'undefined' ? ${fn} : solution;`,
           `  const __res__ = __fn__(...(Array.isArray(__args__) ? __args__ : [__args__]));`,
           `  console.log(JSON.stringify(__res__));`,
-          `  console.log("${SENTINEL}");`,
+          ...(includeSentinel ? [`  console.log("${SENTINEL}");`] : []),
           `})();`,
         ].join("\n");
       });
@@ -711,6 +712,7 @@ const WANDBOX_COMPILER: Record<string, string> = {
 async function executeWithWandbox(
   fullCode: string,
   language: string,
+  stdin?: string,
 ): Promise<{ stdout: string; stderr: string }> {
   const compiler = WANDBOX_COMPILER[language];
   if (!compiler) throw new Error(`Wandbox: unsupported language: ${language}`);
@@ -718,10 +720,14 @@ async function executeWithWandbox(
   let lastErr: any;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
+      const payload: Record<string, any> = { compiler, code: fullCode };
+      if (stdin !== undefined) {
+        payload.stdin = stdin;
+      }
       const res = await fetch("https://wandbox.org/api/compile.json", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ compiler, code: fullCode }),
+        body: JSON.stringify(payload),
         signal: AbortSignal.timeout(30000),
       });
 
@@ -782,74 +788,95 @@ export async function executeRawProgram(
   }
 }
 
-// runAgainstTestCases makes exactly ONE Judge0 call for all
-// test cases combined, instead of one call per test case.
-// Falls back to Wandbox if Judge0 is unreachable.
+// runAgainstTestCases:
+// 1. Primary path: Judge0 fully batched (all cases in a single compile + run, separated by SENTINEL)
+// 2. Fallback path: Wandbox sequential single-case execution (running cases one by one without SENTINEL)
 
 export async function runAgainstTestCases(
   userCode: string,
   language: string,
-  testCases: { input: string; expected: string }[],
+  testCases: { input: string; expected: string; is_hidden?: boolean }[],
 ): Promise<RunResult> {
   if (!testCases.length) return { passed: 0, total: 0, results: [] };
 
-  const batchedCode = buildBatchedProgram(userCode, language, testCases);
+  // 1. Primary Judge0 execution path (fully batched with SENTINEL)
+  const batchedCode = buildBatchedProgram(userCode, language, testCases, true);
   const t0 = Date.now();
-  let stdout = "";
-  let stderr = "";
 
   try {
-    // Try Judge0 first
     const out = await executeWithJudge0(batchedCode, language);
-    stdout = out.stdout;
-    stderr = out.stderr;
-  } catch (e: any) {
-    console.warn("[executor] Judge0 failed, trying Wandbox fallback:", e.message);
-    try {
-      // Fallback to Wandbox
-      const out = await executeWithWandbox(batchedCode, language);
-      stdout = out.stdout;
-      stderr = out.stderr;
-    } catch (e2: any) {
-      const errMsg = e2.message || "Execution error";
+    const totalMs = Date.now() - t0;
+
+    const rawBlocks = (out.stdout || "").split(SENTINEL + "\n");
+    if (rawBlocks[rawBlocks.length - 1]?.trim() === "") rawBlocks.pop();
+
+    const results: TestResult[] = testCases.map((tc, idx) => {
+      const rawOutput = (rawBlocks[idx] ?? "").trim();
+      const actual    = rawOutput.replace(/\s+/g, "");
+      const expected  = String(tc.expected).trim().replace(/\s+/g, "");
+      const ok        = jsonEqual(actual, expected);
+
       return {
-        passed: 0,
-        total:  testCases.length,
-        results: testCases.map((tc) => ({
-          input:    tc.input,
-          expected: String(tc.expected).trim(),
-          actual:   "",
-          ok:       false,
-          error:    errMsg,
-        })),
+        input:     tc.input,
+        expected:  String(tc.expected).trim(),
+        actual:    rawOutput,
+        ok,
+        error:     out.stderr || undefined,
+        time:      `~${Math.round(totalMs / testCases.length)}ms`,
+        is_hidden: tc.is_hidden,
       };
-    }
-  }
-
-  const totalMs = Date.now() - t0;
-
-  const rawBlocks = stdout.split(SENTINEL + "\n");
-  if (rawBlocks[rawBlocks.length - 1].trim() === "") rawBlocks.pop();
-
-  const results: TestResult[] = testCases.map((tc, idx) => {
-    const rawOutput = (rawBlocks[idx] ?? "").trim();
-    const actual    = rawOutput.replace(/\s+/g, "");
-    const expected  = String(tc.expected).trim().replace(/\s+/g, "");
-    const ok        = jsonEqual(actual, expected);
+    });
 
     return {
-      input:    tc.input,
-      expected: String(tc.expected).trim(),
-      actual:   rawOutput,
-      ok,
-      error:    stderr || undefined,
-      time: `~${Math.round(totalMs / testCases.length)}ms`,
+      passed: results.filter((r) => r.ok).length,
+      total:  results.length,
+      results,
     };
-  });
+  } catch (e: any) {
+    console.warn("[executor] Judge0 failed, falling back to sequential Wandbox execution:", e.message);
 
-  return {
-    passed: results.filter((r) => r.ok).length,
-    total:  results.length,
-    results,
-  };
+    // 2. Wandbox fallback handler: execute test cases sequentially one by one
+    // bypassing the multi-case ---CASE--- stream wrapper
+    const results: TestResult[] = [];
+
+    for (let idx = 0; idx < testCases.length; idx++) {
+      const tc = testCases[idx];
+      const caseT0 = Date.now();
+      try {
+        const singleProgram = buildBatchedProgram(userCode, language, [tc], false);
+        const out = await executeWithWandbox(singleProgram, language);
+        const caseMs = Date.now() - caseT0;
+
+        const rawOutput = (out.stdout || "").trim();
+        const actual    = rawOutput.replace(/\s+/g, "");
+        const expected  = String(tc.expected).trim().replace(/\s+/g, "");
+        const ok        = jsonEqual(actual, expected);
+
+        results.push({
+          input:     tc.input,
+          expected:  String(tc.expected).trim(),
+          actual:    rawOutput,
+          ok,
+          error:     out.stderr || undefined,
+          time:      `${caseMs}ms`,
+          is_hidden: tc.is_hidden,
+        });
+      } catch (err: any) {
+        results.push({
+          input:     tc.input,
+          expected:  String(tc.expected).trim(),
+          actual:    "",
+          ok:        false,
+          error:     err.message || "Execution error",
+          is_hidden: tc.is_hidden,
+        });
+      }
+    }
+
+    return {
+      passed: results.filter((r) => r.ok).length,
+      total:  results.length,
+      results,
+    };
+  }
 }

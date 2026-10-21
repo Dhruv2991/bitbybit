@@ -6,7 +6,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import type { Problem, User } from '@/types/database';
 import { LANG_LABELS, type SupportedLang } from '@/types/database';
 import { isActiveSubscription } from '@/lib/subscription';
-import { getRecommendations, setAiUser } from '@/lib/gemini';
+import { getRecommendations, getCachedDailyRecommendations, setAiUser } from '@/lib/gemini';
 
 const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false });
 
@@ -323,6 +323,16 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         const solvedTitles = [...new Set((solvedSubs || []).map((s: any) => s.problem_title))];
         const availableTitles = pool.filter(p => !solvedTitles.includes(p.title)).map(p => p.title);
         if (!availableTitles.length) { if (alive) setRecommended([]); return; }
+
+        // Fast path: if daily suggestions are already cached for today, load immediately without spinner
+        const cachedPicks = getCachedDailyRecommendations(user.github);
+        if (cachedPicks && cachedPicks.length > 0) {
+          const matched = cachedPicks.map(title => pool.find(p => p.title === title)).filter(Boolean) as Problem[];
+          if (matched.length > 0) {
+            if (alive) setRecommended(matched);
+            return;
+          }
+        }
 
         setRecLoading(true);
         const picks = await getRecommendations(solvedTitles as string[], availableTitles);

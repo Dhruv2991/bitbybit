@@ -346,12 +346,60 @@ export async function reviewCode(
   return result;
 }
 
-// ── Feature 4: Problem Recommendations ───────────────────────────────────────
+// ── Feature 4: Problem Recommendations (with daily date-keyed cache) ─────────
+
+function getDailyCachedRecommendations(userKey: string, dateStr: string): string[] | null {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  try {
+    const key = `bb_daily_problem_suggestions_${userKey}_${dateStr}`;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(x => typeof x === 'string')) {
+      return parsed;
+    }
+  } catch {}
+  return null;
+}
+
+function setDailyCachedRecommendations(userKey: string, dateStr: string, suggestions: string[]): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    const key = `bb_daily_problem_suggestions_${userKey}_${dateStr}`;
+    localStorage.setItem(key, JSON.stringify(suggestions));
+
+    // Prune older cache entries for this user from previous dates
+    const prefix = `bb_daily_problem_suggestions_${userKey}_`;
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(prefix) && k !== key) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch {}
+}
+
+export function getCachedDailyRecommendations(github?: string): string[] | null {
+  const userKey = github || _github || 'guest';
+  const today = todayStr();
+  return getDailyCachedRecommendations(userKey, today);
+}
 
 export async function getRecommendations(
   solvedTitles: string[], availableTitles: string[],
 ): Promise<string[]> {
   if (!availableTitles.length) return [];
+
+  const today = todayStr();
+  const userKey = _github || 'guest';
+
+  // 1. Check if a suggestion for the current calendar date (YYYY-MM-DD) already exists
+  const cached = getDailyCachedRecommendations(userKey, today);
+  if (cached && cached.length > 0) {
+    return cached;
+  }
+
+  // 2. Check quota limits before calling AI
   const blocked = checkGlobal('recommendations');
   if (blocked) { console.warn(blocked); return []; }
 
@@ -364,7 +412,15 @@ export async function getRecommendations(
     const match = raw.replace(/```(?:json)?/g, '').trim().match(/\[[\s\S]*?\]/);
     if (!match) throw new Error('No array');
     const parsed = JSON.parse(match[0]);
-    if (Array.isArray(parsed)) { incrementLocal('recommendations'); return parsed.slice(0, 3); }
+    if (Array.isArray(parsed)) {
+      const picks = parsed.slice(0, 3).filter((t: any) => typeof t === 'string');
+      if (picks.length > 0) {
+        incrementLocal('recommendations');
+        // Store the suggestion once for today to prevent redundant API calls on subsequent visits
+        setDailyCachedRecommendations(userKey, today, picks);
+        return picks;
+      }
+    }
   } catch (e) { console.error('Recommendations error:', e); }
   return [];
 }
@@ -413,13 +469,92 @@ export async function generateEditorial(
 
 // ── Admin Feature: Auto Test Case Generator ───────────────────────────────────
 
-// ── Admin Feature: Auto Test Case Generator ───────────────────────────────────
-
 export interface GeneratedTestCase {
-  input:       string;
-  expected:    string;
-  is_hidden?:  boolean;
+  input:        string;
+  expected:     string;
+  output?:      string;
+  is_hidden?:   boolean;
   explanation?: string;
+}
+
+/**
+ * Safely extracts a JSON array from LLM responses, stripping code fences,
+ * conversational preambles/postscripts, comments, trailing commas, or wrapping root objects.
+ */
+function extractJsonArray(raw: string): any[] {
+  if (!raw || typeof raw !== 'string') return [];
+
+  let text = raw.trim();
+
+  // Strip leading and trailing markdown code block wrappers
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // 1. Try direct JSON.parse first
+  try {
+    const direct = JSON.parse(text);
+    if (Array.isArray(direct)) return direct;
+    if (direct && typeof direct === 'object') {
+      for (const key of ['test_cases', 'testCases', 'tests', 'cases', 'data']) {
+        if (Array.isArray((direct as any)[key])) return (direct as any)[key];
+      }
+    }
+  } catch {}
+
+  // 2. Locate outermost square brackets [ ... ] to ignore conversational preambles/fillers
+  const firstBracket = text.indexOf('[');
+  const lastBracket = text.lastIndexOf(']');
+
+  if (firstBracket !== -1 && lastBracket > firstBracket) {
+    const arraySlice = text.substring(firstBracket, lastBracket + 1);
+
+    try {
+      const parsed = JSON.parse(arraySlice);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      try {
+        const cleaned = arraySlice
+          .replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1') // remove comments
+          .replace(/,\s*([}\]])/g, '$1'); // remove trailing commas
+        const parsed = JSON.parse(cleaned);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+  }
+
+  // 3. Check if wrapped in an outermost JSON object { ... }
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const objSlice = text.substring(firstBrace, lastBrace + 1);
+    try {
+      const cleaned = objSlice
+        .replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1')
+        .replace(/,\s*([}\]])/g, '$1');
+      const parsedObj = JSON.parse(cleaned);
+      if (parsedObj && typeof parsedObj === 'object') {
+        for (const key of ['test_cases', 'testCases', 'tests', 'cases', 'data']) {
+          if (Array.isArray(parsedObj[key])) return parsedObj[key];
+        }
+      }
+    } catch {}
+  }
+
+  // 4. Fallback recovery: extract individual JSON objects { ... } that contain input/output/expected
+  const objectMatches = text.match(/\{[\s\S]*?\}/g) || [];
+  const recovered: any[] = [];
+  for (const objStr of objectMatches) {
+    try {
+      const cleanedObj = objStr
+        .replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1')
+        .replace(/,\s*}/g, '}');
+      const obj = JSON.parse(cleanedObj);
+      if (obj && typeof obj === 'object' && (obj.input !== undefined || obj.args !== undefined)) {
+        recovered.push(obj);
+      }
+    } catch {}
+  }
+
+  return recovered;
 }
 
 export async function generateTestCases(
@@ -447,57 +582,73 @@ export async function generateTestCases(
     : `Parameter Types: [${paramTypes.join(', ')}], Return Type: ${returnType}`;
 
   const existingSummary = existingCases.length
-    ? `Existing test cases (do NOT duplicate these):\n${existingCases.map(c => `  input: ${c.input} → expected: ${c.expected}${c.is_hidden ? ' (hidden)' : ''}`).join('\n')}`
+    ? `Existing test cases (do NOT duplicate these):\n${existingCases.map(c => `  input: ${c.input} → expected: ${c.expected || c.output}${c.is_hidden ? ' (hidden)' : ''}`).join('\n')}`
     : 'No existing test cases yet.';
+
+  const markdownDesc = (problemDescription || '').trim().slice(0, 4000);
 
   const result = await callAI(
     `Problem: "${problemTitle}"
-Description: ${problemDescription.replace(/<[^>]*>/g, '').slice(0, 1000)}
+Problem Markdown Description and Explanation:
+${markdownDesc}
+
 ${signatureDesc}
 
 ${existingSummary}
 
-Generate exactly 8 high-quality, comprehensive test cases adhering strictly to the function signature and parameter types:
-1. Basic / Example Cases (2): Standard typical inputs. Mark "is_hidden": false.
-2. Edge Cases (2): Empty arrays/strings, single-element arrays, all identical values, minimum/maximum allowed constraints. Mark "is_hidden": true.
-3. Stress / Large Cases (1): Larger inputs to test algorithm performance and non-trivial patterns. Mark "is_hidden": true.
-4. Boundary / Negative Values (1): Negative numbers, zeroes, special character strings if applicable. Mark "is_hidden": true.
-5. Zero / False / None / Empty Result Cases (1): Inputs where expected output is 0, false, empty array, or false. Mark "is_hidden": true.
-6. Tricky / Counter-Intuitive Case (1): Edge cases that break naive greedy or brute-force approaches. Mark "is_hidden": true.
+Generate high-quality, comprehensive test cases for this problem based on the markdown description, constraints, and explanation.
+Provide:
+1. Basic / Example Cases (2): Standard typical inputs derived from the problem description and examples. Mark "is_hidden": false.
+2. Edge Cases (2): Empty or single-element inputs, all identical values, minimum/maximum boundary constraints. Mark "is_hidden": true.
+3. Stress / Non-Trivial Cases (2): Complex patterns, tricky cases that break naive greedy or brute-force approaches. Mark "is_hidden": true.
+4. Boundary / Special Values (2): Negative numbers, zeros, special cases, or empty result scenarios. Mark "is_hidden": true.
 
-CRITICAL SCHEMA REQUIREMENTS:
-- Output ONLY a raw JSON array of objects. No markdown, no commentary, no wrapping text.
-- Every object MUST have:
-  - "input": A single valid JSON array containing ALL arguments in exact positional order. Example for two params (nums: int[], k: int): "[[2,7,11,15], 9]". Example for single param (s: string): "[\"babad\"]".
-  - "expected": A single valid JSON string or literal representing the exact expected return value. Example: "[0,1]" or "true" or "42" or "\"bab\"".
-  - "is_hidden": boolean (false for first 2 sample cases, true for remaining 6).
-  - "explanation": Short 1-sentence explanation of what this test case tests.
+CRITICAL FORMATTING INSTRUCTIONS - STRICT RAW JSON ONLY:
+- Return RAW JSON ONLY.
+- Absolutely NO markdown code fences (do NOT use \`\`\` or \`\`\`json).
+- Absolutely NO conversational filler, introductory text, explanations, or notes outside the JSON array.
+- The output MUST start with "[" as the very first character and end with "]" as the very last character.
+- The output must be a strict JSON array where each object strictly matches:
+  {
+    "input": "...",
+    "output": "...",
+    "is_hidden": false,
+    "explanation": "..."
+  }
 
-Example format:
+Field Rules:
+- "input": A single valid JSON array string containing all function arguments in exact positional order.
+  Example for 2 parameters (nums: int[], target: int): "[[2,7,11,15], 9]"
+  Example for 1 parameter (s: string): "[\\"babad\\"]"
+- "output": A single valid JSON string or literal representing the exact expected return value. (e.g. "[0,1]" or "true" or "42" or "\\"bab\\""). Note: "expected" is also supported as a synonym.
+- "is_hidden": boolean (false for the first 2 example cases, true for the remaining cases).
+- "explanation": Short 1-sentence description of the edge case or condition tested.
+
+Example Output:
 [
-  {"input": "[[1,2,1,3], 3]", "expected": "1", "is_hidden": false, "explanation": "Basic sample with frequency count"},
-  {"input": "[[5], 1]", "expected": "5", "is_hidden": true, "explanation": "Single element boundary case"}
+  {"input": "[[1,2,1,3], 3]", "output": "1", "is_hidden": false, "explanation": "Basic sample with frequency count"},
+  {"input": "[[5], 1]", "output": "5", "is_hidden": true, "explanation": "Single element boundary case"}
 ]`,
     1000,
-    `You are a LeetCode principal test engineer. You produce bulletproof, syntactically flawless test suites. Every test case "input" MUST be a single valid JSON array wrapping all arguments in order. Output ONLY the JSON array matching the schema.`,
+    `You are an expert test suite generator. Output raw JSON array ONLY (e.g. [{"input": "...", "output": "...", "is_hidden": false}]). Absolutely NO markdown code fences (no \`\`\` or \`\`\`json), NO conversational filler, and NO introductory or concluding text.`,
   );
 
   try {
-    const cleaned = result.replace(/```(?:json)?/g, '').trim();
-    const match   = cleaned.match(/\[[\s\S]*\]/);
-    if (!match) throw new Error('No array found');
-    const parsed: any[] = JSON.parse(match[0]);
-    if (!Array.isArray(parsed)) throw new Error('Not an array');
+    const parsed = extractJsonArray(result);
+    if (!parsed || !parsed.length) throw new Error('No array found');
 
     // Strict schema validation and normalization
     const validated: GeneratedTestCase[] = [];
     for (let i = 0; i < parsed.length; i++) {
       const item = parsed[i];
       if (!item || typeof item !== 'object') continue;
-      if (item.input === undefined || item.expected === undefined) continue;
 
-      const normalizedInput = normalizeTestInput(String(item.input));
-      const normalizedExpected = typeof item.expected === 'string' ? item.expected : JSON.stringify(item.expected);
+      const rawInput = item.input !== undefined ? item.input : item.args;
+      const rawExpected = item.output !== undefined ? item.output : item.expected;
+      if (rawInput === undefined || rawExpected === undefined) continue;
+
+      const normalizedInput = normalizeTestInput(String(rawInput));
+      const normalizedExpected = typeof rawExpected === 'string' ? rawExpected : JSON.stringify(rawExpected);
 
       // Verify that input is valid JSON
       try {
@@ -507,10 +658,15 @@ Example format:
         continue;
       }
 
+      const isHidden = item.is_hidden !== undefined
+        ? Boolean(item.is_hidden)
+        : (item.hidden !== undefined ? Boolean(item.hidden) : i >= 2);
+
       validated.push({
         input: normalizedInput,
         expected: normalizedExpected,
-        is_hidden: item.is_hidden !== undefined ? Boolean(item.is_hidden) : i >= 2,
+        output: normalizedExpected,
+        is_hidden: isHidden,
         explanation: typeof item.explanation === 'string' ? item.explanation : undefined,
       });
     }
