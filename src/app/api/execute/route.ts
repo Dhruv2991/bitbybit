@@ -100,12 +100,16 @@ export async function POST(req: NextRequest) {
           actual: '[Hidden]',
           ok: res.ok,
           time: res.time,
+          is_hidden: true,
           // Only show generic runtime/compilation error message if failed
           error: res.ok ? undefined : (res.error ? 'Test case failed' : undefined),
         };
       }
 
-      return res;
+      return {
+        ...res,
+        is_hidden: false,
+      };
     });
 
     const hiddenTotal = targetCases.filter(tc => tc.is_hidden).length;

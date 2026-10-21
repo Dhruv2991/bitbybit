@@ -754,8 +754,9 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     setActiveLine(null);
 
     try {
-      // Pass the first test case's JSON args so the function body actually runs
-      const firstInput = problem.test_cases?.[0]?.input ?? null;
+      // Pass the first visible test case's JSON args so the function body actually runs
+      const firstVisibleCase = (problem.test_cases || []).find(tc => !tc.is_hidden) || problem.test_cases?.[0];
+      const firstInput = firstVisibleCase?.input ?? null;
 
       const result: TraceResult = await traceCode(
         code,
@@ -1269,34 +1270,46 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         {leftTab === 'problem' && (<>
         <ProblemDescription problem={problem} />
 
-        {(problem.test_cases || []).length > 0 && (
-          <div className="mt-7">
-            <div className="text-xs text-slate-700 dark:text-zinc-300 font-mono mb-3 uppercase tracking-widest flex items-center gap-2 font-semibold">
-              <span className="text-cyan-600 dark:text-cyan-400">🧪</span>
-              <span>Sample Test Cases</span>
-            </div>
-            <div className="space-y-3">
-              {problem.test_cases.slice(0, 3).map((tc, i) => (
-                <div key={i} className="bg-slate-50/70 dark:bg-zinc-900/70 border border-slate-200 dark:border-zinc-800/90 rounded-xl p-3.5 text-sm font-mono hover:border-slate-300 dark:hover:border-zinc-700 transition-colors shadow-2xs">
-                  <div className="flex items-baseline gap-2.5">
-                    <span className="text-slate-500 dark:text-zinc-400 font-sans font-semibold text-xs w-16 shrink-0 select-none">Input:</span>
-                    <code className="text-slate-900 dark:text-zinc-100 break-all flex-1 text-sm leading-relaxed">{formatTestCaseInput(tc.input, problem)}</code>
+        {(() => {
+          const allCases = problem.test_cases || [];
+          if (!allCases.length) return null;
+          const hasExplicitHidden = allCases.some(tc => tc.is_hidden !== undefined);
+          const visibleCases = hasExplicitHidden
+            ? allCases.filter(tc => !tc.is_hidden)
+            : allCases.slice(0, 3);
+          const hiddenCount = hasExplicitHidden
+            ? allCases.filter(tc => tc.is_hidden).length
+            : Math.max(0, allCases.length - 3);
+
+          return (
+            <div className="mt-7">
+              <div className="text-xs text-slate-700 dark:text-zinc-300 font-mono mb-3 uppercase tracking-widest flex items-center gap-2 font-semibold">
+                <span className="text-cyan-600 dark:text-cyan-400">🧪</span>
+                <span>Sample Test Cases</span>
+              </div>
+              <div className="space-y-3">
+                {visibleCases.map((tc, i) => (
+                  <div key={i} className="bg-slate-50/70 dark:bg-zinc-900/70 border border-slate-200 dark:border-zinc-800/90 rounded-xl p-3.5 text-sm font-mono hover:border-slate-300 dark:hover:border-zinc-700 transition-colors shadow-2xs">
+                    <div className="flex items-baseline gap-2.5">
+                      <span className="text-slate-500 dark:text-zinc-400 font-sans font-semibold text-xs w-16 shrink-0 select-none">Input:</span>
+                      <code className="text-slate-900 dark:text-zinc-100 break-all flex-1 text-sm leading-relaxed">{formatTestCaseInput(tc.input, problem)}</code>
+                    </div>
+                    <div className="flex items-baseline gap-2.5 mt-2 pt-2 border-t border-slate-200 dark:border-zinc-800/50">
+                      <span className="text-slate-500 dark:text-zinc-400 font-sans font-semibold text-xs w-16 shrink-0 select-none">Output:</span>
+                      <code className="text-emerald-700 dark:text-emerald-300 font-semibold break-all flex-1 text-sm leading-relaxed">{tc.expected}</code>
+                    </div>
                   </div>
-                  <div className="flex items-baseline gap-2.5 mt-2 pt-2 border-t border-slate-200 dark:border-zinc-800/50">
-                    <span className="text-slate-500 dark:text-zinc-400 font-sans font-semibold text-xs w-16 shrink-0 select-none">Output:</span>
-                    <code className="text-emerald-700 dark:text-emerald-300 font-semibold break-all flex-1 text-sm leading-relaxed">{tc.expected}</code>
+                ))}
+                {hiddenCount > 0 && (
+                  <div className="text-sm text-slate-500 dark:text-zinc-400 font-mono pl-1 pt-1 flex items-center gap-1.5">
+                    <span className="text-slate-400 dark:text-zinc-500">🔒</span>
+                    <span>+{hiddenCount} hidden test {hiddenCount === 1 ? 'case' : 'cases'} (tested on submission)</span>
                   </div>
-                </div>
-              ))}
-              {problem.test_cases.length > 3 && (
-                <div className="text-sm text-slate-500 dark:text-zinc-400 font-mono pl-1 pt-1 flex items-center gap-1.5">
-                  <span className="text-slate-400 dark:text-zinc-500">🔒</span>
-                  <span>+{problem.test_cases.length - 3} hidden test cases (tested on submission)</span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ── AI Hint panel — hidden in arena mode ── */}
         {!onArenaSubmit && (
@@ -1653,7 +1666,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
             stdout={vizStdout}
             error={vizError}
             isLoading={vizLoading}
-            testInput={problem.test_cases?.[0]?.input ?? null}
+            testInput={((problem.test_cases || []).find(tc => !tc.is_hidden) || problem.test_cases?.[0])?.input ?? null}
             quota={getVisualizerQuota(isSubscriber, user?.github)}
             onActiveLineChange={setActiveLine}
             onClose={() => { setVizOpen(false); setVizLoading(false); setActiveLine(null); }}

@@ -34,6 +34,7 @@ export interface TestResult {
   ok: boolean;
   error?: string;
   time?: string;
+  is_hidden?: boolean;
 }
 
 export interface RunResult {
@@ -282,7 +283,8 @@ function cppSerializer(resultExpr: string, returnType: string): string {
       '            cout << "[";',
       "            for (size_t __j__ = 0; __j__ < __r__[__i__].size(); ++__j__) {",
       '                if (__j__) cout << ",";',
-      "                cout << __r__[__i__][__j__];",
+      "                auto __val__ = __r__[__i__][__j__];",
+      "                cout << __val__;",
       "            }",
       '            cout << "]";',
       "        }",
@@ -295,7 +297,20 @@ function cppSerializer(resultExpr: string, returnType: string): string {
       '        cout << "[";',
       "        for (size_t __i__ = 0; __i__ < __r__.size(); ++__i__) {",
       '            if (__i__) cout << ",";',
-      '            cout << "\\"" << __r__[__i__] << "\\"";',
+      "            auto __val__ = __r__[__i__];",
+      '            cout << "\\"" << __val__ << "\\"";',
+      "        }",
+      '        cout << "]" << endl;',
+    ].join("\n");
+  }
+  if (returnType.includes("vector<bool")) {
+    return [
+      `        auto __r__ = ${resultExpr};`,
+      '        cout << "[";',
+      "        for (size_t __i__ = 0; __i__ < __r__.size(); ++__i__) {",
+      '            if (__i__) cout << ",";',
+      "            bool __val__ = __r__[__i__];",
+      '            cout << (__val__ ? "true" : "false");',
       "        }",
       '        cout << "]" << endl;',
     ].join("\n");
@@ -306,7 +321,8 @@ function cppSerializer(resultExpr: string, returnType: string): string {
       '        cout << "[";',
       "        for (size_t __i__ = 0; __i__ < __r__.size(); ++__i__) {",
       '            if (__i__) cout << ",";',
-      "            cout << __r__[__i__];",
+      "            auto __val__ = __r__[__i__];",
+      "            cout << __val__;",
       "        }",
       '        cout << "]" << endl;',
     ].join("\n");

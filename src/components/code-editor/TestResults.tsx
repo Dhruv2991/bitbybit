@@ -61,7 +61,7 @@ export default function TestResults({
               className={`w-2 h-2 rounded-full transition-transform ${
                 r.ok ? 'bg-emerald-500 shadow-xs' : 'bg-rose-500 shadow-xs'
               }`}
-              title={`Test ${i + 1}: ${r.ok ? 'Pass' : 'Fail'}${r.input.includes('Hidden') ? ' (Hidden)' : ''}`}
+              title={`Test ${i + 1}: ${r.ok ? 'Pass' : 'Fail'}${r.is_hidden || r.input.includes('Hidden') ? ' (Hidden)' : ''}`}
             />
           ))}
         </div>
@@ -70,7 +70,7 @@ export default function TestResults({
       {/* Per-case rows */}
       <div className="divide-y divide-slate-100 dark:divide-zinc-800/60 max-h-[380px] overflow-y-auto">
         {results.map((r, i) => {
-          const isHidden = r.input === '[Hidden]' || r.input.includes('Hidden');
+          const isHidden = Boolean(r.is_hidden) || r.input === '[Hidden]' || r.input.includes('Hidden');
           const formattedInput = isHidden
             ? 'Hidden Test Case'
             : formatTestCaseInput(r.input, paramNames || starterCode || '');

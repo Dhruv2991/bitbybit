@@ -165,7 +165,7 @@ export function getStrategy(language: string): ExecutionStrategy {
 export async function runInBrowser(
   userCode:  string,
   language:  string,
-  testCases: { input: string; expected: string }[],
+  testCases: { input: string; expected: string; is_hidden?: boolean }[],
   onProgress?: (done: number, total: number) => void
 ): Promise<RunResult> {
   if (!testCases.length) return { passed: 0, total: 0, results: [] };
@@ -174,6 +174,7 @@ export async function runInBrowser(
 
   for (let i = 0; i < testCases.length; i++) {
     const tc = testCases[i];
+    const isHidden = Boolean((tc as any)?.is_hidden);
     try {
       const harness = buildHarness(userCode, language, tc.input);
       const t0  = Date.now();
@@ -186,16 +187,47 @@ export async function runInBrowser(
       const expected = String(tc.expected).trim();
       const ok       = jsonEqual(actual, expected);
 
-      results.push({
-        input: tc.input, expected, actual, ok,
-        error: !ok && out.stderr ? out.stderr : undefined,
-        time:  `${ms}ms`,
-      });
+      if (isHidden) {
+        results.push({
+          input: '[Hidden]',
+          expected: '[Hidden]',
+          actual: '[Hidden]',
+          ok,
+          time: `${ms}ms`,
+          is_hidden: true,
+          error: ok ? undefined : (out.stderr ? 'Test case failed' : undefined),
+        });
+      } else {
+        results.push({
+          input: tc.input,
+          expected,
+          actual,
+          ok,
+          time: `${ms}ms`,
+          is_hidden: false,
+          error: !ok && out.stderr ? out.stderr : undefined,
+        });
+      }
     } catch (e: any) {
-      results.push({
-        input: tc.input, expected: String(tc.expected).trim(),
-        actual: '', ok: false, error: e.message || 'Execution error',
-      });
+      if (isHidden) {
+        results.push({
+          input: '[Hidden]',
+          expected: '[Hidden]',
+          actual: '[Hidden]',
+          ok: false,
+          is_hidden: true,
+          error: 'Test case failed',
+        });
+      } else {
+        results.push({
+          input: tc.input,
+          expected: String(tc.expected).trim(),
+          actual: '',
+          ok: false,
+          is_hidden: false,
+          error: e.message || 'Execution error',
+        });
+      }
     }
     onProgress?.(i + 1, testCases.length);
   }
@@ -206,7 +238,7 @@ export async function runInBrowser(
 export async function runOnServer(
   userCode:  string,
   language:  string,
-  testCases: { input: string; expected: string }[]
+  testCases: { input: string; expected: string; is_hidden?: boolean }[]
 ): Promise<RunResult> {
   const res = await fetch('/api/execute', {
     method:  'POST',

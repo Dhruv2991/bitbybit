@@ -210,6 +210,7 @@ export default function DuelWarRoomPage() {
         const cases = (problem.test_cases || []).map((tc) => ({
           input: tc.input,
           expected: tc.expected,
+          is_hidden: tc.is_hidden,
         }));
         data = await runInBrowser(code, language, cases);
       } else {
@@ -437,7 +438,14 @@ export default function DuelWarRoomPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between font-bold">
-                      <span>Case {i + 1} {res.ok ? "✓ Passed" : "✗ Failed"}</span>
+                      <span className="flex items-center gap-1.5">
+                        <span>Case {i + 1} {res.ok ? "✓ Passed" : "✗ Failed"}</span>
+                        {(res.input === '[Hidden]' || (res as any).is_hidden) && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-zinc-400">
+                            🔒 Hidden
+                          </span>
+                        )}
+                      </span>
                       {res.time && <span className="text-[10px] text-slate-400">{res.time}</span>}
                     </div>
                     {res.error && !res.ok && (
@@ -446,9 +454,17 @@ export default function DuelWarRoomPage() {
                       </div>
                     )}
                     <div className="text-[11px] text-slate-600 dark:text-slate-400 space-y-0.5">
-                      <div>Input: <code className="text-slate-800 dark:text-slate-200">{res.input}</code></div>
-                      <div>Expected: <code className="text-slate-800 dark:text-slate-200">{res.expected}</code></div>
-                      <div>Actual: <code className="text-slate-800 dark:text-slate-200">{res.actual || (res.ok ? res.expected : (res.error ? "Error" : "None"))}</code></div>
+                      {res.input === '[Hidden]' || (res as any).is_hidden ? (
+                        <div className="text-slate-500 dark:text-zinc-400 italic">
+                          [Hidden test inputs are masked for security]
+                        </div>
+                      ) : (
+                        <>
+                          <div>Input: <code className="text-slate-800 dark:text-slate-200">{res.input}</code></div>
+                          <div>Expected: <code className="text-slate-800 dark:text-slate-200">{res.expected}</code></div>
+                          <div>Actual: <code className="text-slate-800 dark:text-slate-200">{res.actual || (res.ok ? res.expected : (res.error ? "Error" : "None"))}</code></div>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
