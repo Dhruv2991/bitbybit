@@ -217,9 +217,65 @@ export function getUsageStatus(): UsageStatus {
   };
 }
 
-// ── Core: Server AI API (Groq) ────────────────────────────────────────────────
+// ── Core: Server AI API (OpenAI / OpenRouter / Groq) ─────────────────────────
 
 interface Msg { role: 'system' | 'user'; content: string; }
+
+/**
+ * Universal response extractor supporting OpenAI, OpenRouter, Groq, and Gemini payload formats.
+ */
+export function extractAIResponseContent(data: any): string {
+  if (!data) return '';
+  if (typeof data === 'string') return data.trim();
+
+  // 1. OpenAI / OpenRouter style: choices[0].message.content
+  if (Array.isArray(data.choices) && data.choices.length > 0) {
+    const firstChoice = data.choices[0];
+    if (firstChoice?.message?.content !== undefined && firstChoice?.message?.content !== null) {
+      if (typeof firstChoice.message.content === 'string') {
+        return firstChoice.message.content.trim();
+      }
+      if (Array.isArray(firstChoice.message.content)) {
+        return firstChoice.message.content
+          .map((part: any) => (typeof part === 'string' ? part : part?.text || ''))
+          .join('')
+          .trim();
+      }
+    }
+    if (typeof firstChoice?.text === 'string') {
+      return firstChoice.text.trim();
+    }
+    if (typeof firstChoice?.delta?.content === 'string') {
+      return firstChoice.delta.content.trim();
+    }
+  }
+
+  // 2. Direct text field (e.g. from /api/ai or Gemini response.text)
+  if (typeof data.text === 'string') {
+    return data.text.trim();
+  }
+
+  // 3. Gemini REST format: candidates[0].content.parts[0].text
+  if (Array.isArray(data.candidates) && data.candidates.length > 0) {
+    const parts = data.candidates[0]?.content?.parts;
+    if (Array.isArray(parts)) {
+      return parts.map((p: any) => p?.text || '').join('').trim();
+    }
+  }
+
+  // 4. response.text or content
+  if (typeof data.response?.text === 'function') {
+    try { return data.response.text().trim(); } catch {}
+  }
+  if (typeof data.response?.text === 'string') {
+    return data.response.text.trim();
+  }
+  if (typeof data.content === 'string') {
+    return data.content.trim();
+  }
+
+  return '';
+}
 
 async function callGroq(messages: Msg[], maxTokens: number): Promise<string> {
   const controller = new AbortController();
@@ -237,7 +293,11 @@ async function callGroq(messages: Msg[], maxTokens: number): Promise<string> {
       throw new Error(errData.error || `AI error ${res.status}`);
     }
     const data = await res.json();
-    return data.text?.trim() ?? '';
+    const content = extractAIResponseContent(data);
+    if (!content && res.ok) {
+      throw new Error('AI returned an empty response payload');
+    }
+    return content;
   } finally { clearTimeout(timer); }
 }
 
@@ -251,7 +311,7 @@ async function callOllama(messages: Msg[], maxTokens: number): Promise<string> {
   });
   if (!res.ok) throw new Error(`Ollama ${res.status}`);
   const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() ?? '';
+  return extractAIResponseContent(data);
 }
 
 // ── Core: router — Groq → Ollama ─────────────────────────────────────────────

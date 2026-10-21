@@ -94,7 +94,23 @@ const JUDGE0_LANGUAGE_ID: Record<string, number> = {
 };
 
 // Sentinel printed between test case outputs so we can split the stdout
-const SENTINEL = "---CASE---";
+export const SENTINEL = "---CASE---";
+
+/**
+ * Universal batch output parser across all server-side execution languages (C++, Java, Go, Rust):
+ * - Normalizes line endings (\r\n and \r to \n).
+ * - Splits the stdout stream by the ---CASE--- sentinel.
+ * - Filters out empty or whitespace-only chunks (.filter(c => c.trim().length > 0)).
+ * - Ensures correct index alignment so that all configured test cases render properly in the UI.
+ */
+export function parseBatchOutput(stdout: string): string[] {
+  if (!stdout) return [];
+  const normalized = stdout.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return normalized
+    .split(SENTINEL)
+    .filter((c) => c.trim().length > 0)
+    .map((c) => c.trim());
+}
 
 // ── Extract function name from user code ─────────────────────
 
@@ -833,8 +849,8 @@ export function evaluateJudge0Output(
   const stdout = submission.stdout || "";
   const stderr = ((submission.stderr || "") + (submission.compile_output || "") + (submission.message || "")).trim();
 
-  const rawBlocks = stdout.split(SENTINEL + "\n");
-  if (rawBlocks[rawBlocks.length - 1]?.trim() === "") rawBlocks.pop();
+  // Universal batch output parsing: normalize CRLF, split by SENTINEL, filter empty chunks
+  const rawBlocks = parseBatchOutput(stdout);
 
   const totalTime = submission.time ? `${Math.round(parseFloat(submission.time) * 1000)}ms` : undefined;
 
@@ -1029,8 +1045,8 @@ export async function runAgainstTestCases(
     const out = await executeWithJudge0(batchedCode, language);
     const totalMs = Date.now() - t0;
 
-    const rawBlocks = (out.stdout || "").split(SENTINEL + "\n");
-    if (rawBlocks[rawBlocks.length - 1]?.trim() === "") rawBlocks.pop();
+    // Universal batch output parsing: normalize CRLF, split by SENTINEL, filter empty chunks
+    const rawBlocks = parseBatchOutput(out.stdout || "");
 
     const results: TestResult[] = testCases.map((tc, idx) => {
       const rawOutput = (rawBlocks[idx] ?? "").trim();
