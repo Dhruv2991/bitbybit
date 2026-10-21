@@ -40,7 +40,7 @@ interface ExecuteBody {
 function sanitizeTestResults(rawResults: TestResult[], targetCases: TestCase[]): TestResult[] {
   return rawResults.map((res, idx) => {
     const tc = targetCases[idx];
-    const isHidden = Boolean(tc?.is_hidden);
+    const isHidden = Boolean(tc?.is_hidden || res.is_hidden);
 
     if (isHidden) {
       return {
@@ -81,11 +81,6 @@ async function loadAuthoritativeCases(problem_id: string, mode?: 'run' | 'submit
   }
 
   const allProblemCases: TestCase[] = (problem as Problem).test_cases || [];
-
-  if (mode === 'run') {
-    const visibleOnly = allProblemCases.filter(tc => !tc.is_hidden);
-    return visibleOnly.length > 0 ? visibleOnly : allProblemCases.slice(0, 3);
-  }
   return allProblemCases;
 }
 
