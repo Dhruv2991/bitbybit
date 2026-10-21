@@ -21,7 +21,6 @@ import {
   runWandboxSequential,
   pendingSubmissions,
   prunePendingSubmissions,
-  sanitizeTestResults,
   type TestResult,
   type RunResult,
 } from '@/lib/executor';
@@ -36,6 +35,31 @@ interface ExecuteBody {
   problem_id?: string;
   test_cases?: { input: string; expected: string; is_hidden?: boolean }[];
   mode?: 'run' | 'submit';
+}
+
+function sanitizeTestResults(rawResults: TestResult[], targetCases: TestCase[]): TestResult[] {
+  return rawResults.map((res, idx) => {
+    const tc = targetCases[idx];
+    const isHidden = Boolean(tc?.is_hidden);
+
+    if (isHidden) {
+      return {
+        input: '[Hidden]',
+        expected: '[Hidden]',
+        actual: '[Hidden]',
+        ok: res.ok,
+        time: res.time,
+        is_hidden: true,
+        // Only show generic runtime/compilation error message if failed
+        error: res.ok ? undefined : (res.error ? 'Test case failed' : undefined),
+      };
+    }
+
+    return {
+      ...res,
+      is_hidden: false,
+    };
+  });
 }
 
 async function loadAuthoritativeCases(problem_id: string, mode?: 'run' | 'submit'): Promise<TestCase[]> {

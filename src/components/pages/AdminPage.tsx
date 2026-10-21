@@ -385,18 +385,17 @@ function ProblemForm({
         form.test_cases,
         form.starter_code,
       );
-      if (!generated || !generated.length) {
+      if (!generated.length) {
         setAiTestErr(
-          "AI couldn't generate test cases matching the specified signature. Please check your parameter types and description, and try again.",
+          "AI couldn't generate test cases. Check your description and try again.",
         );
       } else {
         set("test_cases", [...form.test_cases, ...generated]);
       }
-    } catch (err: any) {
-      setAiTestErr(err?.message || "Generation failed. Try again.");
-    } finally {
-      setGeneratingTests(false);
+    } catch {
+      setAiTestErr("Generation failed. Try again.");
     }
+    setGeneratingTests(false);
   }
 
   async function handleImproveDescription() {
@@ -684,17 +683,9 @@ function ProblemForm({
           </button>
         </div>
         {aiTestErr && (
-          <div className="mb-3 p-2.5 bg-[#ff4d4d12] border border-[#ff4d4d35] rounded-lg flex items-start gap-2 text-xs font-mono text-[#ff6b6b]">
-            <span className="text-sm shrink-0">⚠️</span>
-            <div className="flex-1 leading-relaxed">{aiTestErr}</div>
-            <button
-              onClick={() => setAiTestErr("")}
-              className="text-[#ff6b6b] hover:text-[#fff] text-xs px-1"
-              title="Dismiss"
-            >
-              ✕
-            </button>
-          </div>
+          <p className="text-[10px] text-[#ff4d4d] font-mono mb-2">
+            {aiTestErr}
+          </p>
         )}
         <TestCaseEditor
           cases={form.test_cases}
@@ -5008,8 +4999,8 @@ function AiGenerateSection() {
       } else {
         setGenerated(result);
       }
-    } catch (err: any) {
-      setErr(err?.message || "Generation failed. Try again.");
+    } catch {
+      setErr("Generation failed. Try again.");
     }
     setGenerating(false);
   }

@@ -32,47 +32,9 @@ export interface TestResult {
   expected: string;
   actual: string;
   ok: boolean;
-  passed?: boolean;
-  expected_output?: string;
-  output?: string;
   error?: string;
   time?: string;
   is_hidden?: boolean;
-}
-
-export const HIDDEN_TEST_CASE_PLACEHOLDER = '🔒 Hidden Test Case';
-
-export function sanitizeTestResults(
-  rawResults: TestResult[],
-  targetCases: { input: string; expected: string; is_hidden?: boolean }[],
-): TestResult[] {
-  return rawResults.map((res, idx) => {
-    const tc = targetCases[idx];
-    const isHidden = Boolean(tc?.is_hidden ?? res.is_hidden);
-
-    if (isHidden) {
-      return {
-        input: HIDDEN_TEST_CASE_PLACEHOLDER,
-        expected: HIDDEN_TEST_CASE_PLACEHOLDER,
-        expected_output: HIDDEN_TEST_CASE_PLACEHOLDER,
-        actual: HIDDEN_TEST_CASE_PLACEHOLDER,
-        output: HIDDEN_TEST_CASE_PLACEHOLDER,
-        ok: res.ok,
-        passed: res.ok,
-        time: res.time,
-        is_hidden: true,
-        error: res.ok ? undefined : (res.error ? 'Test case failed' : undefined),
-      };
-    }
-
-    return {
-      ...res,
-      passed: res.ok,
-      expected_output: res.expected,
-      output: res.actual,
-      is_hidden: false,
-    };
-  });
 }
 
 export interface RunResult {
@@ -94,23 +56,7 @@ const JUDGE0_LANGUAGE_ID: Record<string, number> = {
 };
 
 // Sentinel printed between test case outputs so we can split the stdout
-export const SENTINEL = "---CASE---";
-
-/**
- * Universal batch output parser across all server-side execution languages (C++, Java, Go, Rust):
- * - Normalizes line endings (\r\n and \r to \n).
- * - Splits the stdout stream by the ---CASE--- sentinel.
- * - Filters out empty or whitespace-only chunks (.filter(c => c.trim().length > 0)).
- * - Ensures correct index alignment so that all configured test cases render properly in the UI.
- */
-export function parseBatchOutput(stdout: string): string[] {
-  if (!stdout) return [];
-  const normalized = stdout.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  return normalized
-    .split(SENTINEL)
-    .filter((c) => c.trim().length > 0)
-    .map((c) => c.trim());
-}
+const SENTINEL = "---CASE---";
 
 // ── Extract function name from user code ─────────────────────
 
@@ -849,8 +795,8 @@ export function evaluateJudge0Output(
   const stdout = submission.stdout || "";
   const stderr = ((submission.stderr || "") + (submission.compile_output || "") + (submission.message || "")).trim();
 
-  // Universal batch output parsing: normalize CRLF, split by SENTINEL, filter empty chunks
-  const rawBlocks = parseBatchOutput(stdout);
+  const rawBlocks = stdout.split(SENTINEL + "\n");
+  if (rawBlocks[rawBlocks.length - 1]?.trim() === "") rawBlocks.pop();
 
   const totalTime = submission.time ? `${Math.round(parseFloat(submission.time) * 1000)}ms` : undefined;
 
@@ -863,11 +809,8 @@ export function evaluateJudge0Output(
     return {
       input:     tc.input,
       expected:  String(tc.expected).trim(),
-      expected_output: String(tc.expected).trim(),
       actual:    rawOutput,
-      output:    rawOutput,
       ok,
-      passed:    ok,
       error:     ok ? undefined : (stderr || undefined),
       time:      totalTime ? `~${Math.round((parseFloat(submission.time || "0") * 1000) / testCases.length)}ms` : undefined,
       is_hidden: tc.is_hidden,
@@ -1045,8 +988,8 @@ export async function runAgainstTestCases(
     const out = await executeWithJudge0(batchedCode, language);
     const totalMs = Date.now() - t0;
 
-    // Universal batch output parsing: normalize CRLF, split by SENTINEL, filter empty chunks
-    const rawBlocks = parseBatchOutput(out.stdout || "");
+    const rawBlocks = (out.stdout || "").split(SENTINEL + "\n");
+    if (rawBlocks[rawBlocks.length - 1]?.trim() === "") rawBlocks.pop();
 
     const results: TestResult[] = testCases.map((tc, idx) => {
       const rawOutput = (rawBlocks[idx] ?? "").trim();
@@ -1057,11 +1000,8 @@ export async function runAgainstTestCases(
       return {
         input:     tc.input,
         expected:  String(tc.expected).trim(),
-        expected_output: String(tc.expected).trim(),
         actual:    rawOutput,
-        output:    rawOutput,
         ok,
-        passed:    ok,
         error:     out.stderr || undefined,
         time:      `~${Math.round(totalMs / testCases.length)}ms`,
         is_hidden: tc.is_hidden,
@@ -1102,11 +1042,8 @@ export async function runWandboxSequential(
       results.push({
         input:     tc.input,
         expected:  String(tc.expected).trim(),
-        expected_output: String(tc.expected).trim(),
         actual:    rawOutput,
-        output:    rawOutput,
         ok,
-        passed:    ok,
         error:     out.stderr || undefined,
         time:      `${caseMs}ms`,
         is_hidden: tc.is_hidden,
@@ -1115,11 +1052,8 @@ export async function runWandboxSequential(
       results.push({
         input:     tc.input,
         expected:  String(tc.expected).trim(),
-        expected_output: String(tc.expected).trim(),
         actual:    "",
-        output:    "",
         ok:        false,
-        passed:    false,
         error:     err.message || "Execution error",
         is_hidden: tc.is_hidden,
       });
