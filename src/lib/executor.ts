@@ -41,6 +41,8 @@ export interface RunResult {
   passed: number;
   total: number;
   results: TestResult[];
+  hidden_passed?: number;
+  hidden_total?: number;
 }
 
 // Judge0 language IDs
@@ -354,7 +356,7 @@ function detectCppReturnType(code: string): string {
 
 // ── Build a single batched program (all test cases, one compile) ─
 
-function buildBatchedProgram(
+export function buildBatchedProgram(
   userCode: string,
   lang: string,
   testCases: { input: string; expected: string; is_hidden?: boolean }[],
@@ -643,6 +645,185 @@ function jsonEqual(a: string, b: string): boolean {
 
 let judge0OfflineUntil = 0;
 
+export async function submitToJudge0(
+  fullCode: string,
+  language: string,
+): Promise<{ token: string }> {
+  const languageId = JUDGE0_LANGUAGE_ID[language];
+  if (!languageId) throw new Error(`Unsupported language: ${language}`);
+
+  const base = process.env.JUDGE0_URL || "http://localhost:2358";
+
+  if (Date.now() < judge0OfflineUntil) {
+    throw new Error("Judge0 recently unreachable; circuit open");
+  }
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (process.env.JUDGE0_AUTH_TOKEN) {
+      headers["X-Auth-Token"] = process.env.JUDGE0_AUTH_TOKEN;
+    }
+
+    // Submit with wait=false to bypass Vercel 10s serverless timeout
+    const submitRes = await fetch(`${base}/submissions?wait=false`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        source_code: fullCode,
+        language_id: languageId,
+        stdin: "",
+        cpu_time_limit: 10,
+        compile_timeout: 30,
+        wall_time_limit: 15,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!submitRes.ok) {
+      const body = await submitRes.text();
+      throw new Error(`Judge0 error ${submitRes.status}: ${body}`);
+    }
+
+    const data = await submitRes.json();
+    if (!data.token) {
+      throw new Error("Judge0 response missing submission token");
+    }
+
+    return { token: data.token };
+  } catch (err) {
+    judge0OfflineUntil = Date.now() + 60000;
+    throw err;
+  }
+}
+
+export interface Judge0SubmissionResult {
+  token?: string;
+  stdout: string | null;
+  stderr: string | null;
+  compile_output: string | null;
+  message: string | null;
+  time: string | null;
+  memory: number | null;
+  status: {
+    id: number;
+    description: string;
+  };
+}
+
+export async function getJudge0Submission(token: string): Promise<Judge0SubmissionResult> {
+  const base = process.env.JUDGE0_URL || "http://localhost:2358";
+  const headers: Record<string, string> = {};
+  if (process.env.JUDGE0_AUTH_TOKEN) {
+    headers["X-Auth-Token"] = process.env.JUDGE0_AUTH_TOKEN;
+  }
+
+  const res = await fetch(`${base}/submissions/${token}?base64_encoded=false`, {
+    method: "GET",
+    headers,
+    signal: AbortSignal.timeout(5000),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Judge0 status error ${res.status}: ${text}`);
+  }
+
+  return await res.json();
+}
+
+export interface PendingSubmission {
+  token: string;
+  problem_id?: string;
+  mode?: 'run' | 'submit';
+  testCases: { input: string; expected: string; is_hidden?: boolean }[];
+  createdAt: number;
+}
+
+export const pendingSubmissions = new Map<string, PendingSubmission>();
+
+export function prunePendingSubmissions(): void {
+  const now = Date.now();
+  for (const [token, item] of pendingSubmissions.entries()) {
+    if (now - item.createdAt > 15 * 60 * 1000) {
+      pendingSubmissions.delete(token);
+    }
+  }
+}
+
+export function evaluateJudge0Output(
+  submission: Judge0SubmissionResult,
+  testCases: { input: string; expected: string; is_hidden?: boolean }[],
+): RunResult {
+  const statusId = submission.status?.id ?? 0;
+  const statusDesc = submission.status?.description || "Unknown";
+
+  // Compilation Error (status id 6)
+  if (statusId === 6) {
+    const compileErr = (submission.compile_output || submission.stderr || statusDesc).trim();
+    return {
+      passed: 0,
+      total: testCases.length,
+      results: testCases.map(tc => ({
+        input: tc.input,
+        expected: String(tc.expected).trim(),
+        actual: "",
+        ok: false,
+        error: compileErr || "Compilation error",
+        is_hidden: tc.is_hidden,
+      })),
+    };
+  }
+
+  // Time Limit Exceeded (status id 5)
+  if (statusId === 5) {
+    return {
+      passed: 0,
+      total: testCases.length,
+      results: testCases.map(tc => ({
+        input: tc.input,
+        expected: String(tc.expected).trim(),
+        actual: "",
+        ok: false,
+        error: "Time Limit Exceeded (10s)",
+        is_hidden: tc.is_hidden,
+      })),
+    };
+  }
+
+  const stdout = submission.stdout || "";
+  const stderr = ((submission.stderr || "") + (submission.compile_output || "") + (submission.message || "")).trim();
+
+  const rawBlocks = stdout.split(SENTINEL + "\n");
+  if (rawBlocks[rawBlocks.length - 1]?.trim() === "") rawBlocks.pop();
+
+  const totalTime = submission.time ? `${Math.round(parseFloat(submission.time) * 1000)}ms` : undefined;
+
+  const results: TestResult[] = testCases.map((tc, idx) => {
+    const rawOutput = (rawBlocks[idx] ?? "").trim();
+    const actual    = rawOutput.replace(/\s+/g, "");
+    const expected  = String(tc.expected).trim().replace(/\s+/g, "");
+    const ok        = jsonEqual(actual, expected);
+
+    return {
+      input:     tc.input,
+      expected:  String(tc.expected).trim(),
+      actual:    rawOutput,
+      ok,
+      error:     ok ? undefined : (stderr || undefined),
+      time:      totalTime ? `~${Math.round((parseFloat(submission.time || "0") * 1000) / testCases.length)}ms` : undefined,
+      is_hidden: tc.is_hidden,
+    };
+  });
+
+  return {
+    passed: results.filter(r => r.ok).length,
+    total:  results.length,
+    results,
+  };
+}
+
 async function executeWithJudge0(
   fullCode: string,
   language: string,
@@ -834,49 +1015,54 @@ export async function runAgainstTestCases(
     };
   } catch (e: any) {
     console.warn("[executor] Judge0 failed, falling back to sequential Wandbox execution:", e.message);
-
-    // 2. Wandbox fallback handler: execute test cases sequentially one by one
-    // bypassing the multi-case ---CASE--- stream wrapper
-    const results: TestResult[] = [];
-
-    for (let idx = 0; idx < testCases.length; idx++) {
-      const tc = testCases[idx];
-      const caseT0 = Date.now();
-      try {
-        const singleProgram = buildBatchedProgram(userCode, language, [tc], false);
-        const out = await executeWithWandbox(singleProgram, language);
-        const caseMs = Date.now() - caseT0;
-
-        const rawOutput = (out.stdout || "").trim();
-        const actual    = rawOutput.replace(/\s+/g, "");
-        const expected  = String(tc.expected).trim().replace(/\s+/g, "");
-        const ok        = jsonEqual(actual, expected);
-
-        results.push({
-          input:     tc.input,
-          expected:  String(tc.expected).trim(),
-          actual:    rawOutput,
-          ok,
-          error:     out.stderr || undefined,
-          time:      `${caseMs}ms`,
-          is_hidden: tc.is_hidden,
-        });
-      } catch (err: any) {
-        results.push({
-          input:     tc.input,
-          expected:  String(tc.expected).trim(),
-          actual:    "",
-          ok:        false,
-          error:     err.message || "Execution error",
-          is_hidden: tc.is_hidden,
-        });
-      }
-    }
-
-    return {
-      passed: results.filter((r) => r.ok).length,
-      total:  results.length,
-      results,
-    };
+    return await runWandboxSequential(userCode, language, testCases);
   }
+}
+
+export async function runWandboxSequential(
+  userCode: string,
+  language: string,
+  testCases: { input: string; expected: string; is_hidden?: boolean }[],
+): Promise<RunResult> {
+  const results: TestResult[] = [];
+
+  for (let idx = 0; idx < testCases.length; idx++) {
+    const tc = testCases[idx];
+    const caseT0 = Date.now();
+    try {
+      const singleProgram = buildBatchedProgram(userCode, language, [tc], false);
+      const out = await executeWithWandbox(singleProgram, language);
+      const caseMs = Date.now() - caseT0;
+
+      const rawOutput = (out.stdout || "").trim();
+      const actual    = rawOutput.replace(/\s+/g, "");
+      const expected  = String(tc.expected).trim().replace(/\s+/g, "");
+      const ok        = jsonEqual(actual, expected);
+
+      results.push({
+        input:     tc.input,
+        expected:  String(tc.expected).trim(),
+        actual:    rawOutput,
+        ok,
+        error:     out.stderr || undefined,
+        time:      `${caseMs}ms`,
+        is_hidden: tc.is_hidden,
+      });
+    } catch (err: any) {
+      results.push({
+        input:     tc.input,
+        expected:  String(tc.expected).trim(),
+        actual:    "",
+        ok:        false,
+        error:     err.message || "Execution error",
+        is_hidden: tc.is_hidden,
+      });
+    }
+  }
+
+  return {
+    passed: results.filter((r) => r.ok).length,
+    total:  results.length,
+    results,
+  };
 }

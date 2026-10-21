@@ -235,17 +235,104 @@ export async function runInBrowser(
   return { passed: results.filter(r => r.ok).length, total: results.length, results };
 }
 
+/**
+ * Polls the execution status endpoint every 1.5 to 2 seconds until Judge0 finishes (status id > 2).
+ * Shows loading progress and returns final RunResult.
+ */
+export async function pollExecutionStatus(
+  token: string,
+  problemId?: string,
+  onStatus?: (status: string) => void,
+  mode: 'run' | 'submit' = 'run'
+): Promise<RunResult> {
+  const pollIntervalMs = 1800; // 1.8 seconds (within the 1.5s - 2.0s range)
+  const maxAttempts = 60; // 60 * 1.8s ≈ 108 seconds timeout safeguard
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    attempts++;
+
+    onStatus?.(`Compiling & executing… (polling #${attempts})`);
+
+    const query = new URLSearchParams({ token });
+    if (problemId) query.set('problem_id', problemId);
+    if (mode) query.set('mode', mode);
+
+    try {
+      const res = await fetch(`/api/execute?${query.toString()}`);
+      if (!res.ok) {
+        continue;
+      }
+
+      const data = await res.json();
+
+      if (data.status === 'done') {
+        return {
+          passed: data.passed ?? 0,
+          total: data.total ?? 0,
+          results: data.results ?? [],
+          hidden_passed: data.hidden_passed,
+          hidden_total: data.hidden_total,
+        };
+      }
+
+      if (data.description) {
+        onStatus?.(`Status: ${data.description}…`);
+      }
+    } catch {
+      // Continue next attempt
+    }
+  }
+
+  throw new Error('Execution timed out waiting for Judge0');
+}
+
 export async function runOnServer(
   userCode:  string,
   language:  string,
-  testCases: { input: string; expected: string; is_hidden?: boolean }[]
+  testCases?: { input: string; expected: string; is_hidden?: boolean }[],
+  onStatus?: (status: string) => void,
+  problemId?: string,
+  mode: 'run' | 'submit' = 'run'
 ): Promise<RunResult> {
+  const payload: Record<string, any> = {
+    code: userCode,
+    language,
+    mode,
+  };
+  if (problemId) {
+    payload.problem_id = problemId;
+  }
+  if (testCases && testCases.length > 0) {
+    payload.test_cases = testCases;
+  }
+
   const res = await fetch('/api/execute', {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: userCode, language, test_cases: testCases, use_harness: true }),
+    body: JSON.stringify(payload),
   });
+
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Execution failed');
+
+  // If already finished (e.g. Wandbox fallback or immediate response)
+  if (data.status === 'done' || data.results) {
+    return {
+      passed: data.passed ?? 0,
+      total: data.total ?? 0,
+      results: data.results ?? [],
+      hidden_passed: data.hidden_passed,
+      hidden_total: data.hidden_total,
+    };
+  }
+
+  // If asynchronous token returned, enter polling loop
+  if (data.token) {
+    onStatus?.('Submitted to Judge0, awaiting execution…');
+    return await pollExecutionStatus(data.token, problemId, onStatus, mode);
+  }
+
   return data as RunResult;
 }

@@ -11,6 +11,7 @@ import { STARTER_CODE }                              from '@/types/database';
 import {
   runInBrowser,
   runOnServer,
+  pollExecutionStatus,
   getStrategy,
   type RunResult,
 } from '@/lib/browserExecutor';
@@ -987,7 +988,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         });
       } else {
         setRunStatus(`Compiling ${lang}…`);
-        result = await runOnServer(code, lang, cases);
+        result = await runOnServer(code, lang, cases, (msg) => setRunStatus(msg), problem.id, 'run');
       }
       setTestResult(result);
       recordTestRun(code, lang, result.passed, result.total);
@@ -1013,7 +1014,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
 
     // ── Server-Side Submission Execution (Isolated & Hidden Test Case Secure) ──
     setSubmitting(true);
-    setStatusMsg('Running full test suite on server…');
+    setStatusMsg('Submitting code to Judge0…');
     let finalTestResult: RunResult | null = null;
     try {
       const execRes = await fetch('/api/execute', {
@@ -1027,7 +1028,18 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         }),
       });
       if (execRes.ok) {
-        finalTestResult = await execRes.json();
+        const initData = await execRes.json();
+        if (initData.status === 'processing' && initData.token) {
+          setStatusMsg('Executing on Judge0… (polling status)');
+          finalTestResult = await pollExecutionStatus(
+            initData.token,
+            problem.id,
+            (msg) => setStatusMsg(msg),
+            'submit'
+          );
+        } else {
+          finalTestResult = initData;
+        }
         setTestResult(finalTestResult);
       } else {
         // Fallback to client/server runner if problem not found in DB
@@ -1035,11 +1047,12 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         if (strategy === 'browser') {
           finalTestResult = await runInBrowser(code, lang, problem.test_cases || [], () => {});
         } else {
-          finalTestResult = await runOnServer(code, lang, problem.test_cases || []);
+          finalTestResult = await runOnServer(code, lang, problem.test_cases || [], (msg) => setStatusMsg(msg), problem.id, 'submit');
         }
         setTestResult(finalTestResult);
       }
-    } catch {
+    } catch (execErr: any) {
+      console.warn('[Workspace submit] Execution error:', execErr);
       finalTestResult = testResult;
     }
 

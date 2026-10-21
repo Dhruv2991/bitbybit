@@ -17,7 +17,7 @@ import {
   updateDuelProgressAction,
   forfeitDuelAction,
 } from "@/app/actions/duels";
-import { getStrategy, runInBrowser } from "@/lib/browserExecutor";
+import { getStrategy, runInBrowser, pollExecutionStatus } from "@/lib/browserExecutor";
 
 import ProblemStatement from "./ProblemStatement";
 
@@ -228,7 +228,12 @@ export default function DuelWarRoomPage() {
           });
 
           if (response.ok) {
-            data = await response.json();
+            const initData = await response.json();
+            if (initData.status === "processing" && initData.token) {
+              data = await pollExecutionStatus(initData.token, problem.id, undefined, 'submit');
+            } else {
+              data = initData;
+            }
           } else {
             const errData = await response.json().catch(() => ({}));
             console.warn("[Duel] /api/execute returned error:", errData);
