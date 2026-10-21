@@ -261,12 +261,15 @@ async function callAI(userPrompt: string, maxTokens: number, systemPrompt?: stri
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
   messages.push({ role: 'user', content: userPrompt });
 
+  let groqErr = '';
+
   // 1. Try server AI endpoint (Groq)
   try {
     const result = await callGroq(messages, maxTokens);
     if (result) return result;
   } catch (e: any) {
-    console.warn('AI endpoint failed, trying Ollama fallback:', e.message);
+    groqErr = e.message || '';
+    console.warn('AI endpoint failed, trying Ollama fallback:', groqErr);
   }
 
   // 2. Fallback: Ollama
@@ -275,8 +278,17 @@ async function callAI(userPrompt: string, maxTokens: number, systemPrompt?: stri
     if (result) return result;
     return 'No response from AI.';
   } catch (e: any) {
+    if (groqErr === 'NO_GROQ_KEY') {
+      return '⚠️ Groq API key is not configured (NO_GROQ_KEY). Please set GROQ_API_KEY in your environment.';
+    }
+    if (groqErr === 'GROQ_RATE_LIMIT') {
+      return '⚠️ Groq AI rate limit reached (429). Please wait a moment and try again.';
+    }
+    if (groqErr && !groqErr.includes('failed to fetch')) {
+      return `⚠️ ${groqErr}`;
+    }
     if (e.message?.includes('fetch failed') || e.message?.includes('ECONNREFUSED'))
-      return '⚠️ AI is unavailable right now. Try again in a moment.';
+      return '⚠️ AI service is currently unavailable. Please verify GROQ_API_KEY or connection.';
     return `AI error: ${e.message}`;
   }
 }
@@ -557,6 +569,82 @@ function extractJsonArray(raw: string): any[] {
   return recovered;
 }
 
+export function sanitizeMarkdownForPrompt(markdown: string): string {
+  if (!markdown) return '';
+  return markdown
+    // 1. Strip massive base64 images so they do not exhaust prompt tokens or crash the parser
+    .replace(/!\[([^\]]*)\]\(data:image\/[^;]+;base64,[^)]+\)/gi, (_, alt) => `[Image: ${alt || 'Diagram'}]`)
+    .replace(/src=["']data:image\/[^;]+;base64,[^"']*["']/gi, 'src="[embedded-image]"')
+    // 2. Strip large SVG blocks
+    .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, '[Vector Diagram]')
+    // 3. Replace regular markdown images ![alt](url) with a clean descriptive placeholder
+    .replace(/!\[([^\]]*)\]\([^)]+\)/gi, (_, alt) => `[Image: ${alt || 'Diagram'}]`)
+    // 4. Replace reference-style markdown images ![alt][ref]
+    .replace(/!\[([^\]]*)\]\[[^\]]*\]/gi, (_, alt) => `[Image: ${alt || 'Diagram'}]`)
+    // 5. Replace HTML <img> / <picture> tags with [Image: alt]
+    .replace(/<picture\b[^>]*>[\s\S]*?<\/picture>/gi, '[Image: Diagram]')
+    .replace(/<img\b[^>]*>/gi, (tag) => {
+      const altMatch = tag.match(/alt=["']([^"']*)["']/i);
+      return `[Image: ${altMatch?.[1] || 'Diagram'}]`;
+    })
+    // 6. Strip iframes / video embeds
+    .replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, '')
+    .trim();
+}
+
+// Format and strictly validate expected output string according to the declared return type
+function formatExpectedForReturnType(raw: any, returnType: string): string {
+  const rType = (returnType || '').trim().toLowerCase();
+  
+  if (typeof raw === 'boolean') {
+    return raw ? 'true' : 'false';
+  }
+
+  if (typeof raw === 'number') {
+    return String(raw);
+  }
+
+  const rawStr = typeof raw === 'string' ? raw.trim() : JSON.stringify(raw);
+
+  // Boolean return type
+  if (rType === 'bool' || rType === 'boolean') {
+    if (rawStr.toLowerCase() === 'true') return 'true';
+    if (rawStr.toLowerCase() === 'false') return 'false';
+  }
+
+  // Numeric return type (int, long, double, float)
+  if (['int', 'long', 'double', 'float', 'number'].includes(rType)) {
+    const num = Number(rawStr);
+    if (!isNaN(num)) return String(num);
+  }
+
+  // String return type: must be wrapped in JSON quotes
+  if (rType === 'string') {
+    try {
+      const parsed = JSON.parse(rawStr);
+      if (typeof parsed === 'string') return rawStr;
+    } catch {}
+    return JSON.stringify(rawStr);
+  }
+
+  // Array / Matrix return type
+  if (rType.endsWith('[]') || rType.startsWith('list') || rType.startsWith('array')) {
+    try {
+      const parsed = JSON.parse(rawStr);
+      if (Array.isArray(parsed)) return rawStr;
+    } catch {
+      // Try wrapping comma-separated numbers/strings: "1, 2, 3" -> "[1, 2, 3]"
+      const wrapped = `[${rawStr}]`;
+      try {
+        const parsed = JSON.parse(wrapped);
+        if (Array.isArray(parsed)) return wrapped;
+      } catch {}
+    }
+  }
+
+  return rawStr;
+}
+
 export async function generateTestCases(
   problemTitle:       string,
   problemDescription: string,
@@ -565,117 +653,230 @@ export async function generateTestCases(
   existingCases:      GeneratedTestCase[],
   starterCode?:       string,
 ): Promise<GeneratedTestCase[]> {
-  // Extract parameter names from starter code or generate defaults
+  // Extract parameter names and types from starter code or generate defaults
   let paramNames: string[] = [];
+  let inferredParamTypes: string[] = [];
+  let inferredReturnType = '';
+
   if (starterCode) {
-    const pyMatch = starterCode.match(/def\s+\w+\s*\(([^)]*)\)/);
+    // Try matching typed Python def: def solution(nums: List[int], target: int) -> List[int]:
+    const pyMatch = starterCode.match(/def\s+\w+\s*\(([^)]*)\)(?:\s*->\s*([^:]+))?/);
     if (pyMatch && pyMatch[1]) {
-      paramNames = pyMatch[1].split(',').map(p => p.trim()).filter(p => p && p !== 'self').map(p => p.split(':')[0].trim());
+      const rawParams = pyMatch[1].split(',').map(p => p.trim()).filter(p => p && p !== 'self');
+      paramNames = rawParams.map(p => p.split(':')[0].trim());
+      inferredParamTypes = rawParams.map(p => {
+        const parts = p.split(':');
+        return parts.length > 1 ? parts[1].trim() : '';
+      }).filter(Boolean);
+      if (pyMatch[2]) {
+        inferredReturnType = pyMatch[2].trim();
+      }
     }
   }
-  if (!paramNames.length && paramTypes.length) {
-    paramNames = paramTypes.map((_, i) => `arg${i + 1}`);
+
+  const cleanParamTypes = (Array.isArray(paramTypes) && paramTypes.length > 0)
+    ? paramTypes.map(p => p.trim()).filter(Boolean)
+    : inferredParamTypes;
+
+  const cleanReturnType = (returnType && returnType.trim() !== 'bool')
+    ? returnType.trim()
+    : (inferredReturnType || returnType || 'bool').trim();
+
+  if (!paramNames.length && cleanParamTypes.length) {
+    paramNames = cleanParamTypes.map((_, i) => `arg${i + 1}`);
   }
 
-  const signatureDesc = paramNames.length > 0
-    ? `Function Signature: solution(${paramNames.map((name, i) => `${name}: ${paramTypes[i] || 'any'}`).join(', ')}) -> ${returnType}`
-    : `Parameter Types: [${paramTypes.join(', ')}], Return Type: ${returnType}`;
+  const signatureDesc = cleanParamTypes.length > 0
+    ? `Function Signature & Strict Type Constraints:
+- Expected Parameter Count: ${cleanParamTypes.length}
+- Parameters:
+${cleanParamTypes.map((type, i) => `  * Parameter ${i + 1} (${paramNames[i] || `arg${i + 1}`}): type "${type}"`).join('\n')}
+- Expected Return Type: "${cleanReturnType}"
+- Function Call Interface: solution(${cleanParamTypes.map((type, i) => `${paramNames[i] || `arg${i + 1}`}: ${type}`).join(', ')}) -> ${cleanReturnType}`
+    : `Function Signature & Type Constraints:
+- Parameters: [any]
+- Expected Return Type: "${cleanReturnType}"`;
 
   const existingSummary = existingCases.length
     ? `Existing test cases (do NOT duplicate these):\n${existingCases.map(c => `  input: ${c.input} → expected: ${c.expected || c.output}${c.is_hidden ? ' (hidden)' : ''}`).join('\n')}`
     : 'No existing test cases yet.';
 
-  const markdownDesc = (problemDescription || '').trim().slice(0, 4000);
+  const cleanedDesc = sanitizeMarkdownForPrompt(problemDescription || '');
+  const markdownDesc = cleanedDesc.slice(0, 5000);
 
-  const result = await callAI(
-    `Problem: "${problemTitle}"
-Problem Markdown Description and Explanation:
+  const prompt = `Problem Title: "${problemTitle}"
+
+Markdown Problem Description & Constraints:
 ${markdownDesc}
 
 ${signatureDesc}
 
 ${existingSummary}
 
-Generate high-quality, comprehensive test cases for this problem based on the markdown description, constraints, and explanation.
+Generate high-quality, comprehensive test cases for this problem based on the markdown description, constraints, and function signature.
 Provide:
-1. Basic / Example Cases (2): Standard typical inputs derived from the problem description and examples. Mark "is_hidden": false.
+1. Basic / Example Cases (2): Standard typical inputs derived directly from the problem description and examples. Mark "is_hidden": false.
 2. Edge Cases (2): Empty or single-element inputs, all identical values, minimum/maximum boundary constraints. Mark "is_hidden": true.
 3. Stress / Non-Trivial Cases (2): Complex patterns, tricky cases that break naive greedy or brute-force approaches. Mark "is_hidden": true.
 4. Boundary / Special Values (2): Negative numbers, zeros, special cases, or empty result scenarios. Mark "is_hidden": true.
 
-CRITICAL FORMATTING INSTRUCTIONS - STRICT RAW JSON ONLY:
-- Return RAW JSON ONLY.
-- Absolutely NO markdown code fences (do NOT use \`\`\` or \`\`\`json).
-- Absolutely NO conversational filler, introductory text, explanations, or notes outside the JSON array.
-- The output MUST start with "[" as the very first character and end with "]" as the very last character.
-- The output must be a strict JSON array where each object strictly matches:
-  {
-    "input": "...",
-    "output": "...",
-    "is_hidden": false,
-    "explanation": "..."
-  }
+CRITICAL INSTRUCTIONS ON MARKDOWN & IMAGES:
+- The problem description may contain markdown formatting, mathematical symbols, and image references like \`[Image: ...]\`.
+- Do NOT output any images, markdown formatting, or image links. Extract all logic, types, and constraints from the written text and signature.
 
-Field Rules:
-- "input": A single valid JSON array string containing all function arguments in exact positional order.
-  Example for 2 parameters (nums: int[], target: int): "[[2,7,11,15], 9]"
-  Example for 1 parameter (s: string): "[\\"babad\\"]"
-- "output": A single valid JSON string or literal representing the exact expected return value. (e.g. "[0,1]" or "true" or "42" or "\\"bab\\""). Note: "expected" is also supported as a synonym.
-- "is_hidden": boolean (false for the first 2 example cases, true for the remaining cases).
+CRITICAL SIGNATURE & TYPE COMPLIANCE:
+- Every test case "input" MUST be a single valid JSON array string containing all function arguments in exact positional order.
+  ${cleanParamTypes.length > 0 ? `* The outer JSON array MUST contain EXACTLY ${cleanParamTypes.length} elements corresponding to the parameters.` : ''}
+  * Example for 2 parameters (nums: int[], target: int): "[[2,7,11,15], 9]"
+  * Example for 1 parameter (s: string): "[\\"babad\\"]"
+- Every test case "output" (or "expected") MUST be a valid JSON representation strictly matching the return type "${cleanReturnType}":
+  * Numeric types (int, number, float, double): Must be valid JSON numbers, e.g. "42", "-1", "0" (never descriptive words).
+  * Boolean types (bool, boolean): Must be "true" or "false".
+  * String types (string, String): Must be valid JSON string with quotes, e.g. "\\"result\\"".
+  * Array/List types: Must be a valid JSON array string, e.g. "[0, 1]" or "[]".
+- "is_hidden": boolean (false for first 2 sample cases, true for remaining cases).
 - "explanation": Short 1-sentence description of the edge case or condition tested.
+
+OUTPUT FORMAT REQUIREMENTS:
+- Output RAW JSON ONLY.
+- Absolutely NO markdown code fences (no \`\`\` or \`\`\`json).
+- Absolutely NO conversational filler, introductory remarks, or commentary.
+- Must start with "[" as the very first character and end with "]" as the very last character.
 
 Example Output:
 [
   {"input": "[[1,2,1,3], 3]", "output": "1", "is_hidden": false, "explanation": "Basic sample with frequency count"},
   {"input": "[[5], 1]", "output": "5", "is_hidden": true, "explanation": "Single element boundary case"}
-]`,
-    1000,
-    `You are an expert test suite generator. Output raw JSON array ONLY (e.g. [{"input": "...", "output": "...", "is_hidden": false}]). Absolutely NO markdown code fences (no \`\`\` or \`\`\`json), NO conversational filler, and NO introductory or concluding text.`,
+]`;
+
+  const result = await callAI(
+    prompt,
+    1400,
+    `You are an expert competitive programming test suite generator. Output raw JSON array ONLY (e.g. [{"input": "...", "output": "...", "is_hidden": false}]). Adhere strictly to the parameter count and types. Absolutely NO markdown code fences, NO conversational text, and NO preamble.`
   );
 
-  try {
-    const parsed = extractJsonArray(result);
-    if (!parsed || !parsed.length) throw new Error('No array found');
+  if (isBlocked(result) || result.startsWith('AI error:')) {
+    if (result.includes('NO_GROQ_KEY') || result.includes('Groq API key')) {
+      throw new Error('Groq API Key is missing. Please set GROQ_API_KEY in your .env file or server environment.');
+    }
+    if (result.includes('GROQ_RATE_LIMIT') || result.includes('429')) {
+      throw new Error('Groq AI rate limit reached (429). Please wait a moment and try again.');
+    }
+    if (result.includes('unavailable') || result.includes('ECONNREFUSED') || result.includes('fetch failed')) {
+      throw new Error('AI service is currently unavailable. Please verify GROQ_API_KEY and network connection.');
+    }
+    throw new Error(result.replace(/^[⚠️⛔]\s*/, ''));
+  }
 
-    // Strict schema validation and normalization
-    const validated: GeneratedTestCase[] = [];
-    for (let i = 0; i < parsed.length; i++) {
-      const item = parsed[i];
-      if (!item || typeof item !== 'object') continue;
+  const parsed = extractJsonArray(result);
+  if (!parsed || !parsed.length) {
+    if (result.length < 30) {
+      throw new Error('AI returned an empty or invalid response. Please try again.');
+    }
+    throw new Error(`Failed to parse AI output into a valid test case array. (Received: ${result.slice(0, 120)}...)`);
+  }
 
-      const rawInput = item.input !== undefined ? item.input : item.args;
-      const rawExpected = item.output !== undefined ? item.output : item.expected;
-      if (rawInput === undefined || rawExpected === undefined) continue;
+  // Strict schema validation and signature compliance
+  const validated: GeneratedTestCase[] = [];
+  for (let i = 0; i < parsed.length; i++) {
+    const item = parsed[i];
+    if (!item || typeof item !== 'object') continue;
 
-      const normalizedInput = normalizeTestInput(String(rawInput));
-      const normalizedExpected = typeof rawExpected === 'string' ? rawExpected : JSON.stringify(rawExpected);
+    const rawInput = item.input !== undefined ? item.input : item.args;
+    const rawExpected = item.output !== undefined ? item.output : item.expected;
+    if (rawInput === undefined || rawExpected === undefined) continue;
 
-      // Verify that input is valid JSON
-      try {
-        const testArgs = JSON.parse(normalizedInput);
-        if (!Array.isArray(testArgs)) continue;
-      } catch {
-        continue;
-      }
+    const normalizedInput = normalizeTestInput(String(rawInput));
 
-      const isHidden = item.is_hidden !== undefined
-        ? Boolean(item.is_hidden)
-        : (item.hidden !== undefined ? Boolean(item.hidden) : i >= 2);
-
-      validated.push({
-        input: normalizedInput,
-        expected: normalizedExpected,
-        output: normalizedExpected,
-        is_hidden: isHidden,
-        explanation: typeof item.explanation === 'string' ? item.explanation : undefined,
-      });
+    // Verify that input is valid JSON
+    let testArgs: any;
+    try {
+      testArgs = JSON.parse(normalizedInput);
+    } catch {
+      continue;
     }
 
-    return validated.slice(0, 10);
-  } catch (err) {
-    console.error('[generateTestCases] Error parsing AI response:', err);
-    return [];
+    // Ensure testArgs is an array representing function arguments
+    if (!Array.isArray(testArgs)) {
+      testArgs = [testArgs];
+    }
+
+    // Handle single parameter array cases where the LLM generated [1, 2, 3] instead of [[1, 2, 3]]
+    if (cleanParamTypes.length === 1) {
+      const singleType = cleanParamTypes[0].toLowerCase();
+      const isArrayType = singleType.endsWith('[]') || singleType.startsWith('list') || singleType.startsWith('array');
+      if (isArrayType && testArgs.length > 1 && !Array.isArray(testArgs[0])) {
+        testArgs = [testArgs];
+      }
+    }
+
+    // Verify parameter count compliance if specified
+    if (cleanParamTypes.length > 0 && testArgs.length !== cleanParamTypes.length) {
+      continue;
+    }
+
+    // Validate and coerce parameter types if specified
+    let paramsValid = true;
+    if (cleanParamTypes.length > 0) {
+      for (let pIdx = 0; pIdx < cleanParamTypes.length; pIdx++) {
+        const pType = cleanParamTypes[pIdx].trim().toLowerCase();
+        const argVal = testArgs[pIdx];
+
+        if (pType.endsWith('[]') || pType.startsWith('list')) {
+          if (!Array.isArray(argVal)) {
+            paramsValid = false;
+            break;
+          }
+        } else if (['int', 'long', 'double', 'float', 'number'].includes(pType)) {
+          if (typeof argVal !== 'number') {
+            const num = Number(argVal);
+            if (isNaN(num)) {
+              paramsValid = false;
+              break;
+            }
+            testArgs[pIdx] = num;
+          }
+        } else if (pType === 'bool' || pType === 'boolean') {
+          if (typeof argVal !== 'boolean') {
+            if (String(argVal).toLowerCase() === 'true') testArgs[pIdx] = true;
+            else if (String(argVal).toLowerCase() === 'false') testArgs[pIdx] = false;
+            else {
+              paramsValid = false;
+              break;
+            }
+          }
+        } else if (pType === 'string') {
+          if (typeof argVal !== 'string') {
+            testArgs[pIdx] = String(argVal);
+          }
+        }
+      }
+    }
+
+    if (!paramsValid) continue;
+
+    // Normalize output for return type compliance
+    const normalizedExpected = formatExpectedForReturnType(rawExpected, cleanReturnType);
+
+    const isHidden = item.is_hidden !== undefined
+      ? Boolean(item.is_hidden)
+      : (item.hidden !== undefined ? Boolean(item.hidden) : i >= 2);
+
+    validated.push({
+      input: JSON.stringify(testArgs),
+      expected: normalizedExpected,
+      output: normalizedExpected,
+      is_hidden: isHidden,
+      explanation: typeof item.explanation === 'string' ? item.explanation : undefined,
+    });
   }
+
+  if (!validated.length) {
+    const sigStr = cleanParamTypes.length > 0 ? `(${cleanParamTypes.join(', ')}) -> ${cleanReturnType}` : `any -> ${cleanReturnType}`;
+    throw new Error(`AI generated ${parsed.length} test cases, but none passed strict signature verification for ${sigStr}. Please verify parameter types and description constraints.`);
+  }
+
+  return validated.slice(0, 10);
 }
 
 // Defensive normalizer: the platform (admin editor + executor) expects
@@ -789,6 +990,19 @@ Rules:
     'You are a competitive programming problem generator. Output ONLY valid JSON, where every test case "input" is itself a single valid JSON array of arguments, never a bare comma-separated list. No markdown, no explanation.',
   );
 
+  if (isBlocked(result) || result.startsWith('AI error:')) {
+    if (result.includes('NO_GROQ_KEY') || result.includes('Groq API key')) {
+      throw new Error('Groq API Key is missing. Please set GROQ_API_KEY in your .env file or server environment.');
+    }
+    if (result.includes('GROQ_RATE_LIMIT') || result.includes('429')) {
+      throw new Error('Groq AI rate limit reached (429). Please wait a moment and try again.');
+    }
+    if (result.includes('unavailable') || result.includes('ECONNREFUSED') || result.includes('fetch failed')) {
+      throw new Error('AI service is currently unavailable. Please verify GROQ_API_KEY and network connection.');
+    }
+    throw new Error(result.replace(/^[⚠️⛔]\s*/, ''));
+  }
+
   try {
     const cleaned = result.replace(/```(?:json)?/g, '').trim();
     const match   = cleaned.match(/\{[\s\S]*\}/);
@@ -802,8 +1016,11 @@ Rules:
       }));
     }
     return parsed as GeneratedProblem;
-  } catch {
-    return null;
+  } catch (err: any) {
+    if (err.message && !err.message.includes('No object found') && !err.message.includes('Unexpected token')) {
+      throw err;
+    }
+    throw new Error(`Failed to parse AI-generated problem JSON: ${err.message || 'Invalid format'}`);
   }
 }
 

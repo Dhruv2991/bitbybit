@@ -32,9 +32,47 @@ export interface TestResult {
   expected: string;
   actual: string;
   ok: boolean;
+  passed?: boolean;
+  expected_output?: string;
+  output?: string;
   error?: string;
   time?: string;
   is_hidden?: boolean;
+}
+
+export const HIDDEN_TEST_CASE_PLACEHOLDER = '🔒 Hidden Test Case';
+
+export function sanitizeTestResults(
+  rawResults: TestResult[],
+  targetCases: { input: string; expected: string; is_hidden?: boolean }[],
+): TestResult[] {
+  return rawResults.map((res, idx) => {
+    const tc = targetCases[idx];
+    const isHidden = Boolean(tc?.is_hidden ?? res.is_hidden);
+
+    if (isHidden) {
+      return {
+        input: HIDDEN_TEST_CASE_PLACEHOLDER,
+        expected: HIDDEN_TEST_CASE_PLACEHOLDER,
+        expected_output: HIDDEN_TEST_CASE_PLACEHOLDER,
+        actual: HIDDEN_TEST_CASE_PLACEHOLDER,
+        output: HIDDEN_TEST_CASE_PLACEHOLDER,
+        ok: res.ok,
+        passed: res.ok,
+        time: res.time,
+        is_hidden: true,
+        error: res.ok ? undefined : (res.error ? 'Test case failed' : undefined),
+      };
+    }
+
+    return {
+      ...res,
+      passed: res.ok,
+      expected_output: res.expected,
+      output: res.actual,
+      is_hidden: false,
+    };
+  });
 }
 
 export interface RunResult {
@@ -809,8 +847,11 @@ export function evaluateJudge0Output(
     return {
       input:     tc.input,
       expected:  String(tc.expected).trim(),
+      expected_output: String(tc.expected).trim(),
       actual:    rawOutput,
+      output:    rawOutput,
       ok,
+      passed:    ok,
       error:     ok ? undefined : (stderr || undefined),
       time:      totalTime ? `~${Math.round((parseFloat(submission.time || "0") * 1000) / testCases.length)}ms` : undefined,
       is_hidden: tc.is_hidden,
@@ -1000,8 +1041,11 @@ export async function runAgainstTestCases(
       return {
         input:     tc.input,
         expected:  String(tc.expected).trim(),
+        expected_output: String(tc.expected).trim(),
         actual:    rawOutput,
+        output:    rawOutput,
         ok,
+        passed:    ok,
         error:     out.stderr || undefined,
         time:      `~${Math.round(totalMs / testCases.length)}ms`,
         is_hidden: tc.is_hidden,
@@ -1042,8 +1086,11 @@ export async function runWandboxSequential(
       results.push({
         input:     tc.input,
         expected:  String(tc.expected).trim(),
+        expected_output: String(tc.expected).trim(),
         actual:    rawOutput,
+        output:    rawOutput,
         ok,
+        passed:    ok,
         error:     out.stderr || undefined,
         time:      `${caseMs}ms`,
         is_hidden: tc.is_hidden,
@@ -1052,8 +1099,11 @@ export async function runWandboxSequential(
       results.push({
         input:     tc.input,
         expected:  String(tc.expected).trim(),
+        expected_output: String(tc.expected).trim(),
         actual:    "",
+        output:    "",
         ok:        false,
+        passed:    false,
         error:     err.message || "Execution error",
         is_hidden: tc.is_hidden,
       });

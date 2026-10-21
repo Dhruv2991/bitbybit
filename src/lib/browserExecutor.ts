@@ -8,6 +8,7 @@
 // ════════════════════════════════════════════════════════════
 
 import type { RunResult, TestResult } from './executor';
+import { HIDDEN_TEST_CASE_PLACEHOLDER } from './executor';
 export type { RunResult, TestResult };
 
 // ── Pyodide loader (singleton) ───────────────────────────────
@@ -189,10 +190,13 @@ export async function runInBrowser(
 
       if (isHidden) {
         results.push({
-          input: '[Hidden]',
-          expected: '[Hidden]',
-          actual: '[Hidden]',
+          input: HIDDEN_TEST_CASE_PLACEHOLDER,
+          expected: HIDDEN_TEST_CASE_PLACEHOLDER,
+          expected_output: HIDDEN_TEST_CASE_PLACEHOLDER,
+          actual: HIDDEN_TEST_CASE_PLACEHOLDER,
+          output: HIDDEN_TEST_CASE_PLACEHOLDER,
           ok,
+          passed: ok,
           time: `${ms}ms`,
           is_hidden: true,
           error: ok ? undefined : (out.stderr ? 'Test case failed' : undefined),
@@ -201,8 +205,11 @@ export async function runInBrowser(
         results.push({
           input: tc.input,
           expected,
+          expected_output: expected,
           actual,
+          output: actual,
           ok,
+          passed: ok,
           time: `${ms}ms`,
           is_hidden: false,
           error: !ok && out.stderr ? out.stderr : undefined,
@@ -211,10 +218,13 @@ export async function runInBrowser(
     } catch (e: any) {
       if (isHidden) {
         results.push({
-          input: '[Hidden]',
-          expected: '[Hidden]',
-          actual: '[Hidden]',
+          input: HIDDEN_TEST_CASE_PLACEHOLDER,
+          expected: HIDDEN_TEST_CASE_PLACEHOLDER,
+          expected_output: HIDDEN_TEST_CASE_PLACEHOLDER,
+          actual: HIDDEN_TEST_CASE_PLACEHOLDER,
+          output: HIDDEN_TEST_CASE_PLACEHOLDER,
           ok: false,
+          passed: false,
           is_hidden: true,
           error: 'Test case failed',
         });
@@ -222,8 +232,11 @@ export async function runInBrowser(
         results.push({
           input: tc.input,
           expected: String(tc.expected).trim(),
+          expected_output: String(tc.expected).trim(),
           actual: '',
+          output: '',
           ok: false,
+          passed: false,
           is_hidden: false,
           error: e.message || 'Execution error',
         });
