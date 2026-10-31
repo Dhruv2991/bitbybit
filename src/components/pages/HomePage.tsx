@@ -58,22 +58,59 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
       try {
         const { data } = await (db.from('app_config') as any)
           .select('*')
-          .in('key', ['announcement_text', 'announcement_active']);
+          .in('key', ['announcement_text', 'announcement_active', 'announcement_expires_at']);
         const map = new Map((data || []).map((c: any) => [c.key, c.value]));
-        if (map.get('announcement_active') === 'true' && map.get('announcement_text')) {
-          setAnnouncement(String(map.get('announcement_text')));
+        const isActive = map.get('announcement_active') === 'true';
+        const text = map.get('announcement_text') ? String(map.get('announcement_text')) : '';
+        const expiresAt = map.get('announcement_expires_at') ? String(map.get('announcement_expires_at')) : null;
+
+        if (isActive && text) {
+          const now = Date.now();
+          // Check explicit expiration timestamp if provided
+          if (expiresAt && !isNaN(new Date(expiresAt).getTime()) && new Date(expiresAt).getTime() <= now) {
+            return;
+          }
+
+          // Auto-expire weekly challenge announcements whose referenced week has ended
+          const weekMatch = text.match(/Week\s*(\d+)/i);
+          if (weekMatch) {
+            const weekTitle = `Week ${weekMatch[1]}`;
+            const { data: chData } = await (db.from('weekly_challenges') as any)
+              .select('ends_at, status')
+              .ilike('title', weekTitle)
+              .maybeSingle();
+
+            if (chData) {
+              const chEnded = chData.status === 'ended' || (chData.ends_at && new Date(chData.ends_at).getTime() <= now);
+              if (chEnded) {
+                return;
+              }
+            }
+          }
+
+          // Check if dismissed in localStorage or sessionStorage
+          try {
+            const dismissedKey = `bb_announcement_dismissed_${encodeURIComponent(text.slice(0, 32))}`;
+            if (localStorage.getItem(dismissedKey) === '1' || sessionStorage.getItem('bb_announcement_dismissed') === '1') {
+              setDismissed(true);
+            }
+          } catch {}
+
+          setAnnouncement(text);
         }
       } catch {}
     })();
-    try {
-      const stored = sessionStorage.getItem('bb_announcement_dismissed');
-      if (stored) setDismissed(true);
-    } catch {}
   }, []);
 
   function handleDismissAnnouncement() {
     setDismissed(true);
-    try { sessionStorage.setItem('bb_announcement_dismissed', '1'); } catch {}
+    try {
+      sessionStorage.setItem('bb_announcement_dismissed', '1');
+      if (announcement) {
+        const dismissedKey = `bb_announcement_dismissed_${encodeURIComponent(announcement.slice(0, 32))}`;
+        localStorage.setItem(dismissedKey, '1');
+      }
+    } catch {}
   }
 
   // Main Dashboard Data Loader
@@ -85,7 +122,7 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
       // 1. Fetch all public problems
       const { data: problemsData } = await db
         .from('problems')
-        .select('*')
+        .select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at')
         .eq('visibility', 'public');
 
       const allProblems: Problem[] = (problemsData || []) as Problem[];

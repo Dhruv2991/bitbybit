@@ -43,6 +43,10 @@ export interface RunResult {
   results: TestResult[];
   hidden_passed?: number;
   hidden_total?: number;
+  points_awarded?: number;
+  is_first_solve?: boolean;
+  streak?: number;
+  isVictory?: boolean;
 }
 
 // Judge0 language IDs
@@ -678,7 +682,7 @@ export async function submitToJudge0(
         compile_timeout: 30,
         wall_time_limit: 15,
       }),
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(15000),
     });
 
     if (!submitRes.ok) {
@@ -736,8 +740,15 @@ export async function getJudge0Submission(token: string): Promise<Judge0Submissi
 export interface PendingSubmission {
   token: string;
   problem_id?: string;
-  mode?: 'run' | 'submit';
+  mode?: 'run' | 'submit' | 'duel';
+  duel_id?: string;
   testCases: { input: string; expected: string; is_hidden?: boolean }[];
+  user?: { github: string; name: string };
+  code?: string;
+  language?: string;
+  problemTitle?: string;
+  problemPoints?: number;
+  isWeekly?: boolean;
   createdAt: number;
 }
 
@@ -977,8 +988,11 @@ export async function runAgainstTestCases(
   userCode: string,
   language: string,
   testCases: { input: string; expected: string; is_hidden?: boolean }[],
+  options?: { allowFallback?: boolean },
 ): Promise<RunResult> {
   if (!testCases.length) return { passed: 0, total: 0, results: [] };
+
+  const allowFallback = options?.allowFallback ?? true;
 
   // 1. Primary Judge0 execution path (fully batched with SENTINEL)
   const batchedCode = buildBatchedProgram(userCode, language, testCases, true);
@@ -1014,6 +1028,9 @@ export async function runAgainstTestCases(
       results,
     };
   } catch (e: any) {
+    if (!allowFallback) {
+      throw new Error("Execution service temporarily unavailable for this challenge. Please retry in a moment.");
+    }
     console.warn("[executor] Judge0 failed, falling back to sequential Wandbox execution:", e.message);
     return await runWandboxSequential(userCode, language, testCases);
   }

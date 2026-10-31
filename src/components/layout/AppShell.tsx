@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import AnimatedBackground from "@/components/pages/AnimatedBackground";
 import GlobalSearch from "@/components/GlobalSearch";
@@ -136,7 +136,55 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     navigate, signIn, signOut, switchAccount,
   } = useAppShell();
 
-  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const [sidebarHovered, setSidebarHovered]   = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const isSidebarOpen = sidebarHovered || sidebarExpanded;
+
+  // Restore persisted sidebar state (defaults to false / collapsed w-20)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('bb_sidebar_expanded');
+      if (saved !== null) setSidebarExpanded(saved === 'true');
+    } catch {}
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarExpanded(prev => {
+      const next = !prev;
+      try { localStorage.setItem('bb_sidebar_expanded', String(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  // Keyboard shortcut Ctrl/Cmd+B and Escape for sidebar toggle
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const isInput = target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        Boolean(target.closest?.('.monaco-editor')) ||
+        Boolean(target.closest?.('.monaco-diff-editor'))
+      );
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b' && !isInput) {
+        e.preventDefault();
+        toggleSidebar();
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        setSidebarHovered(false);
+        if (sidebarExpanded) {
+          setSidebarExpanded(false);
+          try { localStorage.setItem('bb_sidebar_expanded', 'false'); } catch {}
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sidebarExpanded, toggleSidebar]);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -178,6 +226,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       document.removeEventListener("keydown", handleKey);
     };
   }, [notifOpen]);
+
+  // Handle Escape key for mobile drawer
+  useEffect(() => {
+    if (!mobileDrawerOpen) return;
+    function handleKey(e: KeyboardEvent) { if (e.key === "Escape") setMobileDrawerOpen(false); }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [mobileDrawerOpen]);
 
   function go(id: PageId) {
     setNotifOpen(false);
@@ -240,7 +296,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const activeEntry = NAV_GROUPS.flatMap(g => g.items).find(i => i.id === page) || { label: page.toUpperCase() };
 
   const bellDropdown = notifOpen && (
-    <div className="absolute right-0 top-12 w-80 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down">
+    <div className="fixed sm:absolute left-3 right-3 sm:left-auto sm:right-0 top-16 sm:top-12 w-auto sm:w-80 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down">
       <div className="px-4 py-3 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-slate-50/80 dark:bg-zinc-950/60">
         <div className="flex items-center gap-2">
           <span className="text-xs font-mono font-medium text-slate-800 dark:text-zinc-100">Contests & Challenges</span>
@@ -307,13 +363,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           onMouseEnter={() => setSidebarHovered(true)}
           onMouseLeave={() => setSidebarHovered(false)}
           className={`hidden md:flex flex-col fixed top-0 left-0 bottom-0 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] transition-all duration-300 ease-in-out select-none backdrop-blur-xl
-            ${sidebarHovered ? "w-64 z-50 shadow-2xl ring-1 ring-black/[0.05] dark:ring-white/[0.05]" : "w-20 z-40"}`}
+            ${isSidebarOpen ? "w-64 z-50 shadow-2xl ring-1 ring-black/[0.05] dark:ring-white/[0.05]" : "w-20 z-40"}`}
         >
           {/* Sidebar Header / Brand */}
-          <div className="h-16 px-4 flex items-center border-b border-[var(--sidebar-border)] shrink-0 overflow-hidden">
+          <div className="h-16 px-4 flex items-center justify-between border-b border-[var(--sidebar-border)] shrink-0 overflow-hidden">
             <button
               onClick={() => go("home")}
-              className="flex items-center gap-3 overflow-hidden text-left focus:outline-none group w-full"
+              className="flex items-center gap-3 overflow-hidden text-left focus:outline-none group flex-1 min-w-0"
               title="BitByBit Home"
             >
               <div className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700/90 p-1 flex items-center justify-center shrink-0 shadow-sm group-hover:border-sky-500/60 dark:group-hover:border-cyan-500/60 transition-all">
@@ -321,7 +377,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </div>
               <div
                 className={`flex flex-col min-w-0 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
-                  ${sidebarHovered ? "opacity-100 max-w-[170px] translate-x-0" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
+                  ${isSidebarOpen ? "opacity-100 max-w-[140px] translate-x-0" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
               >
                 <span className="font-display font-bold text-[17px] tracking-tight text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-cyan-300 transition-colors leading-tight">
                   BitByBit
@@ -331,6 +387,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </span>
               </div>
             </button>
+            {sidebarExpanded && (
+              <button
+                onClick={toggleSidebar}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:text-zinc-500 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
+                title="Collapse sidebar (Ctrl+B / Esc)"
+                aria-label="Collapse sidebar"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="11 17 6 12 11 7" />
+                  <polyline points="18 17 13 12 18 7" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Sidebar Navigation */}
@@ -339,9 +408,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div key={group.group + gIdx} className="space-y-1">
                 <div
                   className={`transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
-                    ${sidebarHovered ? "px-3 pb-1.5 text-xs font-mono font-semibold tracking-wider uppercase text-slate-400 dark:text-zinc-400 opacity-100 max-h-6" : "w-8 h-px bg-slate-200 dark:bg-zinc-800/80 my-2 mx-auto opacity-50 max-h-2"}`}
+                    ${isSidebarOpen ? "px-3 pb-1.5 text-xs font-mono font-semibold tracking-wider uppercase text-slate-400 dark:text-zinc-400 opacity-100 max-h-6" : "w-8 h-px bg-slate-200 dark:bg-zinc-800/80 my-2 mx-auto opacity-50 max-h-2"}`}
                 >
-                  {sidebarHovered ? group.group : ""}
+                  {isSidebarOpen ? group.group : ""}
                 </div>
 
                 {group.items.map(item => {
@@ -357,14 +426,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                           ? "bg-sky-50 text-sky-700 font-semibold border border-sky-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/25 shadow-xs"
                           : "text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100/80 dark:hover:bg-zinc-800/40 border border-transparent"
                         }
-                        ${sidebarHovered ? "px-3 py-2.5 gap-3" : "px-0 py-2.5 justify-center"}`}
+                        ${isSidebarOpen ? "px-3 py-2.5 gap-3" : "px-0 py-2.5 justify-center"}`}
                     >
                       <div className={`shrink-0 w-6 h-6 flex items-center justify-center ${isActive ? "text-sky-600 dark:text-cyan-400" : "text-slate-500 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200"}`}>
                         <Icon className="w-[19px] h-[19px]" />
                       </div>
                       <span
                         className={`text-left truncate font-medium transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
-                          ${sidebarHovered ? "opacity-100 max-w-[130px] translate-x-0 flex-1" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
+                          ${isSidebarOpen ? "opacity-100 max-w-[130px] translate-x-0 flex-1" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
                       >
                         {item.label}
                       </span>
@@ -372,7 +441,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         <span
                           className={`text-xs font-mono px-2 py-0.5 rounded-full shrink-0 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
                             ${item.badgeColor || "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400 border border-slate-200 dark:border-zinc-700"}
-                            ${sidebarHovered ? "opacity-100 max-w-[80px] scale-100" : "opacity-0 max-w-0 scale-75 pointer-events-none"}`}
+                            ${isSidebarOpen ? "opacity-100 max-w-[80px] scale-100" : "opacity-0 max-w-0 scale-75 pointer-events-none"}`}
                         >
                           {item.badge}
                         </span>
@@ -392,7 +461,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => go("profile")}
                 className={`w-full flex items-center rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800/60 transition-colors group text-left
-                  ${sidebarHovered ? "p-2 gap-2.5" : "p-1.5 justify-center"}`}
+                  ${isSidebarOpen ? "p-2 gap-2.5" : "p-1.5 justify-center"}`}
                 title={user.name}
               >
                 <div className="relative shrink-0">
@@ -410,7 +479,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
                 <div
                   className={`min-w-0 transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
-                    ${sidebarHovered ? "opacity-100 max-w-[150px] translate-x-0 flex-1" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
+                    ${isSidebarOpen ? "opacity-100 max-w-[150px] translate-x-0 flex-1" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
                 >
                   <p className="text-sm font-mono font-medium text-slate-800 dark:text-zinc-200 truncate">{user.name}</p>
                   <p className="text-xs font-mono text-slate-500 dark:text-zinc-500 truncate">@{user.github}</p>
@@ -420,7 +489,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 onClick={signIn}
                 className={`w-full btn-primary text-sm py-2 flex items-center justify-center gap-2
-                  ${sidebarHovered ? "px-3" : "px-0"}`}
+                  ${isSidebarOpen ? "px-3" : "px-0"}`}
                 title="Sign in with GitHub"
               >
                 <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
@@ -428,12 +497,33 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </svg>
                 <span
                   className={`transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
-                    ${sidebarHovered ? "opacity-100 max-w-[100px] translate-x-0" : "opacity-0 max-w-0 pointer-events-none"}`}
+                    ${isSidebarOpen ? "opacity-100 max-w-[100px] translate-x-0" : "opacity-0 max-w-0 pointer-events-none"}`}
                 >
                   Sign In
                 </span>
               </button>
             )}
+
+            {/* Desktop Expand / Collapse toggle button */}
+            <button
+              onClick={toggleSidebar}
+              className={`w-full flex items-center rounded-xl p-2 text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-zinc-800/60 transition-colors font-mono text-xs
+                ${isSidebarOpen ? "justify-between px-3" : "justify-center"}`}
+              title={sidebarExpanded ? "Unpin sidebar (Ctrl+B / Esc)" : "Pin sidebar open (Ctrl+B)"}
+              aria-label={sidebarExpanded ? "Unpin sidebar" : "Pin sidebar open"}
+            >
+              <div className="flex items-center gap-2.5">
+                <svg className={`w-4 h-4 transition-transform duration-300 ${sidebarExpanded ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+                {isSidebarOpen && <span className="font-medium">{sidebarExpanded ? "Unpin" : "Pin open"}</span>}
+              </div>
+              {isSidebarOpen && (
+                <span className="text-[10px] text-slate-400 dark:text-zinc-500 border border-slate-200 dark:border-zinc-800 rounded px-1.5 py-0.5">
+                  ⌘B
+                </span>
+              )}
+            </button>
           </div>
         </aside>
 
@@ -602,7 +692,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   {profileOpen && (
                     <div
                       role="menu"
-                      className="absolute right-0 top-11 w-64 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl border border-slate-200 dark:border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down"
+                      className="fixed sm:absolute right-3 sm:right-0 top-16 sm:top-11 w-64 max-w-[calc(100vw-1.5rem)] bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl border border-slate-200 dark:border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden z-[100] animate-slide-down"
                     >
                       <div className="px-4 py-3 border-b border-slate-200 dark:border-white/[0.06] bg-slate-50/80 dark:bg-zinc-950/40">
                         <p className="text-xs font-mono font-medium text-slate-900 dark:text-zinc-100 truncate">{user.name}</p>
@@ -686,17 +776,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
           {/* MAIN CONTENT AREA */}
           {isFullBleed ? (
-            <main className="flex-1 w-full min-h-0">
+            <main className="flex-1 w-full min-h-0 pb-16 md:pb-0">
               {children}
             </main>
           ) : (
-            <main className="flex-1 w-full max-w-7xl mx-auto px-6 sm:px-8 lg:px-10 py-8 md:py-10">
+            <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 md:py-10 pb-24 md:pb-10">
               {children}
             </main>
           )}
 
           {/* FOOTER */}
-          <footer className="border-t border-slate-200/80 dark:border-zinc-800/80 bg-slate-100/60 dark:bg-zinc-950/60 py-6 px-4 sm:px-6 lg:px-8 mt-auto">
+          <footer className="border-t border-slate-200/80 dark:border-zinc-800/80 bg-slate-100/60 dark:bg-zinc-950/60 py-6 px-4 sm:px-6 lg:px-8 mt-auto mb-16 md:mb-0">
             <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500 dark:text-zinc-400">
               <div className="flex items-center gap-2">
                 <img src="/logo.png" alt="BitByBit" className="w-5 h-5 object-contain opacity-70" />
@@ -713,6 +803,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   Instagram
                 </a>
+                <button onClick={() => go("pricing")} className="hover:text-slate-800 dark:hover:text-zinc-200 transition-colors">Pricing</button>
                 <button onClick={() => go("collaborations")} className="hover:text-slate-800 dark:hover:text-zinc-200 transition-colors">Collaborations</button>
                 <button onClick={() => go("about")} className="hover:text-slate-800 dark:hover:text-zinc-200 transition-colors">About & Legal</button>
                 <button onClick={() => go("privacy")} className="hover:text-slate-800 dark:hover:text-zinc-200 transition-colors">Privacy</button>
@@ -854,16 +945,30 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           { id: "problems" as PageId, label: "Problems", icon: IconProblems },
           { id: "arena" as PageId, label: "Arena", icon: IconArena, badge: liveCount > 0 },
           { id: "leaderboard" as PageId, label: "Rankings", icon: IconLeaderboard },
-          { id: "profile" as PageId, label: "Profile", icon: IconProfile },
+          {
+            id: "menu" as any,
+            label: "Menu",
+            icon: ({ className = "w-5 h-5" }: { className?: string }) => (
+              <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+            ),
+          },
         ].map(item => {
-          const isActive = page === item.id;
+          const isMenu = item.id === "menu";
+          const isActive = !isMenu && page === item.id;
           const Icon = item.icon;
           return (
             <button
               key={item.id}
-              onClick={() => go(item.id)}
+              onClick={() => {
+                if (isMenu) setMobileDrawerOpen(true);
+                else go(item.id);
+              }}
               className={`flex-1 flex flex-col items-center py-1.5 px-1 rounded-xl transition-all relative font-mono text-[10px]
-                ${isActive ? "text-sky-600 dark:text-cyan-400 font-medium" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"}`}
+                ${isActive ? "text-sky-600 dark:text-cyan-400 font-semibold" : "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"}`}
             >
               <div className="relative">
                 <Icon className="w-5 h-5" />

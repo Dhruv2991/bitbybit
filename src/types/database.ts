@@ -36,6 +36,7 @@ export interface Problem {
   return_type: string;
 
   test_cases: TestCase[];
+  sample_test_cases?: TestCase[];
 
   hints?: string[];
 
@@ -46,6 +47,29 @@ export interface Problem {
 
   created_at: string;
   updated_at: string;
+}
+
+export interface ProblemDetails {
+  problem_id: string;
+  description: string;
+  example: string;
+  hints: string[];
+  starter_code: string;
+  param_types: string[];
+  return_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProblemTestCase {
+  id: string;
+  problem_id: string;
+  input: string;
+  expected: string;
+  is_hidden: boolean;
+  position: number;
+  explanation?: string | null;
+  created_at: string;
 }
 
 export interface Member {
@@ -244,6 +268,26 @@ export type Database = {
         >;
 
         Update: Partial<Member>;
+        Relationships: [];
+      };
+
+      problem_details: {
+        Row: ProblemDetails;
+        Insert: Omit<ProblemDetails, 'created_at' | 'updated_at'> & {
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<ProblemDetails, 'problem_id'>>;
+        Relationships: [];
+      };
+
+      problem_test_cases: {
+        Row: ProblemTestCase;
+        Insert: Omit<ProblemTestCase, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<ProblemTestCase, 'id' | 'problem_id'>>;
         Relationships: [];
       };
 

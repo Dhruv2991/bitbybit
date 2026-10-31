@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
+import { PRICING_CONFIG, formatPriceWithPeriod } from '@/lib/pricing';
 import type { User, Contest } from '@/types/database';
 
 interface ContestEntryButtonProps {
@@ -60,7 +61,7 @@ export default function ContestEntryButton({
       <div className="flex flex-col items-center gap-2.5 p-3.5 bg-zinc-900/50 rounded-xl border border-zinc-800/80">
         <p className="text-[11px] font-mono text-zinc-400 text-center leading-relaxed">
           Contest entry is <span className="text-emerald-400 font-semibold">free for subscribers</span> &mdash;
-          subscribe monthly (₹39/month) to unlock every contest, weekly problem, and AI feature.
+          subscribe monthly ({formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)}) to unlock every contest, weekly problem, and AI feature.
         </p>
         <button
           onClick={onNavigateSubscribe}

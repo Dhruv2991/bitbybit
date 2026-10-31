@@ -10,7 +10,7 @@ import { isActiveSubscription } from "@/lib/subscription";
 
 export type PageId =
   | "home" | "problems" | "leaderboard" | "arena" | "weekly"
-  | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe" | "collaborations" | "unsubscribe" | "duels";
+  | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe" | "collaborations" | "unsubscribe" | "duels" | "pricing";
 
 export type ToastType = "ok" | "err" | "warn" | "info";
 export interface Toast { id: number; msg: string; type: ToastType; }
@@ -37,6 +37,7 @@ export const ROUTE_TO_PAGE: Record<string, PageId> = {
   "/collaborations": "collaborations",
   "/unsubscribe": "unsubscribe",
   "/duels": "duels",
+  "/pricing": "pricing",
 };
 
 export const PAGE_TO_ROUTE: Record<PageId, string> = {
@@ -44,6 +45,7 @@ export const PAGE_TO_ROUTE: Record<PageId, string> = {
   weekly: "/weekly", admin: "/admin", about: "/about", privacy: "/privacy",
   terms: "/terms", refunds: "/refunds", profile: "/profile", subscribe: "/subscribe",
   collaborations: "/collaborations", unsubscribe: "/unsubscribe", duels: "/duels",
+  pricing: "/pricing",
 };
 
 interface AppShellContextValue {
@@ -58,7 +60,7 @@ interface AppShellContextValue {
   liveItems: LiveItem[];
   userStreak: number;
   navigate: (id: PageId) => void;
-  signIn: () => Promise<void>;
+  signIn: (provider?: any) => Promise<void>;
   signOut: () => Promise<void>;
   switchAccount: () => Promise<void>;
 }
@@ -242,22 +244,6 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
         if (!alive) return;
         setUser(u);
         resolving.current = false;
-        if (u?.github) {
-          const syncKey = `bb_member_synced_${u.github}`;
-          try {
-            if (!sessionStorage.getItem(syncKey)) {
-              (db.from("members") as any).upsert({
-                github: u.github, name: u.name, total_points: 0, problems_solved: 0, streak: 0,
-              }, { onConflict: "github", ignoreDuplicates: true }).then(() => {
-                try { sessionStorage.setItem(syncKey, "1"); } catch {}
-              });
-            }
-          } catch {
-            (db.from("members") as any).upsert({
-              github: u.github, name: u.name, total_points: 0, problems_solved: 0, streak: 0,
-            }, { onConflict: "github", ignoreDuplicates: true }).then(() => {});
-          }
-        }
         syncEmail(session);
       } else if (event === "SIGNED_OUT") {
         const signingOutGithub = user?.github;
@@ -315,8 +301,15 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
       const db = getSupabaseClient();
       const items: LiveItem[] = [];
 
-      const { data: liveContests } = await db.from("contests").select("id, title, status").eq("status", "live");
-      (liveContests || []).forEach((c: any) => items.push({ id: c.id, label: c.title, page: "arena", type: "arena", status: "live" }));
+      const now = Date.now();
+
+      const { data: liveContests } = await db.from("contests").select("id, title, status, created_at, duration_mins").eq("status", "live");
+      (liveContests || []).forEach((c: any) => {
+        const endMs = c.created_at && c.duration_mins ? new Date(c.created_at).getTime() + c.duration_mins * 60000 : null;
+        if (!endMs || endMs > now) {
+          items.push({ id: c.id, label: c.title, page: "arena", type: "arena", status: "live" });
+        }
+      });
 
       const { data: upcomingContests } = await db.from("contests").select("id, title, status").eq("status", "upcoming");
       (upcomingContests || []).forEach((c: any) => items.push({ id: c.id, label: c.title, page: "arena", type: "arena", status: "upcoming" }));
@@ -325,11 +318,10 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
         .select("id, title, status, starts_at, ends_at")
         .in("status", ["active", "upcoming"]);
       (weekly || []).forEach((w: any) => {
-        const now = Date.now();
         const started = new Date(w.starts_at).getTime() <= now;
         const ended = new Date(w.ends_at).getTime() < now;
-        if (started && !ended) items.push({ id: w.id, label: w.title, page: "weekly", type: "weekly", status: "live" });
-        else if (!started) items.push({ id: w.id, label: w.title, page: "weekly", type: "weekly", status: "upcoming" });
+        if (started && !ended && w.status !== "ended") items.push({ id: w.id, label: w.title, page: "weekly", type: "weekly", status: "live" });
+        else if (!started && !ended && w.status !== "ended") items.push({ id: w.id, label: w.title, page: "weekly", type: "weekly", status: "upcoming" });
       });
 
       setLiveItems(items);
@@ -339,10 +331,11 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  async function signIn() {
+  async function signIn(provider?: any) {
+    const p = (provider === "google" || provider === "github") ? provider : "github";
     const db = getSupabaseClient();
     await db.auth.signInWithOAuth({
-      provider: "github",
+      provider: p,
       options: { redirectTo: window.location.origin, queryParams: { prompt: "select_account" } },
     });
   }

@@ -69,21 +69,36 @@ export async function traceJavaScript(
   let errorMsg = '';
 
   try {
-    let parsedArgs: any[] = [];
-    if (inputJson) {
-      try {
-        const raw = JSON.parse(inputJson);
-        parsedArgs = Array.isArray(raw) ? raw : [raw];
-      } catch {
-        parsedArgs = [];
-      }
-    }
-
     const fnName = extractFunctionName(userCode, 'javascript');
     const rawLines = userCode.split('\n');
     const declaredVars = new Set<string>();
 
     const paramMatch = userCode.match(/(?:function\s+\w+|\w+)\s*\(([^)]*)\)/);
+    const paramCount = paramMatch && paramMatch[1] ? paramMatch[1].split(',').filter(s => s.trim().length > 0).length : 1;
+
+    let parsedArgs: any[] = [];
+    if (inputJson) {
+      try {
+        let raw = JSON.parse(inputJson);
+        if (typeof raw === 'string') {
+          try { raw = JSON.parse(raw); } catch {}
+        }
+        if (!Array.isArray(raw)) {
+          parsedArgs = [raw];
+        } else if (paramCount === 1 && raw.length === 1) {
+          // Input was already an outer argument array e.g. [[3, 1, 4]]
+          parsedArgs = raw;
+        } else if (paramCount === 1 && raw.length > 1) {
+          // Single-parameter function receiving raw 1D array [3, 1, 4]
+          parsedArgs = [raw];
+        } else {
+          parsedArgs = raw;
+        }
+      } catch {
+        parsedArgs = [];
+      }
+    }
+
     if (paramMatch && paramMatch[1]) {
       paramMatch[1].split(',').map(s => s.trim()).filter(Boolean).forEach(p => declaredVars.add(p));
     }

@@ -10,7 +10,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 import type { User, Problem } from "@/types/database";
 import type { CodeDuel } from "@/types/duels";
 import type { PageId } from "@/components/layout/AppShellContext";
-import { createDuelAction, joinDuelAction } from "@/app/actions/duels";
+import { createDuelAction, joinDuelAction, leaveOrDiscardDuelAction } from "@/app/actions/duels";
 
 interface DuelsLobbyPageProps {
   user: User | null;
@@ -26,6 +26,7 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [discardingId, setDiscardingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [createdRoomLink, setCreatedRoomLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -122,13 +123,16 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
     setErrorMsg(null);
 
     try {
+      const { data: { session } } = await getSupabaseClient().auth.getSession();
+      const token = session?.access_token;
+
       const res = await createDuelAction({
         problem_id: problem.id,
         problem_title: problem.title,
         time_limit_mins: timeLimitMins,
         host_github: user.github,
         host_name: user.name || user.github,
-      });
+      }, token);
 
       if (!res.success || !res.duelId) {
         setErrorMsg(res.error || "Failed to create duel.");
@@ -156,7 +160,10 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
     setErrorMsg(null);
 
     try {
-      const res = await joinDuelAction(duel.id, user.github, user.name || user.github);
+      const { data: { session } } = await getSupabaseClient().auth.getSession();
+      const token = session?.access_token;
+
+      const res = await joinDuelAction(duel.id, user.github, user.name || user.github, token);
       if (!res.success) {
         setErrorMsg(res.error || "Failed to join duel room.");
         return;
@@ -168,6 +175,27 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
       setErrorMsg(message);
     } finally {
       setJoiningId(null);
+    }
+  }
+
+  async function handleDiscardDuel(duelId: string) {
+    if (!user?.github) return;
+    if (!confirm("Are you sure you want to discard this waiting duel room?")) return;
+
+    setDiscardingId(duelId);
+    try {
+      const { data: { session } } = await getSupabaseClient().auth.getSession();
+      const res = await leaveOrDiscardDuelAction(duelId, user.github, session?.access_token);
+      if (res.success) {
+        setOpenDuels((prev) => prev.filter((d) => d.id !== duelId));
+      } else {
+        setErrorMsg(res.error || "Failed to discard room.");
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error discarding room.";
+      setErrorMsg(message);
+    } finally {
+      setDiscardingId(null);
     }
   }
 
@@ -293,9 +321,15 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
 
             {/* Trigger Button */}
             <button
-              onClick={handleCreateDuel}
-              disabled={creating || !user}
-              className="w-full btn-primary py-3 text-sm flex items-center justify-center gap-2"
+              onClick={user ? handleCreateDuel : async () => {
+                const db = getSupabaseClient();
+                await db.auth.signInWithOAuth({
+                  provider: "github",
+                  options: { redirectTo: window.location.href, queryParams: { prompt: "select_account" } },
+                });
+              }}
+              disabled={creating}
+              className="w-full btn-primary py-3 text-sm flex items-center justify-center gap-2 cursor-pointer"
             >
               {creating ? (
                 <>
@@ -308,7 +342,10 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
                   <span>→</span>
                 </>
               ) : (
-                <span>Sign in with GitHub to Play</span>
+                <>
+                  <span>Sign in with GitHub to Play</span>
+                  <span>→</span>
+                </>
               )}
             </button>
           </div>
@@ -374,18 +411,34 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
 
                     <div className="shrink-0 w-full sm:w-auto">
                       {isMyRoom ? (
-                        <button
-                          onClick={() => router.push(`/duel/${duel.id}`)}
-                          className="w-full sm:w-auto btn-secondary text-xs px-4 py-2 flex items-center justify-center gap-1.5"
-                        >
-                          <span>Re-enter My Room</span>
-                          <span>→</span>
-                        </button>
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <button
+                            onClick={() => router.push(`/duel/${duel.id}`)}
+                            className="flex-1 sm:flex-initial btn-secondary text-xs px-3.5 py-2 flex items-center justify-center gap-1.5"
+                          >
+                            <span>Re-enter</span>
+                            <span>→</span>
+                          </button>
+                          <button
+                            onClick={() => handleDiscardDuel(duel.id)}
+                            disabled={discardingId === duel.id}
+                            title="Discard / close this waiting room"
+                            className="px-3 py-2 text-xs font-mono font-medium rounded-xl text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all cursor-pointer"
+                          >
+                            {discardingId === duel.id ? "Discarding..." : "Discard"}
+                          </button>
+                        </div>
                       ) : (
                         <button
-                          onClick={() => handleJoinDuel(duel)}
+                          onClick={user ? () => handleJoinDuel(duel) : async () => {
+                            const db = getSupabaseClient();
+                            await db.auth.signInWithOAuth({
+                              provider: "github",
+                              options: { redirectTo: window.location.href, queryParams: { prompt: "select_account" } },
+                            });
+                          }}
                           disabled={joiningId === duel.id}
-                          className="w-full sm:w-auto btn-primary text-xs px-4 py-2 flex items-center justify-center gap-1.5"
+                          className="w-full sm:w-auto btn-primary text-xs px-4 py-2 flex items-center justify-center gap-1.5 cursor-pointer"
                         >
                           {joiningId === duel.id ? (
                             <>
@@ -394,7 +447,7 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
                             </>
                           ) : (
                             <>
-                              <span>Accept Duel</span>
+                              <span>{user ? 'Accept Duel' : 'Sign in to Duel'}</span>
                               <span>⚔️</span>
                             </>
                           )}

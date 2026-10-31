@@ -11,10 +11,11 @@
  */
 
 import { getSupabaseClient } from '@/lib/supabase';
+import { PRICING_CONFIG, formatPriceWithPeriod } from '@/lib/pricing';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const AI_TIMEOUT    = 12000; // ms — fall back to Ollama after this
+const AI_TIMEOUT    = 10000; // ms — fall back to Ollama after this
 
 const OLLAMA_BASE   = process.env.NEXT_PUBLIC_OLLAMA_URL   ?? 'http://localhost:11434';
 const OLLAMA_MODEL  = process.env.NEXT_PUBLIC_OLLAMA_MODEL ?? 'qwen2.5-coder:3b';
@@ -144,7 +145,7 @@ async function incrementHintSupabase(problemId: string): Promise<void> {
 
 function subscriberCheck(): string | null {
   if (!_github)       return '⛔ Sign in to use AI features.';
-  if (!_isSubscriber) return '⭐ AI features are available to subscribers. Subscribe for ₹39/month for access to all AI tools + weekly challenges.';
+  if (!_isSubscriber) return `⭐ AI features are available to subscribers. Subscribe for ${formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)} for access to all AI tools + weekly challenges.`;
   return null;
 }
 
@@ -244,14 +245,21 @@ async function callGroq(messages: Msg[], maxTokens: number): Promise<string> {
 // ── Core: Ollama fallback ─────────────────────────────────────────────────────
 
 async function callOllama(messages: Msg[], maxTokens: number): Promise<string> {
-  const res = await fetch(`${OLLAMA_BASE}/v1/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: OLLAMA_MODEL, messages, max_tokens: maxTokens, temperature: 0.2, stream: false }),
-  });
-  if (!res.ok) throw new Error(`Ollama ${res.status}`);
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() ?? '';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT);
+  try {
+    const res = await fetch(`${OLLAMA_BASE}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: OLLAMA_MODEL, messages, max_tokens: maxTokens, temperature: 0.2, stream: false }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Ollama ${res.status}`);
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() ?? '';
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // ── Core: router — Groq → Ollama ─────────────────────────────────────────────
@@ -275,6 +283,9 @@ async function callAI(userPrompt: string, maxTokens: number, systemPrompt?: stri
     if (result) return result;
     return 'No response from AI.';
   } catch (e: any) {
+    if (e.name === 'AbortError' || e.message?.includes('aborted')) {
+      return '⚠️ AI request timed out. Please try again.';
+    }
     if (e.message?.includes('fetch failed') || e.message?.includes('ECONNREFUSED'))
       return '⚠️ AI is unavailable right now. Try again in a moment.';
     return `AI error: ${e.message}`;
@@ -896,10 +907,12 @@ export async function generateChallengeSummary(
   problems:       { title: string; difficulty: string; tags: string[] }[],
   topFinishers:   { name: string; github: string; points: number }[],
   totalParticipants: number,
-): Promise<ChallengeSummary | null> {
-  // AI features are subscriber-only — non-subscribers / signed-out users
-  // simply don't get a generated summary (UI just shows nothing for them).
-  if (subscriberCheck()) return null;
+): Promise<ChallengeSummary> {
+  // AI features are subscriber-only
+  const subErr = subscriberCheck();
+  if (subErr) {
+    throw new Error(subErr);
+  }
 
   const problemList = problems.map((p, i) =>
     `${i + 1}. "${p.title}" (${p.difficulty}) — tags: ${p.tags.join(', ') || 'none'}`
@@ -909,8 +922,10 @@ export async function generateChallengeSummary(
     `${i + 1}. ${f.name} (@${f.github}) — ${f.points} pts`
   ).join('\n');
 
-  const result = await callAI(
-    `You are writing a post-challenge summary for a coding platform's weekly challenge.
+  let result: string;
+  try {
+    result = await callAI(
+      `You are writing a post-challenge summary for a coding platform's weekly challenge.
 
 Challenge: "${challengeTitle}"
 Total participants: ${totalParticipants}
@@ -929,17 +944,24 @@ Write a friendly, engaging challenge summary. Output ONLY a JSON object:
   "shoutout": "1 sentence: enthusiastic shoutout to top 3 finishers by name",
   "closing": "1 sentence: motivational closing line encouraging people to keep practicing"
 }`,
-    400,
-    'You are an enthusiastic coding community manager writing post-challenge summaries. Be friendly, specific, and encouraging. Output ONLY valid JSON.',
-  );
+      400,
+      'You are an enthusiastic coding community manager writing post-challenge summaries. Be friendly, specific, and encouraging. Output ONLY valid JSON.',
+    );
+  } catch (err: any) {
+    throw new Error(err.message || 'AI request failed');
+  }
+
+  if (isBlocked(result) || result.startsWith('AI error:') || result === 'No response from AI.') {
+    throw new Error(result.replace(/^[⚠️⛔⏳]\s*/, ''));
+  }
 
   try {
     const cleaned = result.replace(/```(?:json)?/g, '').trim();
     const match   = cleaned.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('No JSON');
+    if (!match) throw new Error('Invalid AI response format');
     return JSON.parse(match[0]) as ChallengeSummary;
-  } catch {
-    return null;
+  } catch (parseErr: any) {
+    throw new Error(parseErr.message === 'Invalid AI response format' ? parseErr.message : 'Failed to parse AI challenge summary');
   }
 }
 

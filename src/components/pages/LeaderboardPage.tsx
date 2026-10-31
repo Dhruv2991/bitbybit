@@ -71,14 +71,17 @@ export default function LeaderboardPage() {
         // (prevents double-counting if the same problem was approved in multiple tables)
         const bestPerProblem = new Map<string, { github: string; name: string; points: number }>();
         for (const s of [...(normalSubs || []), ...(arenaSubs || []), ...(weeklySubs || [])]) {
+          const points = s.points_awarded || 0;
+          if (points <= 0) continue;
           const key = `${s.github}::${s.problem_id}`;
           const existing = bestPerProblem.get(key);
-          if (!existing || (s.points_awarded || 0) > existing.points)
-            bestPerProblem.set(key, { github: s.github, name: s.name, points: s.points_awarded || 0 });
+          if (!existing || points > existing.points)
+            bestPerProblem.set(key, { github: s.github, name: s.name, points });
         }
 
         const map: Record<string, { github: string; name: string; total: number; solved: number }> = {};
         for (const v of bestPerProblem.values()) {
+          if (v.points <= 0) continue;
           if (!map[v.github]) map[v.github] = { github: v.github, name: v.name, total: 0, solved: 0 };
           map[v.github].total += v.points;
           map[v.github].solved += 1;
@@ -86,6 +89,7 @@ export default function LeaderboardPage() {
 
         const membersMap = new Map((membersData || []).map((m: any) => [m.github, m]));
         const ranked = Object.values(map)
+          .filter(m => m.total > 0 && m.solved > 0)
           .sort((a, b) => b.total - a.total)
           .slice(0, 100)
           .map(m => {
@@ -265,28 +269,43 @@ export default function LeaderboardPage() {
               >(),
           ]);
 
-        const map: Record<
-          string,
-          { github: string; name: string; total: number; problems: Set<string> }
-        > = {};
+        // Deduplicate: per user per problem, keep highest points_awarded
+        const monthBestPerProblem = new Map<string, { github: string; name: string; problem_id: string; points: number }>();
         for (const s of [
           ...(subs || []),
           ...(arenaSubs || []),
           ...(weeklySubs || []),
         ]) {
-          if (!map[s.github])
-            map[s.github] = {
-              github: s.github,
-              name: s.name,
+          const points = s.points_awarded || 0;
+          if (points <= 0) continue;
+          const pid = (s as any).problem_id;
+          if (!pid) continue;
+          const key = `${s.github}::${pid}`;
+          const existing = monthBestPerProblem.get(key);
+          if (!existing || points > existing.points) {
+            monthBestPerProblem.set(key, { github: s.github, name: s.name, problem_id: pid, points });
+          }
+        }
+
+        const map: Record<
+          string,
+          { github: string; name: string; total: number; problems: Set<string> }
+        > = {};
+        for (const v of monthBestPerProblem.values()) {
+          if (v.points <= 0) continue;
+          if (!map[v.github])
+            map[v.github] = {
+              github: v.github,
+              name: v.name,
               total: 0,
               problems: new Set(),
             };
-          map[s.github].total += s.points_awarded || 0;
-          const pid = (s as any).problem_id || `pts_${map[s.github].total}`;
-          map[s.github].problems.add(pid);
+          map[v.github].total += v.points;
+          map[v.github].problems.add(v.problem_id);
         }
 
         const ranked = Object.values(map)
+          .filter((m) => m.total > 0 && m.problems.size > 0)
           .sort((a, b) => b.total - a.total)
           .slice(0, 100)
           .map(

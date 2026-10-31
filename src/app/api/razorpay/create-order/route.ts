@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Razorpay from 'razorpay';
+import { PRICING_CONFIG } from '@/lib/pricing';
 
 interface Body {
   purpose: 'subscription';
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
-    let baseAmount: number = 199;
+    let baseAmount: number = PRICING_CONFIG.defaultMonthlyFee;
     const notes: Record<string, string> = { type: purpose, github, name, email };
 
     // eslint-disable-next-line
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
 
     const order = await razorpay.orders.create({
       amount:   Math.round(finalAmount * 100), // paise / cents
-      currency: 'INR',
+      currency: PRICING_CONFIG.currencyCode,
       notes,
       receipt: `${purpose}_${github}_${Date.now()}`.slice(0, 40),
     });

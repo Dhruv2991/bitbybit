@@ -225,15 +225,23 @@ function renderInline(text: string): React.ReactNode {
         </strong>
       );
     } else if (token.startsWith('[') && token.includes('](')) {
+      const linkLabel = match[4];
+      let linkHref = match[5];
+      if (
+        (linkLabel.includes('teamcodelocked@gmail.com') && linkHref.includes('ddhruvgnayak@gmail.com')) ||
+        linkHref.includes('to=ddhruvgnayak@gmail.com')
+      ) {
+        linkHref = 'mailto:teamcodelocked@gmail.com?subject=Partnership%20Inquiry%20-%20BitByBit';
+      }
       parts.push(
         <a
           key={match.index}
-          href={match[5]}
-          target="_blank"
-          rel="noopener noreferrer"
+          href={linkHref}
+          target={linkHref.startsWith('mailto:') ? undefined : '_blank'}
+          rel={linkHref.startsWith('mailto:') ? undefined : 'noopener noreferrer'}
           className="text-cyan-600 dark:text-cyan-400 hover:text-cyan-500 dark:hover:text-cyan-300 underline underline-offset-2 transition-colors font-medium"
         >
-          {match[4]}
+          {linkLabel}
         </a>
       );
     }
@@ -263,6 +271,22 @@ export default function CollaborationsContentRenderer({ content, className = '' 
     });
     // Route any Supabase storage problem-images URLs through universal /api/images/ proxy
     raw = raw.replace(/https?:\/\/[^"'\s]+\/storage\/v1\/object\/public\/problem-images\/([^"'\s>]+)/gi, '/api/images/$1');
+
+    // Normalize mismatched contact email links so that any link pointing to ddhruvgnayak@gmail.com
+    // or mentioning teamcodelocked@gmail.com consistently targets mailto:teamcodelocked@gmail.com
+    raw = raw.replace(
+      /<a\s+[^>]*href=["'][^"']*ddhruvgnayak@gmail\.com[^"']*["'][^>]*>([\s\S]*?teamcodelocked@gmail\.com[\s\S]*?)<\/a>/gi,
+      '<a href="mailto:teamcodelocked@gmail.com?subject=Partnership%20Inquiry%20-%20BitByBit">$1</a>'
+    );
+    raw = raw.replace(
+      /href=["']https?:\/\/mail\.google\.com\/mail\/\?[^"']*ddhruvgnayak@gmail\.com[^"']*["']/gi,
+      'href="mailto:teamcodelocked@gmail.com?subject=Partnership%20Inquiry%20-%20BitByBit"'
+    );
+    raw = raw.replace(
+      /href=["']mailto:ddhruvgnayak@gmail\.com["'](?=[^>]*>[\s\S]*?teamcodelocked@gmail\.com)/gi,
+      'href="mailto:teamcodelocked@gmail.com?subject=Partnership%20Inquiry%20-%20BitByBit"'
+    );
+
     return sanitizeHtml(raw);
   }, [isHtml, content]);
 

@@ -941,7 +941,23 @@ export function parseHarnessArgs(inputJson: string | null, paramCount: number, p
     if (!Array.isArray(parsed)) return [parsed];
     if (paramCount === 1) {
       const firstParamKind = params?.[0]?.kind;
-      if (firstParamKind === '2d-array' || firstParamKind === 'array' || firstParamKind === 'listnode' || firstParamKind === 'treenode') {
+      // If parsed is already a 1-element argument array wrapping the target parameter, don't double-wrap:
+      if (firstParamKind === 'array') {
+        if (parsed.length === 1 && Array.isArray(parsed[0])) {
+          return parsed;
+        }
+        return [parsed];
+      }
+      if (firstParamKind === '2d-array') {
+        if (parsed.length === 1 && Array.isArray(parsed[0]) && Array.isArray(parsed[0][0])) {
+          return parsed;
+        }
+        return [parsed];
+      }
+      if (firstParamKind === 'listnode' || firstParamKind === 'treenode') {
+        if (parsed.length === 1 && Array.isArray(parsed[0])) {
+          return parsed;
+        }
         return [parsed];
       }
       if (parsed.length > 0 && !Array.isArray(parsed[0])) {

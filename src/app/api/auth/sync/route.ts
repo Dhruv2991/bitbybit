@@ -37,16 +37,15 @@ async function getVerifiedUser(req: NextRequest) {
   const { data, error } = await supabase.auth.getUser(token);
   if (error || !data.user) return null;
 
-  const github = data.user.user_metadata?.user_name as string | undefined;
-  const name   = data.user.user_metadata?.full_name as string | undefined;
-  // GitHub OAuth returns the account's email via Supabase's own
-  // `user.email` as long as the user has a public/verified email —
-  // some users genuinely have none, in which case this stays null
-  // and we just skip the write (nothing to sync).
-  const email  = (data.user.email || data.user.user_metadata?.email || null) as string | null;
+  // Identity MUST be extracted strictly from verified GitHub identity in auth.identities
+  const githubIdentity = data.user.identities?.find((id: any) => id.provider === 'github');
+  const github = githubIdentity?.identity_data?.user_name as string | undefined;
   if (!github) return null;
 
-  return { github, name: name || github, email };
+  const name = (githubIdentity?.identity_data?.full_name || githubIdentity?.identity_data?.name || github) as string;
+  const email = (data.user.email || githubIdentity?.identity_data?.email || null) as string | null;
+
+  return { github, name, email };
 }
 
 export async function POST(req: NextRequest) {
@@ -57,46 +56,51 @@ export async function POST(req: NextRequest) {
     }
     const { github, name, email } = authUser;
 
-    if (!email) {
-      // Nothing to sync — GitHub account has no public/verified email.
-      return NextResponse.json({ success: true, synced: false });
-    }
-
     const db = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
     );
 
-    // Ensure a members row exists, then set/refresh email + name.
-    // Two steps (rather than one upsert) so an existing member's
-    // points/streak/problems_solved are never reset by a login.
-    // eslint-disable-next-line
-    const { error: upsertErr } = await (db.from('members') as any).upsert(
-      { github, name, total_points: 0, problems_solved: 0, streak: 0 },
-      { onConflict: 'github', ignoreDuplicates: true },
-    );
-    if (upsertErr) {
-      console.error('[auth/sync] members upsert error:', upsertErr);
+    // 1. Check if member row already exists
+    const { data: existingMember } = await (db.from('members') as any)
+      .select('github')
+      .eq('github', github)
+      .maybeSingle();
+
+    if (!existingMember) {
+      // Insert new member row with initial default stats
+      const { error: insertErr } = await (db.from('members') as any).insert({
+        github,
+        name,
+        email,
+        total_points: 0,
+        problems_solved: 0,
+        streak: 0,
+      });
+      if (insertErr) {
+        console.error('[auth/sync] members insert error:', insertErr);
+      }
+    } else {
+      // For existing members, update display fields only (name, email)
+      // NEVER reset total_points, problems_solved, streak, or last_solved_at
+      const updateData: Record<string, any> = { name };
+      if (email) updateData.email = email;
+      const { error: memberErr } = await (db.from('members') as any)
+        .update(updateData)
+        .eq('github', github);
+      if (memberErr) {
+        console.error('[auth/sync] members update error:', memberErr);
+      }
     }
 
-    // eslint-disable-next-line
-    const { error: memberErr } = await (db.from('members') as any)
-      .update({ email, name })
-      .eq('github', github);
-    if (memberErr) {
-      console.error('[auth/sync] members email update error:', memberErr);
-      return NextResponse.json({ error: 'Failed to sync email' }, { status: 500 });
-    }
-
-    // If they already have a subscribers row (e.g. from before this
-    // fix shipped), keep its email in sync too. Don't create one —
-    // that row is only created at actual payment time.
-    // eslint-disable-next-line
-    const { error: subErr } = await (db.from('subscribers') as any)
-      .update({ email, name })
-      .eq('github', github);
-    if (subErr) {
-      console.error('[auth/sync] subscribers email update error:', subErr);
+    // 2. If they already have a subscribers row, sync name + email there too
+    if (email) {
+      const { error: subErr } = await (db.from('subscribers') as any)
+        .update({ email, name })
+        .eq('github', github);
+      if (subErr) {
+        console.error('[auth/sync] subscribers email update error:', subErr);
+      }
     }
 
     return NextResponse.json({ success: true, synced: true });

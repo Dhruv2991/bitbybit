@@ -16,6 +16,7 @@ import {
   joinDuelAction,
   updateDuelProgressAction,
   forfeitDuelAction,
+  leaveOrDiscardDuelAction,
 } from "@/app/actions/duels";
 import { getStrategy, runInBrowser, pollExecutionStatus } from "@/lib/browserExecutor";
 
@@ -56,6 +57,7 @@ export default function DuelWarRoomPage() {
   const [realtimeConnected, setRealtimeConnected] = useState<boolean>(false);
   const [showVictoryModal, setShowVictoryModal] = useState<boolean>(false);
   const [forfeiting, setForfeiting] = useState<boolean>(false);
+  const [leaving, setLeaving] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
@@ -91,13 +93,14 @@ export default function DuelWarRoomPage() {
 
       setDuel(res.duel);
 
-      // Fetch problem details
-      const db = getSupabaseClient();
-      const { data: prob } = await db
-        .from("problems")
-        .select("*")
-        .eq("id", res.duel.problem_id)
-        .maybeSingle();
+      // Fetch problem details via the API route (auth-gated for full columns)
+      const { data: { session: authSession } } = await getSupabaseClient().auth.getSession();
+      const probRes = await fetch(`/api/problems/${res.duel.problem_id}`, {
+        headers: authSession?.access_token
+          ? { Authorization: `Bearer ${authSession.access_token}` }
+          : {},
+      });
+      const prob = probRes.ok ? await probRes.json() : null;
 
       if (prob) {
         setProblem(prob as Problem);
@@ -149,10 +152,12 @@ export default function DuelWarRoomPage() {
     if (!duel || !currentUser || duel.status !== "waiting") return;
     if (duel.host_github !== currentUser.github && !duel.guest_github) {
       // Auto-join as guest
-      joinDuelAction(duel.id, currentUser.github, currentUser.name).then((res) => {
-        if (res.success && res.duel) {
-          setDuel(res.duel);
-        }
+      getSupabaseClient().auth.getSession().then(({ data: { session } }) => {
+        joinDuelAction(duel.id, currentUser.github, currentUser.name, session?.access_token).then((res) => {
+          if (res.success && res.duel) {
+            setDuel(res.duel);
+          }
+        });
       });
     }
   }, [duel, currentUser]);
@@ -191,59 +196,54 @@ export default function DuelWarRoomPage() {
     setCode(template);
   }
 
-  // 6. Execute Test Cases & Transmit Numerical Telemetry
+  // 6. Execute Test Cases & Transmit Numerical Telemetry (Always Server-Side for Competitive Integrity)
   async function handleRunTests() {
     if (!problem || !currentUser || !duel) return;
     setIsRunning(true);
 
+    const { data: { session } } = await getSupabaseClient().auth.getSession();
+    const token = session?.access_token;
+
     // Notify opponent: Status changed to 'running_tests'
     await updateDuelProgressAction(duel.id, currentUser.github, {
       status: "running_tests",
-    });
+    }, token);
 
-    const strategy = getStrategy(language);
     try {
       let data: any = null;
 
-      if (strategy === "browser") {
-        // Python and JavaScript execute directly in the user's browser via Pyodide / Web Workers
-        const cases = (problem.test_cases || []).map((tc) => ({
-          input: tc.input,
-          expected: tc.expected,
-          is_hidden: tc.is_hidden,
-        }));
-        data = await runInBrowser(code, language, cases);
-      } else {
-        // Other languages (C++, Java, Go, Rust) execute on the server (Docker Judge0 with Wandbox fallback)
-        try {
-          const response = await fetch("/api/execute", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              code,
-              language,
-              problem_id: problem.id,
-              mode: "submit",
-            }),
-          });
+      try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
 
-          if (response.ok) {
-            const initData = await response.json();
-            if (initData.status === "processing" && initData.token) {
-              data = await pollExecutionStatus(initData.token, problem.id, undefined, 'submit');
-            } else {
-              data = initData;
-            }
+        const response = await fetch("/api/execute", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            code,
+            language,
+            problem_id: problem.id,
+            mode: "duel",
+            duel_id: duel.id,
+          }),
+        });
+
+        if (response.ok) {
+          const initData = await response.json();
+          if (initData.status === "processing" && initData.token) {
+            data = await pollExecutionStatus(initData.token, problem.id, undefined, 'submit');
           } else {
-            const errData = await response.json().catch(() => ({}));
-            console.warn("[Duel] /api/execute returned error:", errData);
-            if (errData.error) {
-              setErrorBanner(`Execution error: ${errData.error}`);
-            }
+            data = initData;
           }
-        } catch (fetchErr: any) {
-          console.warn("[Duel] Network fetch to /api/execute failed:", fetchErr);
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          console.warn("[Duel] /api/execute returned error:", errData);
+          if (errData.error) {
+            setErrorBanner(`Execution error: ${errData.error}`);
+          }
         }
+      } catch (fetchErr: any) {
+        console.warn("[Duel] Network fetch to /api/execute failed:", fetchErr);
       }
 
       if (!data) {
@@ -263,9 +263,9 @@ export default function DuelWarRoomPage() {
         testsPassed: passedCount,
         totalTests: totalCount,
         status: passedCount === totalCount ? "submitted" : "coding",
-      });
+      }, token);
 
-      if (updateRes.isVictory) {
+      if (data.isVictory || updateRes.isVictory || (passedCount > 0 && passedCount === totalCount)) {
         setShowVictoryModal(true);
       }
     } catch (err: any) {
@@ -285,10 +285,35 @@ export default function DuelWarRoomPage() {
 
     setForfeiting(true);
     try {
-      await forfeitDuelAction(duel.id, currentUser.github);
+      const { data: { session } } = await getSupabaseClient().auth.getSession();
+      await forfeitDuelAction(duel.id, currentUser.github, session?.access_token);
       setShowVictoryModal(true);
     } finally {
       setForfeiting(false);
+    }
+  }
+
+  async function handleLeaveRoom() {
+    if (!duel || !currentUser) return;
+    const isHost = duel.host_github === currentUser.github;
+    const confirmMsg = isHost
+      ? "Are you sure you want to discard this room? The invitation link will expire."
+      : "Are you sure you want to leave this room?";
+    if (!confirm(confirmMsg)) return;
+
+    setLeaving(true);
+    try {
+      const { data: { session } } = await getSupabaseClient().auth.getSession();
+      const res = await leaveOrDiscardDuelAction(duel.id, currentUser.github, session?.access_token);
+      if (res.success) {
+        router.push("/duels");
+      } else {
+        setErrorBanner(res.error || "Failed to leave room");
+        setLeaving(false);
+      }
+    } catch (err: any) {
+      setErrorBanner(err.message || "Failed to leave room");
+      setLeaving(false);
     }
   }
 
@@ -354,8 +379,31 @@ export default function DuelWarRoomPage() {
               {forfeiting ? "Conceding..." : "Forfeit"}
             </button>
           )}
+
+          {duel?.status === "waiting" && (
+            <button
+              onClick={handleLeaveRoom}
+              disabled={leaving}
+              className="text-xs px-3 py-1.5 rounded-xl text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all font-medium"
+            >
+              {leaving ? "Exiting..." : isHost ? "Discard Room" : "Leave Room"}
+            </button>
+          )}
         </div>
       </header>
+
+      {/* ── Abandoned / Discarded Banner ───────────────────────── */}
+      {duel?.status === "abandoned" && (
+        <div className="bg-slate-100 dark:bg-zinc-900 border-b border-slate-200 dark:border-zinc-800 px-4 py-3 text-center text-xs sm:text-sm text-slate-700 dark:text-zinc-300 flex items-center justify-center gap-3">
+          <span>⚠️ This duel room has been discarded or abandoned.</span>
+          <button
+            onClick={() => router.push("/duels")}
+            className="px-3 py-1 rounded-lg bg-cyan-600 text-white font-bold text-xs hover:bg-cyan-500 transition-colors"
+          >
+            ← Return to Duels Lobby
+          </button>
+        </div>
+      )}
 
       {/* ── Waiting for Opponent Banner ────────────────────────── */}
       {duel?.status === "waiting" && (
@@ -364,16 +412,25 @@ export default function DuelWarRoomPage() {
             <span className="spinner-sm" />
             <span>Waiting for challenger to join room...</span>
           </div>
-          <button
-            onClick={() => {
-              navigator.clipboard?.writeText(window.location.href);
-              setCopiedLink(true);
-              setTimeout(() => setCopiedLink(false), 2000);
-            }}
-            className="px-3 py-1 rounded-lg bg-amber-200/60 dark:bg-amber-500/20 font-bold hover:bg-amber-300/60 transition-colors text-xs"
-          >
-            {copiedLink ? "✓ Link Copied to Clipboard!" : "📋 Copy Invite Link"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(window.location.href);
+                setCopiedLink(true);
+                setTimeout(() => setCopiedLink(false), 2000);
+              }}
+              className="px-3 py-1 rounded-lg bg-amber-200/60 dark:bg-amber-500/20 font-bold hover:bg-amber-300/60 transition-colors text-xs"
+            >
+              {copiedLink ? "✓ Link Copied to Clipboard!" : "📋 Copy Invite Link"}
+            </button>
+            <button
+              onClick={handleLeaveRoom}
+              disabled={leaving}
+              className="px-3 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-500/30 font-bold transition-colors text-xs"
+            >
+              {leaving ? "Exiting..." : isHost ? "🗑️ Discard Room" : "🚪 Leave Room"}
+            </button>
+          </div>
         </div>
       )}
 

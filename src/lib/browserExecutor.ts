@@ -274,6 +274,10 @@ export async function pollExecutionStatus(
           results: data.results ?? [],
           hidden_passed: data.hidden_passed,
           hidden_total: data.hidden_total,
+          points_awarded: data.points_awarded,
+          is_first_solve: data.is_first_solve,
+          streak: data.streak,
+          isVictory: data.isVictory,
         };
       }
 
@@ -308,9 +312,18 @@ export async function runOnServer(
     payload.test_cases = testCases;
   }
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const { getSupabaseClient } = await import('@/lib/supabase');
+    const { data: { session } } = await getSupabaseClient().auth.getSession();
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+  } catch {}
+
   const res = await fetch('/api/execute', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
   });
 
@@ -325,6 +338,10 @@ export async function runOnServer(
       results: data.results ?? [],
       hidden_passed: data.hidden_passed,
       hidden_total: data.hidden_total,
+      points_awarded: data.points_awarded,
+      is_first_solve: data.is_first_solve,
+      streak: data.streak,
+      isVictory: data.isVictory,
     };
   }
 

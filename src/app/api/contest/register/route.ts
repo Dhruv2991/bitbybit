@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isActiveSubscription } from '@/lib/subscription';
+import { PRICING_CONFIG, formatPriceWithPeriod } from '@/lib/pricing';
 
 interface Body {
   contestId: string;
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     if (!isActiveSubscription(sub?.status, sub?.current_period_end)) {
       return NextResponse.json(
-        { error: 'An active ₹39/month subscription is required to enter contests. Subscribe to unlock free entry to all contests.' },
+        { error: `An active ${formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)} subscription is required to enter contests. Subscribe to unlock free entry to all contests.` },
         { status: 403 },
       );
     }

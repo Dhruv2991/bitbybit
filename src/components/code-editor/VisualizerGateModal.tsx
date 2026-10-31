@@ -5,6 +5,7 @@
 
 import { useEffect } from 'react';
 import { msUntilMidnight } from '@/lib/visualizer';
+import { PRICING_CONFIG, formatPrice } from '@/lib/pricing';
 
 interface VisualizerGateModalProps {
   reason:    'free_limit_reached' | 'pro_limit_reached' | 'not_subscriber';
@@ -119,7 +120,7 @@ export default function VisualizerGateModal({
                   ✦ BitByBit Pro Tier
                 </span>
                 <span className="font-mono text-xs font-bold text-cyan-700 dark:text-cyan-200 bg-cyan-500/15 px-2 py-0.5 rounded-full border border-cyan-500/30">
-                  ₹39 / mo
+                  {formatPrice(PRICING_CONFIG.defaultMonthlyFee)} / {PRICING_CONFIG.periodUnit}
                 </span>
               </div>
               {[
@@ -150,7 +151,7 @@ export default function VisualizerGateModal({
                 onClick={onUpgrade}
                 className="flex-1 py-2.5 rounded-xl font-mono text-xs font-bold bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 transition-all shadow-xs flex items-center justify-center gap-1.5"
               >
-                <span>⚡ Get Pro — ₹39</span>
+                <span>⚡ Get Pro — {formatPrice(PRICING_CONFIG.defaultMonthlyFee)}</span>
               </button>
             )}
           </div>

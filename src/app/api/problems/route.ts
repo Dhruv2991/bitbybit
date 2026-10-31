@@ -1,34 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/lib/supabase';
-import type { Problem, TestCase } from '@/types/database';
+import { createServerSupabaseClient } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-function sanitizeProblem(p: Problem, isAdmin = false): Problem {
-  if (isAdmin) return p;
-  const rawCases: TestCase[] = p.test_cases || [];
-  const visibleCases = rawCases.filter(tc => !tc.is_hidden);
-  return {
-    ...p,
-    test_cases: visibleCases.length > 0 ? visibleCases : rawCases.slice(0, 2),
-  };
-}
+// Card-only columns — safe for any caller. Full content (description,
+// hints, starter_code, example, param_types, return_type) is gated
+// behind problem_details (Issue #1 Phase B) and the Workspace route.
+const CARD_COLUMNS = [
+  'id', 'title', 'difficulty', 'points', 'tags',
+  'visibility', 'is_contest_problem', 'submission_count',
+  'created_at', 'updated_at',
+].join(', ');
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
-    const db = getSupabaseClient();
+    // Service role so we can read all rows; column restriction is the gate
+    const db = createServerSupabaseClient();
     const { data, error } = await db
       .from('problems')
-      .select('*')
+      .select(CARD_COLUMNS)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-
-    const authHeader = req.headers.get('authorization') || '';
-    const isAdmin = authHeader.includes('admin');
-
-    const sanitized = (data || []).map((p: any) => sanitizeProblem(p as Problem, isAdmin));
-    return NextResponse.json(sanitized);
+    return NextResponse.json(data || []);
   } catch (err: any) {
     console.error('[/api/problems]', err);
     return NextResponse.json({ error: err.message || 'Failed to fetch problems' }, { status: 500 });

@@ -68,6 +68,23 @@ function clearDraft(problemId: string, lang: SupportedLang) {
   try { localStorage.removeItem(draftKey(problemId, lang)); } catch {}
 }
 
+function getSavedLanguage(problemId: string): SupportedLang {
+  try {
+    const savedProblemLang = localStorage.getItem(`bb_last_lang__${problemId}`) as SupportedLang;
+    if (savedProblemLang && STARTER_CODE[savedProblemLang]) return savedProblemLang;
+    const savedGlobalLang = localStorage.getItem('bb_last_lang') as SupportedLang;
+    if (savedGlobalLang && STARTER_CODE[savedGlobalLang]) return savedGlobalLang;
+  } catch {}
+  return 'python';
+}
+
+function saveActiveLanguage(problemId: string, lang: SupportedLang) {
+  try {
+    localStorage.setItem(`bb_last_lang__${problemId}`, lang);
+    localStorage.setItem('bb_last_lang', lang);
+  } catch {}
+}
+
 // ── Arena draft helpers (scoped to contestId so they don't mix with regular drafts) ──
 
 function arenaDraftKey(contestId: string, problemId: string, lang: SupportedLang) {
@@ -108,40 +125,15 @@ function shortcutLabel(key: string, withShift = false) {
 // resubmission of an already-solved problem — that's what makes
 // resubmitting today still count toward today's streak.
 export async function syncMemberProgress(
-  db: ReturnType<typeof getSupabaseClient>,
-  github: string,
-  name: string,
-  pointsDelta: number,
-  isFirstSolve: boolean,
+  _db: any,
+  _github: string,
+  _name: string,
+  _pointsDelta: number,
+  _isFirstSolve: boolean,
 ) {
-  const now = new Date();
-  // eslint-disable-next-line
-  const { data: ex } = await (db.from('members') as any)
-    .select('*').eq('github', github).maybeSingle();
-
-  if (ex) {
-    const last = ex.last_solved_at ? new Date(ex.last_solved_at) : null;
-    const daysSinceLast = last ? calendarDaysBetween(last, now) : 999;
-    const newStreak =
-      daysSinceLast === 0 ? (ex.streak || 1) :
-      daysSinceLast === 1 ? (ex.streak || 0) + 1 : 1;
-    // eslint-disable-next-line
-    await (db.from('members') as any).update({
-      total_points:    (ex.total_points || 0) + pointsDelta,
-      problems_solved: (ex.problems_solved || 0) + (isFirstSolve ? 1 : 0),
-      streak:          newStreak,
-      last_solved_at:  now.toISOString(),
-    }).eq('github', github);
-  } else {
-    // eslint-disable-next-line
-    await (db.from('members') as any).insert([{
-      github, name,
-      total_points:    pointsDelta,
-      problems_solved: isFirstSolve ? 1 : 0,
-      streak:          1,
-      last_solved_at:  now.toISOString(),
-    }]);
-  }
+  // Member points, problems_solved, and streaks are now calculated and updated
+  // atomically server-side inside /api/execute to prevent client tampering.
+  return;
 }
 
 // ── Tiny markdown parser: bold + inline code ─────────────────────────────────
@@ -622,21 +614,119 @@ interface WorkspaceProps {
 type ToastType = 'ok' | 'err' | 'info' | 'warn';
 interface Toast { msg: string; type: ToastType; id: number; }
 
-export default function Workspace({ problem, user, onClose, onArenaSubmit, onArenaCodeChange, onSolved, isWeekly, practiceMode, contestId }: WorkspaceProps) {
+export default function Workspace({ problem: initialProblem, user, onClose, onArenaSubmit, onArenaCodeChange, onSolved, isWeekly, practiceMode, contestId }: WorkspaceProps) {
   const dbRef = useRef(getSupabaseClient());
   const db = dbRef.current;
 
-  const [lang,          setLang]          = useState<SupportedLang>('python');
+  const [problem, setProblem] = useState<Problem>(initialProblem);
+  const [lang,          setLang]          = useState<SupportedLang>(() => getSavedLanguage(initialProblem.id));
+  const langRef = useRef<SupportedLang>(lang);
+  langRef.current = lang;
+
+  // Fetch problem details (description, hints, starter_code, etc.) from problem_details table
+  useEffect(() => {
+    setProblem(initialProblem);
+    let isMounted = true;
+    async function loadDetails() {
+      try {
+        // 1. Try problem_details table first (Phase B table)
+        const { data: details, error } = await (db.from('problem_details') as any)
+          .select('description, example, hints, starter_code, param_types, return_type')
+          .eq('problem_id', initialProblem.id)
+          .maybeSingle();
+
+        if (details && !error && isMounted) {
+          setProblem(prev => {
+            const updated = {
+              ...prev,
+              description: details.description ?? prev.description,
+              example: details.example ?? prev.example,
+              hints: details.hints ?? prev.hints,
+              starter_code: details.starter_code ?? prev.starter_code,
+              param_types: details.param_types ?? prev.param_types,
+              return_type: details.return_type ?? prev.return_type,
+            };
+            try {
+              const currentLang = langRef.current;
+              const hasDraft = !onArenaSubmit && localStorage.getItem(draftKey(initialProblem.id, currentLang));
+              if (!hasDraft && STARTER_CODE[currentLang]) {
+                setCode(prevCode => {
+                  if (!prevCode || prevCode.includes('def solution():\n    pass') || prevCode.trim() === '') {
+                    return STARTER_CODE[currentLang](updated);
+                  }
+                  return prevCode;
+                });
+              }
+            } catch {}
+            return updated;
+          });
+          return;
+        }
+
+        // If problem_details table exists (and details is null or RLS-denied), do NOT attempt fallback
+        const isTableMissing = error?.code === '42P01' || error?.message?.includes('does not exist');
+        if (!isTableMissing) {
+          return;
+        }
+
+        // 2. Pre-migration fallback only (before problem_details table is created)
+        try {
+          const { data: fallback, error: fbErr } = await (db.from('problems') as any)
+            .select('description, example, hints, starter_code, param_types, return_type')
+            .eq('id', initialProblem.id)
+            .maybeSingle();
+
+          if (fallback && !fbErr && isMounted) {
+            setProblem(prev => {
+              const updated = {
+                ...prev,
+                description: fallback.description ?? prev.description,
+                example: fallback.example ?? prev.example,
+                hints: fallback.hints ?? prev.hints,
+                starter_code: fallback.starter_code ?? prev.starter_code,
+                param_types: fallback.param_types ?? prev.param_types,
+                return_type: fallback.return_type ?? prev.return_type,
+              };
+              try {
+                const currentLang = langRef.current;
+                const hasDraft = !onArenaSubmit && localStorage.getItem(draftKey(initialProblem.id, currentLang));
+                if (!hasDraft && STARTER_CODE[currentLang]) {
+                  setCode(prevCode => {
+                    if (!prevCode || prevCode.includes('def solution():\n    pass') || prevCode.trim() === '') {
+                      return STARTER_CODE[currentLang](updated);
+                    }
+                    return prevCode;
+                  });
+                }
+              } catch {}
+              return updated;
+            });
+          }
+        } catch {
+          // Permission denied after migration is safely ignored
+        }
+      } catch (e) {
+        console.error('[Workspace] Error loading problem details:', e);
+      }
+    }
+
+    loadDetails();
+    return () => { isMounted = false; };
+  }, [initialProblem.id, onArenaSubmit]);
+
   const [code,          setCode]          = useState(() => {
+    const initialLang = getSavedLanguage(initialProblem.id);
     if (onArenaSubmit && contestId)
-      return loadArenaDraft(contestId, problem.id, 'python', problem);
+      return loadArenaDraft(contestId, initialProblem.id, initialLang, initialProblem);
     if (!onArenaSubmit)
-      return loadDraft(problem.id, 'python', problem);
-    return STARTER_CODE['python'](problem);
+      return loadDraft(initialProblem.id, initialLang, initialProblem);
+    return STARTER_CODE[initialLang](initialProblem);
   });
   const [approach,      setApproach]      = useState('');
   const [running,       setRunning]       = useState(false);
   const [submitting,    setSubmitting]    = useState(false);
+  const isRunningRef    = useRef(false);
+  const isSubmittingRef = useRef(false);
   const [testResult,    setTestResult]    = useState<RunResult | null>(null);
   const [statusMsg,     setStatusMsg]     = useState('Ready to submit');
   const [submitBlocked, setSubmitBlocked] = useState(false);
@@ -791,18 +881,33 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     function onKeyDown(e: KeyboardEvent) {
       const mod = e.ctrlKey || e.metaKey;
       const target = e.target as HTMLElement | null;
-      const inTextInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
+      const activeEl = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
+
+      const isEditorOrInput = (el: HTMLElement | null): boolean => {
+        if (!el) return false;
+        return (
+          el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.isContentEditable ||
+          Boolean(el.closest?.('.monaco-editor')) ||
+          Boolean(el.closest?.('.monaco-diff-editor')) ||
+          Boolean(el.closest?.('[contenteditable="true"]')) ||
+          Boolean(el.classList?.contains('inputarea'))
+        );
+      };
+
+      const inEditorOrInput = isEditorOrInput(target) || isEditorOrInput(activeEl);
 
       if (mod && e.key === 'Enter') {
         e.preventDefault();
         if (e.shiftKey) {
-          if (!submitting && !submitBlocked) submitSolution();
+          if (!running && !submitting && !submitBlocked) submitSolution();
         } else {
-          if (!running) runTests();
+          if (!running && !submitting) runTests();
         }
         return;
       }
-      if (e.key === '?' && !inTextInput) {
+      if (e.key === '?' && !inEditorOrInput) {
         e.preventDefault();
         setShortcutsOpen(o => !o);
         return;
@@ -813,7 +918,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         } else if (confirmDialog) {
           confirmDialog.resolve(false);
           setConfirmDialog(null);
-        } else if (!inTextInput) {
+        } else if (!inEditorOrInput) {
           onClose();
         }
       }
@@ -848,12 +953,46 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   }
   const toastCounter = useRef(0);
   const arenaCodeChangeTimer = useRef<NodeJS.Timeout | null>(null);
+  const draftSaveTimer = useRef<NodeJS.Timeout | null>(null);
+  const pendingCodeRef = useRef<{ code: string; lang: SupportedLang; problemId: string } | null>(null);
+
+  // Flush pending draft immediately (e.g. on unload, language change, unmount)
+  const flushDraft = useCallback(() => {
+    if (draftSaveTimer.current) {
+      clearTimeout(draftSaveTimer.current);
+      draftSaveTimer.current = null;
+    }
+    if (pendingCodeRef.current) {
+      const { code: c, lang: l, problemId: pid } = pendingCodeRef.current;
+      if (!onArenaSubmit) saveDraft(pid, l, c);
+      if (onArenaSubmit && contestId) saveArenaDraft(contestId, pid, l, c);
+      pendingCodeRef.current = null;
+    }
+  }, [onArenaSubmit, contestId]);
+
+  // Ensure code is persisted immediately if user refreshes or navigates away
+  useEffect(() => {
+    const handleBeforeUnload = () => flushDraft();
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      flushDraft();
+    };
+  }, [flushDraft]);
 
   function handleCodeChange(newCode: string) {
     setCode(newCode);
     recordCodeChange(newCode, lang);
-    if (!onArenaSubmit) saveDraft(problem.id, lang, newCode);
-    if (onArenaSubmit && contestId) saveArenaDraft(contestId, problem.id, lang, newCode);
+
+    // Debounce localStorage writes (400ms) to prevent keystroke thrashing
+    pendingCodeRef.current = { code: newCode, lang, problemId: problem.id };
+    if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
+    draftSaveTimer.current = setTimeout(() => {
+      if (!onArenaSubmit) saveDraft(problem.id, lang, newCode);
+      if (onArenaSubmit && contestId) saveArenaDraft(contestId, problem.id, lang, newCode);
+      draftSaveTimer.current = null;
+    }, 400);
+
     if (!onArenaCodeChange) return;
     if (arenaCodeChangeTimer.current) clearTimeout(arenaCodeChangeTimer.current);
     arenaCodeChangeTimer.current = setTimeout(() => onArenaCodeChange(newCode, lang), 500);
@@ -889,7 +1028,11 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   }, [user, problem.id, isWeekly]);
 
   const handleLangChange = useCallback((l: SupportedLang) => {
+    flushDraft();
     setLang(l);
+    langRef.current = l;
+    saveActiveLanguage(problem.id, l);
+
     const nextCode = onArenaSubmit && contestId
       ? loadArenaDraft(contestId, problem.id, l, problem)
       : !onArenaSubmit
@@ -898,7 +1041,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     setCode(nextCode);
     setTestResult(null); setRunError(null); setRunStatus(''); setProgress(null);
     onArenaCodeChange?.(nextCode, l);
-  }, [problem, onArenaSubmit]);
+  }, [problem, onArenaSubmit, contestId, flushDraft]);
 
   // Wipes whatever's in the editor (and any saved draft for this
   // problem+language) and restores the original starter code — for
@@ -975,8 +1118,22 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
   }
 
   async function runTests() {
-    const cases = problem.test_cases || [];
+    if (running || isRunningRef.current || submitting || isSubmittingRef.current) return;
+    if (!user) {
+      showToast('Please sign in with GitHub to attempt problems and run tests.', 'err');
+      try { sessionStorage.setItem('bb_open_problem_id', problem.id); } catch {}
+      const db = getSupabaseClient();
+      await db.auth.signInWithOAuth({
+        provider: 'github',
+        options: { redirectTo: window.location.href, queryParams: { prompt: 'select_account' } },
+      });
+      return;
+    }
+    const cases = (problem.sample_test_cases && problem.sample_test_cases.length > 0)
+      ? problem.sample_test_cases
+      : (problem.test_cases || []).slice(0, 2);
     if (!cases.length) { setRunError('No test cases defined for this problem. You can still submit for review.'); return; }
+    isRunningRef.current = true;
     setRunning(true); setTestResult(null); setRunError(null); setProgress(null);
     const strategy = getStrategy(lang);
     try {
@@ -1001,25 +1158,42 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
     } catch (e: any) {
       setRunError('Execution error: ' + (e.message || 'Unknown'));
     } finally {
+      isRunningRef.current = false;
       setRunning(false); setRunStatus(''); setProgress(null);
     }
   }
 
   async function submitSolution() {
-    if (!user) { showToast('Sign in to submit!', 'err'); return; }
+    if (submitting || isSubmittingRef.current || running || isRunningRef.current) return;
+    if (!user) {
+      showToast('Please sign in with GitHub to submit your solution.', 'err');
+      try { sessionStorage.setItem('bb_open_problem_id', problem.id); } catch {}
+      const db = getSupabaseClient();
+      await db.auth.signInWithOAuth({
+        provider: 'github',
+        options: { redirectTo: window.location.href, queryParams: { prompt: 'select_account' } },
+      });
+      return;
+    }
     if (practiceMode) { showToast('🏁 Practice mode — submissions are not recorded and no points are awarded.', 'info'); return; }
     if (!onArenaSubmit && !isWeekly && !approach.trim()) { showToast('Please add an approach description or GitHub PR link.', 'warn'); return; }
     if (isWeekly && !testResult) { showToast('Please run the tests before submitting.', 'warn'); return; }
     if (submitBlocked) return;
 
     // ── Server-Side Submission Execution (Isolated & Hidden Test Case Secure) ──
+    isSubmittingRef.current = true;
     setSubmitting(true);
     setStatusMsg('Submitting code to Judge0…');
     let finalTestResult: RunResult | null = null;
     try {
+      const { data: { session } } = await db.auth.getSession();
+      const token = session?.access_token;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const execRes = await fetch('/api/execute', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           code,
           language: lang,
@@ -1027,6 +1201,7 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           mode: 'submit',
         }),
       });
+
       if (execRes.ok) {
         const initData = await execRes.json();
         if (initData.status === 'processing' && initData.token) {
@@ -1042,25 +1217,22 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         }
         setTestResult(finalTestResult);
       } else {
-        // Fallback to client/server runner if problem not found in DB
-        const strategy = getStrategy(lang);
-        if (strategy === 'browser') {
-          finalTestResult = await runInBrowser(code, lang, problem.test_cases || [], () => {});
-        } else {
-          finalTestResult = await runOnServer(code, lang, problem.test_cases || [], (msg) => setStatusMsg(msg), problem.id, 'submit');
-        }
-        setTestResult(finalTestResult);
+        const errJson = await execRes.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Submission execution failed');
       }
     } catch (execErr: any) {
       console.warn('[Workspace submit] Execution error:', execErr);
-      finalTestResult = testResult;
+      isSubmittingRef.current = false;
+      setSubmitting(false);
+      setStatusMsg('Submission error');
+      showToast(execErr.message || 'Execution error during submission', 'err');
+      return;
     }
 
-    setStatusMsg('Uploading submission…');
     try {
       const passed = finalTestResult?.passed ?? 0;
       const total  = finalTestResult?.total  ?? 0;
-      const pointsAwarded = total > 0 ? Math.floor((problem.points || 100) * (passed / total)) : (problem.points || 100);
+      const pointsAwarded = finalTestResult?.points_awarded ?? 0;
 
       // Record final submission milestone and sync timeline
       recordSubmission(code, lang, passed, total);
@@ -1074,76 +1246,23 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         setTimeout(() => onClose(), 1200); return;
       }
 
-      if (isWeekly) {
-        const { data: existingWeekly } = await (db.from('weekly_submissions') as any)
-          .select('id, status').eq('problem_id', problem.id).eq('github', user.github).limit(1);
-        if (existingWeekly?.length) {
-          const proceed = await confirmAction(existingWeekly[0].status === 'approved'
-            ? 'This problem is already approved. Do you want to resubmit? This will replace your approved submission and require admin re-approval.'
-            : 'You already have a pending submission for this problem. Do you want to resubmit and replace it?');
-          if (!proceed) { setStatusMsg('Resubmission cancelled.'); setSubmitting(false); return; }
-        }
-        onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded });
-        clearDraft(problem.id, lang); setSubmitBlocked(true);
-        setStatusMsg(`✅ Submitted — ${passed}/${total} tests, ${pointsAwarded} base pts`);
-        showToast(`✅ "${problem.title}" — ${passed}/${total} tests passed, ${pointsAwarded} base pts (×time bonus)`, 'ok');
-        return;
-      }
+      flushDraft();
+      setApproach('');
+      onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded });
 
-      const { data: existing } = await db.from('submissions').select('id, status, points_awarded')
-        .eq('problem_id', problem.id).eq('github', user.github)
-        .limit(1).returns<{ id: string; status: string; points_awarded: number }[]>();
-      const prevRow = existing?.[0];
-      if (prevRow && prevRow.status === 'pending') {
-        const proceed = await confirmAction('You already have a submission pending manual review for this problem (it has no test cases to auto-grade). Resubmitting will replace it.');
-        if (!proceed) { setStatusMsg('Resubmission cancelled.'); setSubmitting(false); return; }
-      }
-
-      // Problems with test cases can be graded automatically right now —
-      // no more waiting on an admin to manually approve. Problems with
-      // no test cases at all can't be auto-verified, so those still go
-      // to the admin review queue same as before.
-      const canAutoGrade = total > 0;
-      // "First solve" means no previously *approved* row for this problem
-      // — checking row existence alone would wrongly skip the count for
-      // a leftover unapproved row from before auto-grading existed.
-      const isFirstSolve = prevRow?.status !== 'approved';
-      // Never let a resubmission lower the score already on record —
-      // keep whichever attempt scored higher.
-      const finalPointsAwarded = canAutoGrade
-        ? Math.max(pointsAwarded, prevRow?.points_awarded || 0)
-        : pointsAwarded;
-      const pointsDelta = canAutoGrade
-        ? finalPointsAwarded - (prevRow?.points_awarded || 0)
-        : 0;
-
-      const { error } = await (db.from('submissions') as any).upsert([{
-        problem_id: problem.id, problem_title: problem.title,
-        name: user.name, github: user.github, lang, code, approach,
-        status: canAutoGrade ? 'approved' : 'pending',
-        tests_passed: passed, tests_total: total, points_awarded: finalPointsAwarded,
-      }], { onConflict: 'problem_id,github' });
-      if (error) throw error;
-
-      if (canAutoGrade) {
-        await syncMemberProgress(db, user.github, user.name, pointsDelta, isFirstSolve);
-      }
-
-      clearDraft(problem.id, lang); setApproach('');
-      onSolved?.(problem.id, { code, lang, passed, total, pointsAwarded: finalPointsAwarded });
-      if (canAutoGrade) {
-        setStatusMsg(passed === total
-          ? `✅ All tests passed — ${finalPointsAwarded} pts awarded!`
-          : `✅ ${passed}/${total} tests passed — ${finalPointsAwarded} pts awarded.`);
-        showToast(`✅ "${problem.title}" — ${passed}/${total} tests passed, ${finalPointsAwarded} pts awarded${pointsDelta === 0 && !isFirstSolve ? ' (no change — previous attempt scored the same or higher)' : ''}`, 'ok');
+      const allPassed = total > 0 && passed === total;
+      if (allPassed) {
+        setStatusMsg(`✅ All tests passed — ${pointsAwarded} pts awarded!`);
+        showToast(`✅ "${problem.title}" — All tests passed, ${pointsAwarded} pts awarded!`, 'ok');
       } else {
-        setStatusMsg('⏳ No test cases on this problem — sent for manual review.');
-        showToast(`✅ Submitted "${problem.title}" — pending manual review (no test cases to auto-grade)`, 'ok');
+        setStatusMsg(`⚠️ ${passed}/${total} tests passed.`);
+        showToast(`⚠️ "${problem.title}" — ${passed}/${total} tests passed.`, 'warn');
       }
     } catch (e: any) {
       setStatusMsg('Error — try again');
       showToast('Submission error: ' + (e.message || 'Unknown'), 'err');
     } finally {
+      isSubmittingRef.current = false;
       setSubmitting(false);
     }
   }
@@ -1518,15 +1637,15 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
           onChange={handleCodeChange}
           height={isEditorExpanded ? "calc(100vh - 280px)" : "420px"}
           activeLine={activeLine}
-          onRun={() => { if (!running) { setMobileTab('editor'); runTests(); } }}
+          onRun={() => { if (!running && !submitting) { setMobileTab('editor'); runTests(); } }}
           onSubmit={() => {
-            const submitDisabled = submitting || submitBlocked || !user || (!!isWeekly && !testResult && !practiceMode) || (!!practiceMode && !testResult);
+            const submitDisabled = running || submitting || (!!user && submitBlocked) || (!!user && (!!isWeekly || !!practiceMode) && !testResult);
             if (!submitDisabled) submitSolution();
           }}
         />
 
         <div className="flex gap-2">
-          <button onClick={() => { setMobileTab('editor'); runTests(); }} disabled={running}
+          <button onClick={() => { setMobileTab('editor'); runTests(); }} disabled={running || submitting}
             title={`Run tests (${shortcutLabel('Enter')})`}
             className="flex-1 py-2.5 bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 hover:border-cyan-500/50 dark:hover:border-cyan-500/50
               text-cyan-700 dark:text-cyan-400 font-mono text-sm font-bold rounded-xl transition-all duration-200 hover:bg-cyan-50/50 dark:hover:bg-cyan-500/10
@@ -1643,25 +1762,43 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
         )}
 
         <button onClick={submitSolution}
-          title={`Submit (${shortcutLabel('Enter', true)})`}
-          disabled={submitting || submitBlocked || !user || (!!isWeekly && !testResult && !practiceMode) || (!!practiceMode && !testResult)}
-          className={`w-full py-3 rounded-xl font-mono font-bold text-sm transition-all duration-150
-            ${submitBlocked || !user
+          title={!user ? 'Sign in with GitHub to submit' : `Submit (${shortcutLabel('Enter', true)})`}
+          disabled={running || submitting || (!!user && submitBlocked) || (!!user && (!!isWeekly || !!practiceMode) && !testResult)}
+          className={`w-full py-3 rounded-xl font-mono font-bold text-sm transition-all duration-150 flex items-center justify-center gap-2
+            ${!user
+              ? 'bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 shadow-md hover:shadow-lg dark:shadow-cyan-950/40 active:scale-[0.99] border border-cyan-500/30 dark:border-cyan-400/40 cursor-pointer'
+              : submitBlocked
               ? 'bg-slate-100 text-slate-400 dark:bg-zinc-800/60 dark:text-zinc-500 cursor-not-allowed border border-slate-200 dark:border-zinc-800'
               : (isWeekly || practiceMode) && !testResult
               ? 'bg-slate-100 text-slate-400 dark:bg-zinc-800/60 dark:text-zinc-500 cursor-not-allowed border border-slate-200 dark:border-zinc-800'
-              : submitting
+              : (submitting || running)
               ? 'bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 cursor-wait border border-cyan-500/30'
               : practiceMode
               ? 'bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20 hover:bg-purple-100 dark:hover:bg-purple-500/20'
               : 'bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 shadow-md hover:shadow-lg dark:shadow-cyan-950/40 active:scale-[0.99] border border-cyan-500/30 dark:border-cyan-400/40'}`}>
-          {!user                      ? 'Sign in to submit'           :
-           submitBlocked              ? 'Already submitted'           :
-           (isWeekly || practiceMode) && !testResult ? '▶ Run tests first' :
-           submitting                 ? 'Submitting…'                 :
-           practiceMode               ? '🏁 Practice Run (no points)' :
-           onArenaSubmit              ? 'Submit & Next Problem →'     :
-                                        'Submit Solution →'}
+          {submitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-3.5 h-3.5 border-2 border-cyan-600 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
+              <span>Submitting…</span>
+            </span>
+          ) : running ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-3.5 h-3.5 border-2 border-cyan-600 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
+              <span>Running tests…</span>
+            </span>
+          ) : !user ? (
+            'Sign In with GitHub to Submit →'
+          ) : submitBlocked ? (
+            'Already submitted'
+          ) : (isWeekly || practiceMode) && !testResult ? (
+            '▶ Run tests first'
+          ) : practiceMode ? (
+            '🏁 Practice Run (no points)'
+          ) : onArenaSubmit ? (
+            'Submit & Next Problem →'
+          ) : (
+            'Submit Solution →'
+          )}
         </button>
       </div>
 
@@ -1679,7 +1816,10 @@ export default function Workspace({ problem, user, onClose, onArenaSubmit, onAre
             stdout={vizStdout}
             error={vizError}
             isLoading={vizLoading}
-            testInput={((problem.test_cases || []).find(tc => !tc.is_hidden) || problem.test_cases?.[0])?.input ?? null}
+            testInput={(() => {
+              const tc = (problem.test_cases || []).find(t => !t.is_hidden) || problem.test_cases?.[0];
+              return tc?.input ? formatTestCaseInput(tc.input, problem) : null;
+            })()}
             quota={getVisualizerQuota(isSubscriber, user?.github)}
             onActiveLineChange={setActiveLine}
             onClose={() => { setVizOpen(false); setVizLoading(false); setActiveLine(null); }}

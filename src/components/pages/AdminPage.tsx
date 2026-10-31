@@ -26,6 +26,26 @@ import type {
 import MarkdownEditorWithImages from "@/components/admin/MarkdownEditorWithImages";
 import { formatTestCaseInput } from "@/lib/testCaseFormatter";
 
+async function adminProblemFetch(path: string, options: RequestInit = {}) {
+  const db = getSupabaseClient();
+  const { data: { session } } = await db.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("Authentication required");
+  const res = await fetch(path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {}),
+    },
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(json?.error || `Request failed (${res.status})`);
+  }
+  return json;
+}
+
 // Fires the "contest live" / "new weekly challenge" email blast via
 // /api/notify/broadcast. Best-effort from the caller's point of view —
 // returns null (rather than throwing) on any failure so a notify hiccup
@@ -783,21 +803,24 @@ function ContestForm({
       visibility: "arena",
       is_contest_problem: true,
     };
-    // eslint-disable-next-line
-    const { data, error } = await (db.from("problems") as any)
-      .insert([payload])
-      .select()
-      .single();
-    setCreatingProblem(false);
-    if (error) throw new Error((error as any).message);
-    const newProb = data as Problem;
-    onProblemCreated(newProb);
-    setForm((f) => ({
-      ...f,
-      problem_ids: [...(f.problem_ids || []), newProb.id],
-      problem_id: f.problem_id || newProb.id,
-    }));
-    setShowInlineProblem(false);
+    try {
+      const data = await adminProblemFetch("/api/admin/problems", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      setCreatingProblem(false);
+      const newProb = data as Problem;
+      onProblemCreated(newProb);
+      setForm((f) => ({
+        ...f,
+        problem_ids: [...(f.problem_ids || []), newProb.id],
+        problem_id: f.problem_id || newProb.id,
+      }));
+      setShowInlineProblem(false);
+    } catch (err: any) {
+      setCreatingProblem(false);
+      throw new Error(err?.message || "Failed to create problem");
+    }
   }
 
   const selectedIds = form.problem_ids || [];
@@ -1369,7 +1392,9 @@ export default function AdminPage({ user }: AdminPageProps) {
         .select("*")
         .order("submitted_at", { ascending: false })
         .limit(200),
-      db.from("problems").select("*").order("created_at", { ascending: false }),
+      adminProblemFetch("/api/admin/problems")
+        .then((data) => ({ data, error: null }))
+        .catch((error) => ({ data: [], error })),
       db
         .from("members")
         .select("*")
@@ -1456,11 +1481,10 @@ export default function AdminPage({ user }: AdminPageProps) {
         "postgres_changes",
         { event: "*", schema: "public", table: "problems" },
         async () => {
-          const { data } = await db
-            .from("problems")
-            .select("*")
-            .order("created_at", { ascending: false });
-          setProbs(data || []);
+          try {
+            const data = await adminProblemFetch("/api/admin/problems");
+            setProbs(data || []);
+          } catch {}
         },
       )
       .subscribe();
@@ -1498,7 +1522,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     await (db.from("submissions") as any)
       .update({ status: "approved", points_awarded: points })
       .eq("id", id);
-    await awardPoints(github, points, false, undefined, true); // countAsSolved=true
+    await awardPoints(github, points, false, undefined, points > 0);
     setSubs((prev) =>
       prev.map((s) =>
         s.id === id
@@ -1753,22 +1777,19 @@ export default function AdminPage({ user }: AdminPageProps) {
   ) {
     if (editingProblem) {
       console.log("FORM DATA:", form);
-      // eslint-disable-next-line
-      const { error } = await (db.from("problems") as any)
-        .update(form)
-        .eq("id", editingProblem.id);
-      if (error) throw new Error((error as any).message);
+      const data = await adminProblemFetch(`/api/admin/problems?id=${editingProblem.id}`, {
+        method: "PUT",
+        body: JSON.stringify(form),
+      });
       setProbs((prev) =>
-        prev.map((p) => (p.id === editingProblem.id ? { ...p, ...form } : p)),
+        prev.map((p) => (p.id === editingProblem.id ? { ...p, ...data } : p)),
       );
       showToast("Problem updated ✓");
     } else {
-      // eslint-disable-next-line
-      const { data, error } = await (db.from("problems") as any)
-        .insert([form])
-        .select()
-        .single();
-      if (error) throw new Error((error as any).message);
+      const data = await adminProblemFetch("/api/admin/problems", {
+        method: "POST",
+        body: JSON.stringify(form),
+      });
       if (data) setProbs((prev) => [data as Problem, ...prev]);
       showToast("Problem created ✓");
     }
@@ -1784,13 +1805,15 @@ export default function AdminPage({ user }: AdminPageProps) {
       confirmMsg: "Delete this problem? This cannot be undone.",
     });
     if (result === null) return;
-    const { error } = await db.from("problems").delete().eq("id", id);
-    if (error) {
-      showToast("Delete failed: " + error.message);
-      return;
+    try {
+      await adminProblemFetch(`/api/admin/problems?id=${id}`, {
+        method: "DELETE",
+      });
+      setProbs((prev) => prev.filter((p) => p.id !== id));
+      showToast("Problem deleted");
+    } catch (error: any) {
+      showToast("Delete failed: " + (error?.message || error));
     }
-    setProbs((prev) => prev.filter((p) => p.id !== id));
-    showToast("Problem deleted");
   };
 
   // ── Contest CRUD ──────────────────────────────────────────
@@ -3412,8 +3435,8 @@ function WeeklyAdminSection({ user }: { user: User }) {
       await (db.from("members") as any)
         .update({
           total_points: (member.total_points || 0) + finalPts,
-          problems_solved: (member.problems_solved || 0) + 1,
-          last_solved_at: new Date().toISOString(),
+          problems_solved: (member.problems_solved || 0) + (finalPts > 0 ? 1 : 0),
+          last_solved_at: finalPts > 0 ? new Date().toISOString() : member.last_solved_at,
         })
         .eq("github", sub.github);
     } else {
@@ -3421,9 +3444,9 @@ function WeeklyAdminSection({ user }: { user: User }) {
         github: sub.github,
         name: sub.name,
         total_points: finalPts,
-        problems_solved: 1,
-        streak: 1,
-        last_solved_at: new Date().toISOString(),
+        problems_solved: finalPts > 0 ? 1 : 0,
+        streak: finalPts > 0 ? 1 : 0,
+        last_solved_at: finalPts > 0 ? new Date().toISOString() : null,
       });
     }
 
@@ -4315,6 +4338,7 @@ function AnnouncementAdminSection() {
   const db = getSupabaseClient();
   const [text, setText] = useState("");
   const [active, setActive] = useState(false);
+  const [expiresAt, setExpiresAt] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -4329,10 +4353,11 @@ function AnnouncementAdminSection() {
     try {
       const { data } = await (db.from("app_config") as any)
         .select("*")
-        .in("key", ["announcement_text", "announcement_active"]);
+        .in("key", ["announcement_text", "announcement_active", "announcement_expires_at"]);
       for (const c of data || []) {
         if (c.key === "announcement_text") setText(c.value || "");
         if (c.key === "announcement_active") setActive(c.value === "true");
+        if (c.key === "announcement_expires_at") setExpiresAt(c.value || "");
       }
     } catch {}
     setLoading(false);
@@ -4353,6 +4378,10 @@ function AnnouncementAdminSection() {
         (db.from("app_config") as any).upsert({
           key: "announcement_active",
           value: String(nextActive ?? active),
+        }),
+        (db.from("app_config") as any).upsert({
+          key: "announcement_expires_at",
+          value: expiresAt || "",
         }),
       ]);
       showToast("✓ Announcement saved");
@@ -4404,6 +4433,22 @@ function AnnouncementAdminSection() {
               text-sm font-mono text-[#e0e0e0] placeholder-[#333]
               focus:outline-none focus:border-[#00e87a25] transition-colors resize-none"
           />
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-mono uppercase tracking-wider text-[#666] mb-2">
+            Auto-Expires At (Optional)
+          </label>
+          <input
+            type="datetime-local"
+            value={expiresAt ? expiresAt.slice(0, 16) : ""}
+            onChange={(e) => setExpiresAt(e.target.value ? new Date(e.target.value).toISOString() : "")}
+            className="bg-[#080808] border border-[#1a1a1a] rounded-xl px-3 py-2
+              text-xs font-mono text-[#e0e0e0] focus:outline-none focus:border-[#00e87a25]"
+          />
+          <p className="text-[11px] text-[#666] font-mono mt-1">
+            Banner stops displaying automatically after this time. Leave empty to never auto-expire.
+          </p>
         </div>
 
         <label className="flex items-center gap-2.5 cursor-pointer w-fit">
@@ -5009,22 +5054,24 @@ function AiGenerateSection() {
     if (!generated) return;
     setSaving(true);
     try {
-      const { error } = await (db.from("problems") as any).insert({
-        title: generated.title,
-        description: generated.description,
-        difficulty: generated.difficulty,
-        points: generated.points,
-        tags: generated.tags || [],
-        example: generated.example || "",
-        param_types: generated.param_types || [],
-        return_type: generated.return_type || "bool",
-        hints: generated.hints || [],
-        test_cases: generated.test_cases || [],
-        starter_code: "",
-        submission_count: 0,
-        visibility: "public",
+      await adminProblemFetch("/api/admin/problems", {
+        method: "POST",
+        body: JSON.stringify({
+          title: generated.title,
+          description: generated.description,
+          difficulty: generated.difficulty,
+          points: generated.points,
+          tags: generated.tags || [],
+          example: generated.example || "",
+          param_types: generated.param_types || [],
+          return_type: generated.return_type || "bool",
+          hints: generated.hints || [],
+          test_cases: generated.test_cases || [],
+          starter_code: "",
+          submission_count: 0,
+          visibility: "public",
+        }),
       });
-      if (error) throw error;
       setSaved(true);
       showToast("✓ Problem saved! Find it in the Problems section.");
     } catch (e: any) {

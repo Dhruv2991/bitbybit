@@ -11,6 +11,8 @@
  * RBI's requirements for your account type.
  */
 
+import { PRICING_CONFIG, formatPriceWithPeriod } from "@/lib/pricing";
+
 interface Props {
   onNavigate: (page: string) => void;
 }
@@ -31,7 +33,7 @@ export default function RefundPolicyPage({ onNavigate }: Props) {
 
         <section>
           <h2 className="text-slate-900 dark:text-zinc-100 font-bold text-sm mb-2">1. Monthly subscription</h2>
-          <p>The subscription is a <span className="text-slate-900 dark:text-zinc-200 font-semibold">₹39/month manually-renewed pass</span> — there is no auto-debit or recurring mandate. Each payment grants immediate access to weekly challenges, AI features, and free entry to every proctored Arena contest for 30 days. Because access is granted instantly for the full period upon payment, subscription payments are <span className="text-slate-900 dark:text-zinc-200 font-semibold">non-refundable</span> once access has been granted for that period, except as required by applicable law.</p>
+          <p>The subscription is a <span className="text-slate-900 dark:text-zinc-200 font-semibold">{formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)} manually-renewed pass</span> — there is no auto-debit or recurring mandate. Each payment grants immediate access to weekly challenges, AI features, and free entry to every proctored Arena contest for 30 days. Because access is granted instantly for the full period upon payment, subscription payments are <span className="text-slate-900 dark:text-zinc-200 font-semibold">non-refundable</span> once access has been granted for that period, except as required by applicable law.</p>
           <p className="mt-2">If you believe you were charged in error (e.g. a duplicate charge, or a technical failure where payment succeeded but access was not granted), contact us within 7 days of the transaction and we will investigate and issue a refund if a genuine error is confirmed.</p>
           <p className="mt-2">There is nothing to "cancel" — since we never charge you automatically, simply not making another payment when your 30 days end is all that's needed to stop. You may renew early at any time, in which case the new 30 days are added on top of whatever time you have remaining, so you never lose paid-for access.</p>
         </section>

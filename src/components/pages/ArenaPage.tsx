@@ -133,7 +133,7 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
         (ct.problem_ids || []).forEach((id: string) => allIds.add(id));
       });
       if (allIds.size) {
-        const { data: probs } = await db.from('problems').select('*').in('id', Array.from(allIds));
+        const { data: probs } = await db.from('problems').select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at').in('id', Array.from(allIds));
         const map: Record<string, Problem> = {};
         (probs || []).forEach((p: Problem) => { map[p.id] = p; });
         setArenaProblems(map);
@@ -232,6 +232,33 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
     }, 1000);
   }
 
+  async function submitArenaApi(payload: {
+    contest_id: string;
+    problem_id?: string | null;
+    lang?: string;
+    code?: string;
+    strikes?: number;
+    action: 'submit' | 'snapshot' | 'disqualify' | 'expire';
+    tests_passed?: number;
+    tests_total?: number;
+  }) {
+    try {
+      const { data: { session } } = await getSupabaseClient().auth.getSession();
+      const token = session?.access_token;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/arena/submit', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.error('[Arena submitArenaApi error]', e.message);
+    }
+  }
+
   function recordTimerExpirySub() {
     const contest = activeContestRef.current;
     const problem = activeProblemRef.current;
@@ -239,17 +266,13 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
     if (!contest || !problem || !u) return;
     if (submittedProblemIds.current.has(problem.id)) return;
     submittedProblemIds.current.add(problem.id);
-    const elapsed    = contest.duration_mins * 60 - timeLeftRef.current;
-    const timeFactor = Math.max(0.5, 1 - (elapsed / (contest.duration_mins * 60)) * 0.5);
-    ;(db.from('arena_submissions') as any).insert([{
-      contest_id: contest.id, contest_name: contest.name,
-      problem_id: problem.id, problem_title: problem.title,
-      github: u.github, name: u.name,
-      lang: 'unknown', code: '-- Time expired before submission --',
-      strikes: strikesRef.current, status: 'submitted',
-      strike_penalty_factor: timeFactor, points_awarded: 0,
-    }]).then(({ error }: { error: any }) => {
-      if (error) console.error('Timer expiry sub failed:', error.message);
+    submitArenaApi({
+      contest_id: contest.id,
+      problem_id: problem.id,
+      lang: 'unknown',
+      code: '-- Time expired before submission --',
+      strikes: strikesRef.current,
+      action: 'expire',
     });
   }
 
@@ -292,40 +315,23 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
     if (status === 'submitted' && contest && problem && u &&
         !submittedProblemIds.current.has(problem.id)) {
       submittedProblemIds.current.add(problem.id);
-      const elapsed      = contest.duration_mins * 60 - timeLeftRef.current;
-      const timeFactor   = Math.max(0.5, 1 - (elapsed / (contest.duration_mins * 60)) * 0.5);
-      const strikePenalty = Math.max(0.7, 1 - strikesRef.current * 0.1);
       const { code, lang } = currentCodeRef.current;
-      ;(db.from('arena_submissions') as any).upsert([{
-        contest_id:            contest.id,
-        contest_name:          contest.name,
-        problem_id:            problem.id,
-        problem_title:         problem.title,
-        github:                u.github,
-        name:                  u.name,
-        lang:                  lang || 'unknown',
-        code:                  code || '-- No code submitted --',
-        strikes:               strikesRef.current,
-        status:                'submitted',
-        strike_penalty_factor: timeFactor * strikePenalty,
-        tests_passed:          0,
-        tests_total:           0,
-        points_awarded:        0,
-      }], { onConflict: 'contest_id,problem_id,github' }).then(({ error }: { error: any }) => {
-        if (error) console.error('Exit snapshot failed:', error.message);
+      submitArenaApi({
+        contest_id: contest.id,
+        problem_id: problem.id,
+        lang: lang || 'unknown',
+        code: code || '-- No code submitted --',
+        strikes: strikesRef.current,
+        action: 'snapshot',
       });
     }
 
     if (status === 'disqualified' && contest && u) {
-      ;(db.from('arena_submissions') as any).insert([{
-        contest_id: contest.id, contest_name: contest.name,
-        problem_id: problem?.id || null, problem_title: problem?.title || '',
-        github: u.github, name: u.name,
-        lang: 'unknown', code: '',
-        strikes: strikesRef.current, status: 'disqualified',
-        strike_penalty_factor: 0, points_awarded: 0,
-      }]).then(({ error }: { error: any }) => {
-        if (error) console.error('Failed to record disqualification:', error.message);
+      submitArenaApi({
+        contest_id: contest.id,
+        problem_id: problem?.id || null,
+        strikes: strikesRef.current,
+        action: 'disqualify',
       });
     }
 
@@ -375,22 +381,16 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
     submittedProblemIds.current.add(problem.id);
 
     try {
-      await (db.from('arena_submissions') as any).upsert([{
-        contest_id:            contest.id,
-        contest_name:          contest.name,
-        problem_id:            problem.id,
-        problem_title:         problem.title,
-        github:                u.github,
-        name:                  u.name,
+      await submitArenaApi({
+        contest_id: contest.id,
+        problem_id: problem.id,
         lang,
         code,
-        strikes:               strikesRef.current,
-        status:                'submitted',
-        strike_penalty_factor: timeFactor * strikePenalty,
-        tests_passed:          passed,
-        tests_total:           total,
-        points_awarded:        finalPoints,
-      }], { onConflict: 'contest_id,problem_id,github' });
+        strikes: strikesRef.current,
+        action: 'submit',
+        tests_passed: passed,
+        tests_total: total,
+      });
     } catch (e: any) {
       submittedProblemIds.current.delete(problem.id);
       console.error('Arena submit failed:', e.message);
@@ -406,29 +406,14 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
     // Snapshot current code for the problem being closed, if not yet submitted
     if (problem && u && !submittedProblemIds.current.has(problem.id)) {
       submittedProblemIds.current.add(problem.id);
-      const elapsed      = contest.duration_mins * 60 - timeLeftRef.current;
-      const timeFactor   = Math.max(0.5, 1 - (elapsed / (contest.duration_mins * 60)) * 0.5);
-      const strikePenalty = Math.max(0.7, 1 - strikesRef.current * 0.1);
       const { code, lang } = currentCodeRef.current;
-      // Auto-snapshot: 0 tests passed (user didn't submit manually)
-      // Admin can still review code and award points manually
-      ;(db.from('arena_submissions') as any).upsert([{
-        contest_id:            contest.id,
-        contest_name:          contest.name,
-        problem_id:            problem.id,
-        problem_title:         problem.title,
-        github:                u.github,
-        name:                  u.name,
-        lang:                  lang || 'unknown',
-        code:                  code || '-- Time expired before submission --',
-        strikes:               strikesRef.current,
-        status:                'submitted',
-        strike_penalty_factor: timeFactor * strikePenalty,
-        tests_passed:          0,
-        tests_total:           0,
-        points_awarded:        0,
-      }], { onConflict: 'contest_id,problem_id,github' }).then(({ error }: { error: any }) => {
-        if (error) console.error('Problem-close snapshot failed:', error.message);
+      submitArenaApi({
+        contest_id: contest.id,
+        problem_id: problem.id,
+        lang: lang || 'unknown',
+        code: code || '-- Time expired before submission --',
+        strikes: strikesRef.current,
+        action: 'snapshot',
       });
     }
 
@@ -765,8 +750,18 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
                       Registration closed
                     </button>
                   ) : !user ? (
-                    <button disabled className="w-full py-2.5 bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 font-mono text-sm rounded-xl cursor-not-allowed border border-slate-200 dark:border-zinc-700">
-                      Sign in to register
+                    <button
+                      onClick={async () => {
+                        const db = getSupabaseClient();
+                        await db.auth.signInWithOAuth({
+                          provider: "github",
+                          options: { redirectTo: window.location.href, queryParams: { prompt: "select_account" } },
+                        });
+                      }}
+                      className="w-full py-2.5 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 font-mono text-sm font-semibold rounded-xl transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <span>Sign in with GitHub to register</span>
+                      <span>→</span>
                     </button>
                   ) : (
                     <ContestEntryButton

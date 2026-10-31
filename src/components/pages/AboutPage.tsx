@@ -6,6 +6,8 @@
  * © 2026 Dhruv G Nayak / TeamCodeLocked, BMS College of Engineering
  */
 
+import { PRICING_CONFIG, formatPriceWithPeriod } from "@/lib/pricing";
+
 interface Props {
   onNavigate: (page: string) => void;
 }
@@ -42,7 +44,7 @@ export default function AboutPage({ onNavigate }: Props) {
         </p>
         <p className="text-slate-600 dark:text-zinc-400 font-mono text-xs leading-relaxed">
           Problems are executed securely in-browser or within isolated server environments.
-          Subscribers get monthly access (₹39/month) to premium challenges, AI-powered learning features,
+          Subscribers get monthly access ({formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)}) to premium challenges, AI-powered learning features,
           advanced analytics, and proctored coding assessments.
         </p>
       </div>
@@ -116,7 +118,7 @@ export default function AboutPage({ onNavigate }: Props) {
             ["{ }", "Problems library",      "Curated problems with hidden test cases"],
             ["🏅",  "Weekly challenges",     "New problems every week, time bonus scoring"],
             ["🏆",  "Proctored arena", "Live supervised coding assessments with secure proctoring"],
-            ["⭐",  "Monthly subscription",  "₹39/month, unlocks weekly access & free contest entry"],
+            ["⭐",  "Monthly subscription",  `${formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)}, unlocks weekly access & free contest entry`],
             ["✦",  "AI features",           "Hints, debugger, and code review"],
             ["💬",  "Discussion threads",    "Community discussion on every problem"],
             ["⚡",  "Leaderboard",           "Real-time rankings by points and streak"],
@@ -141,7 +143,7 @@ export default function AboutPage({ onNavigate }: Props) {
 
         <div className="space-y-2 text-slate-600 dark:text-zinc-400 font-mono text-xs leading-relaxed">
           <p>
-            BitByBit offers a monthly subscription (₹39/month) that unlocks premium educational
+            BitByBit offers a monthly subscription ({formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)}) that unlocks premium educational
             features including weekly coding challenges, AI-powered tools, the complete
             problems library, advanced analytics, and free entry to every proctored coding assessment.
           </p>

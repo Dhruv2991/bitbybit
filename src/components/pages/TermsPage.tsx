@@ -10,6 +10,8 @@
  * match your actual business setup.
  */
 
+import { PRICING_CONFIG, formatPriceWithPeriod } from "@/lib/pricing";
+
 interface Props {
   onNavigate: (page: string) => void;
 }
@@ -49,7 +51,7 @@ export default function TermsPage({ onNavigate }: Props) {
             platform offering a curated problems library, weekly coding
             challenges, proctored coding assessments, AI-assisted hints, code
             review, performance analytics, and community leaderboards. A
-            monthly subscription (₹39/month) unlocks premium educational
+            monthly subscription ({formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)}) unlocks premium educational
             features, including AI tools, advanced challenges, and free entry
             to every proctored coding assessment ("Arena" contest). No
             separate per-contest fee is charged to subscribers.
@@ -88,7 +90,7 @@ export default function TermsPage({ onNavigate }: Props) {
           </p>
 
           <p className="mt-2">
-            A monthly subscription (₹39/month) grants access to premium
+            A monthly subscription ({formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)}) grants access to premium
             educational features including AI-powered tools, weekly coding
             challenges, the complete problems library, advanced analytics,
             free entry to every proctored coding assessment, and

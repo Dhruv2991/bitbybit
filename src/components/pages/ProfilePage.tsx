@@ -9,6 +9,7 @@ import type { User, Certificate, Subscriber } from '@/types/database';
 import { effectiveStreak } from '@/lib/streak';
 import { BADGES, computeUnlockedBadges, type Badge } from '@/lib/badges';
 import { isActiveSubscription } from '@/lib/subscription';
+import { PRICING_CONFIG, formatPriceWithPeriod } from '@/lib/pricing';
 import ContributionHeatmap from '@/components/profile/ContributionHeatmap';
 import SkillRadar from '@/components/profile/SkillRadar';
 import CertificatePreview from '@/components/certificates/CertificatePreview';
@@ -184,6 +185,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
 
     const bestPerProblem = new Map<string, SolvedRow>();
     for (const r of rows) {
+      if ((r.points || 0) <= 0) continue;
       const existing = bestPerProblem.get(r.problem_id);
       if (!existing || r.points > existing.points) bestPerProblem.set(r.problem_id, r);
     }
@@ -201,6 +203,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       .slice(0, 6)
       .map(([tag, count]) => ({ tag, count }));
     const recent = [...rows]
+      .filter((r) => (r.points || 0) > 0)
       .sort((a, b) => new Date(b.when).getTime() - new Date(a.when).getTime())
       .slice(0, 10);
     const allDates = rows.map((r) => r.when);
@@ -376,12 +379,26 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
         <p className="text-sm font-mono text-slate-600 dark:text-zinc-400 mb-5 max-w-sm">
           Please sign in with GitHub to view your profile dashboard and stats.
         </p>
-        <button
-          onClick={() => onNavigate('home')}
-          className="btn-primary px-5 py-2 font-mono text-xs shadow-xs"
-        >
-          ← Back to Home
-        </button>
+        <div className="flex items-center gap-3 flex-wrap justify-center">
+          <button
+            onClick={async () => {
+              await db.auth.signInWithOAuth({
+                provider: 'github',
+                options: { redirectTo: window.location.origin + '/profile', queryParams: { prompt: 'select_account' } },
+              });
+            }}
+            className="btn-primary px-5 py-2.5 font-mono text-xs shadow-xs flex items-center gap-2 cursor-pointer"
+          >
+            <span>Sign In with GitHub</span>
+            <span>→</span>
+          </button>
+          <button
+            onClick={() => onNavigate('home')}
+            className="btn-secondary px-4 py-2.5 font-mono text-xs shadow-xs cursor-pointer"
+          >
+            ← Back to Home
+          </button>
+        </div>
       </div>
     );
   }
@@ -469,7 +486,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
                     Pro Subscription Active
                   </span>
                   <span className="text-[10px] font-mono text-slate-600 dark:text-zinc-400 bg-slate-200/80 dark:bg-zinc-900 border border-slate-300 dark:border-zinc-800 px-1.5 py-0.5 rounded">
-                    ₹39/mo
+                    {formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)}
                   </span>
                 </div>
                 {stats.subscriber?.current_period_end && (
@@ -486,7 +503,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
                 )}
                 <button
                   onClick={() => onNavigate('subscribe')}
-                  className="text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 mt-1"
+                  className="text-xs font-mono text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 mt-1 cursor-pointer"
                 >
                   Manage / Extend Pass <ChevronRight className="w-3 h-3" />
                 </button>
@@ -496,7 +513,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
                 <div className="text-left">
                   <p className="text-xs font-semibold text-slate-900 dark:text-zinc-200">Upgrade to Pro Pass</p>
                   <p className="text-[11px] font-mono text-slate-500 dark:text-zinc-400">
-                    Unlock full Arena access, AI hints & certificates (₹39/mo)
+                    Unlock full Arena access, AI hints & certificates ({formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)})
                   </p>
                 </div>
                 <button

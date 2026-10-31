@@ -16,6 +16,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { payWithRazorpay } from "@/lib/razorpay";
 import { isActiveSubscription } from "@/lib/subscription";
 import { validateCouponAction } from "@/app/actions/coupons";
+import { PRICING_CONFIG, formatPrice } from "@/lib/pricing";
 import type { User, Subscriber } from "@/types/database";
 import type { CouponValidationResponse } from "@/types/coupons";
 
@@ -26,8 +27,8 @@ interface Props {
 export default function SubscribePage({ user }: Props) {
   const db = getSupabaseClient();
 
-  // Base price defaults to $199
-  const [basePrice, setBasePrice] = useState<number>(199);
+  // Base price defaults to central config
+  const [basePrice, setBasePrice] = useState<number>(PRICING_CONFIG.defaultMonthlyFee);
   const [myStatus, setMyStatus] = useState<Subscriber | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
@@ -198,7 +199,7 @@ export default function SubscribePage({ user }: Props) {
             className="px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 font-mono font-bold text-sm rounded-xl
             active:scale-[0.98] transition-all disabled:opacity-40 shadow-xs"
           >
-            {paying ? "Processing…" : `Renew early — $${basePrice}`}
+            {paying ? "Processing…" : `Renew early — ${formatPrice(basePrice)}`}
           </button>
         )}
       </div>
@@ -212,9 +213,22 @@ export default function SubscribePage({ user }: Props) {
         <h1 className="font-display font-semibold text-2xl text-slate-900 dark:text-zinc-100 mb-2">
           Sign in to subscribe
         </h1>
-        <p className="text-slate-600 dark:text-zinc-400 font-mono text-sm">
+        <p className="text-slate-600 dark:text-zinc-400 font-mono text-sm mb-6">
           Please sign in with GitHub to get monthly access.
         </p>
+        <button
+          onClick={async () => {
+            const db = getSupabaseClient();
+            await db.auth.signInWithOAuth({
+              provider: "github",
+              options: { redirectTo: window.location.href, queryParams: { prompt: "select_account" } },
+            });
+          }}
+          className="px-6 py-3 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 font-mono font-semibold text-sm rounded-xl transition-all shadow-xs inline-flex items-center gap-2 cursor-pointer"
+        >
+          <span>Sign In with GitHub</span>
+          <span>→</span>
+        </button>
       </div>
     );
 
@@ -264,14 +278,14 @@ export default function SubscribePage({ user }: Props) {
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-bold uppercase tracking-wider mb-1">
                 <span>🏷 Promo Applied</span>
                 <span>•</span>
-                <span>Save ${discountAmount}</span>
+                <span>Save {formatPrice(discountAmount)}</span>
               </div>
               <div className="flex items-center justify-center gap-3">
                 <span className="text-2xl font-display font-semibold text-slate-400 dark:text-zinc-500 line-through">
-                  ${basePrice}
+                  {formatPrice(basePrice)}
                 </span>
                 <span className="text-4xl md:text-5xl font-display font-bold text-cyan-600 dark:text-cyan-400 tracking-tight">
-                  ${finalPrice}
+                  {formatPrice(finalPrice)}
                 </span>
               </div>
               <div className="text-xs font-mono text-slate-500 dark:text-zinc-400">
@@ -281,7 +295,7 @@ export default function SubscribePage({ user }: Props) {
           ) : (
             <div className="space-y-1">
               <div className="text-4xl md:text-5xl font-display font-bold text-cyan-600 dark:text-cyan-400 mb-1">
-                ${basePrice}
+                {formatPrice(basePrice)}
               </div>
               <div className="text-xs font-mono text-slate-500 dark:text-zinc-400">
                 per month · 30 days of full access
@@ -351,7 +365,7 @@ export default function SubscribePage({ user }: Props) {
                     <strong className="text-emerald-800 dark:text-emerald-200">
                       {appliedCoupon.coupon?.code}
                     </strong>{" "}
-                    applied (-${discountAmount} off)
+                    applied (-{formatPrice(discountAmount)} off)
                   </span>
                 </div>
                 <button
@@ -376,17 +390,17 @@ export default function SubscribePage({ user }: Props) {
             <div className="bg-slate-50 dark:bg-zinc-950/40 border border-slate-200 dark:border-zinc-800/60 rounded-xl p-3 space-y-1.5 text-xs font-mono">
               <div className="flex items-center justify-between text-slate-500 dark:text-zinc-400">
                 <span>Base Price:</span>
-                <span>${basePrice}.00</span>
+                <span>{formatPrice(basePrice)}</span>
               </div>
               <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 font-semibold">
                 <span>
                   Promo Discount ({appliedCoupon.coupon?.code}):
                 </span>
-                <span>-${discountAmount}.00</span>
+                <span>-{formatPrice(discountAmount)}</span>
               </div>
               <div className="border-t border-slate-200 dark:border-zinc-800 pt-1.5 flex items-center justify-between text-slate-900 dark:text-zinc-200 font-bold">
                 <span>Total Due Now:</span>
-                <span className="text-cyan-600 dark:text-cyan-400">${finalPrice}.00</span>
+                <span className="text-cyan-600 dark:text-cyan-400">{formatPrice(finalPrice)}</span>
               </div>
             </div>
           )}
@@ -405,7 +419,7 @@ export default function SubscribePage({ user }: Props) {
                 onClick={handlePay}
                 disabled={paying}
                 className="w-full py-3 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white dark:from-cyan-400 dark:to-cyan-500 dark:text-zinc-950 font-mono font-bold text-sm rounded-xl
-                  active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2"
+                  active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 {paying ? (
                   <>
@@ -413,9 +427,9 @@ export default function SubscribePage({ user }: Props) {
                     <span>Opening Checkout…</span>
                   </>
                 ) : isLapsed ? (
-                  `Renew Access — $${finalPrice} →`
+                  `Renew Access — ${formatPrice(finalPrice)} →`
                 ) : (
-                  `Complete Checkout — $${finalPrice} →`
+                  `Complete Checkout — ${formatPrice(finalPrice)} →`
                 )}
               </button>
               <p className="text-center text-[11px] text-slate-500 dark:text-zinc-500 font-mono mt-2">

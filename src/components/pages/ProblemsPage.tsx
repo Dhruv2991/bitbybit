@@ -124,18 +124,22 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         });
     }
 
-    // Load attempt counts for all problems (submissions + weekly_submissions + practice_attempts)
-    Promise.all([
-      db.from('submissions').select('problem_id'),
-      (db.from('weekly_submissions') as any).select('problem_id'),
-      (db.from('practice_attempts') as any).select('problem_id'),
-    ]).then(([{ data: normalSubs }, { data: weeklySubs }, { data: practiceAttempts }]) => {
-      const counts: Record<string, number> = {};
-      for (const s of [...(normalSubs || []), ...(weeklySubs || []), ...(practiceAttempts || [])]) {
-        counts[s.problem_id] = (counts[s.problem_id] || 0) + 1;
-      }
-      setAttemptCounts(counts);
-    });
+    // Load personal attempt counts for all problems (submissions + weekly_submissions + practice_attempts)
+    if (!user?.github) {
+      setAttemptCounts({});
+    } else {
+      Promise.all([
+        db.from('submissions').select('problem_id').eq('github', user.github),
+        (db.from('weekly_submissions') as any).select('problem_id').eq('github', user.github),
+        (db.from('practice_attempts') as any).select('problem_id').eq('github', user.github),
+      ]).then(([{ data: normalSubs }, { data: weeklySubs }, { data: practiceAttempts }]) => {
+        const counts: Record<string, number> = {};
+        for (const s of [...(normalSubs || []), ...(weeklySubs || []), ...(practiceAttempts || [])]) {
+          counts[s.problem_id] = (counts[s.problem_id] || 0) + 1;
+        }
+        setAttemptCounts(counts);
+      });
+    }
 
     async function load() {
       setLoading(true);
@@ -143,7 +147,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
         // Load problems (excluding contest problems)
         const { data, error } = await db
           .from('problems')
-          .select('*')
+          .select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at')
           .order('created_at', { ascending: false });
         if (error) throw error;
         const publicProbs = (data || []).filter((p: any) =>
@@ -253,42 +257,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     // seem broken/invisible. The ShareButton in the page header still
     // lets people generate a card manually if they want one.
 
-    // If this is a weekly problem and user is logged in, write to weekly_submissions
-    const challenge = weeklyChallengeMap.get(problemId);
-    if (challenge && user) {
-      try {
-        const db = getSupabaseClient();
-        const problem = problems.find(p => p.id === problemId);
-        const now = Date.now();
-        const start = new Date(challenge.starts_at).getTime();
-        const end = new Date(challenge.ends_at).getTime();
-        const total = end - start;
-        const frac = total > 0 ? Math.min(1, Math.max(0, now - start) / total) : 1;
-        const bonus = 1.0 - frac * 0.8;
-        const basePts = details?.pointsAwarded ?? problem?.points ?? 100;
-        const finalPoints = Math.round(basePts * (1 + bonus));
-        // eslint-disable-next-line
-        await (db.from('weekly_submissions') as any).upsert(
-          {
-            weekly_challenge_id: challenge.id,
-            problem_id: problemId,
-            problem_title: problem?.title ?? '',
-            github: user.github,
-            name: user.name,
-            lang: details?.lang ?? 'unknown',
-            code: details?.code ?? '',
-            tests_passed: details?.passed ?? 0,
-            tests_total: details?.total ?? 0,
-            points_awarded: finalPoints,
-            time_bonus: bonus,
-            status: 'pending',
-            submitted_at: new Date().toISOString(),
-          },
-          { onConflict: 'weekly_challenge_id,problem_id,github' }
-        );
-      } catch {}
-      return; // Don't write to submissions table for weekly problems
-    }
+    // Submissions are now recorded server-side by /api/execute.
   }
 
   // Deep-link: open a specific problem once problems are loaded (e.g. from "Daily Problem" on homepage)
@@ -353,7 +322,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     setSelected(p);
     const params = new URLSearchParams(searchParams.toString());
     params.set('p', p.id);
-    router.replace(`/problems?${params.toString()}`, { scroll: false });
+    router.push(`/problems?${params.toString()}`, { scroll: false });
   }
 
   function closeProblem() {
@@ -364,20 +333,22 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     router.replace(qs ? `/problems?${qs}` : '/problems', { scroll: false });
   }
 
-  // On first load (or once problems finish fetching), open whatever
-  // problem the URL points to — this is what makes a shared /problems?p=…
-  // link land directly on that problem instead of just the list.
-  const appliedUrlProblem = useRef(false);
+  // Reactive URL sync:
+  // 1. On mount / initial load: opens problem if ?p=<id> is present.
+  // 2. On browser back / two-finger swipe back: ?p is removed, so setSelected(null) returns to list.
+  // 3. On forward swipe / deep link: opens matching problem.
   useEffect(() => {
-    if (appliedUrlProblem.current) return;
     if (problems.length === 0) return;
-    const id = searchParams.get('p');
-    if (!id) { appliedUrlProblem.current = true; return; }
-    const match = problems.find(p => p.id === id);
-    if (match) setSelected(match);
-    appliedUrlProblem.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [problems]);
+    const urlId = searchParams.get('p');
+    if (!urlId) {
+      if (selected !== null) setSelected(null);
+      return;
+    }
+    if (selected?.id !== urlId) {
+      const match = problems.find(p => p.id === urlId);
+      if (match) setSelected(match);
+    }
+  }, [searchParams, problems, selected]);
 
   function handleRowClick(p: Problem) {
     const isWeekly      = (p as any).visibility === 'weekly' || weeklyIds.has(p.id);
@@ -617,8 +588,8 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
           <div className="flex bg-slate-100 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-xl p-1 gap-1 shrink-0 shadow-xs">
             {([
               { id: 'all',    label: 'All' },
-              { id: 'free',   label: '🔓 Free' },
-              { id: 'weekly', label: '⭐ Weekly' },
+              { id: 'free',   label: '✓ Free' },
+              { id: 'weekly', label: '🔒 Pro' },
             ] as const).map(opt => (
               <button key={opt.id} onClick={() => setAccessFilter(opt.id)}
                 className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-150 whitespace-nowrap
@@ -851,14 +822,23 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                           }`}>
                             {p.title}
                           </span>
-                          {isLocked && (
-                            <span className="text-xs font-mono text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-medium">
-                              🔒 Weekly
-                            </span>
-                          )}
-                          {isPaidEndedP && !isSolved && (
-                            <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 font-medium">
-                              🏁 Practice
+                          {isWeekly ? (
+                            isLocked ? (
+                              <span className="text-xs font-mono text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 font-medium">
+                                🔒 Pro
+                              </span>
+                            ) : isPaidEndedP && !isSolved ? (
+                              <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 font-medium">
+                                🏁 Practice
+                              </span>
+                            ) : (
+                              <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-medium">
+                                ✓ Pro
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-medium">
+                              ✓ Free
                             </span>
                           )}
                         </div>

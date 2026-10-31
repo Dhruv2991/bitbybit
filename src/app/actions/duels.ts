@@ -4,8 +4,8 @@
 // Server Actions for Real-Time 1v1 Code Duel Management
 // ════════════════════════════════════════════════════════════
 
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { createServerSupabaseClient, getSupabaseClient } from "@/lib/supabase";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Database } from "@/types/database";
 import type { CodeDuel, CreateDuelInput, DuelProgress } from "@/types/duels";
 
@@ -14,24 +14,50 @@ type CodeDuelInsert = Database["public"]["Tables"]["code_duels"]["Insert"];
 type CodeDuelUpdate = Database["public"]["Tables"]["code_duels"]["Update"];
 
 function getDbClient(): SupabaseClient {
+  return createServerSupabaseClient() as unknown as SupabaseClient;
+}
+
+async function getVerifiedUserFromToken(token?: string): Promise<{ github: string; name: string } | null> {
+  if (!token) return null;
   try {
-    return createServerSupabaseClient() as unknown as SupabaseClient;
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    );
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data.user) return null;
+    const githubIdentity = data.user.identities?.find((id: any) => id.provider === "github");
+    const github = githubIdentity?.identity_data?.user_name as string | undefined;
+    if (!github) return null;
+    const name = (githubIdentity?.identity_data?.full_name || githubIdentity?.identity_data?.name || github) as string;
+    return { github, name };
   } catch {
-    return getSupabaseClient() as unknown as SupabaseClient;
+    return null;
   }
 }
 
 /**
  * Creates a new 1v1 Code Duel room in 'waiting' state.
  */
-export async function createDuelAction(input: CreateDuelInput): Promise<{
+export async function createDuelAction(input: CreateDuelInput, token?: string): Promise<{
   success: boolean;
   duel?: CodeDuel;
   duelId?: string;
   error?: string;
 }> {
   try {
-    const { problem_id, problem_title, time_limit_mins = 30, host_github, host_name } = input;
+    const { problem_id, problem_title, time_limit_mins = 30 } = input;
+    let host_github = input.host_github;
+    let host_name = input.host_name;
+
+    if (token) {
+      const verified = await getVerifiedUserFromToken(token);
+      if (!verified) {
+        return { success: false, error: "Authentication failed. Valid GitHub session required." };
+      }
+      host_github = verified.github;
+      host_name = verified.name;
+    }
 
     if (!problem_id) {
       return { success: false, error: "Problem ID is required to create a duel." };
@@ -160,14 +186,27 @@ export async function getDuelAction(roomId: string): Promise<{
 export async function joinDuelAction(
   roomId: string,
   guestGithub: string,
-  guestName: string
+  guestName: string,
+  token?: string
 ): Promise<{
   success: boolean;
   duel?: CodeDuel;
   error?: string;
 }> {
   try {
-    if (!roomId || !guestGithub) {
+    let finalGuestGithub = guestGithub;
+    let finalGuestName = guestName;
+
+    if (token) {
+      const verified = await getVerifiedUserFromToken(token);
+      if (!verified) {
+        return { success: false, error: "Authentication failed. Valid GitHub session required." };
+      }
+      finalGuestGithub = verified.github;
+      finalGuestName = verified.name;
+    }
+
+    if (!roomId || !finalGuestGithub) {
       return { success: false, error: "Room ID and user credentials are required." };
     }
 
@@ -187,22 +226,23 @@ export async function joinDuelAction(
     }
 
     // If already the host, allow them back in without changes
-    if (duel.host_github === guestGithub) {
+    if (duel.host_github === finalGuestGithub) {
       return { success: true, duel };
     }
 
     // If already the guest, allow them in
-    if (duel.guest_github === guestGithub) {
+    if (duel.guest_github === finalGuestGithub) {
       return { success: true, duel };
     }
 
     // Room is already occupied by someone else
-    if (duel.guest_github && duel.guest_github !== guestGithub) {
+    if (duel.guest_github && duel.guest_github !== finalGuestGithub) {
       return { success: false, error: "This duel room is already full with 2 combatants." };
     }
 
-    if (duel.status === "completed" || duel.status === "abandoned") {
-      return { success: false, error: "This duel match has already concluded." };
+    // Room MUST be in waiting state to accept new joins
+    if (duel.status !== "waiting") {
+      return { success: false, error: "This duel room is no longer in waiting state." };
     }
 
     // Resolve guest member_id
@@ -210,7 +250,7 @@ export async function joinDuelAction(
     const { data: memberData } = await db
       .from("members")
       .select("id")
-      .eq("github", guestGithub)
+      .eq("github", finalGuestGithub)
       .maybeSingle();
 
     const member = memberData as { id: string } | null;
@@ -228,8 +268,8 @@ export async function joinDuelAction(
 
     const updatePayload: CodeDuelUpdate = {
       guest_id: guestId,
-      guest_github: guestGithub,
-      guest_name: guestName || guestGithub,
+      guest_github: finalGuestGithub,
+      guest_name: finalGuestName || finalGuestGithub,
       status: "active",
       guest_progress: guestProgress,
       started_at: duel.started_at || now,
@@ -239,13 +279,14 @@ export async function joinDuelAction(
       .from("code_duels")
       .update(updatePayload)
       .eq("id", roomId)
+      .eq("status", "waiting")
       .select("*")
-      .single();
+      .maybeSingle();
 
     const updated = updatedData as CodeDuelRow | null;
 
     if (updateErr || !updated) {
-      return { success: false, error: updateErr?.message || "Failed to join duel room." };
+      return { success: false, error: updateErr?.message || "Failed to join duel room. It may already have started." };
     }
 
     return { success: true, duel: updated };
@@ -258,12 +299,13 @@ export async function joinDuelAction(
 
 /**
  * Updates a participant's telemetry without streaming raw code lines.
- * Checks for victory condition when all tests pass.
+ * Final victory is verified and recorded server-side via /api/execute.
  */
 export async function updateDuelProgressAction(
   roomId: string,
   userGithub: string,
-  progress: Partial<DuelProgress>
+  progress: Partial<DuelProgress>,
+  token?: string
 ): Promise<{
   success: boolean;
   duel?: CodeDuel;
@@ -271,7 +313,17 @@ export async function updateDuelProgressAction(
   error?: string;
 }> {
   try {
-    if (!roomId || !userGithub) {
+    let finalUserGithub = userGithub;
+
+    if (token) {
+      const verified = await getVerifiedUserFromToken(token);
+      if (!verified) {
+        return { success: false, error: "Authentication failed. Valid GitHub session required." };
+      }
+      finalUserGithub = verified.github;
+    }
+
+    if (!roomId || !finalUserGithub) {
       return { success: false, error: "Invalid parameters." };
     }
 
@@ -289,11 +341,15 @@ export async function updateDuelProgressAction(
       return { success: false, error: "Duel room not found." };
     }
 
-    const isHost = duel.host_github === userGithub;
-    const isGuest = duel.guest_github === userGithub;
+    const isHost = duel.host_github === finalUserGithub;
+    const isGuest = duel.guest_github === finalUserGithub;
 
     if (!isHost && !isGuest) {
       return { success: false, error: "User is not a participant in this duel." };
+    }
+
+    if (duel.status !== "active") {
+      return { success: false, error: "Duel match is not active." };
     }
 
     const now = new Date().toISOString();
@@ -305,40 +361,17 @@ export async function updateDuelProgressAction(
       lastUpdated: now,
     };
 
-    // Check victory condition: Passed all test cases (and total > 0)
-    let winnerGithub = duel.winner_github;
-    let winnerId = duel.winner_id;
-    let newStatus = duel.status;
-    let isVictory = false;
-
-    if (
-      mergedProgress.testsPassed > 0 &&
-      mergedProgress.testsPassed === mergedProgress.totalTests &&
-      !duel.winner_github
-    ) {
-      winnerGithub = userGithub;
-      winnerId = isHost ? duel.host_id : duel.guest_id;
-      newStatus = "completed";
-      isVictory = true;
-    }
-
     const updatePayload: CodeDuelUpdate = {
       ...(isHost ? { host_progress: mergedProgress } : { guest_progress: mergedProgress }),
     };
-
-    if (isVictory) {
-      updatePayload.winner_github = winnerGithub;
-      updatePayload.winner_id = winnerId;
-      updatePayload.status = newStatus;
-      updatePayload.ended_at = now;
-    }
 
     const { data: updatedData, error: updateErr } = await db
       .from("code_duels")
       .update(updatePayload)
       .eq("id", roomId)
+      .eq("status", "active")
       .select("*")
-      .single();
+      .maybeSingle();
 
     const updated = updatedData as CodeDuelRow | null;
 
@@ -349,7 +382,7 @@ export async function updateDuelProgressAction(
     return {
       success: true,
       duel: updated,
-      isVictory,
+      isVictory: false,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error updating duel telemetry.";
@@ -363,9 +396,20 @@ export async function updateDuelProgressAction(
  */
 export async function forfeitDuelAction(
   roomId: string,
-  concedingGithub: string
+  concedingGithub: string,
+  token?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    let finalConcedingGithub = concedingGithub;
+
+    if (token) {
+      const verified = await getVerifiedUserFromToken(token);
+      if (!verified) {
+        return { success: false, error: "Authentication failed. Valid GitHub session required." };
+      }
+      finalConcedingGithub = verified.github;
+    }
+
     const db = getDbClient();
 
     const { data: duelData, error: fetchErr } = await db
@@ -380,7 +424,17 @@ export async function forfeitDuelAction(
       return { success: false, error: "Duel room not found." };
     }
 
-    const isHost = duel.host_github === concedingGithub;
+    const isHost = duel.host_github === finalConcedingGithub;
+    const isGuest = duel.guest_github === finalConcedingGithub;
+
+    if (!isHost && !isGuest) {
+      return { success: false, error: "User is not a participant in this duel." };
+    }
+
+    if (duel.status !== "active") {
+      return { success: false, error: "Cannot forfeit: duel match is not active." };
+    }
+
     const opponentGithub = isHost ? duel.guest_github : duel.host_github;
     const opponentId = isHost ? duel.guest_id : duel.host_id;
 
@@ -394,7 +448,8 @@ export async function forfeitDuelAction(
     const { error: updateErr } = await db
       .from("code_duels")
       .update(updatePayload)
-      .eq("id", roomId);
+      .eq("id", roomId)
+      .eq("status", "active");
 
     if (updateErr) {
       return { success: false, error: updateErr.message };
@@ -403,6 +458,88 @@ export async function forfeitDuelAction(
     return { success: true };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error forfeiting duel.";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Leaves or discards a duel room.
+ * - If match is 'waiting' and requester is host: marks room 'abandoned'.
+ * - If match is 'waiting' and requester is guest: disassociates guest from room so others can join.
+ * - If match is 'active': forfeits match to opponent.
+ */
+export async function leaveOrDiscardDuelAction(
+  roomId: string,
+  userGithub: string,
+  token?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    let finalGithub = userGithub;
+    if (token) {
+      const verified = await getVerifiedUserFromToken(token);
+      if (verified) finalGithub = verified.github;
+    }
+
+    const db = getDbClient();
+    const { data: duelData, error: fetchErr } = await db
+      .from("code_duels")
+      .select("*")
+      .eq("id", roomId)
+      .maybeSingle();
+
+    const duel = duelData as CodeDuelRow | null;
+    if (fetchErr || !duel) {
+      return { success: false, error: "Duel room not found." };
+    }
+
+    const isHost = duel.host_github === finalGithub;
+    const isGuest = duel.guest_github === finalGithub;
+
+    if (!isHost && !isGuest) {
+      return { success: false, error: "User is not a participant in this duel." };
+    }
+
+    if (duel.status === "completed" || duel.status === "abandoned") {
+      return { success: true };
+    }
+
+    if (duel.status === "waiting") {
+      if (isHost) {
+        const updatePayload: CodeDuelUpdate = {
+          status: "abandoned",
+          ended_at: new Date().toISOString(),
+        };
+        const { error: updateErr } = await db
+          .from("code_duels")
+          .update(updatePayload)
+          .eq("id", roomId);
+
+        if (updateErr) return { success: false, error: updateErr.message };
+        return { success: true };
+      } else {
+        const updatePayload: CodeDuelUpdate = {
+          guest_github: null,
+          guest_name: null,
+          guest_id: null,
+          guest_progress: { testsPassed: 0, totalTests: 0, status: "waiting" },
+        };
+        const { error: updateErr } = await db
+          .from("code_duels")
+          .update(updatePayload)
+          .eq("id", roomId);
+
+        if (updateErr) return { success: false, error: updateErr.message };
+        return { success: true };
+      }
+    }
+
+    if (duel.status === "active") {
+      return forfeitDuelAction(roomId, finalGithub, token);
+    }
+
+    return { success: true };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error leaving duel room.";
     return { success: false, error: message };
   }
 }

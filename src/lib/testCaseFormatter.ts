@@ -151,17 +151,33 @@ export function parseTestCaseArguments(
 
   // Case A: parsed value is an array of arguments (standard platform format)
   if (Array.isArray(parsed)) {
-    // If parameter count matches array length, or if we have at least some parameter names
-    if (paramNames.length > 0) {
-      // Special case: Single parameter of type array (e.g. nums: int[]), but input was wrapped in outer array [ [1,2,3] ]
-      if (paramNames.length === 1 && parsed.length === 1) {
+    // If single parameter expected
+    if (paramNames.length === 1) {
+      // If input was wrapped in outer array [[1, 2, 3]], unwrap outer array
+      if (parsed.length === 1 && Array.isArray(parsed[0])) {
         return [{
           name: paramNames[0],
           value: formatValue(parsed[0]),
           rawValue: parsed[0],
         }];
       }
+      // If input is a 1D array [1, 2, 3] for a single array parameter, bind the entire array
+      if (parsed.length > 1) {
+        return [{
+          name: paramNames[0],
+          value: formatValue(parsed),
+          rawValue: parsed,
+        }];
+      }
+      return [{
+        name: paramNames[0],
+        value: formatValue(parsed[0]),
+        rawValue: parsed[0],
+      }];
+    }
 
+    // If multiple parameters
+    if (paramNames.length > 0) {
       // If outer array contains arguments for each parameter
       if (parsed.length === paramNames.length) {
         return parsed.map((arg, idx) => ({
@@ -179,7 +195,15 @@ export function parseTestCaseArguments(
       }));
     }
 
-    // No parameter names known: if single element, unwrapped
+    // No parameter names known: if single element wrapped array [[1, 2, 3]], unwrap
+    if (parsed.length === 1 && Array.isArray(parsed[0])) {
+      return [{
+        name: 'arg1',
+        value: formatValue(parsed[0]),
+        rawValue: parsed[0],
+      }];
+    }
+
     if (parsed.length === 1) {
       return [{
         name: 'arg1',

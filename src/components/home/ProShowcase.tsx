@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import SpotlightCard from '@/components/ui/SpotlightCard';
+import { PRICING_CONFIG, formatPrice, formatPriceWithPeriod } from '@/lib/pricing';
 
 interface ProShowcaseProps {
   onNavigate: (page: string) => void;
@@ -217,7 +218,7 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
           <h2 className="font-display font-medium text-base sm:text-lg text-slate-900 dark:text-zinc-100 tracking-tight">
             Everything you need to level up
           </h2>
-          <p className="font-sans text-xs text-slate-500 dark:text-zinc-500 mt-0.5">₹39/month · cancel anytime · all features, no hidden fees</p>
+          <p className="font-sans text-xs text-slate-500 dark:text-zinc-500 mt-0.5">{formatPriceWithPeriod(PRICING_CONFIG.defaultMonthlyFee)} · 30-day pass · No auto-debit · Renew when you want</p>
         </div>
 
         {/* Header CTA — only shown to non-subscribers */}
@@ -288,10 +289,10 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
                   ✦ BitByBit Pro
                 </div>
                 <div className="flex items-end gap-1 mb-1">
-                  <span className="font-display font-bold text-4xl sm:text-5xl text-slate-900 dark:text-zinc-100 tracking-tight leading-none">₹39</span>
-                  <span className="text-slate-500 dark:text-zinc-400 font-sans text-sm mb-1.5">/month</span>
+                  <span className="font-display font-bold text-4xl sm:text-5xl text-slate-900 dark:text-zinc-100 tracking-tight leading-none">{formatPrice(PRICING_CONFIG.defaultMonthlyFee)}</span>
+                  <span className="text-slate-500 dark:text-zinc-400 font-sans text-sm mb-1.5">/{PRICING_CONFIG.periodUnit}</span>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-zinc-500 font-sans">Billed monthly · cancel anytime</p>
+                <p className="text-xs text-slate-500 dark:text-zinc-500 font-sans">30-day pass · No auto-debit · Renew when you want</p>
               </div>
 
               {/* Feature list */}
@@ -330,8 +331,8 @@ export default function ProShowcase({ onNavigate, isSubscriber = false }: ProSho
                       Get BitByBit Pro
                     </button>
                     <button
-                      onClick={() => onNavigate('subscribe')}
-                      className="w-full py-2.5 rounded-xl font-mono text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 border border-slate-200 dark:border-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700 bg-transparent hover:bg-slate-100/60 dark:hover:bg-zinc-800/30 transition-all"
+                      onClick={() => onNavigate('pricing')}
+                      className="w-full py-2.5 rounded-xl font-mono text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 border border-slate-200 dark:border-zinc-800/80 hover:border-slate-300 dark:hover:border-zinc-700 bg-transparent hover:bg-slate-100/60 dark:hover:bg-zinc-800/30 transition-all cursor-pointer"
                     >
                       View pricing details →
                     </button>

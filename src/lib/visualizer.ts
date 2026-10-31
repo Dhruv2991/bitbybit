@@ -250,10 +250,24 @@ except Exception:
 
 if not __err__:
     try:
-        __viz_args__ = __json__.loads(${argsJson})
-        if not isinstance(__viz_args__, list):
-            __viz_args__ = [__viz_args__]
-        ${fnName ? `__user_globals__['${fnName}'](*__viz_args__)` : 'pass'}
+        __viz_raw__ = __json__.loads(${argsJson})
+        if isinstance(__viz_raw__, str):
+            try:
+                __viz_raw__ = __json__.loads(__viz_raw__)
+            except Exception:
+                pass
+        __fn__ = __user_globals__.get('${fnName}')
+        __arg_count__ = getattr(getattr(__fn__, '__code__', None), 'co_argcount', 1) if __fn__ else 1
+        if not isinstance(__viz_raw__, list):
+            __viz_args__ = [__viz_raw__]
+        elif __arg_count__ == 1 and len(__viz_raw__) == 1:
+            __viz_args__ = __viz_raw__
+        elif __arg_count__ == 1 and len(__viz_raw__) > 1:
+            __viz_args__ = [__viz_raw__]
+        else:
+            __viz_args__ = __viz_raw__
+        if __fn__:
+            __fn__(*__viz_args__)
     except Exception:
         __err__ = __err__ or __tb__.format_exc()
 
