@@ -250,10 +250,33 @@ export default function WeeklyChallengePage({ user, onNavigate }: Props) {
       const ids = new Set<string>();
       list.forEach((c) => (c.problem_ids || []).forEach((id: string) => ids.add(id)));
       if (ids.size) {
-        const { data: probs } = await db
-          .from("problems")
-          .select("id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at")
-          .in("id", Array.from(ids));
+        let probs: any[] | null = null;
+        try {
+          const res1 = await db
+            .from("problems")
+            .select("id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at, sample_test_cases, test_cases")
+            .in("id", Array.from(ids));
+          if (!res1.error && res1.data) probs = res1.data;
+        } catch {}
+
+        if (!probs) {
+          try {
+            const res2 = await db
+              .from("problems")
+              .select("id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at, test_cases")
+              .in("id", Array.from(ids));
+            if (!res2.error && res2.data) probs = res2.data;
+          } catch {}
+        }
+
+        if (!probs) {
+          const res3 = await db
+            .from("problems")
+            .select("id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at")
+            .in("id", Array.from(ids));
+          probs = res3.data;
+        }
+
         const map: Record<string, Problem> = {};
         (probs || []).forEach((p: Problem) => { map[p.id] = p; });
         setProblems(map);

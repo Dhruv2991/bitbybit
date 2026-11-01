@@ -629,22 +629,97 @@ export default function Workspace({ problem: initialProblem, user, onClose, onAr
     let isMounted = true;
     async function loadDetails() {
       try {
-        // 1. Try problem_details table first (Phase B table)
-        const { data: details, error } = await (db.from('problem_details') as any)
-          .select('description, example, hints, starter_code, param_types, return_type')
-          .eq('problem_id', initialProblem.id)
-          .maybeSingle();
+        let details: any = null;
+        let testCases: any[] | undefined = undefined;
+        let sampleCases: any[] | undefined = undefined;
 
-        if (details && !error && isMounted) {
+        // 1. Try problem_details table first (Phase B table)
+        try {
+          const { data, error } = await (db.from('problem_details') as any)
+            .select('description, example, hints, starter_code, param_types, return_type')
+            .eq('problem_id', initialProblem.id)
+            .maybeSingle();
+          if (data && !error) details = data;
+        } catch {}
+
+        // Fallback to problems table for description, hints, etc. if problem_details is missing
+        if (!details) {
+          try {
+            const { data: fallback } = await (db.from('problems') as any)
+              .select('description, example, hints, starter_code, param_types, return_type')
+              .eq('id', initialProblem.id)
+              .maybeSingle();
+            if (fallback) details = fallback;
+          } catch {}
+        }
+
+        // 2. Fetch sample_test_cases and test_cases from problems table
+        try {
+          const { data: pRow } = await (db.from('problems') as any)
+            .select('sample_test_cases, test_cases')
+            .eq('id', initialProblem.id)
+            .maybeSingle();
+          if (pRow) {
+            if (Array.isArray(pRow.sample_test_cases) && pRow.sample_test_cases.length > 0) {
+              sampleCases = pRow.sample_test_cases;
+            }
+            if (Array.isArray(pRow.test_cases) && pRow.test_cases.length > 0) {
+              testCases = pRow.test_cases;
+            }
+          }
+        } catch {
+          // If sample_test_cases column doesn't exist yet, query test_cases
+          try {
+            const { data: pTc } = await (db.from('problems') as any)
+              .select('test_cases')
+              .eq('id', initialProblem.id)
+              .maybeSingle();
+            if (pTc && Array.isArray(pTc.test_cases)) {
+              testCases = pTc.test_cases;
+            }
+          } catch {}
+        }
+
+        // 3. Fallback: if details or test cases are still missing, query /api/problems/[id]
+        if (!details || ((!sampleCases || sampleCases.length === 0) && (!testCases || testCases.length === 0))) {
+          try {
+            const res = await fetch(`/api/problems/${initialProblem.id}`);
+            if (res.ok) {
+              const apiData = await res.json();
+              if (apiData) {
+                if (!details) {
+                  details = {
+                    description: apiData.description,
+                    example: apiData.example,
+                    hints: apiData.hints,
+                    starter_code: apiData.starter_code,
+                    param_types: apiData.param_types,
+                    return_type: apiData.return_type,
+                  };
+                }
+                if (Array.isArray(apiData.sample_test_cases) && apiData.sample_test_cases.length > 0) {
+                  sampleCases = apiData.sample_test_cases;
+                }
+                if (Array.isArray(apiData.test_cases) && apiData.test_cases.length > 0) {
+                  testCases = apiData.test_cases;
+                }
+              }
+            }
+          } catch {}
+        }
+
+        if (isMounted) {
           setProblem(prev => {
             const updated = {
               ...prev,
-              description: details.description ?? prev.description,
-              example: details.example ?? prev.example,
-              hints: details.hints ?? prev.hints,
-              starter_code: details.starter_code ?? prev.starter_code,
-              param_types: details.param_types ?? prev.param_types,
-              return_type: details.return_type ?? prev.return_type,
+              description: details?.description ?? prev.description,
+              example: details?.example ?? prev.example,
+              hints: details?.hints ?? prev.hints,
+              starter_code: details?.starter_code ?? prev.starter_code,
+              param_types: details?.param_types ?? prev.param_types,
+              return_type: details?.return_type ?? prev.return_type,
+              sample_test_cases: sampleCases ?? prev.sample_test_cases,
+              test_cases: testCases ?? prev.test_cases,
             };
             try {
               const currentLang = langRef.current;
@@ -660,50 +735,6 @@ export default function Workspace({ problem: initialProblem, user, onClose, onAr
             } catch {}
             return updated;
           });
-          return;
-        }
-
-        // If problem_details table exists (and details is null or RLS-denied), do NOT attempt fallback
-        const isTableMissing = error?.code === '42P01' || error?.message?.includes('does not exist');
-        if (!isTableMissing) {
-          return;
-        }
-
-        // 2. Pre-migration fallback only (before problem_details table is created)
-        try {
-          const { data: fallback, error: fbErr } = await (db.from('problems') as any)
-            .select('description, example, hints, starter_code, param_types, return_type')
-            .eq('id', initialProblem.id)
-            .maybeSingle();
-
-          if (fallback && !fbErr && isMounted) {
-            setProblem(prev => {
-              const updated = {
-                ...prev,
-                description: fallback.description ?? prev.description,
-                example: fallback.example ?? prev.example,
-                hints: fallback.hints ?? prev.hints,
-                starter_code: fallback.starter_code ?? prev.starter_code,
-                param_types: fallback.param_types ?? prev.param_types,
-                return_type: fallback.return_type ?? prev.return_type,
-              };
-              try {
-                const currentLang = langRef.current;
-                const hasDraft = !onArenaSubmit && localStorage.getItem(draftKey(initialProblem.id, currentLang));
-                if (!hasDraft && STARTER_CODE[currentLang]) {
-                  setCode(prevCode => {
-                    if (!prevCode || prevCode.includes('def solution():\n    pass') || prevCode.trim() === '') {
-                      return STARTER_CODE[currentLang](updated);
-                    }
-                    return prevCode;
-                  });
-                }
-              } catch {}
-              return updated;
-            });
-          }
-        } catch {
-          // Permission denied after migration is safely ignored
         }
       } catch (e) {
         console.error('[Workspace] Error loading problem details:', e);
@@ -1129,10 +1160,53 @@ export default function Workspace({ problem: initialProblem, user, onClose, onAr
       });
       return;
     }
-    const cases = (problem.sample_test_cases && problem.sample_test_cases.length > 0)
+    let cases = (problem.sample_test_cases && problem.sample_test_cases.length > 0)
       ? problem.sample_test_cases
       : (problem.test_cases || []).slice(0, 2);
-    if (!cases.length) { setRunError('No test cases defined for this problem. You can still submit for review.'); return; }
+
+    if (!cases || !cases.length) {
+      try {
+        const { data: pRow } = await (db.from('problems') as any)
+          .select('sample_test_cases, test_cases')
+          .eq('id', problem.id)
+          .maybeSingle();
+        if (pRow) {
+          const fresh = (Array.isArray(pRow.sample_test_cases) && pRow.sample_test_cases.length > 0)
+            ? pRow.sample_test_cases
+            : (Array.isArray(pRow.test_cases) ? pRow.test_cases.slice(0, 2) : []);
+          if (fresh.length > 0) {
+            cases = fresh;
+            setProblem(prev => ({
+              ...prev,
+              sample_test_cases: pRow.sample_test_cases,
+              test_cases: pRow.test_cases,
+            }));
+          }
+        }
+      } catch {}
+    }
+
+    if (!cases || !cases.length) {
+      try {
+        const res = await fetch(`/api/problems/${problem.id}`);
+        if (res.ok) {
+          const apiData = await res.json();
+          const fresh = (Array.isArray(apiData.sample_test_cases) && apiData.sample_test_cases.length > 0)
+            ? apiData.sample_test_cases
+            : (Array.isArray(apiData.test_cases) ? apiData.test_cases.slice(0, 2) : []);
+          if (fresh.length > 0) {
+            cases = fresh;
+            setProblem(prev => ({
+              ...prev,
+              sample_test_cases: apiData.sample_test_cases,
+              test_cases: apiData.test_cases,
+            }));
+          }
+        }
+      } catch {}
+    }
+
+    if (!cases || !cases.length) { setRunError('No test cases defined for this problem. You can still submit for review.'); return; }
     isRunningRef.current = true;
     setRunning(true); setTestResult(null); setRunError(null); setProgress(null);
     const strategy = getStrategy(lang);

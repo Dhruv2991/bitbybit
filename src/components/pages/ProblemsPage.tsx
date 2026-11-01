@@ -145,10 +145,42 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
       setLoading(true);
       try {
         // Load problems (excluding contest problems)
-        const { data, error } = await db
-          .from('problems')
-          .select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at')
-          .order('created_at', { ascending: false });
+        let data: any[] | null = null;
+        let error: any = null;
+        try {
+          const res1 = await db
+            .from('problems')
+            .select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at, sample_test_cases, test_cases')
+            .order('created_at', { ascending: false });
+          if (!res1.error && res1.data) {
+            data = res1.data;
+          } else {
+            error = res1.error;
+          }
+        } catch {}
+
+        if (!data) {
+          try {
+            const res2 = await db
+              .from('problems')
+              .select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at, test_cases')
+              .order('created_at', { ascending: false });
+            if (!res2.error && res2.data) {
+              data = res2.data;
+              error = null;
+            }
+          } catch {}
+        }
+
+        if (!data) {
+          const res3 = await db
+            .from('problems')
+            .select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at')
+            .order('created_at', { ascending: false });
+          data = res3.data;
+          error = res3.error;
+        }
+
         if (error) throw error;
         const publicProbs = (data || []).filter((p: any) =>
           p.visibility === 'public' || p.visibility === 'weekly' || (!p.visibility && !p.is_contest_problem)

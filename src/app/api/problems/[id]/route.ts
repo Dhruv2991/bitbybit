@@ -107,17 +107,42 @@ export async function GET(
       return NextResponse.json({ error: 'Problem ID is required' }, { status: 400 });
     }
 
-    // Always return card columns (public)
+    // Always return card columns + sample test cases (public)
     const db = createServerSupabaseClient();
-    const { data: card, error } = await db
-      .from('problems')
-      .select(CARD_COLUMNS)
-      .eq('id', id)
-      .maybeSingle();
+    let card: any = null;
+    try {
+      const res1 = await (db.from('problems') as any)
+        .select(`${CARD_COLUMNS}, sample_test_cases, test_cases`)
+        .eq('id', id)
+        .maybeSingle();
+      if (res1.data) card = res1.data;
+    } catch {}
 
-    if (error || !card) {
+    if (!card) {
+      try {
+        const res2 = await (db.from('problems') as any)
+          .select(`${CARD_COLUMNS}, test_cases`)
+          .eq('id', id)
+          .maybeSingle();
+        if (res2.data) card = res2.data;
+      } catch {}
+    }
+
+    if (!card) {
+      const res3 = await db.from('problems').select(CARD_COLUMNS).eq('id', id).maybeSingle();
+      card = res3.data;
+    }
+
+    if (!card) {
       return NextResponse.json({ error: 'Problem not found' }, { status: 404 });
     }
+
+    // Safely expose only sample test cases to browser execution
+    const samples = (Array.isArray(card.sample_test_cases) && card.sample_test_cases.length > 0)
+      ? card.sample_test_cases
+      : (Array.isArray(card.test_cases) ? card.test_cases.slice(0, 2) : []);
+    card.sample_test_cases = samples;
+    card.test_cases = samples;
 
     // Merge in detail columns only if allowed by RLS / active entitlement
     const details = await getDetailColumnsIfAllowed(req, id);

@@ -133,7 +133,30 @@ export default function ArenaPage({ user, onArenaLockChange, onNavigate }: Arena
         (ct.problem_ids || []).forEach((id: string) => allIds.add(id));
       });
       if (allIds.size) {
-        const { data: probs } = await db.from('problems').select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at').in('id', Array.from(allIds));
+        let probs: any[] | null = null;
+        try {
+          const res1 = await db.from('problems')
+            .select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at, sample_test_cases, test_cases')
+            .in('id', Array.from(allIds));
+          if (!res1.error && res1.data) probs = res1.data;
+        } catch {}
+
+        if (!probs) {
+          try {
+            const res2 = await db.from('problems')
+              .select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at, test_cases')
+              .in('id', Array.from(allIds));
+            if (!res2.error && res2.data) probs = res2.data;
+          } catch {}
+        }
+
+        if (!probs) {
+          const res3 = await db.from('problems')
+            .select('id, title, difficulty, points, tags, visibility, is_contest_problem, submission_count, created_at, updated_at')
+            .in('id', Array.from(allIds));
+          probs = res3.data;
+        }
+
         const map: Record<string, Problem> = {};
         (probs || []).forEach((p: Problem) => { map[p.id] = p; });
         setArenaProblems(map);
