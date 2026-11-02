@@ -119,6 +119,17 @@ function IconAdmin({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
+function IconCoordinator({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
 const toastColors: Record<string, string> = {
   ok: "bg-white dark:bg-zinc-900 border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shadow-xl",
   err: "bg-white dark:bg-zinc-900 border border-rose-500/40 text-rose-600 dark:text-rose-400 shadow-xl",
@@ -284,12 +295,29 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     },
   ];
 
-  if (user?.is_admin) {
+  if (user?.is_admin || user?.is_coordinator) {
+    const mgmtItems: any[] = [];
+    if (user?.is_admin) {
+      mgmtItems.push({
+        id: "admin" as PageId,
+        label: "Admin Console",
+        icon: IconAdmin,
+        badge: user.role === "tech" ? "Tech" : "Admin",
+        badgeColor: "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20",
+      });
+    }
+    if (user?.is_coordinator || user?.is_admin) {
+      mgmtItems.push({
+        id: "coordinator" as PageId,
+        label: "Coordinator Hub",
+        icon: IconCoordinator,
+        badge: "Ops",
+        badgeColor: "bg-sky-100 text-sky-700 border border-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20",
+      });
+    }
     NAV_GROUPS.push({
-      group: "Management",
-      items: [
-        { id: "admin", label: "Admin Console", icon: IconAdmin, badge: "Admin", badgeColor: "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20" },
-      ],
+      group: "Operations",
+      items: mgmtItems,
     });
   }
 

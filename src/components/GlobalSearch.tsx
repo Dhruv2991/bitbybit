@@ -23,7 +23,7 @@ interface GlobalSearchProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const PAGES: { id: PageId; label: string; icon: string; color: string; adminOnly?: boolean }[] = [
+const PAGES: { id: PageId; label: string; icon: string; color: string; adminOnly?: boolean; coordinatorOnly?: boolean }[] = [
   { id: 'home',        label: 'Dashboard',        icon: '⌂',   color: '#0284c7' },
   { id: 'problems',    label: 'Problem Set',      icon: '{ }', color: '#0284c7' },
   { id: 'leaderboard', label: 'Leaderboard',      icon: '⚡',  color: '#d97706' },
@@ -34,6 +34,7 @@ const PAGES: { id: PageId; label: string; icon: string; color: string; adminOnly
   { id: 'collaborations', label: 'Collaborations', icon: '🤝', color: '#9333ea' },
   { id: 'about',       label: 'About & Docs',     icon: 'ℹ️',  color: '#64748b' },
   { id: 'admin',       label: 'Admin Console',    icon: '⚙️',  color: '#9333ea', adminOnly: true },
+  { id: 'coordinator', label: 'Coordinator Hub', icon: '📋',  color: '#0284c7', coordinatorOnly: true },
 ];
 
 function Highlight({ text, q }: { text: string; q: string }) {
@@ -97,7 +98,7 @@ export default function GlobalSearch({ user, navigate, open, onOpenChange }: Glo
   const q = query.trim().toLowerCase();
 
   const pageResults: SearchResult[] = PAGES
-    .filter(p => !p.adminOnly || user?.is_admin)
+    .filter(p => (!p.adminOnly || user?.is_admin) && (!p.coordinatorOnly || user?.is_admin || user?.is_coordinator))
     .filter(p => !q || p.label.toLowerCase().includes(q))
     .map(p => ({
       id: `page-${p.id}`, kind: 'page', title: p.label, icon: p.icon, color: p.color,

@@ -247,14 +247,17 @@ export type Database = {
       admins: {
         Row: {
           github: string;
+          role?: string;
         };
 
         Insert: {
           github: string;
+          role?: string;
         };
 
         Update: {
           github?: string;
+          role?: string;
         };
         Relationships: [];
       };
@@ -419,10 +422,14 @@ export interface Coupon {
   created_at: string;
 }
 
+export type AdminRole = 'super_admin' | 'tech' | 'coordinator';
+
 export interface User {
   name: string;
   github: string;
   is_admin: boolean;
+  is_coordinator?: boolean;
+  role?: AdminRole | null;
   /** Set by the subscription system; true if the user has an active subscription */
   is_subscriber?: boolean;
 }

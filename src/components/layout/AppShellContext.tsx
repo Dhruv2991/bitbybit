@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getSupabaseClient, resolveAdminStatus } from "@/lib/supabase";
+import { getSupabaseClient, resolveAdminStatus, resolveAdminRole } from "@/lib/supabase";
 import type { User } from "@/types/database";
 import { effectiveStreak } from "@/lib/streak";
 import { setAiUser } from "@/lib/gemini";
@@ -10,7 +10,7 @@ import { isActiveSubscription } from "@/lib/subscription";
 
 export type PageId =
   | "home" | "problems" | "leaderboard" | "arena" | "weekly"
-  | "admin" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe" | "collaborations" | "unsubscribe" | "duels" | "pricing";
+  | "admin" | "coordinator" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe" | "collaborations" | "unsubscribe" | "duels" | "pricing";
 
 export type ToastType = "ok" | "err" | "warn" | "info";
 export interface Toast { id: number; msg: string; type: ToastType; }
@@ -28,6 +28,7 @@ export const ROUTE_TO_PAGE: Record<string, PageId> = {
   "/arena": "arena",
   "/weekly": "weekly",
   "/admin": "admin",
+  "/coordinator": "coordinator",
   "/about": "about",
   "/privacy": "privacy",
   "/terms": "terms",
@@ -42,7 +43,7 @@ export const ROUTE_TO_PAGE: Record<string, PageId> = {
 
 export const PAGE_TO_ROUTE: Record<PageId, string> = {
   home: "/", problems: "/problems", leaderboard: "/leaderboard", arena: "/arena",
-  weekly: "/weekly", admin: "/admin", about: "/about", privacy: "/privacy",
+  weekly: "/weekly", admin: "/admin", coordinator: "/coordinator", about: "/about", privacy: "/privacy",
   terms: "/terms", refunds: "/refunds", profile: "/profile", subscribe: "/subscribe",
   collaborations: "/collaborations", unsubscribe: "/unsubscribe", duels: "/duels",
   pricing: "/pricing",
@@ -83,7 +84,16 @@ function readStoredUser(): User | null {
     if (!su?.user_metadata?.user_name) return null;
     const github = su.user_metadata?.user_name;
     const cachedAdmin = localStorage.getItem(`bb_admin_${github}`);
-    return { name: su.user_metadata?.full_name || github, github, is_admin: cachedAdmin === "1" };
+    const cachedCoord = localStorage.getItem(`bb_coord_${github}`);
+    const cachedRole  = localStorage.getItem(`bb_role_${github}`);
+    const role = (cachedRole && cachedRole !== "none") ? (cachedRole as any) : null;
+    return {
+      name: su.user_metadata?.full_name || github,
+      github,
+      is_admin: cachedAdmin === "1",
+      is_coordinator: cachedCoord === "1" || cachedAdmin === "1",
+      role,
+    };
   } catch { return null; }
 }
 
@@ -101,6 +111,8 @@ function clearAuthStorage(github?: string) {
       // Clear all auth, admin, solved, AI usage, drafts, and editorials
       if (
         k.startsWith("bb_admin_") ||
+        k.startsWith("bb_coord_") ||
+        k.startsWith("bb_role_") ||
         k.startsWith("bb_ai_") ||
         k === "bb_solved" ||
         k.startsWith("bb_draft__") ||
@@ -184,6 +196,10 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
       showToast("Access denied.", "err");
       return;
     }
+    if (id === "coordinator" && !user?.is_admin && !user?.is_coordinator) {
+      showToast("Access denied.", "err");
+      return;
+    }
     router.push(PAGE_TO_ROUTE[id]);
   }
 
@@ -196,8 +212,14 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
 
     async function buildUser(su: any): Promise<User> {
       const github = su.user_metadata?.user_name as string;
-      const isAdmin = await resolveAdminStatus(github);
-      return { name: su.user_metadata?.full_name || github, github, is_admin: isAdmin };
+      const roleResult = await resolveAdminRole(github);
+      return {
+        name: su.user_metadata?.full_name || github,
+        github,
+        is_admin: roleResult.isAdmin,
+        is_coordinator: roleResult.isCoordinator,
+        role: roleResult.role,
+      };
     }
 
     async function syncEmail(session: any) {
