@@ -2,6 +2,7 @@
 
 import React from "react";
 import type { CertificateCoordinator } from "@/types/database";
+import type { TemplateConfig } from "@/lib/certificates/types";
 import CertificateView from "./CertificateView";
 
 export interface CertificatePreviewProps {
@@ -11,6 +12,7 @@ export interface CertificatePreviewProps {
   eventName?: string;
   organizationText?: string;
   activityPointsText?: string | null;
+  customDescription?: string;
   coordinators?: CertificateCoordinator[];
   dateStr: string;
   certificateId: string;
@@ -18,6 +20,8 @@ export interface CertificatePreviewProps {
   qrDataUrl?: string | null;
   className?: string;
   scale?: number;
+  customTemplateUrl?: string | null;
+  templateConfig?: TemplateConfig | null;
 }
 
 export default function CertificatePreview({
@@ -27,12 +31,14 @@ export default function CertificatePreview({
   eventName,
   organizationText,
   activityPointsText,
-  coordinators,
+  customDescription,
   dateStr,
   certificateId,
   status = "issued",
   qrDataUrl,
   className = "",
+  customTemplateUrl,
+  templateConfig,
 }: CertificatePreviewProps) {
   return (
     <CertificateView
@@ -42,11 +48,14 @@ export default function CertificatePreview({
       eventName={eventName}
       organizationText={organizationText}
       activityPointsText={activityPointsText}
+      customDescription={customDescription}
       dateStr={dateStr}
       certificateId={certificateId}
       status={status}
       qrDataUrl={qrDataUrl}
       className={className}
+      customTemplateUrl={customTemplateUrl}
+      templateConfig={templateConfig}
     />
   );
 }

@@ -1,0 +1,60 @@
+{
+  "default": {
+    "template_image": "../../public/certificates/certificate-base.png",
+    "description": "Standard BitByBit Certificate Base (1024x723)",
+    "fields": {
+      "recipient_name": {
+        "x": "center",
+        "y": 355,
+        "font": "timesbd.ttf",
+        "font_size": 42,
+        "color": "#09090b",
+        "align": "center"
+      },
+      "body_text": {
+        "x": "center",
+        "y": 420,
+        "font": "arial.ttf",
+        "font_size": 17,
+        "color": "#1f2937",
+        "align": "center",
+        "max_width": 780,
+        "line_spacing": 6
+      },
+      "activity_points": {
+        "x": "center",
+        "y": 490,
+        "font": "timesi.ttf",
+        "font_size": 13,
+        "color": "#4b5563",
+        "align": "center"
+      },
+      "date": {
+        "x": 240,
+        "y": 630,
+        "font": "arial.ttf",
+        "font_size": 12,
+        "color": "#374151",
+        "align": "center"
+      },
+      "cert_id": {
+        "x": 60,
+        "y": 685,
+        "font": "couri.ttf",
+        "font_size": 11,
+        "color": "#4b5563",
+        "align": "left"
+      }
+    },
+    "qr_code": {
+      "enabled": true,
+      "x": 915,
+      "y": 615,
+      "size": 65,
+      "label": "Scan to Verify",
+      "label_font_size": 8,
+      "label_color": "#4b5563"
+    }
+  }
+}
+

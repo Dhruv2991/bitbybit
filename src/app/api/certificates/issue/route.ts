@@ -5,7 +5,7 @@
 // Admin-only endpoint to issue a certificate to a member.
 // 1. Verifies caller is an authenticated admin.
 // 2. Generates unique Certificate ID.
-// 3. Generates PDF matching reference design.
+// 3. Generates PDF matching reference design or custom template.
 // 4. Stores PDF in private Supabase Storage bucket 'certificates'.
 // 5. Creates DB record in 'certificates' table.
 // 6. Sends Brevo notification email.
@@ -18,6 +18,7 @@ import { generateCertificateId } from '@/lib/certificates/idGenerator';
 import { generateCertificatePdf } from '@/lib/certificates/pdfGenerator';
 import { certificateIssuedEmail, sendEmailDetailed } from '@/lib/email';
 import type { CertificateCoordinator } from '@/types/database';
+import type { TemplateConfig } from '@/lib/certificates/types';
 
 export const maxDuration = 45;
 
@@ -28,12 +29,15 @@ interface IssueRequestBody {
   recipientEmail: string;
   certificateType: string;
   title: string;
-  achievementText: string;
-  eventName: string;
+  achievementText?: string;
+  eventName?: string;
   organizationText?: string;
   activityPointsText?: string | null;
   coordinators?: CertificateCoordinator[];
   dateStr?: string;
+  customTemplateImage?: string;
+  templateConfig?: TemplateConfig;
+  customDescription?: string;
 }
 
 async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
@@ -71,18 +75,23 @@ export async function POST(req: NextRequest) {
       recipientEmail,
       certificateType = 'Certificate of Achievement',
       title = 'CERTIFICATE OF ACHIEVEMENT',
-      achievementText,
-      eventName,
+      achievementText = 'securing 1st Place for the',
+      eventName = 'Bit By Bit Contest',
       organizationText = 'from teamcodelocked club',
       activityPointsText = 'This certificate is eligible for claiming 1-2 activity points.',
       coordinators = [],
       dateStr = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      customTemplateImage,
+      templateConfig,
+      customDescription,
     } = body;
 
+    const trimmedDesc = customDescription?.trim();
+
     // Strict validation
-    if (!github || !recipientName?.trim() || !recipientEmail?.trim() || !achievementText?.trim() || !eventName?.trim()) {
+    if (!github || !recipientName?.trim() || !recipientEmail?.trim() || (!trimmedDesc && (!achievementText?.trim() || !eventName?.trim()))) {
       return NextResponse.json(
-        { error: 'Missing required certificate fields (github, recipientName, recipientEmail, achievementText, eventName)' },
+        { error: 'Missing required certificate fields (github, recipientName, recipientEmail, achievementText/customDescription, eventName)' },
         { status: 400 }
       );
     }
@@ -94,7 +103,7 @@ export async function POST(req: NextRequest) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     const verificationUrl = `${siteUrl}/certificate/${certificateId}`;
 
-    // 1. Generate PDF
+    // 1. Generate PDF with custom template, text & layout coordinates if provided
     const pdfBuffer = await generateCertificatePdf({
       certificateId,
       memberId,
@@ -103,13 +112,16 @@ export async function POST(req: NextRequest) {
       recipientEmail: recipientEmail.trim(),
       certificateType,
       title: title.trim(),
-      achievementText: achievementText.trim(),
-      eventName: eventName.trim(),
-      organizationText: organizationText.trim(),
+      achievementText: achievementText?.trim() || '',
+      eventName: eventName?.trim() || '',
+      organizationText: organizationText?.trim() || '',
       activityPointsText: activityPointsText?.trim() || null,
+      customDescription: trimmedDesc,
       coordinators,
       dateStr,
       verificationUrl,
+      customTemplateImage,
+      templateConfig,
     });
 
     // 2. Upload PDF to private Supabase Storage bucket 'certificates'
@@ -137,9 +149,9 @@ export async function POST(req: NextRequest) {
       recipient_email: recipientEmail.trim(),
       certificate_type: certificateType,
       title: title.trim(),
-      achievement_text: achievementText.trim(),
-      event_name: eventName.trim(),
-      organization_text: organizationText.trim(),
+      achievement_text: trimmedDesc || achievementText?.trim() || '',
+      event_name: eventName?.trim() || 'Bit By Bit Event',
+      organization_text: organizationText?.trim() || '',
       activity_points_text: activityPointsText?.trim() || null,
       coordinator_names: coordinators,
       issued_at: new Date().toISOString(),
@@ -170,7 +182,7 @@ export async function POST(req: NextRequest) {
     const { subject, html } = certificateIssuedEmail(
       recipientName,
       title,
-      eventName,
+      eventName || 'Bit By Bit Certificate',
       certificateId,
       `${siteUrl}/profile`
     );

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import type { TemplateConfig } from "@/lib/certificates/types";
 
 export interface CertificateViewProps {
   institutionName?: string;
@@ -22,6 +23,8 @@ export interface CertificateViewProps {
   status?: "issued" | "revoked";
   qrDataUrl?: string | null;
   className?: string;
+  customTemplateUrl?: string | null;
+  templateConfig?: TemplateConfig | null;
 }
 
 export default function CertificateView({
@@ -41,11 +44,15 @@ export default function CertificateView({
   status = "issued",
   qrDataUrl,
   className = "",
+  customTemplateUrl,
+  templateConfig,
 }: CertificateViewProps) {
   const isRevoked = status === "revoked";
   const displayDate = monthYear || dateStr || "October 2026";
   const displayEvent = eventName || contestName || "BitByBit Weekly Contest";
   const displayOrg = organizationText || (teamName ? `from ${teamName} club` : "from teamcodelocked club");
+
+  const cfg = templateConfig || {};
 
   // Format the recognition statement cleanly
   let displayAchievement = achievementText;
@@ -74,51 +81,81 @@ export default function CertificateView({
     }
   }
 
-  // Check if a custom title was passed that differs from "CERTIFICATE OF ACHIEVEMENT"
+  // Title visibility logic
   const isCustomTitle = Boolean(
     title &&
     title.toUpperCase() !== "CERTIFICATE OF ACHIEVEMENT" &&
     title !== "Certificate of Achievement"
   );
+  const showTitle = cfg.showTitle !== undefined
+    ? cfg.showTitle
+    : (customTemplateUrl ? false : isCustomTitle);
+
+  const showBody = cfg.showBody !== undefined ? cfg.showBody : true;
+  const showActivityPoints = cfg.showActivityPoints !== undefined ? cfg.showActivityPoints : true;
+  const showDate = cfg.showDate !== undefined ? cfg.showDate : true;
+  const showCertId = cfg.showCertId !== undefined ? cfg.showCertId : true;
+  const showQr = cfg.showQr !== undefined ? cfg.showQr : true;
+
+  // Custom positioning & styling
+  // Standard A4 landscape dimensions are 297mm x 210mm (~841.89pt width).
+  // In cqw (container query width), 1cqw = 1% of certificate width.
+  // Converting points to cqw: (pt / 841.89) * 100 cqw
+  const nameY = cfg.nameY ?? 49.5;
+  const nameFontSize = cfg.nameFontSize ?? 34;
+  const nameColor = cfg.nameColor ?? "#09090b";
+
+  const titleY = cfg.titleY ?? 31.4;
+  const titleFontSize = cfg.titleFontSize ?? 22;
+  const titleColor = cfg.titleColor ?? "#111827";
+
+  const bodyY = cfg.bodyY ?? 56.7;
+  const bodyFontSize = cfg.bodyFontSize ?? 19.5;
+  const bodyColor = cfg.bodyColor ?? "#1e1e1e";
+
+  const certIdX = cfg.certIdX ?? 4.7;
+  const certIdY = cfg.certIdY ?? 96;
+
+  const qrX = cfg.qrX ?? 90.2;
+  const qrY = cfg.qrY ?? 86.2;
+  const qrSizeMm = cfg.qrSize ?? 17;
+  const qrSizePercent = (qrSizeMm / 297) * 100; // QR width in % of certificate width
 
   return (
     <div
       className={`relative w-full overflow-hidden bg-white shadow-2xl rounded-sm border border-[#e5e0d3] select-none ${className}`}
       style={{
-        aspectRatio: "1024 / 723",
+        aspectRatio: "297 / 210", // Exact A4 landscape printable sheet ratio (1.4142857)
+        containerType: "inline-size",
         fontFamily: "'Georgia', 'Times New Roman', serif",
       }}
     >
-      {/* 
-        Master Base Certificate Image
-        Contains the official BMSCE & TeamCodeLocked seals, topographic background contours,
-        double gold borders with corner geometry, header text, "CERTIFICATE OF ACHIEVEMENT",
-        "PRESENTED TO" dividing lines, and all 3 coordinator signatures.
-      */}
+      {/* Base Certificate Image (Exact A4 Landscape fitting) */}
       <img
-        src="/certificates/certificate-base.png"
+        src={customTemplateUrl || "/certificates/certificate-base.png"}
         alt="Certificate Template"
         className="absolute inset-0 w-full h-full object-fill pointer-events-none z-0 select-none"
         draggable={false}
       />
 
-      {/* Optional Title Patch if a different title (e.g. PARTICIPATION) is specified */}
-      {isCustomTitle && (
+      {/* Title Overlay */}
+      {showTitle && title && (
         <div
-          className="absolute z-10 flex items-center justify-center bg-white py-0.5"
+          className={`absolute z-10 flex items-center justify-center ${customTemplateUrl ? "" : "bg-white"}`}
           style={{
-            top: "26.5%",
-            left: "12%",
-            right: "12%",
+            top: `${titleY}%`,
+            left: "13.5%",
+            right: "13.5%",
+            transform: "translateY(-50%)",
           }}
         >
           <h1
-            className="font-serif font-bold text-zinc-950 uppercase text-center whitespace-nowrap"
+            className="font-serif font-bold uppercase text-center whitespace-nowrap leading-none"
             style={{
               fontFamily: "'Playfair Display', 'Times New Roman', 'Georgia', serif",
-              fontSize: "clamp(16px, 3.1vw, 42px)",
+              fontSize: `calc(${((titleFontSize ?? 22) / 841.89) * 100}cqw)`,
               letterSpacing: "0.07em",
-              color: "#09090b",
+              color: titleColor,
             }}
           >
             {title}
@@ -129,32 +166,35 @@ export default function CertificateView({
       {/* Revoked Watermark Overlay */}
       {isRevoked && (
         <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none bg-red-950/15 backdrop-blur-[1px]">
-          <div className="border-4 border-red-600 text-red-600 font-sans font-black text-3xl sm:text-5xl md:text-6xl px-8 py-3 uppercase tracking-widest rotate-[-15deg] opacity-85 shadow-2xl bg-white/90">
+          <div
+            className="border-4 border-red-600 text-red-600 font-sans font-black px-8 py-3 uppercase tracking-widest rotate-[-15deg] opacity-85 shadow-2xl bg-white/90"
+            style={{ fontSize: "5.2cqw" }}
+          >
             REVOKED
           </div>
         </div>
       )}
 
-      {/* Dynamic Overlays: Recipient Name, Recognition Body, Date, ID & QR */}
+      {/* Dynamic Overlays */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         
-        {/* 1. Dynamic Recipient Name (Centered right in the blank space under 'PRESENTED TO') */}
+        {/* 1. Recipient Name */}
         <div
           className="absolute flex items-center justify-center text-center"
           style={{
-            top: "47%",
-            left: "8%",
-            right: "8%",
-            height: "11%",
+            top: `${nameY}%`,
+            left: "6%",
+            right: "6%",
+            transform: "translateY(-50%)",
           }}
         >
           <h2
-            className="font-serif font-bold italic text-zinc-950 text-center leading-none"
+            className="font-serif font-bold italic text-center leading-none"
             style={{
               fontFamily: "'Playfair Display', 'Times New Roman', 'Georgia', serif",
-              fontSize: "clamp(26px, 4.4vw, 56px)",
+              fontSize: `calc(${((nameFontSize ?? 34) / 841.89) * 100}cqw)`,
               letterSpacing: "0.01em",
-              color: "#09090b",
+              color: nameColor,
             }}
           >
             {recipientName}
@@ -162,71 +202,127 @@ export default function CertificateView({
         </div>
 
         {/* 2. Recognition Statement & Event/Date */}
-        <div
-          className="absolute flex flex-col items-center justify-center text-center px-10"
-          style={{
-            top: "58.5%",
-            left: "10%",
-            right: "10%",
-          }}
-        >
-          <p
-            className="font-sans text-zinc-800 leading-normal"
+        {showBody && bodyStatement && (
+          <div
+            className="absolute flex flex-col items-center justify-center text-center px-[8%]"
             style={{
-              fontSize: "clamp(11px, 1.6vw, 19px)",
-              color: "#27272a",
+              top: `${bodyY}%`,
+              left: "5%",
+              right: "5%",
+              transform: "translateY(-20%)",
             }}
           >
-            {bodyStatement}{" "}
-            <span className="font-semibold uppercase tracking-wider text-zinc-950">
-              ORGANISED IN {displayDate.toUpperCase()}
-            </span>
-          </p>
-
-          {/* 3. Activity Points Disclaimer */}
-          {activityPointsText && (
             <p
-              className="font-serif italic text-zinc-600 mt-2.5"
+              className="font-sans whitespace-pre-wrap"
               style={{
-                fontSize: "clamp(9px, 1.25vw, 14.5px)",
-                color: "#52525b",
+                fontSize: `calc(${((bodyFontSize ?? 19.5) / 841.89) * 100}cqw)`,
+                lineHeight: 1.35,
+                color: bodyColor,
               }}
             >
-              {activityPointsText}
+              {bodyStatement}{" "}
+              {showDate && !customDescription && (
+                <span className="font-semibold uppercase tracking-wider text-zinc-950">
+                  ORGANISED IN {displayDate.toUpperCase()}
+                </span>
+              )}
             </p>
-          )}
-        </div>
 
-        {/* 4. Discrete Certificate Unique ID (Bottom-Left) */}
-        <div
-          className="absolute flex items-center gap-1 font-mono text-zinc-600 bg-white/80 px-2 py-0.5 rounded shadow-sm border border-zinc-200/50"
-          style={{
-            bottom: "3.8%",
-            left: "4.5%",
-            fontSize: "clamp(8px, 0.88vw, 11.5px)",
-          }}
-        >
-          <span className="font-semibold text-zinc-500">ID:</span>
-          <span className="font-bold text-zinc-900 tracking-wider">{certificateId}</span>
-        </div>
+            {/* Activity Points Disclaimer */}
+            {showActivityPoints && activityPointsText && (
+              <p
+                className="font-serif italic text-zinc-600 mt-[1.2%]"
+                style={{
+                  fontSize: `calc(${(14.5 / 841.89) * 100}cqw)`,
+                  color: "#52525b",
+                }}
+              >
+                {activityPointsText}
+              </p>
+            )}
+          </div>
+        )}
 
-        {/* 5. Verification QR Code (Bottom-Right) */}
-        {qrDataUrl && (
+        {/* 3. Date Line (Standalone) */}
+        {showDate && displayDate && (customTemplateUrl || cfg.dateX !== undefined) && (
           <div
-            className="absolute flex items-center gap-1.5 bg-white/90 p-1.5 rounded border border-zinc-200/80 shadow-sm pointer-events-auto"
+            className="absolute font-sans font-medium whitespace-nowrap"
             style={{
-              bottom: "3.2%",
-              right: "4.5%",
+              top: `${cfg.dateY ?? 88}%`,
+              left: `${cfg.dateX ?? 24}%`,
+              transform: "translate(-50%, -50%)",
+              fontSize: `calc(${(12 / 841.89) * 100}cqw)`,
+              color: cfg.dateColor || "#374151",
             }}
           >
-            <img
-              src={qrDataUrl}
-              alt="Verification QR"
-              className="w-7 h-7 sm:w-8 sm:h-8 object-contain"
-            />
+            {displayDate.toLowerCase().startsWith("date:") ? displayDate : `Date: ${displayDate}`}
+          </div>
+        )}
+
+        {/* 4. Extra Custom Text Fields */}
+        {cfg.extraFields && cfg.extraFields.map((field, idx) => {
+          if (!field.text || !field.text.trim()) return null;
+          const align = field.align || "center";
+          const transform = align === "center" ? "translate(-50%, -50%)" : align === "right" ? "translate(-100%, -50%)" : "translate(0, -50%)";
+          return (
+            <div
+              key={field.id || idx}
+              className="absolute font-sans whitespace-pre-wrap"
+              style={{
+                top: `${field.y ?? 50}%`,
+                left: `${field.x ?? 50}%`,
+                transform,
+                fontSize: `calc(${((field.fontSize ?? 14) / 841.89) * 100}cqw)`,
+                color: field.color || "#374151",
+                textAlign: align,
+              }}
+            >
+              {field.text}
+            </div>
+          );
+        })}
+
+        {/* 5. Certificate Unique ID */}
+        {showCertId && (
+          <div
+            className="absolute flex items-center gap-1 font-mono text-zinc-600 bg-white/80 px-2 py-0.5 rounded shadow-xs border border-zinc-200/50"
+            style={{
+              top: `${certIdY}%`,
+              left: `${certIdX}%`,
+              transform: "translateY(-50%)",
+              fontSize: `calc(${(10 / 841.89) * 100}cqw)`,
+            }}
+          >
+            <span className="font-semibold text-zinc-500">ID:</span>
+            <span className="font-bold text-zinc-900 tracking-wider">{certificateId}</span>
+          </div>
+        )}
+
+        {/* 6. Verification QR Code */}
+        {showQr && (
+          <div
+            className="absolute flex flex-col items-center bg-white/90 p-[0.4%] rounded border border-zinc-200/80 shadow-xs pointer-events-auto"
+            style={{
+              top: `${qrY}%`,
+              left: `${qrX}%`,
+              width: `${qrSizePercent}%`,
+              transform: "translate(-50%, -50%)",
+            }}
+          >
+            {qrDataUrl ? (
+              <img
+                src={qrDataUrl}
+                alt="Verification QR"
+                className="w-full h-auto aspect-square object-contain"
+              />
+            ) : (
+              <div className="w-full aspect-square bg-zinc-900 rounded flex items-center justify-center text-white font-mono text-[0.8cqw]">
+                QR
+              </div>
+            )}
             <span
-              className="font-mono text-zinc-600 uppercase tracking-wider font-semibold"
-              style={{ fontSize: "clamp(7px, 0.75vw, 9.5px)" }}
+              className="font-mono text-zinc-600 uppercase tracking-wider font-semibold whitespace-nowrap mt-[2%]"
+              style={{ fontSize: `calc(${(8 / 841.89) * 100}cqw)` }}
             >
               Scan to Verify
             </span>

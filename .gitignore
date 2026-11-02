@@ -31,3 +31,4 @@ yarn-error.log*
 src/components/editor/
 src/lib/sanitize.ts
 *.tsbuildinfo
+scripts/certificate_generator/output_certificates/

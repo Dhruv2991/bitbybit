@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { Certificate, Member, CertificateCoordinator } from "@/types/database";
 import CertificatePreview from "@/components/certificates/CertificatePreview";
-import { DEFAULT_COORDINATORS, CERTIFICATE_TYPES } from "@/lib/certificates/types";
+import { DEFAULT_COORDINATORS, CERTIFICATE_TYPES, type TemplateConfig } from "@/lib/certificates/types";
 import {
   Award,
   Search,
@@ -21,6 +21,12 @@ import {
   User,
   Calendar,
   ExternalLink,
+  Upload,
+  Sliders,
+  Image as ImageIcon,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface CertificatesTabProps {
@@ -68,6 +74,182 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
     new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })
   );
   const [coordinators, setCoordinators] = useState<CertificateCoordinator[]>(DEFAULT_COORDINATORS);
+
+  // Custom Template State
+  const [templateMode, setTemplateMode] = useState<"default" | "custom">("default");
+  const [customTemplateImage, setCustomTemplateImage] = useState<string | null>(null);
+  const [customTemplateFileName, setCustomTemplateFileName] = useState<string>("");
+  const [showLayoutSettings, setShowLayoutSettings] = useState(false);
+
+  // Layout & positioning adjustments (in %)
+  const [nameY, setNameY] = useState(48);
+  const [nameFontSize, setNameFontSize] = useState(38);
+  const [nameColor, setNameColor] = useState("#09090b");
+
+  const [showBody, setShowBody] = useState(true);
+  const [bodyY, setBodyY] = useState(58);
+  const [bodyFontSize, setBodyFontSize] = useState(16);
+  const [bodyColor, setBodyColor] = useState("#27272a");
+
+  const [showTitleOverlay, setShowTitleOverlay] = useState(false);
+  const [titleY, setTitleY] = useState(26.5);
+  const [titleFontSize, setTitleFontSize] = useState(22);
+  const [titleColor, setTitleColor] = useState("#09090b");
+
+  const [showActivityPoints, setShowActivityPoints] = useState(true);
+  const [showDate, setShowDate] = useState(true);
+  const [showCertId, setShowCertId] = useState(true);
+  const [showQr, setShowQr] = useState(true);
+
+  const [certIdX, setCertIdX] = useState(4.5);
+  const [certIdY, setCertIdY] = useState(95.5);
+  const [qrX, setQrX] = useState(88);
+  const [qrY, setQrY] = useState(86);
+
+  // Text Customization & Freeform Mode
+  const [textMode, setTextMode] = useState<"standard" | "custom">("standard");
+  const [customBodyText, setCustomBodyText] = useState("");
+  const [extraFields, setExtraFields] = useState<Array<{ id: string; text: string; x: number; y: number; fontSize: number; color: string }>>([]);
+
+  function addExtraField() {
+    setExtraFields((prev) => [
+      ...prev,
+      {
+        id: `field_${Date.now()}`,
+        text: "Custom Text",
+        x: 50,
+        y: 75,
+        fontSize: 14,
+        color: "#374151",
+      },
+    ]);
+  }
+
+  function updateExtraField(id: string, updates: Partial<{ text: string; x: number; y: number; fontSize: number; color: string }>) {
+    setExtraFields((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, ...updates } : f))
+    );
+  }
+
+  function removeExtraField(id: string) {
+    setExtraFields((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  function resetTemplateLayout() {
+    setNameY(48);
+    setNameFontSize(38);
+    setNameColor("#09090b");
+    setShowBody(true);
+    setBodyY(58);
+    setBodyFontSize(16);
+    setBodyColor("#27272a");
+    setShowTitleOverlay(false);
+    setTitleY(26.5);
+    setTitleFontSize(22);
+    setTitleColor("#09090b");
+    setShowActivityPoints(true);
+    setShowDate(true);
+    setShowCertId(true);
+    setShowQr(true);
+    setCertIdX(4.5);
+    setCertIdY(95.5);
+    setQrX(88);
+    setQrY(86);
+    setExtraFields([]);
+  }
+
+  function handleCustomTemplateUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showToast("Please upload an image file (PNG, JPG, or WebP).");
+      return;
+    }
+
+    setCustomTemplateFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const maxDim = 2048;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL("image/png", 0.95);
+          setCustomTemplateImage(dataUrl);
+          setTemplateMode("custom");
+          setShowLayoutSettings(true);
+          showToast(`Custom template loaded: ${file.name}`);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  const activeTemplateConfig: TemplateConfig = useMemo(() => {
+    return {
+      isCustom: templateMode === "custom",
+      nameY,
+      nameFontSize,
+      nameColor,
+      showTitle: templateMode === "custom" ? showTitleOverlay : undefined,
+      titleY,
+      titleFontSize,
+      titleColor,
+      showBody,
+      bodyY,
+      bodyFontSize,
+      bodyColor,
+      showActivityPoints,
+      showDate,
+      showCertId,
+      showQr,
+      certIdX,
+      certIdY,
+      qrX,
+      qrY,
+      extraFields: extraFields.length > 0 ? extraFields : undefined,
+    };
+  }, [
+    templateMode,
+    nameY,
+    nameFontSize,
+    nameColor,
+    showTitleOverlay,
+    titleY,
+    titleFontSize,
+    titleColor,
+    showBody,
+    bodyY,
+    bodyFontSize,
+    bodyColor,
+    showActivityPoints,
+    showDate,
+    showCertId,
+    showQr,
+    certIdX,
+    certIdY,
+    qrX,
+    qrY,
+    extraFields,
+  ]);
 
   // Load Certificates
   async function loadCertificates() {
@@ -129,7 +311,13 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
   // Submit Issue Certificate
   async function handleIssueCertificate(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedGithub || !recipientName.trim() || !recipientEmail.trim() || !achievementText.trim() || !eventName.trim()) {
+    if (templateMode === "custom" && !customTemplateImage) {
+      showToast("Please upload a custom certificate template image, or switch to Default Template.");
+      return;
+    }
+
+    const trimmedDesc = textMode === "custom" && customBodyText.trim() ? customBodyText.trim() : undefined;
+    if (!selectedGithub || !recipientName.trim() || !recipientEmail.trim() || (!trimmedDesc && (!achievementText.trim() || !eventName.trim()))) {
       showToast("Please fill all required certificate fields.");
       return;
     }
@@ -167,6 +355,9 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
           activityPointsText,
           coordinators,
           dateStr,
+          customTemplateImage: templateMode === "custom" ? customTemplateImage : undefined,
+          templateConfig: activeTemplateConfig,
+          customDescription: trimmedDesc,
         }),
       });
 
@@ -580,6 +771,305 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
             <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-y-auto divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-zinc-800">
               {/* Form Column */}
               <form onSubmit={handleIssueCertificate} className="lg:col-span-5 p-5 space-y-4 overflow-y-auto max-h-[75vh]">
+                {/* 0. Template Selection & Placement Controls */}
+                <div className="bg-slate-50 dark:bg-zinc-900/80 p-3.5 rounded-xl border border-slate-200 dark:border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-mono text-slate-700 dark:text-zinc-300 uppercase font-semibold flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                      Certificate Template
+                    </label>
+                    <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500">
+                      {templateMode === "default" ? "Standard Base" : "Custom Template"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTemplateMode("default")}
+                      className={`py-1.5 px-3 rounded-lg text-xs font-mono font-medium transition-all flex items-center justify-center gap-1.5 border ${
+                        templateMode === "default"
+                          ? "bg-white dark:bg-zinc-800 border-cyan-500 text-cyan-700 dark:text-cyan-300 shadow-xs"
+                          : "bg-slate-100/70 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-100"
+                      }`}
+                    >
+                      Default Template
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTemplateMode("custom")}
+                      className={`py-1.5 px-3 rounded-lg text-xs font-mono font-medium transition-all flex items-center justify-center gap-1.5 border ${
+                        templateMode === "custom"
+                          ? "bg-white dark:bg-zinc-800 border-cyan-500 text-cyan-700 dark:text-cyan-300 shadow-xs"
+                          : "bg-slate-100/70 dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-100"
+                      }`}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Upload Custom
+                    </button>
+                  </div>
+
+                  {templateMode === "custom" && (
+                    <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-zinc-800 animate-fade-in">
+                      <label className="block text-[10px] font-mono text-slate-500 dark:text-zinc-400">
+                        Upload Template Image (PNG / JPG / WebP):
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <label className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-3 py-2 border-2 border-dashed border-slate-300 dark:border-zinc-700 rounded-lg hover:border-cyan-500 dark:hover:border-cyan-400 transition-colors bg-white dark:bg-zinc-950">
+                          <Upload className="w-4 h-4 text-slate-400" />
+                          <span className="text-xs font-mono text-slate-600 dark:text-zinc-300 truncate">
+                            {customTemplateFileName || "Browse or Drop Template Image..."}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={handleCustomTemplateUpload}
+                            className="hidden"
+                          />
+                        </label>
+                        {customTemplateImage && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomTemplateImage(null);
+                              setCustomTemplateFileName("");
+                              setTemplateMode("default");
+                            }}
+                            className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-lg border border-rose-500/20 text-xs font-mono"
+                            title="Remove custom template"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-mono text-slate-400 dark:text-zinc-500">
+                        Upload any blank or pre-designed certificate. Adjust text positions below.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Positioning & Text Adjustment Controls */}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowLayoutSettings(!showLayoutSettings)}
+                      className="w-full flex items-center justify-between text-[11px] font-mono text-cyan-600 dark:text-cyan-400 py-1 hover:underline"
+                    >
+                      <span className="flex items-center gap-1.5 font-semibold">
+                        <Sliders className="w-3.5 h-3.5" />
+                        {templateMode === "custom" ? "Text Placement & Sizing Controls" : "Adjust Positions & Layout (Optional)"}
+                      </span>
+                      {showLayoutSettings ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+
+                    {showLayoutSettings && (
+                      <div className="space-y-3 mt-2.5 p-3 bg-white dark:bg-zinc-950 rounded-lg border border-slate-200 dark:border-zinc-800 text-xs font-mono animate-fade-in">
+                        <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-zinc-850">
+                          <span className="text-[10px] font-bold text-slate-700 dark:text-zinc-300 uppercase">Field Alignments</span>
+                          <button
+                            type="button"
+                            onClick={resetTemplateLayout}
+                            className="text-[10px] text-slate-400 hover:text-cyan-600 flex items-center gap-1"
+                          >
+                            <RotateCcw className="w-3 h-3" /> Reset
+                          </button>
+                        </div>
+
+                        {/* Recipient Name Controls */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-700 dark:text-zinc-300 font-semibold">Recipient Name Position:</span>
+                            <span className="text-slate-400">{nameY}% (Y)</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="15"
+                            max="85"
+                            step="0.5"
+                            value={nameY}
+                            onChange={(e) => setNameY(parseFloat(e.target.value))}
+                            className="w-full accent-cyan-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                          />
+                          <div className="grid grid-cols-2 gap-2 pt-0.5">
+                            <div>
+                              <span className="text-[10px] text-slate-500">Font Size: {nameFontSize}pt</span>
+                              <input
+                                type="range"
+                                min="20"
+                                max="64"
+                                step="1"
+                                value={nameFontSize}
+                                onChange={(e) => setNameFontSize(parseInt(e.target.value))}
+                                className="w-full accent-cyan-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-500">Color:</span>
+                              <input
+                                type="color"
+                                value={nameColor}
+                                onChange={(e) => setNameColor(e.target.value)}
+                                className="w-6 h-6 rounded cursor-pointer border border-slate-300 dark:border-zinc-700 p-0"
+                              />
+                              <span className="text-[10px] text-slate-400 font-mono">{nameColor}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Recognition Statement Controls */}
+                        <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-zinc-800/80">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-slate-700 dark:text-zinc-300 font-semibold">Recognition Body Position:</span>
+                            <span className="text-slate-400">{bodyY}% (Y)</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="25"
+                            max="90"
+                            step="0.5"
+                            value={bodyY}
+                            onChange={(e) => setBodyY(parseFloat(e.target.value))}
+                            className="w-full accent-cyan-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                          />
+                          <div className="grid grid-cols-2 gap-2 pt-0.5">
+                            <div>
+                              <span className="text-[10px] text-slate-500">Font Size: {bodyFontSize}pt</span>
+                              <input
+                                type="range"
+                                min="10"
+                                max="28"
+                                step="1"
+                                value={bodyFontSize}
+                                onChange={(e) => setBodyFontSize(parseInt(e.target.value))}
+                                className="w-full accent-cyan-500 h-1.5 bg-slate-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-500">Color:</span>
+                              <input
+                                type="color"
+                                value={bodyColor}
+                                onChange={(e) => setBodyColor(e.target.value)}
+                                className="w-6 h-6 rounded cursor-pointer border border-slate-300 dark:border-zinc-700 p-0"
+                              />
+                              <span className="text-[10px] text-slate-400 font-mono">{bodyColor}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Toggles for Title, QR Code, ID, Activity Points */}
+                        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 space-y-2">
+                          <span className="block text-[10px] font-bold text-slate-700 dark:text-zinc-300 uppercase">
+                            Elements Visibility
+                          </span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 dark:text-zinc-300">
+                              <input
+                                type="checkbox"
+                                checked={showTitleOverlay}
+                                onChange={(e) => setShowTitleOverlay(e.target.checked)}
+                                className="rounded accent-cyan-500"
+                              />
+                              Title Text
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 dark:text-zinc-300">
+                              <input
+                                type="checkbox"
+                                checked={showQr}
+                                onChange={(e) => setShowQr(e.target.checked)}
+                                className="rounded accent-cyan-500"
+                              />
+                              QR Code
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 dark:text-zinc-300">
+                              <input
+                                type="checkbox"
+                                checked={showCertId}
+                                onChange={(e) => setShowCertId(e.target.checked)}
+                                className="rounded accent-cyan-500"
+                              />
+                              Certificate ID
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer text-[11px] text-slate-600 dark:text-zinc-300">
+                              <input
+                                type="checkbox"
+                                checked={showActivityPoints}
+                                onChange={(e) => setShowActivityPoints(e.target.checked)}
+                                className="rounded accent-cyan-500"
+                              />
+                              Activity Points
+                            </label>
+                          </div>
+                        </div>
+
+                        {/* Extra Custom Text Lines */}
+                        <div className="pt-2 border-t border-slate-100 dark:border-zinc-800/80 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-slate-700 dark:text-zinc-300 uppercase">
+                              Extra Custom Text Lines ({extraFields.length})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={addExtraField}
+                              className="text-[10px] text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 font-semibold"
+                            >
+                              <Plus className="w-3 h-3" /> Add Text Line
+                            </button>
+                          </div>
+
+                          {extraFields.map((field) => (
+                            <div key={field.id} className="p-2 bg-slate-50 dark:bg-zinc-900 rounded-lg border border-slate-200 dark:border-zinc-800 space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={field.text}
+                                  onChange={(e) => updateExtraField(field.id, { text: e.target.value })}
+                                  placeholder="Type text to display..."
+                                  className="flex-1 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded px-2 py-1 text-xs font-mono text-slate-900 dark:text-zinc-200 focus:outline-none focus:border-cyan-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeExtraField(field.id)}
+                                  className="text-rose-500 hover:text-rose-600 p-1"
+                                  title="Remove line"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                <div>
+                                  <span className="text-slate-400">Position Y: {field.y}%</span>
+                                  <input
+                                    type="range"
+                                    min="10"
+                                    max="95"
+                                    step="1"
+                                    value={field.y}
+                                    onChange={(e) => updateExtraField(field.id, { y: parseInt(e.target.value) })}
+                                    className="w-full accent-cyan-500 h-1 bg-slate-200 dark:bg-zinc-800 rounded"
+                                  />
+                                </div>
+                                <div>
+                                  <span className="text-slate-400">Position X: {field.x}%</span>
+                                  <input
+                                    type="range"
+                                    min="5"
+                                    max="95"
+                                    step="1"
+                                    value={field.x}
+                                    onChange={(e) => updateExtraField(field.id, { x: parseInt(e.target.value) })}
+                                    className="w-full accent-cyan-500 h-1 bg-slate-200 dark:bg-zinc-800 rounded"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* 1. Member Selector */}
                 <div>
                   <label className="block text-[11px] font-mono text-slate-600 dark:text-zinc-400 uppercase mb-1">
@@ -675,37 +1165,137 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                   </div>
                 </div>
 
-                {/* 4. Achievement & Event */}
-                <div>
-                  <label className="block text-[11px] font-mono text-slate-600 dark:text-zinc-400 uppercase mb-1">
-                    Recognition / Achievement Statement *
-                  </label>
-                  <input
-                    type="text"
-                    value={achievementText}
-                    onChange={(e) => setAchievementText(e.target.value)}
-                    placeholder="e.g. securing 1st Place for the"
-                    required
-                    className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-900 dark:text-zinc-200 focus:outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-mono text-slate-600 dark:text-zinc-400 uppercase mb-1">
-                      Event / Contest Name *
+                {/* 4. Certificate Text & Body Statement */}
+                <div className="space-y-3 bg-slate-50/70 dark:bg-zinc-900/40 p-3 rounded-xl border border-slate-200 dark:border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-mono text-slate-700 dark:text-zinc-300 uppercase font-semibold">
+                      Certificate Body Statement *
                     </label>
-                    <input
-                      type="text"
-                      value={eventName}
-                      onChange={(e) => setEventName(e.target.value)}
-                      placeholder="e.g. Bit By Bit Weekly Contest"
-                      required
-                      className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-900 dark:text-zinc-200 focus:outline-none focus:border-cyan-500"
-                    />
+                    <div className="flex items-center bg-slate-200/80 dark:bg-zinc-800 p-0.5 rounded-lg text-[10px] font-mono">
+                      <button
+                        type="button"
+                        onClick={() => setTextMode("standard")}
+                        className={`px-2 py-0.5 rounded transition-all ${
+                          textMode === "standard"
+                            ? "bg-white dark:bg-zinc-950 text-cyan-600 dark:text-cyan-400 font-bold shadow-xs"
+                            : "text-slate-500 hover:text-slate-900 dark:text-zinc-400"
+                        }`}
+                      >
+                        Standard Fields
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTextMode("custom");
+                          if (!customBodyText) {
+                            setCustomBodyText(
+                              `from ${organizationText} in recognition of ${achievementText} ${eventName} ORGANISED IN ${dateStr.toUpperCase()}`
+                            );
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded transition-all ${
+                          textMode === "custom"
+                            ? "bg-white dark:bg-zinc-950 text-cyan-600 dark:text-cyan-400 font-bold shadow-xs"
+                            : "text-slate-500 hover:text-slate-900 dark:text-zinc-400"
+                        }`}
+                      >
+                        ✍️ Freeform Custom Text
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-mono text-slate-600 dark:text-zinc-400 uppercase mb-1">
+
+                  {textMode === "custom" ? (
+                    <div className="space-y-2 animate-fade-in">
+                      <textarea
+                        rows={3}
+                        value={customBodyText}
+                        onChange={(e) => setCustomBodyText(e.target.value)}
+                        placeholder="Write the exact text you want to appear on the certificate..."
+                        className="w-full bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg p-2.5 text-xs font-mono text-slate-900 dark:text-zinc-200 focus:outline-none focus:border-cyan-500 resize-none leading-relaxed"
+                        required={textMode === "custom"}
+                      />
+                      <div className="flex flex-wrap gap-1 items-center">
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 mr-1">Templates:</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomBodyText(
+                              `from teamcodelocked club in recognition of securing 1st Place for the ${eventName} ORGANISED IN ${dateStr.toUpperCase()}`
+                            )
+                          }
+                          className="px-2 py-0.5 text-[10px] font-mono bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 rounded text-slate-700 dark:text-zinc-200"
+                        >
+                          1st Place
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomBodyText(
+                              `for active and enthusiastic participation in the ${eventName} conducted by teamcodelocked club IN ${dateStr.toUpperCase()}`
+                            )
+                          }
+                          className="px-2 py-0.5 text-[10px] font-mono bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 rounded text-slate-700 dark:text-zinc-200"
+                        >
+                          Participation
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomBodyText(
+                              `has successfully completed all requirements and practical projects for the ${eventName} conducted by BMSCE TeamCodeLocked.`
+                            )
+                          }
+                          className="px-2 py-0.5 text-[10px] font-mono bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 rounded text-slate-700 dark:text-zinc-200"
+                        >
+                          Bootcamp / Course
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomBodyText(
+                              `in sincere appreciation for outstanding dedication, leadership and mentorship during the ${eventName}.`
+                            )
+                          }
+                          className="px-2 py-0.5 text-[10px] font-mono bg-white dark:bg-zinc-800 hover:bg-slate-100 dark:hover:bg-zinc-700 border border-slate-200 dark:border-zinc-700 rounded text-slate-700 dark:text-zinc-200"
+                        >
+                          Appreciation
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[10px] font-mono text-slate-500 dark:text-zinc-400 mb-1">
+                          Achievement / Placement Text
+                        </label>
+                        <input
+                          type="text"
+                          value={achievementText}
+                          onChange={(e) => setAchievementText(e.target.value)}
+                          placeholder="e.g. securing 1st Place for the"
+                          required={textMode === "standard"}
+                          className="w-full bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-900 dark:text-zinc-200 focus:outline-none focus:border-cyan-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-mono text-slate-500 dark:text-zinc-400 mb-1">
+                          Event / Contest Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={eventName}
+                          onChange={(e) => setEventName(e.target.value)}
+                          placeholder="e.g. Bit By Bit Weekly Contest"
+                          required={textMode === "standard"}
+                          className="w-full bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-900 dark:text-zinc-200 focus:outline-none focus:border-cyan-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Common Date Display */}
+                  <div className="pt-2 border-t border-slate-200/80 dark:border-zinc-800">
+                    <label className="block text-[10px] font-mono text-slate-500 dark:text-zinc-400 mb-1">
                       Date Display
                     </label>
                     <input
@@ -713,7 +1303,7 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       value={dateStr}
                       onChange={(e) => setDateStr(e.target.value)}
                       placeholder="e.g. June 2026"
-                      className="w-full bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-900 dark:text-zinc-200 focus:outline-none focus:border-cyan-500"
+                      className="w-full bg-white dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-900 dark:text-zinc-200 focus:outline-none focus:border-cyan-500"
                     />
                   </div>
                 </div>
@@ -806,13 +1396,15 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
               </form>
 
               {/* Live Certificate Preview Column */}
-              <div className="lg:col-span-7 p-6 bg-slate-100 dark:bg-zinc-950 flex flex-col justify-center items-center overflow-y-auto">
-                <div className="w-full max-w-xl">
+              <div className="lg:col-span-7 p-4 sm:p-6 bg-slate-100/90 dark:bg-zinc-950 flex flex-col justify-center items-center overflow-y-auto">
+                <div className="w-full max-w-3xl">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[11px] font-mono text-cyan-600 dark:text-cyan-400 font-semibold uppercase tracking-wider flex items-center gap-1.5">
-                      <Eye className="w-3.5 h-3.5" /> Live Certificate Preview
+                      <Eye className="w-3.5 h-3.5" /> Live Preview (Exact 1:1 Download Ratio)
                     </span>
-                    <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500">Updates in real-time</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-200/90 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border border-slate-300/50 dark:border-zinc-700">
+                      A4 Print Ratio (297 × 210 mm)
+                    </span>
                   </div>
                   <div className="p-2 sm:p-3 bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800 rounded-xl shadow-xl">
                     <CertificatePreview
@@ -825,6 +1417,9 @@ export default function CertificatesTab({ members, showToast }: CertificatesTabP
                       coordinators={coordinators}
                       dateStr={dateStr || "June 2026"}
                       certificateId="BBCERT-2026-PREVIEW"
+                      customTemplateUrl={templateMode === "custom" ? customTemplateImage : null}
+                      templateConfig={activeTemplateConfig}
+                      customDescription={textMode === "custom" && customBodyText.trim() ? customBodyText.trim() : undefined}
                     />
                   </div>
                 </div>
