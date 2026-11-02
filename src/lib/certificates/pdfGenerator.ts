@@ -47,7 +47,9 @@ export async function generateCertificatePdf(data: CertificateData): Promise<Buf
   // 1. Embed Certificate Base Background (Custom Template or Official Default)
   try {
     if (data.customTemplateImage) {
-      doc.addImage(data.customTemplateImage, 'PNG', 0, 0, width, height, undefined, 'FAST');
+      const img = data.customTemplateImage;
+      const fmt = img.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+      doc.addImage(img, fmt, 0, 0, width, height, undefined, 'FAST');
     } else {
       let templatePath = path.join(process.cwd(), 'public', 'certificates', 'certificate-base.png');
       if (!fs.existsSync(templatePath)) {
