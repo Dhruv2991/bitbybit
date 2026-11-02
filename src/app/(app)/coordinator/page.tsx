@@ -24,3 +24,4 @@ export default function Page() {
 
   return <CoordinatorPage user={user} />;
 }
+

@@ -27,6 +27,8 @@ const PAGES: { id: PageId; label: string; icon: string; color: string; adminOnly
   { id: 'home',        label: 'Dashboard',        icon: '⌂',   color: '#0284c7' },
   { id: 'problems',    label: 'Problem Set',      icon: '{ }', color: '#0284c7' },
   { id: 'leaderboard', label: 'Leaderboard',      icon: '⚡',  color: '#d97706' },
+  { id: 'duels',       label: '1v1 Code Duels',   icon: '⚔️',  color: '#06b6d4' },
+  { id: 'squads',      label: 'Squads & Guilds',  icon: '🛡️',  color: '#6366f1' },
   { id: 'arena',       label: 'Arena Contests',   icon: '🏆',  color: '#e11d48' },
   { id: 'weekly',      label: 'Weekly DSA',       icon: '🏅',  color: '#0284c7' },
   { id: 'subscribe',   label: 'Monthly Access',   icon: '⭐',  color: '#0284c7' },

@@ -282,6 +282,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           badge: "Live 1v1",
           badgeColor: "bg-cyan-100 text-cyan-700 border border-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/20 font-medium",
         },
+        {
+          id: "squads" as PageId,
+          label: "Squads & Clans",
+          icon: IconCoordinator,
+          badge: "Clans",
+          badgeColor: "bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/20 font-medium",
+        },
         { id: "leaderboard", label: "Leaderboard", icon: IconLeaderboard },
       ],
     },

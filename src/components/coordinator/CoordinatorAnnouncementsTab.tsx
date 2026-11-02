@@ -185,3 +185,4 @@ export default function CoordinatorAnnouncementsTab({ showToast }: CoordinatorAn
     </div>
   );
 }
+

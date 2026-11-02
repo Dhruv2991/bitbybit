@@ -33,6 +33,7 @@ import {
   type Editorial,
 } from '@/lib/gemini';
 import ProblemDiscussion from '@/components/discussion/ProblemDiscussion';
+import ProblemDiscussionsTab from '@/components/problems/ProblemDiscussionsTab';
 import {
   traceCode,
   checkVisualizerAccess,
@@ -1877,7 +1878,27 @@ export default function Workspace({ problem: initialProblem, user, onClose, onAr
       </div>
 
       {/* Discussion — shown for all problems, hidden in arena only */}
-      {!onArenaSubmit && <ProblemDiscussion problemId={problem.id} problemTitle={problem.title} user={user} />}
+      {!onArenaSubmit && (
+        <div className="border-t border-slate-200 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/40">
+          <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono font-bold tracking-widest uppercase bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
+                  Peer Explanations
+                </span>
+                <span className="text-xs font-mono text-slate-500 dark:text-zinc-400">ELI5 & Mental Models</span>
+              </div>
+              <h3 className="text-lg font-bold font-mono text-slate-900 dark:text-zinc-100">
+                Community Solutions & Gotchas
+              </h3>
+            </div>
+            <ProblemDiscussionsTab problemId={problem.id} user={user} />
+            <div className="pt-4 border-t border-slate-200 dark:border-zinc-800">
+              <ProblemDiscussion problemId={problem.id} problemTitle={problem.title} user={user} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Logic Visualizer Drawer (slides up from bottom of editor column) ── */}
       {vizOpen && (

@@ -11,6 +11,7 @@ import ProblemOfTheDay from '@/components/home/ProblemOfTheDay';
 import ProgressOverview from '@/components/home/ProgressOverview';
 import RecentActivity from '@/components/home/RecentActivity';
 import LeaderboardPreview from '@/components/home/LeaderboardPreview';
+import DailyCommunityPoll from '@/components/community/DailyCommunityPoll';
 import QuickActions from '@/components/home/QuickActions';
 import ProShowcase from '@/components/home/ProShowcase';
 
@@ -394,6 +395,9 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
           />
         </div>
       </div>
+
+      {/* Daily Community Question & Debate */}
+      <DailyCommunityPoll user={user} />
 
       {/* 4. BitByBit Pro Showcase & Comparison */}
       <ProShowcase

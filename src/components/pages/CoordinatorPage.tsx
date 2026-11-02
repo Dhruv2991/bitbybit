@@ -199,3 +199,4 @@ export default function CoordinatorPage({ user }: CoordinatorPageProps) {
     </div>
   );
 }
+

@@ -14,6 +14,7 @@ import ContributionHeatmap from '@/components/profile/ContributionHeatmap';
 import SkillRadar from '@/components/profile/SkillRadar';
 import CertificatePreview from '@/components/certificates/CertificatePreview';
 import SpotlightCard from '@/components/ui/SpotlightCard';
+import DeveloperCardModal from '@/components/profile/DeveloperCardModal';
 import {
   Award,
   Download,
@@ -72,6 +73,7 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewingCertificate, setViewingCertificate] = useState<Certificate | null>(null);
+  const [showCardModal, setShowCardModal] = useState(false);
   const [downloadingCertId, setDownloadingCertId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'certificates' | 'badges'>('certificates');
 
@@ -473,6 +475,12 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
                     🩸 {stats.bloodFirstCount} First Blood{stats.bloodFirstCount === 1 ? '' : 's'}
                   </span>
                 )}
+                <button
+                  onClick={() => setShowCardModal(true)}
+                  className="text-[10px] font-mono font-bold text-sky-600 dark:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 rounded-md px-2.5 py-0.5 flex items-center gap-1 transition cursor-pointer"
+                >
+                  🪪 Share Dev Card
+                </button>
               </div>
             </div>
           </div>
@@ -853,6 +861,13 @@ export default function ProfilePage({ user, onNavigate }: ProfilePageProps) {
       </div>
 
       {/* ── 5. CERTIFICATE VIEWER MODAL ── */}
+      {showCardModal && stats && (
+        <DeveloperCardModal
+          user={user}
+          stats={stats}
+          onClose={() => setShowCardModal(false)}
+        />
+      )}
       {viewingCertificate && (
         <div className="fixed inset-0 z-[200] bg-slate-950/70 dark:bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
           <div className="bg-white dark:bg-zinc-900/95 backdrop-blur-2xl border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto">

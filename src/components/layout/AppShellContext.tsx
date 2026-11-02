@@ -10,7 +10,7 @@ import { isActiveSubscription } from "@/lib/subscription";
 
 export type PageId =
   | "home" | "problems" | "leaderboard" | "arena" | "weekly"
-  | "admin" | "coordinator" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe" | "collaborations" | "unsubscribe" | "duels" | "pricing";
+  | "admin" | "coordinator" | "about" | "privacy" | "terms" | "refunds" | "profile" | "subscribe" | "collaborations" | "unsubscribe" | "duels" | "squads" | "pricing";
 
 export type ToastType = "ok" | "err" | "warn" | "info";
 export interface Toast { id: number; msg: string; type: ToastType; }
@@ -38,6 +38,7 @@ export const ROUTE_TO_PAGE: Record<string, PageId> = {
   "/collaborations": "collaborations",
   "/unsubscribe": "unsubscribe",
   "/duels": "duels",
+  "/squads": "squads",
   "/pricing": "pricing",
 };
 
@@ -45,7 +46,7 @@ export const PAGE_TO_ROUTE: Record<PageId, string> = {
   home: "/", problems: "/problems", leaderboard: "/leaderboard", arena: "/arena",
   weekly: "/weekly", admin: "/admin", coordinator: "/coordinator", about: "/about", privacy: "/privacy",
   terms: "/terms", refunds: "/refunds", profile: "/profile", subscribe: "/subscribe",
-  collaborations: "/collaborations", unsubscribe: "/unsubscribe", duels: "/duels",
+  collaborations: "/collaborations", unsubscribe: "/unsubscribe", duels: "/duels", squads: "/squads",
   pricing: "/pricing",
 };
 

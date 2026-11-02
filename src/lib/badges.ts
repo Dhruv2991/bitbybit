@@ -15,6 +15,9 @@ export interface BadgeInput {
   everSolvedWeekly: boolean;
   currentStreak:  number;
   monthlyRank:    number | null;
+  duelsWon?:      number;
+  isNightOwl?:    boolean;
+  mentorUpvotes?: number;
 }
 
 export interface Badge {
@@ -92,6 +95,21 @@ export const BADGES: Badge[] = [
     id: 'unstoppable', icon: '⚡', label: 'Unstoppable',
     description: 'Reach a 7-day streak',
     permanent: false, unlocked: s => s.currentStreak >= 7,
+  },
+  {
+    id: 'duelist', icon: '⚔️', label: 'Duelist',
+    description: 'Win a live 1v1 Code Duel',
+    permanent: true, unlocked: s => (s.duelsWon || 0) >= 1,
+  },
+  {
+    id: 'night-owl', icon: '🦉', label: 'Night Owl',
+    description: 'Solve a problem between 12:00 AM and 4:00 AM',
+    permanent: true, unlocked: s => !!s.isNightOwl,
+  },
+  {
+    id: 'top-mentor', icon: '🤝', label: 'Top Mentor',
+    description: 'Earn 10+ upvotes on community explanations',
+    permanent: true, unlocked: s => (s.mentorUpvotes || 0) >= 10,
   },
   {
     id: 'top-10-month', icon: '🥇', label: 'Top 10 This Month',

@@ -353,3 +353,25 @@
   -webkit-appearance: none !important;
   appearance: none !important;
 }
+
+/* ══════════════════════════════════════════
+   FLOATING CHEER ANIMATION (DUELS)
+══════════════════════════════════════════ */
+@keyframes floatUp {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-120px) scale(1.15);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(-280px) scale(1);
+    opacity: 0;
+  }
+}
+
+.animate-float-up {
+  animation: floatUp 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}

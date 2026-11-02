@@ -21,6 +21,7 @@ import {
 import { getStrategy, runInBrowser, pollExecutionStatus } from "@/lib/browserExecutor";
 
 import ProblemStatement from "./ProblemStatement";
+import FloatingEmojiReactions from "@/components/duels/FloatingEmojiReactions";
 
 // Dynamic import of Monaco Editor with ssr: false for bundle optimization
 const CodeEditor = dynamic(() => import("./DuelEditor"), {
@@ -325,6 +326,8 @@ export default function DuelWarRoomPage() {
   }
 
   const isHost = duel?.host_github === currentUser?.github;
+  const isGuest = duel?.guest_github === currentUser?.github;
+  const isSpectator = !isHost && !isGuest;
   const myProgress = isHost ? duel?.host_progress : duel?.guest_progress;
   const opponentProgress = isHost ? duel?.guest_progress : duel?.host_progress;
   const opponentName = isHost ? duel?.guest_name || duel?.guest_github || "Challenger" : duel?.host_name || duel?.host_github;
@@ -708,6 +711,13 @@ export default function DuelWarRoomPage() {
           </div>
         </div>
       )}
+
+      {/* Floating Emoji Reactions & Live Cheers */}
+      <FloatingEmojiReactions
+        roomId={roomId}
+        userName={currentUser?.name || currentUser?.github || "Spectator"}
+        isSpectator={isSpectator}
+      />
     </div>
   );
 }
