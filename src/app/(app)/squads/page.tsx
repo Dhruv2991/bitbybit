@@ -16,3 +16,4 @@ export default function Page() {
 
   return <SquadsPage user={user} />;
 }
+

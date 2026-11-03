@@ -444,3 +444,4 @@ export default function SquadsPage({ user }: SquadsPageProps) {
     </div>
   );
 }
+

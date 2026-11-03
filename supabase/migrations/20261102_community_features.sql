@@ -83,3 +83,4 @@ CREATE TABLE IF NOT EXISTS public.problem_discussion_votes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_discussion_votes_disc ON public.problem_discussion_votes(discussion_id);
+

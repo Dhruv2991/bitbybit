@@ -56,3 +56,4 @@ export interface ProblemDiscussion {
   created_at: string;
   has_upvoted?: boolean;
 }
+

@@ -34,6 +34,7 @@ import {
 } from '@/lib/gemini';
 import ProblemDiscussion from '@/components/discussion/ProblemDiscussion';
 import ProblemDiscussionsTab from '@/components/problems/ProblemDiscussionsTab';
+import ProblemLivePresence from '@/components/problem/ProblemLivePresence';
 import {
   traceCode,
   checkVisualizerAccess,
@@ -1475,6 +1476,12 @@ export default function Workspace({ problem: initialProblem, user, onClose, onAr
         )}
 
         {leftTab === 'problem' && (<>
+        <ProblemLivePresence
+          problemId={problem.id}
+          problemTitle={problem.title}
+          user={user}
+          failedAttempts={testResult && testResult.passed < testResult.total ? 2 : 0}
+        />
         <ProblemDescription problem={problem} />
 
         {(() => {
@@ -1879,7 +1886,7 @@ export default function Workspace({ problem: initialProblem, user, onClose, onAr
 
       {/* Discussion — shown for all problems, hidden in arena only */}
       {!onArenaSubmit && (
-        <div className="border-t border-slate-200 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/40">
+        <div id="community-discussions" className="border-t border-slate-200 dark:border-zinc-800/80 bg-slate-50/50 dark:bg-zinc-950/40">
           <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
             <div className="space-y-1">
               <div className="flex items-center gap-2">

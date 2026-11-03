@@ -174,3 +174,4 @@ export async function leaveSquadAction(
     return { success: false, error: err.message || "Failed to leave squad" };
   }
 }
+

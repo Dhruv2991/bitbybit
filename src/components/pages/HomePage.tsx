@@ -14,6 +14,7 @@ import LeaderboardPreview from '@/components/home/LeaderboardPreview';
 import DailyCommunityPoll from '@/components/community/DailyCommunityPoll';
 import QuickActions from '@/components/home/QuickActions';
 import ProShowcase from '@/components/home/ProShowcase';
+import CommunityHeartbeat from '@/components/home/CommunityHeartbeat';
 
 interface HomePageProps {
   user: User | null;
@@ -399,8 +400,8 @@ export default function HomePage({ user, onNavigate }: HomePageProps) {
       {/* Daily Community Question & Debate */}
       <DailyCommunityPoll user={user} />
 
-      {/* 4. BitByBit Pro Showcase & Comparison */}
-      <ProShowcase
+      {/* 4. Community Pulse & Living Highlights */}
+      <CommunityHeartbeat
         onNavigate={onNavigate}
         isSubscriber={user?.is_subscriber}
       />
