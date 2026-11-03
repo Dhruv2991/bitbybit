@@ -119,6 +119,15 @@ function IconAdmin({ className = "w-4 h-4" }: { className?: string }) {
   );
 }
 
+function IconLounge({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+    </svg>
+  );
+}
+
 function IconCoordinator({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -263,6 +272,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         { id: "home", label: "Dashboard", icon: IconHome },
         { id: "problems", label: "Problem Set", icon: IconProblems },
         { id: "weekly", label: "Weekly DSA", icon: IconWeekly, badge: "New", badgeColor: "bg-sky-100 text-sky-700 border border-sky-200 dark:bg-cyan-500/10 dark:text-cyan-400 dark:border-cyan-500/20" },
+        { id: "lounge" as PageId, label: "Lo-Fi Lounge", icon: IconLounge, badge: "Chill", badgeColor: "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20 font-medium" },
       ],
     },
     {
