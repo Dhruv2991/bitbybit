@@ -81,18 +81,10 @@ export default function LeaderboardPage() {
             const list = Object.values(map).sort((a, b) => b.upvotes - a.upvotes).slice(0, 50);
             setMentorRows(list);
           } else {
-            setMentorRows([
-              { github: "alex_coder", name: "Alex Coder", upvotes: 42, posts: 3 },
-              { github: "deepak_v", name: "Deepak V.", upvotes: 28, posts: 2 },
-              { github: "ananya_s", name: "Ananya Sharma", upvotes: 19, posts: 2 },
-            ]);
+            setMentorRows([]);
           }
         } catch {
-          setMentorRows([
-            { github: "alex_coder", name: "Alex Coder", upvotes: 42, posts: 3 },
-            { github: "deepak_v", name: "Deepak V.", upvotes: 28, posts: 2 },
-            { github: "ananya_s", name: "Ananya Sharma", upvotes: 19, posts: 2 },
-          ]);
+          setMentorRows([]);
         }
       } else if (tab === "overall") {
         // Aggregate from all three tables for true all-time points (with safe bounds)
@@ -686,42 +678,54 @@ export default function LeaderboardPage() {
         </div>
       ) : tab === "mentors" ? (
         <div className="space-y-2">
-          <div className="hidden sm:grid grid-cols-[3rem_1fr_6rem_6rem] gap-4 px-4 py-2 text-[10px] text-slate-500 dark:text-zinc-500 font-mono uppercase tracking-widest border-b border-slate-200/80 dark:border-white/[0.04] mb-1">
-            <div>Rank</div>
-            <div>Community Mentor</div>
-            <div className="text-center">Takes Shared</div>
-            <div className="text-right">Mentor Karma</div>
-          </div>
-          {mentorRows.map((m, i) => (
-            <div
-              key={m.github}
-              className="flex items-center gap-3 md:gap-4 px-4 py-3 rounded-2xl border transition-all duration-150 backdrop-blur-xl bg-white dark:bg-zinc-900/40 border-slate-200 dark:border-white/[0.06] hover:bg-slate-50 dark:hover:bg-zinc-900/60 shadow-xs"
-            >
-              <div className="w-8 text-center shrink-0 font-mono text-xs font-semibold">
-                {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
-              </div>
-              <img
-                src={`https://github.com/${m.github}.png?size=40`}
-                alt={m.name}
-                className="w-8 h-8 rounded-full border border-slate-200 dark:border-zinc-700 bg-slate-100 shrink-0"
-                onError={(e) => {
-                  (e.target as any).src = `https://github.com/identicons/${m.github}.png`;
-                }}
-              />
-              <div className="flex-1 min-w-0">
-                <span className="font-mono font-bold text-sm text-slate-900 dark:text-zinc-100 truncate block">
-                  {m.name}
-                </span>
-                <span className="text-[10px] font-mono text-sky-600 dark:text-sky-400">@{m.github}</span>
-              </div>
-              <div className="w-20 text-center font-mono text-xs text-slate-500">
-                {m.posts} explanations
-              </div>
-              <div className="w-24 text-right font-mono font-bold text-emerald-500 text-sm">
-                👍 {m.upvotes}
-              </div>
+          {mentorRows.length === 0 ? (
+            <div className="py-16 text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-3xl p-8 space-y-3 font-mono">
+              <div className="text-3xl">🤝</div>
+              <div className="text-sm font-bold text-slate-800 dark:text-zinc-200">No Community Mentors Ranked Yet</div>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+                Be the first to post an intuitive "Explain Like I'm 5" breakdown on any problem's Discussion tab. When peers upvote your explanation, your Mentor Karma will appear here!
+              </p>
             </div>
-          ))}
+          ) : (
+            <>
+              <div className="hidden sm:grid grid-cols-[3rem_1fr_6rem_6rem] gap-4 px-4 py-2 text-[10px] text-slate-500 dark:text-zinc-500 font-mono uppercase tracking-widest border-b border-slate-200/80 dark:border-white/[0.04] mb-1">
+                <div>Rank</div>
+                <div>Community Mentor</div>
+                <div className="text-center">Takes Shared</div>
+                <div className="text-right">Mentor Karma</div>
+              </div>
+              {mentorRows.map((m, i) => (
+                <div
+                  key={m.github}
+                  className="flex items-center gap-3 md:gap-4 px-4 py-3 rounded-2xl border transition-all duration-150 backdrop-blur-xl bg-white dark:bg-zinc-900/40 border-slate-200 dark:border-white/[0.06] hover:bg-slate-50 dark:hover:bg-zinc-900/60 shadow-xs"
+                >
+                  <div className="w-8 text-center shrink-0 font-mono text-xs font-semibold">
+                    {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
+                  </div>
+                  <img
+                    src={`https://github.com/${m.github}.png?size=40`}
+                    alt={m.name}
+                    className="w-8 h-8 rounded-full border border-slate-200 dark:border-zinc-700 bg-slate-100 shrink-0"
+                    onError={(e) => {
+                      (e.target as any).src = `https://github.com/identicons/${m.github}.png`;
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <span className="font-mono font-bold text-sm text-slate-900 dark:text-zinc-100 truncate block">
+                      {m.name}
+                    </span>
+                    <span className="text-[10px] font-mono text-sky-600 dark:text-sky-400">@{m.github}</span>
+                  </div>
+                  <div className="w-20 text-center font-mono text-xs text-slate-500">
+                    {m.posts} explanations
+                  </div>
+                  <div className="w-24 text-right font-mono font-bold text-emerald-500 text-sm">
+                    👍 {m.upvotes}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
       ) : tab === "challenge" ? (
         filteredChallenge.length === 0 ? (

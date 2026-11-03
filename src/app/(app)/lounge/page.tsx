@@ -16,3 +16,4 @@ export default function Page() {
 
   return <LoungePage user={user} onNavigate={navigate} />;
 }
+

@@ -35,6 +35,8 @@ import {
 import ProblemDiscussion from '@/components/discussion/ProblemDiscussion';
 import ProblemDiscussionsTab from '@/components/problems/ProblemDiscussionsTab';
 import ProblemLivePresence from '@/components/problem/ProblemLivePresence';
+import { getGhostRunsAction, recordGhostRunAction } from '@/app/actions/ghosts';
+import type { GhostRun } from '@/types/ghost';
 import {
   traceCode,
   checkVisualizerAccess,
@@ -772,6 +774,8 @@ export default function Workspace({ problem: initialProblem, user, onClose, onAr
   const [copiedCode,    setCopiedCode]    = useState(false);
   const [isEditorExpanded, setIsEditorExpanded] = useState(false);
   const [mobileTab,     setMobileTab]     = useState<'problem' | 'editor'>('problem');
+  const [bestGhost,     setBestGhost]     = useState<GhostRun | null>(null);
+  const sessionStartTimeRef               = useRef<number>(Date.now());
   const [hintsRevealed, setHintsRevealed] = useState(0);
   const [hintCooldown,  setHintCooldown]  = useState(false);
   const [hintTimer,     setHintTimer]     = useState(0);
@@ -908,6 +912,19 @@ export default function Workspace({ problem: initialProblem, user, onClose, onAr
     const id = setInterval(() => setHintCooldownSecs(s => s <= 1 ? (clearInterval(id), 0) : s - 1), 1000);
     return () => clearInterval(id);
   }, [hintCooldownSecs]);
+
+  // Load best community ghost run for this problem
+  useEffect(() => {
+    if (problem?.id) {
+      getGhostRunsAction(problem.id)
+        .then((runs) => {
+          if (runs && runs.length > 0) {
+            setBestGhost(runs[0]);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [problem?.id]);
 
   // ── Keyboard shortcuts: Ctrl/Cmd+Enter = run, Ctrl/Cmd+Shift+Enter = submit, ? = shortcuts modal, Escape = close ──
   useEffect(() => {
@@ -1330,6 +1347,26 @@ export default function Workspace({ problem: initialProblem, user, onClose, onAr
       if (allPassed) {
         setStatusMsg(`✅ All tests passed — ${pointsAwarded} pts awarded!`);
         showToast(`✅ "${problem.title}" — All tests passed, ${pointsAwarded} pts awarded!`, 'ok');
+
+        // Record user's clean run into Ghost Runs so peers can challenge it
+        if (user?.github) {
+          const elapsedSec = Math.max(15, Math.floor((Date.now() - sessionStartTimeRef.current) / 1000));
+          recordGhostRunAction({
+            problem_id: problem.id,
+            problem_title: problem.title,
+            github: user.github,
+            user_name: user.name || user.github,
+            user_avatar: (user as any).avatar || (user as any).user_metadata?.avatar_url,
+            time_seconds: elapsedSec,
+            language: lang,
+            code_length: code.length,
+            checkpoints: [
+              { at: 10, label: "Analyzed problem constraints" },
+              { at: Math.floor(elapsedSec * 0.5), label: "Drafted algorithm logic" },
+              { at: elapsedSec, label: `Submitted & ${total}/${total} tests green!` },
+            ],
+          }).catch(() => {});
+        }
       } else {
         setStatusMsg(`⚠️ ${passed}/${total} tests passed.`);
         showToast(`⚠️ "${problem.title}" — ${passed}/${total} tests passed.`, 'warn');
@@ -1482,6 +1519,36 @@ export default function Workspace({ problem: initialProblem, user, onClose, onAr
           user={user}
           failedAttempts={testResult && testResult.passed < testResult.total ? 2 : 0}
         />
+
+        {bestGhost && (
+          <div className="mb-5 bg-gradient-to-r from-cyan-950/40 via-slate-900 to-amber-950/30 border border-cyan-500/30 rounded-2xl p-3.5 flex items-center justify-between font-mono text-xs shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-sm shrink-0">
+                👻
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-cyan-400 font-bold">Ghost Record:</span>
+                  <span className="text-white font-semibold">@{bestGhost.github}</span>
+                  <span className="text-amber-400 font-bold">
+                    ⏱️ {Math.floor(bestGhost.time_seconds / 60)}m {bestGhost.time_seconds % 60}s
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400 truncate">
+                  Race this recorded run asynchronously in the duel arena!
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => window.open(`/duel/ghost/${bestGhost.id}`, '_blank')}
+              className="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shadow-xs shadow-cyan-500/20 flex items-center gap-1.5 shrink-0 cursor-pointer ml-3"
+            >
+              <span>Race Ghost</span>
+              <span>⚡</span>
+            </button>
+          </div>
+        )}
+
         <ProblemDescription problem={problem} />
 
         {(() => {

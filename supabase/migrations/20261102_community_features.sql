@@ -84,3 +84,40 @@ CREATE TABLE IF NOT EXISTS public.problem_discussion_votes (
 
 CREATE INDEX IF NOT EXISTS idx_discussion_votes_disc ON public.problem_discussion_votes(discussion_id);
 
+-- 4. GHOST RUNS (Recorded runs for Asynchronous 1v1 Battles)
+CREATE TABLE IF NOT EXISTS public.ghost_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  problem_id TEXT NOT NULL,
+  problem_title TEXT NOT NULL,
+  github TEXT NOT NULL,
+  user_name TEXT NOT NULL,
+  user_avatar TEXT,
+  time_seconds INTEGER NOT NULL, -- Time taken to pass all tests in seconds (e.g. 165s = 2m 45s)
+  language TEXT NOT NULL DEFAULT 'javascript',
+  code_length INTEGER NOT NULL DEFAULT 0,
+  checkpoints JSONB NOT NULL DEFAULT '[]'::jsonb, -- Array of { at: number, label: string }
+  is_verified BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ghost_runs_problem ON public.ghost_runs(problem_id, time_seconds ASC);
+CREATE INDEX IF NOT EXISTS idx_ghost_runs_github ON public.ghost_runs(github);
+
+-- 5. GHOST DUEL MATCHES (Completed race matches against ghosts)
+CREATE TABLE IF NOT EXISTS public.ghost_duel_matches (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ghost_run_id UUID REFERENCES public.ghost_runs(id) ON DELETE SET NULL,
+  problem_id TEXT NOT NULL,
+  problem_title TEXT NOT NULL,
+  challenger_github TEXT NOT NULL,
+  challenger_name TEXT NOT NULL,
+  challenger_time_seconds INTEGER NOT NULL,
+  result TEXT NOT NULL, -- 'won' | 'lost'
+  time_diff_seconds INTEGER NOT NULL, -- positive if user beat ghost by X seconds, negative if ghost was faster
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ghost_matches_challenger ON public.ghost_duel_matches(challenger_github);
+CREATE INDEX IF NOT EXISTS idx_ghost_matches_recent ON public.ghost_duel_matches(created_at DESC);
+
+

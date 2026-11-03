@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { getSupabaseClient } from "@/lib/supabase";
 import type { PageId } from "@/components/layout/AppShellContext";
 
 interface CommunityHeartbeatProps {
@@ -8,7 +9,108 @@ interface CommunityHeartbeatProps {
   isSubscriber?: boolean;
 }
 
-export default function CommunityHeartbeat({ onNavigate, isSubscriber }: CommunityHeartbeatProps) {
+interface TopSquadData {
+  name: string;
+  tag: string;
+  total_points: number;
+}
+
+interface TopDuelData {
+  problem_title: string;
+  winner_github: string;
+  loser_github?: string;
+  time_diff_text?: string;
+}
+
+interface TopDiscussionData {
+  title: string;
+  content: string;
+  author_name: string;
+  github: string;
+  upvotes: number;
+}
+
+export default function CommunityHeartbeat({ onNavigate }: CommunityHeartbeatProps) {
+  const [topSquad, setTopSquad] = useState<TopSquadData | null>(null);
+  const [topDuel, setTopDuel] = useState<TopDuelData | null>(null);
+  const [topDiscussion, setTopDiscussion] = useState<TopDiscussionData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadCommunityHighlights() {
+      try {
+        const db = getSupabaseClient();
+
+        // 1. Fetch real top squad
+        const { data: squadData } = await (db.from("squads") as any)
+          .select("name, tag, total_points")
+          .order("total_points", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (squadData) {
+          setTopSquad(squadData);
+        }
+
+        // 2. Fetch real latest duel or ghost duel match
+        const { data: duelData } = await (db.from("code_duels") as any)
+          .select("problem_title, host_github, guest_github, winner_github")
+          .eq("status", "completed")
+          .order("ended_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (duelData && duelData.winner_github) {
+          const loser =
+            duelData.winner_github === duelData.host_github
+              ? duelData.guest_github
+              : duelData.host_github;
+          setTopDuel({
+            problem_title: duelData.problem_title || "Algorithm Duel",
+            winner_github: duelData.winner_github,
+            loser_github: loser || "opponent",
+            time_diff_text: "Won Live Match",
+          });
+        } else {
+          // Check ghost match table
+          const { data: ghostMatch } = await (db.from("ghost_duel_matches") as any)
+            .select("problem_title, challenger_github, result, time_diff_seconds")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (ghostMatch) {
+            setTopDuel({
+              problem_title: ghostMatch.problem_title,
+              winner_github: ghostMatch.challenger_github,
+              time_diff_text:
+                ghostMatch.result === "won"
+                  ? `Beat Ghost by ${Math.abs(ghostMatch.time_diff_seconds)}s`
+                  : "Raced Ghost",
+            });
+          }
+        }
+
+        // 3. Fetch real top ELI5 discussion
+        const { data: discData } = await (db.from("problem_discussions") as any)
+          .select("title, content, author_name, github, upvotes")
+          .order("upvotes", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (discData) {
+          setTopDiscussion(discData);
+        }
+      } catch (err) {
+        console.warn("Could not load dynamic community highlights:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadCommunityHighlights();
+  }, []);
+
   return (
     <div className="space-y-4 animate-fade-up">
       {/* Section Header */}
@@ -29,7 +131,7 @@ export default function CommunityHeartbeat({ onNavigate, isSubscriber }: Communi
 
         <button
           onClick={() => onNavigate("squads")}
-          className="text-xs font-mono text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-medium"
+          className="text-xs font-mono text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 font-medium cursor-pointer"
         >
           <span>Explore All Squads</span>
           <span>→</span>
@@ -43,28 +145,40 @@ export default function CommunityHeartbeat({ onNavigate, isSubscriber }: Communi
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20">
-                🛡️ Clan of the Week
+                🛡️ Clan Ranking #1
               </span>
               <span className="text-xs font-mono font-bold text-amber-400">
-                ⚡ 38,400 pts
+                ⚡ {topSquad ? `${topSquad.total_points.toLocaleString()} pts` : "0 pts"}
               </span>
             </div>
 
-            <h3 className="text-base font-bold font-mono text-white flex items-center gap-2">
-              <span className="text-indigo-400">[VIT]</span>
-              <span>ByteBusters</span>
-            </h3>
-
-            <p className="text-xs font-mono text-slate-400 leading-relaxed">
-              5 college friends holding the #1 spot on the global clan leaderboard with an unbroken 14-day team streak.
-            </p>
+            {topSquad ? (
+              <>
+                <h3 className="text-base font-bold font-mono text-white flex items-center gap-2">
+                  <span className="text-indigo-400">[{topSquad.tag}]</span>
+                  <span>{topSquad.name}</span>
+                </h3>
+                <p className="text-xs font-mono text-slate-400 leading-relaxed">
+                  Leading the global clan standings with points pooled from daily problems, weekly challenges, and duels.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-base font-bold font-mono text-white">
+                  Assemble Your Clan
+                </h3>
+                <p className="text-xs font-mono text-slate-400 leading-relaxed">
+                  No clan holds the throne yet. Rally 3–5 college friends or peers to claim the #1 spot on the leaderboard!
+                </p>
+              </>
+            )}
           </div>
 
           <button
             onClick={() => onNavigate("squads")}
-            className="w-full py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-mono font-bold transition flex items-center justify-center gap-1.5"
+            className="w-full py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <span>Rally Your Own Squad →</span>
+            <span>{topSquad ? "View Clan Standings →" : "Create First Clan →"}</span>
           </button>
         </div>
 
@@ -73,35 +187,48 @@ export default function CommunityHeartbeat({ onNavigate, isSubscriber }: Communi
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
-                ⚔️ Duel of the Day
+                ⚔️ Duels & Ghosts
               </span>
               <span className="text-[10px] font-mono text-cyan-300">
-                Won by 8s!
+                {topDuel?.time_diff_text || "Live & Async"}
               </span>
             </div>
 
-            <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 font-mono text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="font-bold text-white">@karthik</span>
-              </div>
-              <span className="text-rose-400 font-bold">VS</span>
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-slate-400">@priya_dev</span>
-                <span className="w-2 h-2 rounded-full bg-slate-500" />
-              </div>
-            </div>
-
-            <p className="text-xs font-mono text-slate-400 leading-relaxed">
-              Problem: <strong>Valid Parentheses</strong>. 10/10 test cases passed under intense 3-minute battle pressure.
-            </p>
+            {topDuel ? (
+              <>
+                <div className="flex items-center justify-between bg-slate-900/80 border border-slate-800 rounded-xl p-2.5 font-mono text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span className="font-bold text-white">@{topDuel.winner_github}</span>
+                  </div>
+                  <span className="text-amber-400 font-bold text-[10px]">VICTORY</span>
+                  {topDuel.loser_github && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-slate-400">@{topDuel.loser_github}</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs font-mono text-slate-400 leading-relaxed truncate">
+                  Problem: <strong>{topDuel.problem_title}</strong>.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-base font-bold font-mono text-white">
+                  1v1 Battle Arena Ready
+                </h3>
+                <p className="text-xs font-mono text-slate-400 leading-relaxed">
+                  Challenge a friend to a real-time showdown or race against an asynchronous Ghost runner at your own speed!
+                </p>
+              </>
+            )}
           </div>
 
           <button
             onClick={() => onNavigate("duels")}
-            className="w-full py-2 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-cyan-200 text-xs font-mono font-bold transition flex items-center justify-center gap-1.5"
+            className="w-full py-2 rounded-xl bg-cyan-600/30 hover:bg-cyan-600/50 border border-cyan-500/40 text-cyan-200 text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <span>Challenge Someone in 1v1 →</span>
+            <span>{topDuel ? "Enter Duels & Race Ghosts →" : "Start a Duel Now →"}</span>
           </button>
         </div>
 
@@ -113,28 +240,42 @@ export default function CommunityHeartbeat({ onNavigate, isSubscriber }: Communi
                 💡 Top Mentor Take
               </span>
               <span className="text-xs font-mono text-amber-400 font-bold">
-                👍 28 Upvotes
+                👍 {topDiscussion?.upvotes || 0} Upvotes
               </span>
             </div>
 
-            <h3 className="text-sm font-bold font-mono text-white truncate">
-              "Why a Hash Map turns O(N²) into O(N)"
-            </h3>
-
-            <p className="text-xs font-mono text-slate-400 leading-relaxed line-clamp-3">
-              "Imagine searching for your matching socks in a giant unorganized basket. Instead of checking every pair, you have labelled cubbies on your wall..."
-            </p>
+            {topDiscussion ? (
+              <>
+                <h3 className="text-sm font-bold font-mono text-white truncate">
+                  "{topDiscussion.title}"
+                </h3>
+                <p className="text-xs font-mono text-slate-400 leading-relaxed line-clamp-3">
+                  {topDiscussion.content}
+                </p>
+                <div className="text-[10px] font-mono text-amber-300">
+                  By @{topDiscussion.github}
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-sm font-bold font-mono text-white">
+                  Be the First Community Mentor
+                </h3>
+                <p className="text-xs font-mono text-slate-400 leading-relaxed">
+                  Explain tricky algorithms in plain English on any problem's discussion tab to earn peer upvotes and mentor badges!
+                </p>
+              </>
+            )}
           </div>
 
           <button
             onClick={() => onNavigate("problems")}
-            className="w-full py-2 rounded-xl bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/40 text-amber-200 text-xs font-mono font-bold transition flex items-center justify-center gap-1.5"
+            className="w-full py-2 rounded-xl bg-amber-600/30 hover:bg-amber-600/50 border border-amber-500/40 text-amber-200 text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
           >
-            <span>Browse Problem Intuitions →</span>
+            <span>{topDiscussion ? "Browse Problem Intuitions →" : "Share First Solution →"}</span>
           </button>
         </div>
       </div>
     </div>
   );
 }
-

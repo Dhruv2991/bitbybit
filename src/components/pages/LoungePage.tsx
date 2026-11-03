@@ -49,12 +49,7 @@ const STATIONS: AudioStation[] = [
   },
 ];
 
-const DEFAULT_PEERS = [
-  { github: "alex_coder", name: "Alex Coder", goal: "Mastering Binary Trees", joinedAt: "10m ago" },
-  { github: "priya_dev", name: "Priya D.", goal: "Solving Daily Challenge", joinedAt: "24m ago" },
-  { github: "karthik_algo", name: "Karthik K.", goal: "Graph DFS Practice", joinedAt: "35m ago" },
-  { github: "ananya_s", name: "Ananya Sharma", goal: "Placement Gauntlet Prep", joinedAt: "45m ago" },
-];
+// Active peers are tracked in real-time via Supabase Presence (zero hardcoding)
 
 export default function LoungePage({ user, onNavigate }: LoungePageProps) {
   // Audio state
@@ -74,7 +69,7 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
   const [goalCompleted, setGoalCompleted] = useState(false);
 
   // Peers state
-  const [peers, setPeers] = useState<LoungePeer[]>(DEFAULT_PEERS);
+  const [peers, setPeers] = useState<LoungePeer[]>([]);
   const [waveReceived, setWaveReceived] = useState<string | null>(null);
 
   // 1. Audio controls
@@ -149,22 +144,56 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
     setTimeLeft(mode === "focus" ? 25 * 60 : 5 * 60);
   }
 
-  // 3. Realtime presence & waves
+  // 3. Realtime presence & waves (True real-time sync with zero hardcoded peers)
   useEffect(() => {
     const db = getSupabaseClient();
-    const ch = db.channel("lounge-study-room");
+    const presenceKey = user?.github || `visitor_${Math.random().toString(36).slice(2, 7)}`;
+    const ch = db.channel("lounge-study-room", {
+      config: {
+        presence: { key: presenceKey },
+      },
+    });
 
-    ch.on("broadcast", { event: "wave" }, ({ payload }) => {
+    ch.on("presence", { event: "sync" }, () => {
+      const state = ch.presenceState();
+      const currentGithub = user?.github;
+      const activeList: LoungePeer[] = [];
+
+      for (const presences of Object.values(state)) {
+        for (const p of presences as any[]) {
+          if (p.github && p.github !== currentGithub && !activeList.some((x) => x.github === p.github)) {
+            activeList.push({
+              github: p.github,
+              name: p.name || p.github,
+              goal: p.goal || "Deep Problem Solving",
+              joinedAt: p.joinedAt || "Just now",
+            });
+          }
+        }
+      }
+      setPeers(activeList);
+    })
+    .on("broadcast", { event: "wave" }, ({ payload }) => {
       if (payload?.sender) {
         setWaveReceived(`${payload.sender} sent a ${payload.emoji || "👋"} wave!`);
         setTimeout(() => setWaveReceived(null), 4000);
       }
-    }).subscribe();
+    })
+    .subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await ch.track({
+          github: user?.github || presenceKey,
+          name: user?.name || user?.github || "Fellow Coder",
+          goal: sessionGoal || "Deep Problem Solving",
+          joinedAt: "Just now",
+        });
+      }
+    });
 
     return () => {
       db.removeChannel(ch);
     };
-  }, []);
+  }, [user?.github, user?.name, sessionGoal]);
 
   function sendWave(emoji: string) {
     const db = getSupabaseClient();
@@ -459,34 +488,53 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
 
             {/* Peers List */}
             <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-              {peers.map((p) => (
-                <div
-                  key={p.github}
-                  className="flex items-center justify-between bg-slate-50 dark:bg-zinc-950/60 border border-slate-100 dark:border-zinc-800/80 rounded-xl p-2.5 text-xs font-mono"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={`https://github.com/${p.github}.png`}
-                      alt={p.name}
-                      className="w-6 h-6 rounded-full border border-slate-200 dark:border-zinc-700 bg-slate-200 dark:bg-zinc-800 shrink-0"
-                      onError={(e) => {
-                        (e.target as any).src = `https://github.com/identicons/${p.github}.png`;
-                      }}
-                    />
-                    <div className="min-w-0">
-                      <span className="font-bold text-slate-800 dark:text-zinc-200 truncate block">
-                        {p.name}
-                      </span>
-                      <span className="text-[10px] text-slate-400 truncate block">
-                        {p.goal || "Deep Coding"}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-emerald-500 font-bold shrink-0">
-                    Studying
-                  </span>
+              {peers.length === 0 ? (
+                <div className="p-4 text-center rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 text-[11px] font-mono text-slate-500 space-y-2">
+                  <div>🎧 You have the lounge to yourself right now.</div>
+                  <p className="text-[10px] text-slate-400">Put on lo-fi tunes, start your Pomodoro timer, or copy the link to invite a teammate to study together.</p>
+                  <button
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        navigator.clipboard.writeText(window.location.href);
+                        setWaveReceived("Lounge invite link copied to clipboard!");
+                        setTimeout(() => setWaveReceived(null), 3000);
+                      }
+                    }}
+                    className="px-3 py-1 bg-purple-500/10 text-purple-400 border border-purple-500/20 rounded-lg text-[10px] font-bold hover:bg-purple-500/20 transition cursor-pointer"
+                  >
+                    📋 Copy Lounge Link
+                  </button>
                 </div>
-              ))}
+              ) : (
+                peers.map((p) => (
+                  <div
+                    key={p.github}
+                    className="flex items-center justify-between bg-slate-50 dark:bg-zinc-950/60 border border-slate-100 dark:border-zinc-800/80 rounded-xl p-2.5 text-xs font-mono"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <img
+                        src={`https://github.com/${p.github}.png`}
+                        alt={p.name}
+                        className="w-6 h-6 rounded-full border border-slate-200 dark:border-zinc-700 bg-slate-200 dark:bg-zinc-800 shrink-0"
+                        onError={(e) => {
+                          (e.target as any).src = `https://github.com/identicons/${p.github}.png`;
+                        }}
+                      />
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-800 dark:text-zinc-200 truncate block">
+                          {p.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 truncate block">
+                          {p.goal || "Deep Coding"}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-emerald-500 font-bold shrink-0">
+                      Studying
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -522,3 +570,4 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
     </div>
   );
 }
+

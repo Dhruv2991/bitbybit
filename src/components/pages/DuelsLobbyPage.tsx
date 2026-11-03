@@ -9,8 +9,10 @@ import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
 import type { User, Problem } from "@/types/database";
 import type { CodeDuel } from "@/types/duels";
+import type { GhostRun, GhostMatch } from "@/types/ghost";
 import type { PageId } from "@/components/layout/AppShellContext";
 import { createDuelAction, joinDuelAction, leaveOrDiscardDuelAction } from "@/app/actions/duels";
+import { getGhostRunsAction, getRecentGhostMatchesAction } from "@/app/actions/ghosts";
 
 interface DuelsLobbyPageProps {
   user: User | null;
@@ -30,6 +32,12 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [createdRoomLink, setCreatedRoomLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Tab: live 1v1 vs ghost duels
+  const [duelTab, setDuelTab] = useState<"live" | "ghost">("live");
+  const [ghosts, setGhosts] = useState<GhostRun[]>([]);
+  const [ghostMatches, setGhostMatches] = useState<GhostMatch[]>([]);
+  const [ghostLoading, setGhostLoading] = useState(false);
 
   // Fetch problems and active waiting duels
   useEffect(() => {
@@ -62,6 +70,16 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
         if (duelsData) {
           setOpenDuels(duelsData as CodeDuel[]);
         }
+
+        // 3. Load Ghost Runs & Recent Matches
+        setGhostLoading(true);
+        const [ghostList, matchesList] = await Promise.all([
+          getGhostRunsAction(),
+          getRecentGhostMatchesAction(5),
+        ]);
+        setGhosts(ghostList);
+        setGhostMatches(matchesList);
+        setGhostLoading(false);
       } catch (err) {
         console.error("[DuelsLobby] Error loading data:", err);
       } finally {
@@ -247,7 +265,39 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
         </div>
       )}
 
-      {/* ── Match Creation & Open Lobbies Grid ──────────────────── */}
+      {/* ── Mode Switcher: Live 1v1 vs Ghost Duels ──────────────── */}
+      <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button
+          onClick={() => setDuelTab("live")}
+          className={`pb-2 px-4 font-mono text-xs sm:text-sm font-bold border-b-2 flex items-center gap-2 transition cursor-pointer ${
+            duelTab === "live"
+              ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
+              : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-300"
+          }`}
+        >
+          <span>⚔️ Live 1v1 Arena</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
+            {openDuels.length} waiting
+          </span>
+        </button>
+
+        <button
+          onClick={() => setDuelTab("ghost")}
+          className={`pb-2 px-4 font-mono text-xs sm:text-sm font-bold border-b-2 flex items-center gap-2 transition cursor-pointer ${
+            duelTab === "ghost"
+              ? "border-cyan-500 text-cyan-600 dark:text-cyan-400"
+              : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-300"
+          }`}
+        >
+          <span>👻 Ghost Duels (Race Replays)</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+            {ghosts.length} available
+          </span>
+        </button>
+      </div>
+
+      {duelTab === "live" ? (
+      /* ── Match Creation & Open Lobbies Grid ──────────────────── */
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Match Creation Card */}
         <div
@@ -461,6 +511,165 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
           )}
         </div>
       </div>
+      ) : (
+      /* ── Ghost Duels (Asynchronous Replays) ───────────────────── */
+      <div className="space-y-8 animate-fade-up">
+        {/* Ghost Explanation Banner */}
+        <div className="bg-gradient-to-r from-amber-500/10 via-slate-900 to-cyan-500/10 border border-amber-500/20 rounded-2xl p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-400 text-base">👻</span>
+                <h3 className="text-base font-bold font-mono text-white">
+                  Race Recorded Runs — No Opponent Waiting Required
+                </h3>
+              </div>
+              <p className="text-xs font-mono text-slate-400 max-w-2xl">
+                Every verified accepted solution on BitByBit generates an asynchronous Ghost runner. Challenge friends or top community coders, watch their telemetry progress in real-time, and win points for your Squad when you beat their clock!
+              </p>
+            </div>
+            <button
+              onClick={() => onNavigate("problems")}
+              className="text-xs font-mono font-bold text-amber-300 bg-amber-500/20 border border-amber-500/30 px-3.5 py-2 rounded-xl hover:bg-amber-500/30 transition shrink-0"
+            >
+              Record Your Own Ghost →
+            </button>
+          </div>
+        </div>
+
+        {/* Recent Ghost Conquests Ticker */}
+        {ghostMatches.length > 0 && (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-2">
+            <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Recent Ghost Conquests</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {ghostMatches.slice(0, 3).map((m) => (
+                <div
+                  key={m.id}
+                  className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3 flex items-center justify-between font-mono text-xs"
+                >
+                  <div className="space-y-0.5 truncate pr-2">
+                    <div className="text-white font-bold truncate">
+                      {m.result === "won" ? "🏆" : "👻"} @{m.challenger_github}
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">
+                      {m.problem_title}
+                    </div>
+                  </div>
+                  <span
+                    className={`text-[11px] font-bold shrink-0 ${
+                      m.result === "won" ? "text-emerald-400" : "text-rose-400"
+                    }`}
+                  >
+                    {m.result === "won"
+                      ? `+${m.time_diff_seconds}s beat`
+                      : "Defeated"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Available Ghost Runners */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold font-mono text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <span>👻 Community Ghosts Ready to Race</span>
+              </h2>
+              <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                Pick a record below to summon the ghost runner in the live duel arena
+              </p>
+            </div>
+          </div>
+
+          {ghostLoading ? (
+            <div className="p-12 text-center font-mono text-xs text-slate-500">
+              Loading ghost records...
+            </div>
+          ) : ghosts.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl border border-dashed border-slate-800 font-mono text-xs text-slate-500 space-y-3">
+              <div>👻 No ghost runs recorded yet.</div>
+              <button
+                onClick={() => onNavigate("problems")}
+                className="btn-primary text-xs px-4 py-2"
+              >
+                Solve a Problem to Set the First Record
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {ghosts.map((ghost) => {
+                const mins = Math.floor(ghost.time_seconds / 60);
+                const secs = ghost.time_seconds % 60;
+                const formattedTime = `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+
+                return (
+                  <div
+                    key={ghost.id}
+                    className="bg-slate-900/60 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex flex-col justify-between space-y-4 hover:border-cyan-500/40 transition group"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
+                          {ghost.language.toUpperCase()}
+                        </span>
+                        <div className="flex items-center gap-1.5 font-mono text-xs font-bold text-amber-400">
+                          <span>⏱️</span>
+                          <span>{formattedTime}</span>
+                        </div>
+                      </div>
+
+                      <h3 className="text-base font-bold font-mono text-slate-900 dark:text-white group-hover:text-cyan-400 transition">
+                        {ghost.problem_title}
+                      </h3>
+
+                      {/* Ghost holder identity */}
+                      <div className="flex items-center gap-2.5 pt-1">
+                        {ghost.user_avatar ? (
+                          <img
+                            src={ghost.user_avatar}
+                            alt={ghost.user_name}
+                            className="w-7 h-7 rounded-full border border-slate-700 object-cover"
+                          />
+                        ) : (
+                          <div className="w-7 h-7 rounded-full bg-cyan-600/30 border border-cyan-500/30 flex items-center justify-center font-mono font-bold text-xs text-cyan-300">
+                            {ghost.github.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="truncate">
+                          <div className="text-xs font-mono font-semibold text-slate-300 truncate">
+                            {ghost.user_name}
+                          </div>
+                          <div className="text-[10px] font-mono text-slate-500">
+                            @{ghost.github}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] font-mono text-slate-400 flex items-center gap-2">
+                        <span>🎯 {ghost.checkpoints.length} race checkpoints</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => router.push(`/duel/ghost/${ghost.id}`)}
+                      className="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold transition shadow-xs shadow-cyan-500/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>👻 Race This Ghost</span>
+                      <span>→</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+      )}
     </div>
   );
 }
