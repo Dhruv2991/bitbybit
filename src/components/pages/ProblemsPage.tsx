@@ -9,6 +9,7 @@ import { isActiveSubscription } from '@/lib/subscription';
 import { getRecommendations, getCachedDailyRecommendations, setAiUser } from '@/lib/gemini';
 
 const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false });
+import ProblemQuestRoadmap from '@/components/problems/ProblemQuestRoadmap';
 
 const DIFFICULTIES = ['all', 'Easy', 'Medium', 'Hard'] as const;
 
@@ -82,6 +83,7 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   } | null>(null);
   const [recommended, setRecommended] = useState<Problem[]>([]);
   const [recLoading,  setRecLoading]  = useState(false);
+  const [layoutMode,  setLayoutMode]  = useState<'quest' | 'list'>('quest');
 
   useEffect(() => {
     if (!user?.github) {
@@ -566,6 +568,30 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
                 </button>
               </div>
             )}
+            <div className="flex bg-slate-100 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-xl p-1 gap-1 shadow-xs">
+              <button
+                onClick={() => setLayoutMode('quest')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center gap-1.5 ${
+                  layoutMode === 'quest'
+                    ? 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/30 shadow-xs font-bold'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                }`}
+              >
+                <span>🗺️</span>
+                <span>Quest Roadmap</span>
+              </button>
+              <button
+                onClick={() => setLayoutMode('list')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all flex items-center gap-1.5 ${
+                  layoutMode === 'list'
+                    ? 'bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/30 shadow-xs font-bold'
+                    : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                }`}
+              >
+                <span>📋</span>
+                <span>List Table</span>
+              </button>
+            </div>
             <ShareButton />
           </div>
         </div>
@@ -810,6 +836,12 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
             {problems.length === 0 ? 'No problems yet — check back soon!' : 'Nothing matches this filter.'}
           </div>
         </div>
+      ) : layoutMode === 'quest' && !search && filter === 'all' && accessFilter === 'all' ? (
+        <ProblemQuestRoadmap
+          problems={problems}
+          solvedIds={solved}
+          onSelectProblem={handleRowClick}
+        />
       ) : (
         <>
           {/* Enterprise-grade Problems Table */}

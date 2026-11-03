@@ -137,3 +137,4 @@ export default function CommunityHeartbeat({ onNavigate, isSubscriber }: Communi
     </div>
   );
 }
+
