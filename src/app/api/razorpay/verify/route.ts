@@ -29,24 +29,12 @@ interface Body {
   purpose:             'subscription';
 }
 
+import { getVerifiedApiUser } from '@/lib/serverAuth';
+
 async function getVerifiedUser(req: NextRequest) {
-  const authHeader = req.headers.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return null;
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user) return null;
-
-  const github = data.user.user_metadata?.user_name as string | undefined;
-  const name   = data.user.user_metadata?.full_name as string | undefined;
-  const email  = data.user.email as string | undefined;
-  if (!github) return null;
-
-  return { github, name: name || github, email: email || null };
+  const user = await getVerifiedApiUser(req);
+  if (!user) return null;
+  return { github: user.github, name: user.name, email: user.email || null };
 }
 
 export async function POST(req: NextRequest) {

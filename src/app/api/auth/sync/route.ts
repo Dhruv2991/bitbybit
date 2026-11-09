@@ -25,27 +25,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+import { getVerifiedApiUser } from '@/lib/serverAuth';
+
 async function getVerifiedUser(req: NextRequest) {
-  const authHeader = req.headers.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return null;
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user) return null;
-
-  // Identity MUST be extracted strictly from verified GitHub identity in auth.identities
-  const githubIdentity = data.user.identities?.find((id: any) => id.provider === 'github');
-  const github = githubIdentity?.identity_data?.user_name as string | undefined;
-  if (!github) return null;
-
-  const name = (githubIdentity?.identity_data?.full_name || githubIdentity?.identity_data?.name || github) as string;
-  const email = (data.user.email || githubIdentity?.identity_data?.email || null) as string | null;
-
-  return { github, name, email };
+  const user = await getVerifiedApiUser(req);
+  if (!user) return null;
+  return { github: user.github, name: user.name, email: user.email || null };
 }
 
 export async function POST(req: NextRequest) {

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import AnimatedBackground from "@/components/pages/AnimatedBackground";
 import GlobalSearch from "@/components/GlobalSearch";
 import { useAppShell, ROUTE_TO_PAGE, PAGE_TO_ROUTE, type PageId } from "./AppShellContext";
+import { useLoungeAudio } from "@/components/lounge/LoungeAudioContext";
 
 interface NavEntry {
   id: PageId;
@@ -155,6 +156,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     theme, toggleTheme,
     navigate, signIn, signOut, switchAccount,
   } = useAppShell();
+  const { isPlaying, selectedStation, togglePlay } = useLoungeAudio();
 
   const [sidebarHovered, setSidebarHovered]   = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
@@ -271,8 +273,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       items: [
         { id: "home", label: "Dashboard", icon: IconHome },
         { id: "problems", label: "Problem Set", icon: IconProblems },
-        { id: "weekly", label: "Weekly DSA", icon: IconWeekly, badge: "New", badgeColor: "bg-sky-100 text-sky-700 border border-sky-200 dark:bg-cyan-500/10 dark:text-cyan-400 dark:border-cyan-500/20" },
-        { id: "lounge" as PageId, label: "Lo-Fi Lounge", icon: IconLounge, badge: "Chill", badgeColor: "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20 font-medium" },
+        { id: "weekly", label: "Weekly DSA", icon: IconWeekly },
+        { id: "lounge" as PageId, label: "Lo-Fi Lounge", icon: IconLounge },
       ],
     },
     {
@@ -282,22 +284,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           id: "arena",
           label: "Arena Contests",
           icon: IconArena,
-          badge: liveCount > 0 ? `${liveCount} Live` : undefined,
-          badgeColor: "bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 font-medium",
+
+
         },
         {
           id: "duels",
           label: "1v1 Code Duels",
           icon: IconDuel,
-          badge: "Live 1v1",
-          badgeColor: "bg-cyan-100 text-cyan-700 border border-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/20 font-medium",
+
+
         },
         {
           id: "squads" as PageId,
           label: "Squads & Clans",
           icon: IconCoordinator,
-          badge: "Clans",
-          badgeColor: "bg-indigo-100 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/20 font-medium",
+
+
         },
         { id: "leaderboard", label: "Leaderboard", icon: IconLeaderboard },
       ],
@@ -319,8 +321,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         id: "admin" as PageId,
         label: "Admin Console",
         icon: IconAdmin,
-        badge: user.role === "tech" ? "Tech" : "Admin",
-        badgeColor: "bg-purple-100 text-purple-700 border border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20",
+
+
       });
     }
     if (user?.is_coordinator || user?.is_admin) {
@@ -328,8 +330,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         id: "coordinator" as PageId,
         label: "Coordinator Hub",
         icon: IconCoordinator,
-        badge: "Ops",
-        badgeColor: "bg-sky-100 text-sky-700 border border-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20",
+
+
       });
     }
     NAV_GROUPS.push({
@@ -478,7 +480,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                       </div>
                       <span
                         className={`text-left truncate font-medium transition-all duration-300 ease-in-out overflow-hidden whitespace-nowrap
-                          ${isSidebarOpen ? "opacity-100 max-w-[130px] translate-x-0 flex-1" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
+                          ${isSidebarOpen ? "opacity-100 translate-x-0 flex-1" : "opacity-0 max-w-0 -translate-x-3 pointer-events-none"}`}
                       >
                         {item.label}
                       </span>
@@ -691,6 +693,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   <span>{userStreak}d</span>
                 </div>
               )}
+
+              {/* Background Music Dock */}
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-700 dark:text-purple-300 font-mono text-xs shadow-2xs"
+                title={`Lo-Fi Lounge: ${selectedStation.name} (${isPlaying ? "Playing" : "Paused"})`}
+              >
+                <span className={isPlaying ? "animate-pulse" : ""}>🎧</span>
+                <button
+                  type="button"
+                  onClick={() => navigate("lounge")}
+                  className="hidden md:inline font-medium hover:underline truncate max-w-[110px]"
+                  title="Open Lo-Fi Lounge"
+                >
+                  {selectedStation.name}
+                </button>
+                <button
+                  type="button"
+                  onClick={togglePlay}
+                  aria-label={isPlaying ? "Pause music" : "Play music"}
+                  className="hover:scale-110 transition ml-0.5 text-xs font-bold"
+                  title={isPlaying ? "Pause music" : "Play music"}
+                >
+                  {isPlaying ? "⏸" : "▶"}
+                </button>
+              </div>
 
               {/* Notification / Contests Button */}
               <div className="relative" ref={notifRef}>

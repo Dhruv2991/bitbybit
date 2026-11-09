@@ -81,6 +81,7 @@ export interface Member {
 
   total_points: number;
   problems_solved: number;
+  duels_won?: number;
 
   streak: number;
   last_solved_at: string | null;
@@ -402,6 +403,112 @@ export type Database = {
           reason: string | null;
           source: string;
           unsubscribed_at: string;
+        }>;
+        Relationships: [];
+      };
+
+      ghost_runs: {
+        Row: import('@/types/ghost').GhostRun;
+        Insert: Omit<import('@/types/ghost').GhostRun, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<import('@/types/ghost').GhostRun, 'id' | 'created_at'>>;
+        Relationships: [];
+      };
+
+      ghost_duel_matches: {
+        Row: import('@/types/ghost').GhostMatch;
+        Insert: Omit<import('@/types/ghost').GhostMatch, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<import('@/types/ghost').GhostMatch>;
+        Relationships: [];
+      };
+
+      squads: {
+        Row: import('@/types/community').Squad;
+        Insert: Omit<import('@/types/community').Squad, 'id' | 'created_at' | 'total_points'> & {
+          id?: string;
+          created_at?: string;
+          total_points?: number;
+        };
+        Update: Partial<import('@/types/community').Squad>;
+        Relationships: [];
+      };
+
+      squad_members: {
+        Row: import('@/types/community').SquadMember;
+        Insert: Omit<import('@/types/community').SquadMember, 'id' | 'joined_at' | 'points_contributed'> & {
+          id?: string;
+          joined_at?: string;
+          points_contributed?: number;
+        };
+        Update: Partial<import('@/types/community').SquadMember>;
+        Relationships: [];
+      };
+
+      community_polls: {
+        Row: import('@/types/community').CommunityPoll;
+        Insert: Omit<import('@/types/community').CommunityPoll, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<import('@/types/community').CommunityPoll>;
+        Relationships: [];
+      };
+
+      community_poll_votes: {
+        Row: {
+          id: string;
+          poll_id: string;
+          github: string;
+          option_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          poll_id: string;
+          github: string;
+          option_id: string;
+          created_at?: string;
+        };
+        Update: Partial<{
+          poll_id: string;
+          github: string;
+          option_id: string;
+        }>;
+        Relationships: [];
+      };
+
+      problem_discussions: {
+        Row: import('@/types/community').ProblemDiscussion;
+        Insert: Omit<import('@/types/community').ProblemDiscussion, 'id' | 'created_at' | 'upvotes'> & {
+          id?: string;
+          created_at?: string;
+          upvotes?: number;
+        };
+        Update: Partial<import('@/types/community').ProblemDiscussion>;
+        Relationships: [];
+      };
+
+      problem_discussion_votes: {
+        Row: {
+          id: string;
+          discussion_id: string;
+          github: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          discussion_id: string;
+          github: string;
+          created_at?: string;
+        };
+        Update: Partial<{
+          discussion_id: string;
+          github: string;
         }>;
         Relationships: [];
       };

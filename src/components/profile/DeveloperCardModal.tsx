@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import type { User } from "@/types/database";
 import type { Badge } from "@/lib/badges";
 
@@ -26,10 +26,21 @@ export default function DeveloperCardModal({
   const [downloading, setDownloading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Close on Escape key
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   const shareText = `Check out my Developer Card on BitByBit! 🔥 Streak: ${stats.streak} days | 🧩 Solved: ${stats.problemsSolved} problems | ⚡ Points: ${stats.totalPoints}. Join the arena: https://bitbybit.org`;
 
   function copyText() {
-    navigator.clipboard.writeText(shareText);
+    navigator.clipboard?.writeText(shareText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
@@ -43,7 +54,10 @@ export default function DeveloperCardModal({
   }
 
   function shareLinkedIn() {
-    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://bitbybit.org")}`, "_blank");
+    window.open(
+      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://bitbybit.org")}`,
+      "_blank"
+    );
   }
 
   // Draw card to HTML Canvas and trigger PNG download
@@ -158,12 +172,19 @@ export default function DeveloperCardModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dev-card-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+    >
       <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full p-6 space-y-6 shadow-2xl relative text-slate-100">
         {/* Close Button */}
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white text-lg font-mono transition"
+          aria-label="Close modal"
+          className="absolute top-4 right-4 text-slate-400 hover:text-white text-lg font-mono transition p-1"
         >
           ✕
         </button>
@@ -173,7 +194,7 @@ export default function DeveloperCardModal({
           <span className="text-[10px] font-mono uppercase tracking-widest text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2.5 py-0.5 rounded-full font-bold">
             Public Card
           </span>
-          <h2 className="text-xl font-bold font-mono text-white mt-1">
+          <h2 id="dev-card-title" className="text-xl font-bold font-mono text-white mt-1">
             Developer Trading Card
           </h2>
           <p className="text-xs font-mono text-slate-400">
@@ -191,9 +212,11 @@ export default function DeveloperCardModal({
               <img
                 src={`https://github.com/${user.github}.png`}
                 alt={user.github}
-                className="w-12 h-12 rounded-full border border-sky-400/40 bg-slate-800"
+                className="w-12 h-12 rounded-full border border-sky-400/40 bg-slate-800 object-cover"
                 onError={(e) => {
-                  (e.target as any).src = `https://github.com/identicons/${user.github}.png`;
+                  const target = e.currentTarget;
+                  target.onerror = null;
+                  target.src = `https://github.com/identicons/${user.github}.png`;
                 }}
               />
               <div>
@@ -239,16 +262,22 @@ export default function DeveloperCardModal({
               Unlocked Badges ({stats.badges.length})
             </span>
             <div className="flex flex-wrap gap-1.5">
-              {stats.badges.slice(0, 6).map((b) => (
-                <span
-                  key={b.id}
-                  title={b.label}
-                  className="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-xs font-mono flex items-center gap-1"
-                >
-                  <span>{b.icon}</span>
-                  <span className="text-[10px] text-slate-300">{b.label}</span>
+              {stats.badges.length === 0 ? (
+                <span className="text-xs font-mono text-slate-500 italic">
+                  Solve daily problems & duels to unlock badges
                 </span>
-              ))}
+              ) : (
+                stats.badges.slice(0, 6).map((b) => (
+                  <span
+                    key={b.id}
+                    title={b.label}
+                    className="px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-xs font-mono flex items-center gap-1"
+                  >
+                    <span>{b.icon}</span>
+                    <span className="text-[10px] text-slate-300">{b.label}</span>
+                  </span>
+                ))
+              )}
             </div>
           </div>
 
@@ -263,14 +292,16 @@ export default function DeveloperCardModal({
         <div className="space-y-3 pt-1">
           <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={downloadPNG}
               disabled={downloading}
-              className="flex-1 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-mono text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20"
+              className="flex-1 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-mono text-xs font-bold transition flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20 disabled:opacity-50"
             >
               <span>📥</span>
               <span>{downloading ? "Generating..." : "Download Card (PNG)"}</span>
             </button>
             <button
+              type="button"
               onClick={copyText}
               className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-mono text-xs transition border border-slate-700"
             >
@@ -280,20 +311,23 @@ export default function DeveloperCardModal({
 
           <div className="grid grid-cols-3 gap-2">
             <button
+              type="button"
               onClick={shareWhatsApp}
-              className="py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-mono text-xs transition flex items-center justify-center gap-1.5"
+              className="py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 font-mono text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>💬 WhatsApp</span>
             </button>
             <button
+              type="button"
               onClick={shareTwitter}
-              className="py-2 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/30 font-mono text-xs transition flex items-center justify-center gap-1.5"
+              className="py-2 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/30 font-mono text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>🐦 X / Twitter</span>
             </button>
             <button
+              type="button"
               onClick={shareLinkedIn}
-              className="py-2 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 font-mono text-xs transition flex items-center justify-center gap-1.5"
+              className="py-2 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 font-mono text-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>💼 LinkedIn</span>
             </button>
@@ -303,4 +337,3 @@ export default function DeveloperCardModal({
     </div>
   );
 }
-

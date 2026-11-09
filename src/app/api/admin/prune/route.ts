@@ -30,28 +30,15 @@ const RETENTION_DAYS: Record<string, number> = {
 
 const INACTIVITY_DAYS = 30; // no solve in this window => nudge email
 
+import { getVerifiedAdminUser } from '@/lib/serverAuth';
+
 async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
   const cronSecret = req.headers.get('x-cron-secret');
   if (cronSecret && process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET) {
     return 'cron';
   }
-  const authHeader = req.headers.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return null;
-
-  const authClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { data, error } = await authClient.auth.getUser(token);
-  if (error || !data.user) return null;
-  const github = data.user.user_metadata?.user_name as string | undefined;
-  if (!github) return null;
-
-  const db = createServerSupabaseClient();
-  // eslint-disable-next-line
-  const { data: admin } = await (db.from('admins') as any).select('github').eq('github', github).maybeSingle();
-  return admin ? github : null;
+  const admin = await getVerifiedAdminUser(req);
+  return admin ? admin.github : null;
 }
 
 export async function GET(req: NextRequest) {

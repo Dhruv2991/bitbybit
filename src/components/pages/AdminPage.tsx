@@ -1395,10 +1395,9 @@ export default function AdminPage({ user }: AdminPageProps) {
       adminProblemFetch("/api/admin/problems")
         .then((data) => ({ data, error: null }))
         .catch((error) => ({ data: [], error })),
-      db
-        .from("members")
-        .select("*")
-        .order("total_points", { ascending: false }),
+      adminProblemFetch("/api/admin/members")
+        .then((res) => ({ data: (res.members as Member[]) || [], error: null }))
+        .catch((error) => ({ data: [] as Member[], error })),
       db.from("contests").select("*").order("created_at", { ascending: false }),
       db
         .from("contest_registrations")
@@ -1448,11 +1447,8 @@ export default function AdminPage({ user }: AdminPageProps) {
         "postgres_changes",
         { event: "*", schema: "public", table: "members" },
         async () => {
-          const { data } = await db
-            .from("members")
-            .select("*")
-            .order("total_points", { ascending: false });
-          setMembers(data || []);
+          const res = await adminProblemFetch("/api/admin/members").catch(() => null);
+          if (res?.members) setMembers(res.members as Member[]);
         },
       )
       .on(
@@ -1518,11 +1514,11 @@ export default function AdminPage({ user }: AdminPageProps) {
     if (input === null) return;
     const points = Math.max(0, parseInt(input as string, 10) || 0);
 
-    // eslint-disable-next-line
-    await (db.from("submissions") as any)
-      .update({ status: "approved", points_awarded: points })
-      .eq("id", id);
-    await awardPoints(github, points, false, undefined, points > 0);
+    await adminProblemFetch("/api/admin/submissions", {
+      method: "POST",
+      body: JSON.stringify({ action: "approve", id, github, points }),
+    });
+
     setSubs((prev) =>
       prev.map((s) =>
         s.id === id
@@ -1531,6 +1527,8 @@ export default function AdminPage({ user }: AdminPageProps) {
       ),
     );
     showToast(`✓ Approved — ${points} pts to @${github}`);
+    const refreshed = await adminProblemFetch("/api/admin/members").catch(() => null);
+    if (refreshed?.members) setMembers(refreshed.members as Member[]);
   }
 
   async function rejectSubmission(id: string, github: string) {
@@ -1538,10 +1536,12 @@ export default function AdminPage({ user }: AdminPageProps) {
     if (reason === null) return;
     const finalReason =
       (reason as string).trim() || "Does not meet requirements";
-    // eslint-disable-next-line
-    await (db.from("submissions") as any)
-      .update({ status: "rejected", reject_reason: finalReason })
-      .eq("id", id);
+
+    await adminProblemFetch("/api/admin/submissions", {
+      method: "POST",
+      body: JSON.stringify({ action: "reject", id, github, reason: finalReason }),
+    });
+
     setSubs((prev) =>
       prev.map((s) =>
         s.id === id
@@ -1571,22 +1571,10 @@ export default function AdminPage({ user }: AdminPageProps) {
     const delta = newPoints - (sub.points_awarded || 0);
     if (delta === 0) return;
 
-    // eslint-disable-next-line
-    await (db.from("submissions") as any)
-      .update({ points_awarded: newPoints })
-      .eq("id", sub.id);
-
-    // eslint-disable-next-line
-    const { data: mem } = await (db.from("members") as any)
-      .select("total_points")
-      .eq("github", sub.github)
-      .maybeSingle();
-    if (mem) {
-      // eslint-disable-next-line
-      await (db.from("members") as any)
-        .update({ total_points: Math.max(0, (mem.total_points || 0) + delta) })
-        .eq("github", sub.github);
-    }
+    await adminProblemFetch("/api/admin/submissions", {
+      method: "POST",
+      body: JSON.stringify({ action: "edit_points", id: sub.id, github: sub.github, newPoints, delta }),
+    });
 
     setSubs((prev) =>
       prev.map((s) =>
@@ -1596,6 +1584,8 @@ export default function AdminPage({ user }: AdminPageProps) {
     showToast(
       `💾 Points updated for @${sub.github}: ${sub.points_awarded || 0} → ${newPoints}`,
     );
+    const refreshed = await adminProblemFetch("/api/admin/members").catch(() => null);
+    if (refreshed?.members) setMembers(refreshed.members as Member[]);
   }
 
   async function checkPlagiarism(sub: Submission) {
@@ -1656,17 +1646,16 @@ export default function AdminPage({ user }: AdminPageProps) {
     if (finalStr === null) return;
     const finalPts = Math.max(0, parseInt(finalStr as string, 10) || 0);
 
-    // eslint-disable-next-line
-    await (db.from("arena_submissions") as any)
-      .update({ status: "reviewed", points_awarded: finalPts })
-      .eq("id", sub.id);
-    await awardPoints(
-      sub.github,
-      finalPts,
-      true,
-      sub.contest_id ?? undefined,
-      false,
-    ); // FIX: countAsSolved=false
+    await adminProblemFetch("/api/admin/arena-submissions", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "approve",
+        id: sub.id,
+        github: sub.github,
+        points: finalPts,
+        contestId: sub.contest_id,
+      }),
+    });
 
     setArenaSubs((prev) =>
       prev.map((a) =>
@@ -1680,6 +1669,8 @@ export default function AdminPage({ user }: AdminPageProps) {
     showToast(
       `✓ Arena approved — ${finalPts} pts to @${sub.github}${discount > 0 ? ` (${discount}% leaderboard discount applied)` : ""}`,
     );
+    const refreshed = await adminProblemFetch("/api/admin/members").catch(() => null);
+    if (refreshed?.members) setMembers(refreshed.members as Member[]);
   }
 
   async function rejectArenaSubmission(id: string, github: string) {
@@ -1687,10 +1678,12 @@ export default function AdminPage({ user }: AdminPageProps) {
     if (reason === null) return;
     const finalReason =
       (reason as string).trim() || "Did not meet requirements";
-    // eslint-disable-next-line
-    await (db.from("arena_submissions") as any)
-      .update({ status: "disqualified", strike_penalty_factor: 0 })
-      .eq("id", id);
+
+    await adminProblemFetch("/api/admin/arena-submissions", {
+      method: "POST",
+      body: JSON.stringify({ action: "reject", id, github, reason: finalReason }),
+    });
+
     setArenaSubs((prev) =>
       prev.map((a) =>
         a.id === id ? { ...a, status: "disqualified" as const } : a,
@@ -1698,6 +1691,7 @@ export default function AdminPage({ user }: AdminPageProps) {
     );
     showToast(`✗ Arena rejected for @${github}: ${finalReason}`);
   }
+
   // ── FIX: countAsSolved param — arena passes false so problems_solved & streak stay clean ──
   async function awardPoints(
     github: string,
@@ -1706,69 +1700,20 @@ export default function AdminPage({ user }: AdminPageProps) {
     contestId?: string,
     countAsSolved = true,
   ) {
-    let effectivePoints = points;
-    if (isContest && contestId) {
-      const contest = contests.find((c) => c.id === contestId);
-      const discount = contest?.leaderboard_discount ?? 0;
-      if (discount > 0) {
-        const { data: memberCheck } = await db
-          .from("members")
-          .select("total_points")
-          .eq("github", github)
-          .maybeSingle<{ total_points: number }>();
-        if (memberCheck && memberCheck.total_points > 0)
-          effectivePoints = Math.floor(points * (1 - discount / 100));
-      }
-    }
-    const now = new Date();
-    const { data: ex } = await db
-      .from("members")
-      .select("*")
-      .eq("github", github)
-      .maybeSingle<Member>();
+    await adminProblemFetch("/api/admin/members", {
+      method: "POST",
+      body: JSON.stringify({
+        action: "award_points",
+        github,
+        points,
+        isContest,
+        contestId,
+        countAsSolved,
+      }),
+    });
 
-    if (ex) {
-      const last = ex.last_solved_at ? new Date(ex.last_solved_at) : null;
-      const daysSinceLast = last ? calendarDaysBetween(last, now) : 999;
-      const newStreak = countAsSolved
-        ? daysSinceLast === 0
-          ? ex.streak || 1
-          : daysSinceLast === 1
-            ? (ex.streak || 0) + 1
-            : 1
-        : ex.streak || 0; // arena: leave streak untouched
-
-      // eslint-disable-next-line
-      await (db.from("members") as any)
-        .update({
-          total_points: (ex.total_points || 0) + effectivePoints,
-          problems_solved: (ex.problems_solved || 0) + (countAsSolved ? 1 : 0),
-          streak: newStreak,
-          last_solved_at: countAsSolved ? now.toISOString() : ex.last_solved_at,
-        })
-        .eq("github", github);
-    } else {
-      const nameFromSub =
-        subs.find((s) => s.github === github)?.name ||
-        arenaSubs.find((a) => a.github === github)?.name ||
-        github;
-      await db.from("members").insert([
-        {
-          github,
-          name: nameFromSub,
-          total_points: effectivePoints,
-          problems_solved: countAsSolved ? 1 : 0,
-          streak: countAsSolved ? 1 : 0,
-          last_solved_at: countAsSolved ? now.toISOString() : null,
-        },
-      ] as any);
-    }
-
-    const { data } = await db
-      .from("members")
-      .select("*")
-      .order("total_points", { ascending: false });
-    setMembers(data || []);
+    const refreshed = await adminProblemFetch("/api/admin/members").catch(() => null);
+    if (refreshed?.members) setMembers(refreshed.members as Member[]);
   }
 
   // ── Problem CRUD ──────────────────────────────────────────
@@ -3357,34 +3302,24 @@ function WeeklyAdminSection({ user }: { user: User }) {
       return;
     }
     const delta = pts - (sub.points_awarded || 0);
-    // eslint-disable-next-line
-    const { error } = await (db.from("weekly_submissions") as any)
-      .update({ points_awarded: pts })
-      .eq("id", sub.id);
-    if (error) {
+
+    try {
+      await adminProblemFetch("/api/admin/weekly-submissions", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "edit_points",
+          id: sub.id,
+          github: sub.github,
+          newPoints: pts,
+          delta,
+          isApproved: sub.status === "approved",
+        }),
+      });
+    } catch {
       showToast("Update failed");
       return;
     }
-    // Weekly submissions with test cases are auto-approved at submit
-    // time now, same as regular Problems — if this one's already
-    // approved, its points already counted toward the member's total,
-    // so editing them here has to apply just the difference, not the
-    // full new value (which would double-count what was already added).
-    if (sub.status === "approved" && delta !== 0) {
-      // eslint-disable-next-line
-      const { data: mem } = await (db.from("members") as any)
-        .select("total_points")
-        .eq("github", sub.github)
-        .maybeSingle();
-      if (mem) {
-        // eslint-disable-next-line
-        await (db.from("members") as any)
-          .update({
-            total_points: Math.max(0, (mem.total_points || 0) + delta),
-          })
-          .eq("github", sub.github);
-      }
-    }
+
     setEditingPts((prev) => {
       const n = { ...prev };
       delete n[sub.id];
@@ -3411,43 +3346,20 @@ function WeeklyAdminSection({ user }: { user: User }) {
 
     const finalPts = Math.max(0, parseInt(finalStr, 10) || 0);
 
-    const { error } = await (db.from("weekly_submissions") as any)
-      .update({
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        points_awarded: finalPts,
-      })
-      .eq("id", sub.id);
-
-    if (error) {
+    try {
+      await adminProblemFetch("/api/admin/weekly-submissions", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "approve",
+          id: sub.id,
+          github: sub.github,
+          name: sub.name,
+          points: finalPts,
+        }),
+      });
+    } catch {
       showToast("Approval failed");
       return;
-    }
-
-    // ===== UPDATE MEMBERS TABLE =====
-
-    const { data: member } = await (db.from("members") as any)
-      .select("*")
-      .eq("github", sub.github)
-      .maybeSingle();
-
-    if (member) {
-      await (db.from("members") as any)
-        .update({
-          total_points: (member.total_points || 0) + finalPts,
-          problems_solved: (member.problems_solved || 0) + (finalPts > 0 ? 1 : 0),
-          last_solved_at: finalPts > 0 ? new Date().toISOString() : member.last_solved_at,
-        })
-        .eq("github", sub.github);
-    } else {
-      await (db.from("members") as any).insert({
-        github: sub.github,
-        name: sub.name,
-        total_points: finalPts,
-        problems_solved: finalPts > 0 ? 1 : 0,
-        streak: finalPts > 0 ? 1 : 0,
-        last_solved_at: finalPts > 0 ? new Date().toISOString() : null,
-      });
     }
 
     showToast(`Approved ${sub.github} (${finalPts} pts)`);
@@ -3463,14 +3375,17 @@ function WeeklyAdminSection({ user }: { user: User }) {
     });
     if (reason === null) return;
 
-    const { error } = await (db.from("weekly_submissions") as any)
-      .update({
-        status: "rejected",
-        review_notes: (reason as string).trim() || "Rejected",
-      })
-      .eq("id", sub.id);
-
-    if (error) {
+    try {
+      await adminProblemFetch("/api/admin/weekly-submissions", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "reject",
+          id: sub.id,
+          github: sub.github,
+          reason: (reason as string).trim() || "Rejected",
+        }),
+      });
+    } catch {
       showToast("Reject failed");
       return;
     }

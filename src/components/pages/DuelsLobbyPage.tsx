@@ -60,8 +60,7 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
         }
 
         // 2. Load open duels waiting for opponents
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: duelsData } = await (db.from("code_duels") as any)
+                const { data: duelsData } = await (db.from("code_duels") as any)
           .select("*")
           .eq("status", "waiting")
           .order("created_at", { ascending: false })
@@ -96,8 +95,7 @@ export default function DuelsLobbyPage({ user, onNavigate }: DuelsLobbyPageProps
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "code_duels" },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (payload: any) => {
+                (payload: any) => {
           if (payload.eventType === "INSERT") {
             const newDuel = payload.new as CodeDuel;
             if (newDuel.status === "waiting") {

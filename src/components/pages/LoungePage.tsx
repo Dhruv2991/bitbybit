@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { getSupabaseClient } from "@/lib/supabase";
+import { LOUNGE_CONFIG, INPUT_LIMITS } from "@/config/community";
+import { useRealtimeChannel } from "@/hooks/useRealtimeChannel";
+import { useLoungeAudio } from "@/components/lounge/LoungeAudioContext";
 import type { User } from "@/types/database";
 import type { PageId } from "@/components/layout/AppShellContext";
 
@@ -17,51 +20,22 @@ interface LoungePeer {
   joinedAt: string;
 }
 
-interface AudioStation {
-  id: string;
-  name: string;
-  genre: string;
-  icon: string;
-  url: string;
-}
-
-const STATIONS: AudioStation[] = [
-  {
-    id: "lofi-beats",
-    name: "Chillhop Study Beats",
-    genre: "Lo-Fi Instrumental",
-    icon: "☕",
-    url: "https://streams.ilovemusic.de/iloveradio17.mp3", // reliable lofi/chill stream
-  },
-  {
-    id: "rain-piano",
-    name: "Rainy Night Ambience",
-    genre: "Rain & Piano",
-    icon: "🌧️",
-    url: "https://stream.zeno.fm/f3wvbbqmdg8uv", // rain stream
-  },
-  {
-    id: "synthwave",
-    name: "Cyberpunk Synthwave",
-    genre: "Electronic Focus",
-    icon: "🌌",
-    url: "https://stream.nightride.fm/chillsynth.mp3", // chillsynth stream
-  },
-];
-
-// Active peers are tracked in real-time via Supabase Presence (zero hardcoding)
-
 export default function LoungePage({ user, onNavigate }: LoungePageProps) {
-  // Audio state
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [selectedStation, setSelectedStation] = useState<AudioStation>(STATIONS[0]);
-  const [volume, setVolume] = useState(0.65);
-  const [audioError, setAudioError] = useState(false);
+  // Audio state from persistent background Audio Context
+  const {
+    isPlaying,
+    selectedStation,
+    volume,
+    audioError,
+    failingStationName,
+    togglePlay,
+    handleSelectStation,
+    handleVolumeChange,
+  } = useLoungeAudio();
 
   // Pomodoro state
   const [timerMode, setTimerMode] = useState<"focus" | "break">("focus");
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [timeLeft, setTimeLeft] = useState<number>(LOUNGE_CONFIG.FOCUS_DURATION_SECS);
   const [timerRunning, setTimerRunning] = useState(false);
 
   // Personal session goal
@@ -72,48 +46,7 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
   const [peers, setPeers] = useState<LoungePeer[]>([]);
   const [waveReceived, setWaveReceived] = useState<string | null>(null);
 
-  // 1. Audio controls
-  useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio(selectedStation.url);
-      audioRef.current.volume = volume;
-    } else {
-      audioRef.current.src = selectedStation.url;
-      audioRef.current.volume = volume;
-      if (isPlaying) {
-        audioRef.current.play().catch(() => setAudioError(true));
-      }
-    }
 
-    return () => {
-      audioRef.current?.pause();
-    };
-  }, [selectedStation]);
-
-  function togglePlay() {
-    if (!audioRef.current) return;
-    setAudioError(false);
-
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current
-        .play()
-        .then(() => setIsPlaying(true))
-        .catch(() => {
-          setAudioError(true);
-          setIsPlaying(false);
-        });
-    }
-  }
-
-  function handleVolumeChange(v: number) {
-    setVolume(v);
-    if (audioRef.current) {
-      audioRef.current.volume = v;
-    }
-  }
 
   // 2. Pomodoro countdown
   useEffect(() => {
@@ -123,13 +56,13 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
         setTimeLeft((prev) => prev - 1);
       }, 1000);
     } else if (timeLeft === 0) {
-      // Switch mode
+      // Switch mode automatically
       if (timerMode === "focus") {
         setTimerMode("break");
-        setTimeLeft(5 * 60);
+        setTimeLeft(LOUNGE_CONFIG.BREAK_DURATION_SECS);
       } else {
         setTimerMode("focus");
-        setTimeLeft(25 * 60);
+        setTimeLeft(LOUNGE_CONFIG.FOCUS_DURATION_SECS);
       }
     }
 
@@ -141,27 +74,42 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
   function resetTimer(mode: "focus" | "break") {
     setTimerMode(mode);
     setTimerRunning(false);
-    setTimeLeft(mode === "focus" ? 25 * 60 : 5 * 60);
+    setTimeLeft(
+      mode === "focus"
+        ? LOUNGE_CONFIG.FOCUS_DURATION_SECS
+        : LOUNGE_CONFIG.BREAK_DURATION_SECS
+    );
   }
 
-  // 3. Realtime presence & waves (True real-time sync with zero hardcoded peers)
-  useEffect(() => {
-    const db = getSupabaseClient();
-    const presenceKey = user?.github || `visitor_${Math.random().toString(36).slice(2, 7)}`;
-    const ch = db.channel("lounge-study-room", {
-      config: {
-        presence: { key: presenceKey },
-      },
-    });
+  // 3. Realtime presence & waves with useRealtimeChannel
+  const presenceKey = useMemo(() => {
+    return user?.github || "visitor_coder";
+  }, [user?.github]);
 
-    ch.on("presence", { event: "sync" }, () => {
-      const state = ch.presenceState();
+  const presenceData = useMemo(() => {
+    return {
+      github: user?.github || presenceKey,
+      name: user?.name || user?.github || "Fellow Coder",
+      goal: sessionGoal || "Deep Problem Solving",
+      joinedAt: "Just now",
+    };
+  }, [user?.github, user?.name, presenceKey, sessionGoal]);
+
+  useRealtimeChannel({
+    channelName: "lounge-study-room",
+    presenceKey,
+    presenceData,
+    onPresenceSync: (presenceState) => {
       const currentGithub = user?.github;
       const activeList: LoungePeer[] = [];
 
-      for (const presences of Object.values(state)) {
+      for (const presences of Object.values(presenceState)) {
         for (const p of presences as any[]) {
-          if (p.github && p.github !== currentGithub && !activeList.some((x) => x.github === p.github)) {
+          if (
+            p.github &&
+            p.github !== currentGithub &&
+            !activeList.some((x) => x.github === p.github)
+          ) {
             activeList.push({
               github: p.github,
               name: p.name || p.github,
@@ -172,42 +120,38 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
         }
       }
       setPeers(activeList);
-    })
-    .on("broadcast", { event: "wave" }, ({ payload }) => {
-      if (payload?.sender) {
-        setWaveReceived(`${payload.sender} sent a ${payload.emoji || "👋"} wave!`);
-        setTimeout(() => setWaveReceived(null), 4000);
-      }
-    })
-    .subscribe(async (status) => {
-      if (status === "SUBSCRIBED") {
-        await ch.track({
-          github: user?.github || presenceKey,
-          name: user?.name || user?.github || "Fellow Coder",
-          goal: sessionGoal || "Deep Problem Solving",
-          joinedAt: "Just now",
-        });
-      }
-    });
-
-    return () => {
-      db.removeChannel(ch);
-    };
-  }, [user?.github, user?.name, sessionGoal]);
+    },
+    broadcastEvents: [
+      {
+        event: "wave",
+        callback: (payload) => {
+          if (payload?.sender) {
+            setWaveReceived(`${payload.sender} sent a ${payload.emoji || "👋"} wave!`);
+            setTimeout(() => setWaveReceived(null), 4000);
+          }
+        },
+      },
+    ],
+    enabled: true,
+  });
 
   function sendWave(emoji: string) {
-    const db = getSupabaseClient();
-    const ch = db.channel("lounge-study-room");
-    ch.send({
-      type: "broadcast",
-      event: "wave",
-      payload: {
-        sender: user?.name || user?.github || "Fellow Coder",
-        emoji,
-      },
-    });
-    setWaveReceived(`You sent a ${emoji} wave to the lounge!`);
-    setTimeout(() => setWaveReceived(null), 3000);
+    try {
+      const db = getSupabaseClient();
+      const ch = db.channel("lounge-study-room");
+      ch.send({
+        type: "broadcast",
+        event: "wave",
+        payload: {
+          sender: user?.name || user?.github || "Fellow Coder",
+          emoji,
+        },
+      });
+      setWaveReceived(`You sent a ${emoji} wave to the lounge!`);
+      setTimeout(() => setWaveReceived(null), 3000);
+    } catch (err) {
+      console.warn("Could not broadcast wave:", err);
+    }
   }
 
   const formatTime = (seconds: number) => {
@@ -216,23 +160,25 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
     return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
   };
 
-  const timerPct =
-    timerMode === "focus"
-      ? Math.round(((25 * 60 - timeLeft) / (25 * 60)) * 100)
-      : Math.round(((5 * 60 - timeLeft) / (5 * 60)) * 100);
-
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6 animate-fade-up">
       {/* Wave Toast */}
       {waveReceived && (
-        <div className="fixed top-20 right-6 z-50 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-xl font-mono text-xs shadow-xl animate-fade-in flex items-center gap-2">
-          <span>✨</span>
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-20 right-6 z-50 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-xl font-mono text-xs shadow-xl animate-fade-in flex items-center gap-2"
+        >
+          <span aria-hidden="true">✨</span>
           <span>{waveReceived}</span>
         </div>
       )}
 
       {/* Hero Atmosphere Header */}
-      <div className="bg-gradient-to-r from-slate-950 via-purple-950/40 to-slate-950 border border-purple-500/30 rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-2xl backdrop-blur-xl">
+      <section
+        aria-labelledby="lounge-hero-heading"
+        className="bg-gradient-to-r from-slate-950 via-purple-950/40 to-slate-950 border border-purple-500/30 rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-2xl backdrop-blur-xl"
+      >
         <div className="absolute top-0 right-0 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-60 h-60 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -248,12 +194,16 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
               </span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-display font-bold text-white tracking-tight">
+            <h1
+              id="lounge-hero-heading"
+              className="text-2xl sm:text-3xl font-display font-bold text-white tracking-tight"
+            >
               The Midnight Study Cafe 🎧
             </h1>
 
             <p className="text-xs font-mono text-slate-300 max-w-xl leading-relaxed">
-              Plug in your headphones, stream ambient beats, sync with the community Pomodoro timer, and code alongside fellow students late into the night.
+              Plug in your headphones, stream ambient beats, sync with the community Pomodoro timer,
+              and code alongside fellow students late into the night.
             </p>
           </div>
 
@@ -273,28 +223,38 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
                   key={p.github}
                   src={`https://github.com/${p.github}.png`}
                   alt={p.name}
-                  className="w-7 h-7 rounded-full border-2 border-slate-900 bg-slate-800"
+                  className="w-7 h-7 rounded-full border-2 border-slate-900 bg-slate-800 object-cover"
                   onError={(e) => {
-                    (e.target as any).src = `https://github.com/identicons/${p.github}.png`;
+                    const target = e.currentTarget;
+                    target.onerror = null;
+                    target.src = `https://github.com/identicons/${p.github}.png`;
                   }}
                 />
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Main Control Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Lo-Fi Music Player & Session Goals (7 Cols) */}
         <div className="lg:col-span-7 space-y-6">
           {/* Audio Player Card */}
-          <div className="bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-6 shadow-sm space-y-5">
+          <section
+            aria-labelledby="audio-player-heading"
+            className="bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-6 shadow-sm space-y-5"
+          >
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-zinc-800 pb-4">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{selectedStation.icon}</span>
+                <span className="text-2xl" aria-hidden="true">
+                  {selectedStation.icon}
+                </span>
                 <div>
-                  <h3 className="text-sm font-bold font-mono text-slate-900 dark:text-zinc-100">
+                  <h3
+                    id="audio-player-heading"
+                    className="text-sm font-bold font-mono text-slate-900 dark:text-zinc-100"
+                  >
                     {selectedStation.name}
                   </h3>
                   <p className="text-[11px] font-mono text-purple-600 dark:text-purple-400">
@@ -305,7 +265,9 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
 
               {/* Play / Pause Big Button */}
               <button
+                type="button"
                 onClick={togglePlay}
+                aria-label={isPlaying ? "Pause music" : "Play music"}
                 className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition shadow-lg ${
                   isPlaying
                     ? "bg-purple-600 hover:bg-purple-500 text-white shadow-purple-600/30 animate-pulse"
@@ -317,26 +279,24 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
             </div>
 
             {audioError && (
-              <p className="text-[11px] font-mono text-amber-500">
-                ⚠️ Click play again to enable audio streaming in this browser session.
+              <p role="status" className="text-[11px] font-mono text-amber-500">
+                ⚠️ Playback error on &quot;{failingStationName || selectedStation.name}&quot;. Click play again to enable audio streaming in this browser session.
               </p>
             )}
 
             {/* Station Selector */}
             <div className="space-y-2">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-zinc-500 font-bold">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-zinc-500 font-bold block">
                 Select Ambient Station
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {STATIONS.map((st) => {
+                {LOUNGE_CONFIG.STATIONS.map((st) => {
                   const isCur = selectedStation.id === st.id;
                   return (
                     <button
                       key={st.id}
-                      onClick={() => {
-                        setSelectedStation(st);
-                        setIsPlaying(true);
-                      }}
+                      type="button"
+                      onClick={() => handleSelectStation(st)}
                       className={`p-3 rounded-xl border text-left transition font-mono ${
                         isCur
                           ? "bg-purple-500/15 border-purple-500/40 text-purple-900 dark:text-purple-200 shadow-xs"
@@ -344,7 +304,7 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        <span>{st.icon}</span>
+                        <span aria-hidden="true">{st.icon}</span>
                         <span className="text-xs font-bold truncate">{st.name}</span>
                       </div>
                       <span className="text-[10px] text-slate-400 block truncate">{st.genre}</span>
@@ -359,6 +319,7 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
               <span className="text-xs font-mono text-slate-400">🔊 Volume</span>
               <input
                 type="range"
+                aria-label="Volume control"
                 min="0"
                 max="1"
                 step="0.05"
@@ -370,17 +331,24 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
                 {Math.round(volume * 100)}%
               </span>
             </div>
-          </div>
+          </section>
 
           {/* Session Goal Tracker */}
-          <div className="bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-3">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-zinc-500 font-bold block">
+          <section
+            aria-labelledby="goal-tracker-heading"
+            className="bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-3"
+          >
+            <span
+              id="goal-tracker-heading"
+              className="text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-zinc-500 font-bold block"
+            >
               🎯 My Focus Goal For This Session
             </span>
             <div className="flex items-center gap-2">
               <input
                 type="text"
-                placeholder="e.g. Solve 2 Graph BFS problems & finish Weekly Challenge"
+                maxLength={INPUT_LIMITS.SESSION_GOAL_MAX}
+                placeholder="What are you focusing on this session? (e.g. Solve 3 Binary Search problems)"
                 value={sessionGoal}
                 onChange={(e) => {
                   setSessionGoal(e.target.value);
@@ -390,6 +358,7 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
               />
               {sessionGoal && (
                 <button
+                  type="button"
                   onClick={() => setGoalCompleted(!goalCompleted)}
                   className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center gap-1.5 ${
                     goalCompleted
@@ -401,15 +370,19 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
                 </button>
               )}
             </div>
-          </div>
+          </section>
         </div>
 
         {/* Right: Communal Pomodoro Timer & Peers (5 Cols) */}
         <div className="lg:col-span-5 space-y-6">
           {/* Pomodoro Timer */}
-          <div className="bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-6 shadow-sm space-y-5 text-center">
+          <section
+            aria-labelledby="pomodoro-timer-heading"
+            className="bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-6 shadow-sm space-y-5 text-center"
+          >
             <div className="flex items-center justify-center gap-2">
               <button
+                type="button"
                 onClick={() => resetTimer("focus")}
                 className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition ${
                   timerMode === "focus"
@@ -417,9 +390,10 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
                     : "text-slate-500 hover:text-slate-900 dark:hover:text-zinc-100"
                 }`}
               >
-                🧠 Focus (25m)
+                🧠 Focus Mode (25m)
               </button>
               <button
+                type="button"
                 onClick={() => resetTimer("break")}
                 className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition ${
                   timerMode === "break"
@@ -427,13 +401,17 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
                     : "text-slate-500 hover:text-slate-900 dark:hover:text-zinc-100"
                 }`}
               >
-                ☕ Rest (5m)
+                ☕ Short Break (5m)
               </button>
             </div>
 
-            {/* Giant Digits */}
+            {/* Digits Display */}
             <div className="py-2">
-              <div className="text-5xl sm:text-6xl font-mono font-bold text-slate-900 dark:text-zinc-100 tracking-tight">
+              <div
+                role="timer"
+                aria-label="Pomodoro countdown"
+                className="text-5xl sm:text-6xl font-mono font-bold text-slate-900 dark:text-zinc-100 tracking-tight"
+              >
                 {formatTime(timeLeft)}
               </div>
               <p className="text-[11px] font-mono text-slate-400 mt-2">
@@ -448,6 +426,7 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
             {/* Timer Actions */}
             <div className="flex items-center justify-center gap-2">
               <button
+                type="button"
                 onClick={() => setTimerRunning(!timerRunning)}
                 className={`px-6 py-2.5 rounded-xl font-mono text-xs font-bold transition shadow-sm ${
                   timerRunning
@@ -458,26 +437,36 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
                 {timerRunning ? "Pause Timer" : "Start Session"}
               </button>
               <button
+                type="button"
                 onClick={() => resetTimer(timerMode)}
+                aria-label="Reset timer"
                 className="px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 font-mono text-xs transition"
               >
                 ↻
               </button>
             </div>
-          </div>
+          </section>
 
           {/* Social Waves & Peer Presence List */}
-          <div className="bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4">
+          <section
+            aria-labelledby="lounge-peers-heading"
+            className="bg-white dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800/80 rounded-2xl p-5 shadow-sm space-y-4"
+          >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono font-bold text-slate-900 dark:text-zinc-100">
+              <span
+                id="lounge-peers-heading"
+                className="text-xs font-mono font-bold text-slate-900 dark:text-zinc-100"
+              >
                 Say Hi to Room ({peers.length + 1})
               </span>
               <div className="flex items-center gap-1.5">
                 {["👋", "☕", "💻", "🔥", "🚀"].map((emoji) => (
                   <button
                     key={emoji}
+                    type="button"
                     onClick={() => sendWave(emoji)}
                     className="w-7 h-7 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 flex items-center justify-center text-sm transition transform active:scale-125 cursor-pointer"
+                    aria-label={`Send ${emoji} wave`}
                     title={`Send ${emoji} wave`}
                   >
                     {emoji}
@@ -490,9 +479,13 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
             <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
               {peers.length === 0 ? (
                 <div className="p-4 text-center rounded-xl border border-dashed border-slate-200 dark:border-zinc-800 text-[11px] font-mono text-slate-500 space-y-2">
-                  <div>🎧 You have the lounge to yourself right now.</div>
-                  <p className="text-[10px] text-slate-400">Put on lo-fi tunes, start your Pomodoro timer, or copy the link to invite a teammate to study together.</p>
+                  <div>🎧 You have the peaceful study room to yourself right now.</div>
+                  <p className="text-[10px] text-slate-400">
+                    Put on lo-fi tunes, start your Pomodoro timer, or copy the link to invite your
+                    squad to study together.
+                  </p>
                   <button
+                    type="button"
                     onClick={() => {
                       if (typeof window !== "undefined") {
                         navigator.clipboard.writeText(window.location.href);
@@ -515,9 +508,11 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
                       <img
                         src={`https://github.com/${p.github}.png`}
                         alt={p.name}
-                        className="w-6 h-6 rounded-full border border-slate-200 dark:border-zinc-700 bg-slate-200 dark:bg-zinc-800 shrink-0"
+                        className="w-6 h-6 rounded-full border border-slate-200 dark:border-zinc-700 bg-slate-200 dark:bg-zinc-800 shrink-0 object-cover"
                         onError={(e) => {
-                          (e.target as any).src = `https://github.com/identicons/${p.github}.png`;
+                          const target = e.currentTarget;
+                          target.onerror = null;
+                          target.src = `https://github.com/identicons/${p.github}.png`;
                         }}
                       />
                       <div className="min-w-0">
@@ -536,38 +531,44 @@ export default function LoungePage({ user, onNavigate }: LoungePageProps) {
                 ))
               )}
             </div>
-          </div>
+          </section>
         </div>
       </div>
 
       {/* Quick Launchpad Dock */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-white">
+      <nav
+        aria-label="Quick launchpad"
+        className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-white"
+      >
         <div className="flex items-center gap-2">
-          <span>⚡ Ready to code while listening?</span>
+          <span aria-hidden="true">⚡</span>
+          <span>Ready to code while listening?</span>
           <span className="text-slate-400">Jump directly into a challenge:</span>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
+            type="button"
             onClick={() => onNavigate("problems")}
             className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 font-bold transition"
           >
             🗺️ Quest Roadmap
           </button>
           <button
+            type="button"
             onClick={() => onNavigate("duels")}
             className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 font-bold transition"
           >
             ⚔️ 1v1 Duels
           </button>
           <button
+            type="button"
             onClick={() => onNavigate("weekly")}
             className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 font-bold transition"
           >
             🏅 Weekly DSA
           </button>
         </div>
-      </div>
+      </nav>
     </div>
   );
 }
-

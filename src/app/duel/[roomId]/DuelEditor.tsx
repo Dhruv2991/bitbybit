@@ -80,7 +80,7 @@ export default function DuelEditor({
       id:          'format-code',
       label:       'Format Code',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS],
-      run:         (ed) => { ed.getAction('editor.action.formatDocument')?.run(); },
+      run:         (ed: any) => { ed.getAction('editor.action.formatDocument')?.run(); },
     });
     editor.addAction({
       id:          'run-tests',

@@ -30,6 +30,8 @@ export interface PollOption {
   votes: number;
 }
 
+export type CommunityPollOption = PollOption;
+
 export interface CommunityPoll {
   id: string;
   question: string;

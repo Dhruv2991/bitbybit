@@ -1,6 +1,7 @@
 "use client";
 import HomePage from "@/components/pages/HomePage";
 import { AppShellProvider, useAppShell } from "@/components/layout/AppShellContext";
+import { LoungeAudioProvider } from "@/components/lounge/LoungeAudioContext";
 import AppShell from "@/components/layout/AppShell";
 
 function Inner() {
@@ -11,9 +12,11 @@ function Inner() {
 export default function Page() {
   return (
     <AppShellProvider>
-      <AppShell>
-        <Inner />
-      </AppShell>
+      <LoungeAudioProvider>
+        <AppShell>
+          <Inner />
+        </AppShell>
+      </LoungeAudioProvider>
     </AppShellProvider>
   );
 }

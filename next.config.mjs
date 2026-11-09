@@ -60,6 +60,7 @@ const ContentSecurityPolicy = `
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net;
   font-src 'self' data: https://fonts.gstatic.com;
   img-src 'self' data: blob: https://github.com https://avatars.githubusercontent.com https://*.githubusercontent.com;
+  media-src 'self' blob: data: https://ilm.stream18.radiohost.de https://stream.nightride.fm https://streams.ilovemusic.de https://stream.zeno.fm;
   connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net https://api.razorpay.com https://wandbox.org http://localhost:11434;
   worker-src 'self' blob: https://cdn.jsdelivr.net;
   frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com;

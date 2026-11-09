@@ -1,11 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import type { GhostRun } from "@/types/ghost";
 import type { Problem, SupportedLang } from "@/types/database";
-import { recordGhostMatchAction, recordGhostRunAction } from "@/app/actions/ghosts";
+import { getSupabaseClient } from "@/lib/supabase";
+import {
+  recordGhostMatchAction,
+  recordGhostRunAction,
+  startGhostDuelAction,
+} from "@/app/actions/ghosts";
 
 const DuelEditor = dynamic(() => import("@/app/duel/[roomId]/DuelEditor"), {
   ssr: false,
@@ -31,12 +36,20 @@ export default function GhostDuelArena({
 }: GhostDuelArenaProps) {
   const router = useRouter();
 
+  // Mobile layout state
+  const [mobileTab, setMobileTab] = useState<"problem" | "editor" | "ghost">("editor");
+
   // Language & Code
   const [lang, setLang] = useState<SupportedLang>(
     (ghost.language as SupportedLang) || "python"
   );
+
   const starterCode =
-    (problem.starter_code && (problem.starter_code as any)[lang]) ||
+    (problem.starter_code && typeof problem.starter_code === "object"
+      ? (problem.starter_code as Record<string, string>)[lang]
+      : typeof problem.starter_code === "string"
+        ? problem.starter_code
+        : null) ||
     (lang === "python"
       ? `class Solution:\n    def solve(self, *args):\n        # Beat ${ghost.user_name}'s record of ${Math.floor(ghost.time_seconds / 60)}m ${ghost.time_seconds % 60}s!\n        pass\n`
       : `function solve(...args) {\n    // Beat ${ghost.user_name}'s record of ${Math.floor(ghost.time_seconds / 60)}m ${ghost.time_seconds % 60}s!\n}\n`);
@@ -49,7 +62,7 @@ export default function GhostDuelArena({
   const [raceActive, setRaceActive] = useState(true);
 
   // Execution states
-  const [testResults, setTestResults] = useState<any[]>([]);
+  const [testResults, setTestResults] = useState<{ ok: boolean }[]>([]);
   const [passedTests, setPassedTests] = useState(0);
   const [totalTests, setTotalTests] = useState(problem.test_cases?.length || 4);
   const [statusMessage, setStatusMessage] = useState("Race in progress! Beat the Ghost.");
@@ -57,7 +70,7 @@ export default function GhostDuelArena({
 
   // Match Result Modal
   const [matchOutcome, setMatchOutcome] = useState<"won" | "lost" | null>(null);
-  const [submittingMatch, setSubmittingMatch] = useState(false);
+  const [isAlreadyClaimed, setIsAlreadyClaimed] = useState(false);
   const [awardedPoints, setAwardedPoints] = useState(0);
   const [awardedSquadPoints, setAwardedSquadPoints] = useState(0);
 
@@ -70,15 +83,28 @@ export default function GhostDuelArena({
     return () => clearInterval(interval);
   }, [raceActive]);
 
+  // Initiate Server-Side Ghost Duel Session Start for Time Integrity
+  useEffect(() => {
+    if (currentUser?.github && ghost?.id && problem?.id) {
+      (async () => {
+        try {
+          const { data: { session } } = await getSupabaseClient().auth.getSession();
+          await startGhostDuelAction(ghost.id, currentUser.github, problem.id, session?.access_token);
+        } catch (err) {
+          console.warn("[GhostDuelArena] Could not record start session:", err);
+        }
+      })();
+    }
+  }, [currentUser?.github, ghost?.id, problem?.id]);
+
   // Format mm:ss
   function formatTime(sec: number) {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
+    const safeSec = Math.max(0, Math.floor(sec));
+    const m = Math.floor(safeSec / 60);
+    const s = safeSec % 60;
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   }
 
-  // Active Ghost Milestones
-  const activeCheckpoints = ghost.checkpoints.filter((cp) => elapsedSeconds >= cp.at);
   const ghostFinished = elapsedSeconds >= ghost.time_seconds;
   const timeDifference = ghost.time_seconds - elapsedSeconds;
 
@@ -106,8 +132,8 @@ export default function GhostDuelArena({
         throw new Error(data.error || "Execution failed. Check syntax.");
       }
 
-      const results = data.results || [];
-      const passed = data.passed ?? results.filter((r: any) => r.ok).length;
+      const results = Array.isArray(data.results) ? data.results : [];
+      const passed = data.passed ?? results.filter((r: { ok?: boolean }) => r.ok).length;
       const total = (data.total ?? results.length) || totalTests;
 
       setTestResults(results);
@@ -119,31 +145,29 @@ export default function GhostDuelArena({
         if (allGreen) {
           // RACE FINISHED!
           setRaceActive(false);
-          setSubmittingMatch(true);
 
           const won = elapsedSeconds < ghost.time_seconds;
-          const diff = ghost.time_seconds - elapsedSeconds;
           setMatchOutcome(won ? "won" : "lost");
 
-          // Save match result to DB
+          // Save match result to DB with server-side validation
           if (currentUser?.github) {
             const outcome = await recordGhostMatchAction({
-              ghost_run_id: ghost.id.startsWith("seed") ? null : ghost.id,
+              ghost_run_id: ghost.id,
               problem_id: problem.id,
               problem_title: problem.title,
               challenger_github: currentUser.github,
               challenger_name: currentUser.name || currentUser.github,
               challenger_time_seconds: elapsedSeconds,
-              result: won ? "won" : "lost",
-              time_diff_seconds: diff,
             });
 
             if (outcome.success) {
+              setMatchOutcome(outcome.result);
               setAwardedPoints(outcome.pointsAwarded);
               setAwardedSquadPoints(outcome.squadPointsAwarded);
+              setIsAlreadyClaimed(!!outcome.alreadyClaimed);
             }
 
-            // Also record user's own run as a new ghost if fast
+            // Also record user's own run as a new ghost if they won
             if (won) {
               recordGhostRunAction({
                 problem_id: problem.id,
@@ -155,17 +179,13 @@ export default function GhostDuelArena({
                 language: lang,
                 code_length: code.length,
                 checkpoints: [
-                  { at: 15, label: "Analyzed constraints & logic" },
-                  { at: Math.floor(elapsedSeconds * 0.6), label: "Passed sample cases" },
-                  { at: elapsedSeconds, label: "All test cases passed!" },
+                  { at: 10, label: "Analyzed constraints & logic" },
+                  { at: Math.floor(elapsedSeconds * 0.5), label: "Sample tests passed" },
+                  { at: elapsedSeconds, label: "All test cases green!" },
                 ],
               }).catch(() => {});
             }
-          } else {
-            // Unauthenticated local win
-            setMatchOutcome(won ? "won" : "lost");
           }
-          setSubmittingMatch(false);
         } else {
           setStatusMessage(`Passed ${passed}/${total} tests. Keep debugging!`);
         }
@@ -191,67 +211,73 @@ export default function GhostDuelArena({
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-950 text-slate-100 font-sans overflow-hidden">
       {/* 1. TOP RACE HUD */}
-      <header className="h-16 px-6 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
+      <header
+        role="region"
+        aria-label="Duel Telemetry Header"
+        className="h-16 px-4 sm:px-6 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between shrink-0"
+      >
+        <div className="flex items-center gap-3">
           <button
             onClick={handleExit}
-            className="text-xs font-mono text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 transition"
+            aria-label="Exit race and return to lobby"
+            className="text-xs font-mono text-slate-400 hover:text-white px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition"
           >
-            ← Exit Race
+            ← Exit
           </button>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-mono font-bold tracking-widest uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded">
-                👻 Ghost Duel Arena
+                👻 Ghost Arena
               </span>
-              <h1 className="text-sm font-bold font-mono text-white">
+              <h1 className="text-xs sm:text-sm font-bold font-mono text-white truncate max-w-[150px] sm:max-w-xs">
                 {problem.title}
               </h1>
             </div>
-            <p className="text-[11px] font-mono text-slate-400">
-              Racing against <strong className="text-cyan-300">@{ghost.github}</strong>'s recorded run
+            <p className="text-[10px] sm:text-[11px] font-mono text-slate-400 hidden sm:block">
+              Racing against <strong className="text-cyan-300">@{ghost.github}</strong>
             </p>
           </div>
         </div>
 
         {/* Speedometer Center */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <div className="text-center font-mono">
-            <div className="text-[10px] uppercase tracking-wider text-slate-400">Your Time</div>
-            <div className="text-xl font-black text-amber-400 tracking-tight">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400">You</div>
+            <div className="text-base sm:text-xl font-black text-amber-400 tracking-tight">
               {formatTime(elapsedSeconds)}
             </div>
           </div>
 
-          <div className="text-xl font-bold font-mono text-slate-600">VS</div>
+          <div className="text-xs sm:text-base font-bold font-mono text-slate-600">VS</div>
 
           <div className="text-center font-mono">
-            <div className="text-[10px] uppercase tracking-wider text-slate-400">Ghost Record</div>
-            <div className="text-xl font-black text-cyan-400 tracking-tight">
+            <div className="text-[9px] uppercase tracking-wider text-slate-400">Ghost</div>
+            <div className="text-base sm:text-xl font-black text-cyan-400 tracking-tight">
               {formatTime(ghost.time_seconds)}
             </div>
           </div>
 
           <div
-            className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border ${
+            className={`hidden md:block px-2.5 py-1 rounded-lg text-xs font-mono font-bold border ${
               timeDifference >= 0
                 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                 : "bg-rose-500/10 text-rose-400 border-rose-500/30"
             }`}
           >
             {timeDifference >= 0
-              ? `⚡ +${formatTime(timeDifference)} ahead`
-              : `⚠️ -${formatTime(Math.abs(timeDifference))} behind`}
+              ? `⚡ +${formatTime(timeDifference)}`
+              : `⚠️ -${formatTime(Math.abs(timeDifference))}`}
           </div>
         </div>
 
         {/* Right Action buttons */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <select
             value={lang}
             onChange={(e) => setLang(e.target.value as SupportedLang)}
             disabled={!raceActive}
-            className="bg-slate-800 border border-slate-700 text-xs font-mono text-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-hidden"
+            aria-label="Select Programming Language"
+            className="bg-slate-800 border border-slate-700 text-xs font-mono text-slate-200 px-2 py-1.5 rounded-lg focus:outline-hidden"
           >
             <option value="python">Python 3</option>
             <option value="javascript">JavaScript</option>
@@ -262,25 +288,63 @@ export default function GhostDuelArena({
           <button
             onClick={() => executeSolution(false)}
             disabled={isRunning || !raceActive}
-            className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono font-medium text-slate-200 transition disabled:opacity-50"
+            className="hidden sm:inline-block px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono text-slate-200 transition disabled:opacity-50"
           >
-            Run Tests
+            Run
           </button>
 
           <button
             onClick={() => executeSolution(true)}
             disabled={isRunning || !raceActive}
-            className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold transition shadow-xs shadow-emerald-500/20 disabled:opacity-50 flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold transition shadow-xs shadow-emerald-500/20 disabled:opacity-50 flex items-center gap-1"
           >
-            <span>{isRunning ? "Testing…" : "Submit & Finish 🏁"}</span>
+            <span>{isRunning ? "Testing…" : "Submit 🏁"}</span>
           </button>
         </div>
       </header>
 
-      {/* 2. MAIN SPLIT ARENA */}
-      <div className="flex-1 grid grid-cols-12 gap-0 overflow-hidden">
+      {/* MOBILE TAB SWITCHER (< lg) */}
+      <div className="lg:hidden flex border-b border-slate-800 bg-slate-900 font-mono text-xs">
+        <button
+          onClick={() => setMobileTab("problem")}
+          className={`flex-1 py-2 text-center border-b-2 transition ${
+            mobileTab === "problem"
+              ? "border-cyan-400 text-cyan-400 font-bold"
+              : "border-transparent text-slate-400"
+          }`}
+        >
+          📋 Problem
+        </button>
+        <button
+          onClick={() => setMobileTab("editor")}
+          className={`flex-1 py-2 text-center border-b-2 transition ${
+            mobileTab === "editor"
+              ? "border-cyan-400 text-cyan-400 font-bold"
+              : "border-transparent text-slate-400"
+          }`}
+        >
+          💻 Editor
+        </button>
+        <button
+          onClick={() => setMobileTab("ghost")}
+          className={`flex-1 py-2 text-center border-b-2 transition ${
+            mobileTab === "ghost"
+              ? "border-cyan-400 text-cyan-400 font-bold"
+              : "border-transparent text-slate-400"
+          }`}
+        >
+          👻 Ghost HUD
+        </button>
+      </div>
+
+      {/* 2. MAIN BATTLE ARENA */}
+      <div className="flex-1 lg:grid lg:grid-cols-12 gap-0 overflow-hidden flex flex-col">
         {/* LEFT COLUMN: Problem Description & Test Runner (4 cols) */}
-        <div className="col-span-4 border-r border-slate-800 flex flex-col bg-slate-900/40 overflow-hidden">
+        <div
+          className={`lg:col-span-4 border-r border-slate-800 flex flex-col bg-slate-900/40 overflow-hidden ${
+            mobileTab === "problem" ? "flex-1" : "hidden lg:flex"
+          }`}
+        >
           {/* Problem Details */}
           <div className="p-4 border-b border-slate-800 flex-1 overflow-y-auto space-y-3">
             <div className="flex items-center justify-between">
@@ -351,10 +415,14 @@ export default function GhostDuelArena({
         </div>
 
         {/* CENTER COLUMN: Code Editor (5 cols) */}
-        <div className="col-span-5 flex flex-col bg-slate-950 overflow-hidden">
+        <div
+          className={`lg:col-span-5 flex flex-col bg-slate-950 overflow-hidden ${
+            mobileTab === "editor" ? "flex-1" : "hidden lg:flex"
+          }`}
+        >
           <div className="h-8 bg-slate-900 px-3 flex items-center justify-between text-xs font-mono text-slate-400 border-b border-slate-800">
             <span>solution.{lang === "python" ? "py" : lang === "javascript" ? "js" : "cpp"}</span>
-            <span>Ctrl+Enter to Run • Ctrl+Shift+Enter to Submit</span>
+            <span className="hidden sm:inline">Ctrl+Enter = Run • Ctrl+Shift+Enter = Submit</span>
           </div>
 
           <div className="flex-1">
@@ -370,7 +438,11 @@ export default function GhostDuelArena({
         </div>
 
         {/* RIGHT COLUMN: Ghost Competitor HUD & Telemetry (3 cols) */}
-        <div className="col-span-3 border-l border-slate-800 bg-slate-900/60 flex flex-col overflow-hidden">
+        <div
+          className={`lg:col-span-3 border-l border-slate-800 bg-slate-900/60 flex flex-col overflow-hidden ${
+            mobileTab === "ghost" ? "flex-1" : "hidden lg:flex"
+          }`}
+        >
           {/* Ghost Profile Card */}
           <div className="p-4 border-b border-slate-800 space-y-3">
             <div className="flex items-center gap-3">
@@ -484,14 +556,19 @@ export default function GhostDuelArena({
 
       {/* 3. VICTORY / OUTCOME MODAL */}
       {matchOutcome && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ghost-outcome-title"
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
+        >
           <div className="bg-slate-900 border border-slate-700 max-w-md w-full rounded-2xl p-6 text-center shadow-2xl space-y-5 animate-scale-up">
             <div className="text-5xl">
               {matchOutcome === "won" ? "🏆" : "👻"}
             </div>
 
             <div className="space-y-1">
-              <h2 className="text-xl font-bold font-mono text-white">
+              <h2 id="ghost-outcome-title" className="text-xl font-bold font-mono text-white">
                 {matchOutcome === "won" ? "GHOST RECORD BEATEN!" : "GHOST CROSSED FIRST!"}
               </h2>
               <p className="text-xs font-mono text-slate-400">
@@ -518,16 +595,25 @@ export default function GhostDuelArena({
             </div>
 
             {matchOutcome === "won" && (
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1 font-mono text-xs text-emerald-400">
-                <div className="font-bold">🎉 Rewards Claimed:</div>
-                <div>+100 Duel Points Awarded</div>
-                {awardedSquadPoints > 0 && (
-                  <div className="text-indigo-400 font-bold">
-                    +50 Points Contributed to your Squad!
+              isAlreadyClaimed ? (
+                <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl space-y-1 font-mono text-xs text-cyan-300">
+                  <div className="font-bold">⚡ Record Re-matched!</div>
+                  <div className="text-[11px] text-slate-400">
+                    Points for this ghost record were already claimed previously. Great work keeping your skills sharp!
                   </div>
-                )}
-                <div>⚔️ Duelist Badge Progress Updated</div>
-              </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-1 font-mono text-xs text-emerald-400">
+                  <div className="font-bold">🎉 Rewards Claimed:</div>
+                  <div>+{awardedPoints || 100} Duel Points Awarded</div>
+                  {awardedSquadPoints > 0 && (
+                    <div className="text-indigo-400 font-bold">
+                      +{awardedSquadPoints} Points Contributed to your Squad!
+                    </div>
+                  )}
+                  <div>⚔️ Duelist Badge Progress Updated</div>
+                </div>
+              )
             )}
 
             {/* Actions */}

@@ -18,27 +18,12 @@
 // ════════════════════════════════════════════════════════════
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase';
+import { getVerifiedAdminUser, extractVerifiedGithubIdentity } from '@/lib/serverAuth';
 
 async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return null;
-
-  const authClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { data, error } = await authClient.auth.getUser(token);
-  if (error || !data.user) return null;
-  const github = data.user.user_metadata?.user_name as string | undefined;
-  if (!github) return null;
-
-  const db = createServerSupabaseClient();
-  // eslint-disable-next-line
-  const { data: admin } = await (db.from('admins') as any).select('github').eq('github', github).maybeSingle();
-  return admin ? github : null;
+  const admin = await getVerifiedAdminUser(req);
+  return admin ? admin.github : null;
 }
 
 export async function POST(req: NextRequest) {
@@ -63,10 +48,11 @@ export async function POST(req: NextRequest) {
       }
       const users = data?.users || [];
       for (const u of users) {
-        const github = u.user_metadata?.user_name as string | undefined;
-        const email  = (u.email || u.user_metadata?.email || null) as string | null;
-        const name   = (u.user_metadata?.full_name as string | undefined) || github;
-        if (github && email) rows.push({ github, email, name: name || github });
+        const verified = extractVerifiedGithubIdentity(u);
+        const email = (u.email || verified?.email || null) as string | null;
+        if (verified && email) {
+          rows.push({ github: verified.github, email, name: verified.name });
+        }
       }
       if (users.length < perPage) break;
       page++;

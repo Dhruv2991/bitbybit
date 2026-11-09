@@ -35,3 +35,24 @@ export interface GhostMatch {
   time_diff_seconds: number;
   created_at: string;
 }
+
+export interface RecordGhostMatchInput {
+  ghost_run_id?: string | null;
+  problem_id: string;
+  problem_title?: string;
+  challenger_github: string;
+  challenger_name?: string;
+  challenger_time_seconds: number;
+  submission_id?: string;
+  token?: string;
+}
+
+export interface RecordGhostMatchResult {
+  success: boolean;
+  result: "won" | "lost";
+  timeDiffSeconds: number;
+  pointsAwarded: number;
+  squadPointsAwarded: number;
+  alreadyClaimed?: boolean;
+  error?: string;
+}

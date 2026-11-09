@@ -1,4 +1,5 @@
 "use client";
+import { extractVerifiedGithubIdentity } from '@/lib/authIdentity';
 // ════════════════════════════════════════════════════════════
 // src/app/duel/[roomId]/page.tsx
 // Real-Time 1v1 Code Duel War Room & Live Telemetry Arena
@@ -73,10 +74,11 @@ export default function DuelWarRoomPage() {
       if (raw) {
         const parsed = JSON.parse(raw);
         const su = parsed?.user ?? parsed?.session?.user;
-        if (su?.user_metadata?.user_name) {
+        const verified = extractVerifiedGithubIdentity(su);
+        if (verified) {
           setCurrentUser({
-            github: su.user_metadata.user_name,
-            name: su.user_metadata.full_name || su.user_metadata.user_name,
+            github: verified.github,
+            name: verified.name,
           });
         }
       }
@@ -128,8 +130,7 @@ export default function DuelWarRoomPage() {
           table: "code_duels",
           filter: `id=eq.${roomId}`,
         },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (payload: any) => {
+                (payload: any) => {
           const updated = payload.new as CodeDuel;
           setDuel(updated);
 

@@ -1,6 +1,7 @@
 "use client";
+import { extractVerifiedGithubIdentity } from '@/lib/authIdentity';
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getGhostRunByIdAction } from "@/app/actions/ghosts";
@@ -9,13 +10,26 @@ import type { Problem } from "@/types/database";
 import GhostDuelArena from "@/components/duels/GhostDuelArena";
 
 interface PageProps {
-  params: Promise<{ ghostId: string }>;
+  params: { ghostId: string } | Promise<{ ghostId: string }>;
 }
 
 export default function GhostDuelPage({ params }: PageProps) {
-  const resolvedParams = use(params);
+  const [ghostId, setGhostId] = useState<string>(() => {
+    if (params && typeof (params as any).then !== "function") {
+      return (params as { ghostId: string }).ghostId || "";
+    }
+    return "";
+  });
+
+  useEffect(() => {
+    if (params && typeof (params as any).then === "function") {
+      Promise.resolve(params).then((p) => {
+        if (p?.ghostId) setGhostId(p.ghostId);
+      });
+    }
+  }, [params]);
+
   const router = useRouter();
-  const ghostId = resolvedParams.ghostId;
 
   const [ghost, setGhost] = useState<GhostRun | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
@@ -36,12 +50,14 @@ export default function GhostDuelPage({ params }: PageProps) {
       try {
         const { data: { session } } = await db.auth.getSession();
         if (session?.user) {
-          const u = session.user;
-          setCurrentUser({
-            github: u.user_metadata?.user_name || u.email?.split("@")[0] || "coder",
-            name: u.user_metadata?.full_name || u.user_metadata?.user_name || "Coder",
-            avatar: u.user_metadata?.avatar_url,
-          });
+          const verified = extractVerifiedGithubIdentity(session.user);
+          if (verified) {
+            setCurrentUser({
+              github: verified.github,
+              name: verified.name,
+              avatar: verified.avatar_url || undefined,
+            });
+          }
         }
       } catch (err) {
         console.warn("Auth check error in ghost duel:", err);
@@ -139,3 +155,4 @@ export default function GhostDuelPage({ params }: PageProps) {
     />
   );
 }
+

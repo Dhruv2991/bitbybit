@@ -1,10 +1,13 @@
 import { AppShellProvider } from "@/components/layout/AppShellContext";
+import { LoungeAudioProvider } from "@/components/lounge/LoungeAudioContext";
 import AppShell from "@/components/layout/AppShell";
 
 export default function AppGroupLayout({ children }: { children: React.ReactNode }) {
   return (
     <AppShellProvider>
-      <AppShell>{children}</AppShell>
+      <LoungeAudioProvider>
+        <AppShell>{children}</AppShell>
+      </LoungeAudioProvider>
     </AppShellProvider>
   );
 }

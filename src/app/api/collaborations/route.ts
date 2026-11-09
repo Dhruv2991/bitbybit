@@ -29,34 +29,11 @@ const DEFAULT_COLLABORATION_DATA: CollaborationsPageData = {
 /**
  * Validates whether the caller has administrator privileges
  */
+import { getVerifiedAdminUser } from '@/lib/serverAuth';
+
 async function verifyAdminCaller(req: NextRequest): Promise<string | null> {
-  try {
-    const authHeader = req.headers.get('authorization') || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!token) return null;
-
-    const authClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    const { data, error } = await authClient.auth.getUser(token);
-    if (error || !data.user) return null;
-
-    const github = data.user.user_metadata?.user_name as string | undefined;
-    if (!github) return null;
-
-    const db = createServerSupabaseClient();
-    // eslint-disable-next-line
-    const { data: admin } = await (db.from('admins') as any)
-      .select('github')
-      .eq('github', github)
-      .maybeSingle();
-
-    return admin ? github : null;
-  } catch (err) {
-    console.error('Admin verification error:', err);
-    return null;
-  }
+  const admin = await getVerifiedAdminUser(req);
+  return admin ? admin.github : null;
 }
 
 /**

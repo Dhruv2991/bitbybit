@@ -1,3 +1,4 @@
+import { getVerifiedApiUser } from '@/lib/serverAuth';
 // ════════════════════════════════════════════════════════════
 // src/app/api/execute/route.ts
 // POST /api/execute — Asynchronous Submission (wait=false)
@@ -66,23 +67,9 @@ function checkRateLimit(
 
 // ── Verified JWT Identity Extraction ─────────────────────────
 async function getVerifiedAuthUser(req: NextRequest) {
-  const authHeader = req.headers.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return null;
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { data, error } = await supabase.auth.getUser(token);
-  if (error || !data.user) return null;
-
-  const githubIdentity = data.user.identities?.find((id: any) => id.provider === 'github');
-  const github = githubIdentity?.identity_data?.user_name as string | undefined;
-  if (!github) return null;
-
-  const name = (githubIdentity?.identity_data?.full_name || githubIdentity?.identity_data?.name || github) as string;
-  return { id: data.user.id, github, name };
+  const user = await getVerifiedApiUser(req);
+  if (!user) return null;
+  return { id: user.id, github: user.github, name: user.name };
 }
 
 // ── Sanitization ─────────────────────────────────────────────
@@ -576,6 +563,23 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Solve guard: only full hidden-test submit (not sample runs), all passed, problem matches, and solved_at is null
+      const isFullSubmit = mode === 'submit';
+      const allPassed = rawResult.passed > 0 && rawResult.passed === targetCases.length;
+      if (isFullSubmit && allPassed && authUser?.github && problem_id) {
+        try {
+          const nowIso = new Date().toISOString();
+          await (dbClient.from('ghost_duel_sessions') as any)
+            .update({ solved_at: nowIso })
+            .eq('problem_id', String(problem_id))
+            .ilike('challenger_github', authUser.github)
+            .is('completed_at', null)
+            .is('solved_at', null);
+        } catch (e) {
+          console.warn('[execute] Failed to update ghost session solved_at:', e);
+        }
+      }
+
       return NextResponse.json({
         status: 'done',
         passed: rawResult.passed,
@@ -662,6 +666,25 @@ export async function GET(req: NextRequest) {
         rawResult.passed,
         rawResult.total
       );
+    }
+
+    // Solve guard: only full hidden-test submit (not sample runs), all passed, problem matches, and solved_at is null
+    const isFullSubmit = pending?.mode === 'submit';
+    const isAllPassed = rawResult.passed > 0 && rawResult.passed === targetCases.length;
+    const activeChallengerGithub = pending?.user?.github;
+    const activeTargetProblemId = pending?.problem_id;
+    if (isFullSubmit && isAllPassed && activeChallengerGithub && activeTargetProblemId) {
+      try {
+        const nowIso = new Date().toISOString();
+        await (dbClient.from('ghost_duel_sessions') as any)
+          .update({ solved_at: nowIso })
+          .eq('problem_id', String(activeTargetProblemId))
+          .ilike('challenger_github', activeChallengerGithub)
+          .is('completed_at', null)
+          .is('solved_at', null);
+      } catch (e) {
+        console.warn('[execute] Failed to update ghost session solved_at:', e);
+      }
     }
 
     // Atomic duel victory resolution

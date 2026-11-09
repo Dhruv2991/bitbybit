@@ -159,3 +159,85 @@ No Razorpay keys needed. UPI IDs are managed per-contest / for the AI subscripti
 - **Problems** — Create/edit problems with test cases (includes AI-assisted problem/test-case generation, admin-only)
 - **Members** — View all registered members, manage subscription status
 - **Contests** — Create contests, set UPI ID, manage status, verify registrations
+
+---
+
+## 🚀 Community Update Features
+
+BitByBit includes a full suite of community-driven collaborative and competitive features:
+
+1. **Ghost Duels (`/duel/ghost/[ghostId]`)**
+   - Race asynchronously against verified past duel recordings (or curated seed ghosts).
+   - Replays step-by-step progress with typing speed pacing and real-time live match UI.
+   - Secure server-side reward validation (+100 XP, Duelist badge) with replay-protection.
+
+2. **Squads & College Clans (`/squads`)**
+   - Form or join 3–5 member squads with unguessable cryptographic invite codes.
+   - Atomic, race-safe membership capacity verified via PostgreSQL triggers.
+   - Cooperative point pooling from daily challenges and duels with automatic leader succession.
+
+3. **Daily Community Poll & Heartbeat**
+   - Pinned daily technical poll on the dashboard (atomic server-side vote deduplication).
+   - Real-time community heartbeat counter tracking active online coders.
+
+4. **ELI5 Discussions & Mentor Karma**
+   - Problem-level explanation feed with approach badges (ELI5, Brute Force, Optimal, Stuck).
+   - Community upvotes and Mentor Karma (+5 per upvote) with strict self-upvote prevention.
+
+5. **Workspace Extras**
+   - Real-time coder presence counter on problems ("*N developers currently solving*").
+   - Progressive Socratic nudges guiding users through stuck test cases without spoiling answers.
+
+6. **Lo-Fi Study Lounge (`/lounge`)**
+   - Virtual coding lounge with curated ambient streams (Lofi Girl, Synthwave, Chillhop).
+   - Integrated Pomodoro timer (25m / 5m intervals) and live room presence.
+
+7. **Live Spectator Cheering (`/duel/[roomId]`)**
+   - Friends spectate live 1v1 duels and broadcast animated floating emoji reactions (🔥, 🤯, 👏, 💀).
+   - Full accessible keyboard controls and `prefers-reduced-motion` compliance.
+
+8. **Interactive Quest Roadmap (`/problems`)**
+   - Visual skill progression tree across beginner, intermediate, and advanced problem tiers.
+   - Interactive node modal with direct problem launching.
+
+9. **Clans & Mentors Leaderboard (`/leaderboard`)**
+   - Clan rankings based on aggregate squad member XP.
+   - Top Mentors board recognizing high-karma discussion contributors.
+
+10. **Developer Trading Card (`/profile`)**
+    - Cyberpunk holographic developer card with stats, streak, top language, and badges.
+    - 1-click sharing to Twitter/X, LinkedIn, and high-res PNG download.
+
+---
+
+## 🧪 Testing & Verification
+
+The test suite runs on [Vitest](https://vitest.dev/) with React Testing Library and JSDOM:
+
+```bash
+# Run all unit and integration tests (71 tests across 11 suites)
+npm test
+
+# Run in watch mode during development
+npm run test:watch
+
+# Run end-to-end browser tests
+npm run test:e2e
+
+# Static TypeScript checking
+npx tsc --noEmit
+
+# ESLint verification
+npm run lint
+
+# Full production Next.js build
+npm run build
+```
+
+### Database Migrations
+
+Community features use the migration file:
+- `supabase/migrations/20261102_community_features.sql`
+- Rollback: `supabase/migrations/20261102_community_features_rollback.sql`
+
+Features include atomic triggers enforcing squad capacity, server-side reward claims, and default seed data.

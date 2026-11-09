@@ -31,12 +31,15 @@ export default function CoordinatorPage({ user }: CoordinatorPageProps) {
   useEffect(() => {
     async function fetchMembers() {
       try {
-        const { data, error } = await db
-          .from("members")
-          .select("*")
-          .order("total_points", { ascending: false });
-        if (!error && data) {
-          setMembers(data as Member[]);
+        const { data: { session } } = await db.auth.getSession();
+        const res = await fetch("/api/coordinator/members", {
+          headers: {
+            Authorization: `Bearer ${session?.access_token || ""}`,
+          },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setMembers((json.members as Member[]) || []);
         }
       } catch (err) {
         console.error("Failed to load members", err);

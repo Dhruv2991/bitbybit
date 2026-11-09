@@ -26,34 +26,11 @@ export const dynamic = 'force-dynamic';
  *
  * Returns the verified github username, or null if check fails.
  */
+import { getVerifiedAdminUser } from '@/lib/serverAuth';
+
 async function getVerifiedAdminGithub(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return null;
-
-  // Resolve the actual user from Supabase auth — not from JWT claims
-  const authClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { data: userData, error: userError } = await authClient.auth.getUser(token);
-  if (userError || !userData.user) return null;
-
-  // Get github strictly from auth.identities (provider=github), NOT user_metadata
-  const githubIdentity = userData.user.identities?.find(
-    (id) => id.provider === 'github',
-  );
-  const github = githubIdentity?.identity_data?.user_name as string | undefined;
-  if (!github) return null;
-
-  // DB-level admin check using service role
-  const db = createServerSupabaseClient();
-  const { data: adminRow } = await (db.from('admins') as any)
-    .select('github')
-    .eq('github', github)
-    .maybeSingle();
-
-  return adminRow ? github : null;
+  const admin = await getVerifiedAdminUser(req);
+  return admin ? admin.github : null;
 }
 
 // ── GET — fetch problems with full details & test cases (service role) ─────────

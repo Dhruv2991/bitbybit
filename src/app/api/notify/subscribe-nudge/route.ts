@@ -29,31 +29,15 @@ import { sendEmail, subscribeNudgeEmail } from '@/lib/email';
 // Fluid Compute — comfortably covers ~40-100 recipients with pooling.
 export const maxDuration = 60;
 
+import { getVerifiedAdminUser } from '@/lib/serverAuth';
+
 async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
-  // Allow a scheduled job (e.g. Vercel Cron) to call this with a
-  // shared secret instead of a user session.
   const cronSecret = req.headers.get('x-cron-secret');
   if (cronSecret && process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET) {
     return 'cron';
   }
-
-  const authHeader = req.headers.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return null;
-
-  const authClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { data, error } = await authClient.auth.getUser(token);
-  if (error || !data.user) return null;
-  const github = data.user.user_metadata?.user_name as string | undefined;
-  if (!github) return null;
-
-  const db = createServerSupabaseClient();
-  // eslint-disable-next-line
-  const { data: admin } = await (db.from('admins') as any).select('github').eq('github', github).maybeSingle();
-  return admin ? github : null;
+  const admin = await getVerifiedAdminUser(req);
+  return admin ? admin.github : null;
 }
 
 // Vercel Cron always sends GET requests, and automatically attaches

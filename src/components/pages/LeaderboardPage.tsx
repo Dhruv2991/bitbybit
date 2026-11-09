@@ -57,7 +57,7 @@ export default function LeaderboardPage() {
   const [monthOffset, setMonthOffset] = useState(0);
   const [search, setSearch] = useState("");
   const [squadRows, setSquadRows] = useState<Squad[]>([]);
-  const [mentorRows, setMentorRows] = useState<{ github: string; name: string; upvotes: number; posts: number }[]>([]);
+  const [mentorRows, setMentorRows] = useState<{ github: string; name: string; karma: number; upvotes: number; posts: number }[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,21 +67,31 @@ export default function LeaderboardPage() {
         setSquadRows(sq || []);
       } else if (tab === "mentors") {
         try {
-          const { data: discs } = await (db.from("problem_discussions") as any)
+          const { data: membersKarma } = await (db.from("members") as any)
+            .select("github, name, karma_points")
+            .gt("karma_points", 0)
+            .order("karma_points", { ascending: false })
+            .limit(50);
+          if (membersKarma && membersKarma.length > 0) {
+            setMentorRows(membersKarma.map((m: any) => ({ github: m.github, name: m.name || m.github, karma: m.karma_points || 0, upvotes: Math.floor((m.karma_points || 0) / 15), posts: 0 })));
+          } else {
+            const { data: discs } = await (db.from("problem_discussions") as any)
             .select("github, author_name, upvotes");
           if (discs && discs.length > 0) {
-            const map: Record<string, { github: string; name: string; upvotes: number; posts: number }> = {};
+            const map: Record<string, { github: string; name: string; karma: number; upvotes: number; posts: number }> = {};
             for (const d of discs) {
               if (!map[d.github]) {
-                map[d.github] = { github: d.github, name: d.author_name || d.github, upvotes: 0, posts: 0 };
+                map[d.github] = { github: d.github, name: d.author_name || d.github, karma: 0, upvotes: 0, posts: 0 };
               }
               map[d.github].upvotes += (d.upvotes || 0);
+              map[d.github].karma += (d.upvotes || 0) * 15;
               map[d.github].posts += 1;
             }
-            const list = Object.values(map).sort((a, b) => b.upvotes - a.upvotes).slice(0, 50);
+            const list = Object.values(map).sort((a, b) => b.karma - a.karma).slice(0, 50);
             setMentorRows(list);
           } else {
             setMentorRows([]);
+          }
           }
         } catch {
           setMentorRows([]);
@@ -642,13 +652,23 @@ export default function LeaderboardPage() {
         </div>
       ) : tab === "squads" ? (
         <div className="space-y-2">
-          <div className="hidden sm:grid grid-cols-[3rem_1fr_6rem_6rem] gap-4 px-4 py-2 text-[10px] text-slate-500 dark:text-zinc-500 font-mono uppercase tracking-widest border-b border-slate-200/80 dark:border-white/[0.04] mb-1">
-            <div>Rank</div>
-            <div>Clan / Squad</div>
-            <div className="text-center">Members</div>
-            <div className="text-right">Clan Score</div>
-          </div>
-          {squadRows.map((s, i) => (
+          {squadRows.length === 0 ? (
+            <div className="py-16 text-center border border-dashed border-slate-200 dark:border-zinc-800 rounded-3xl p-8 space-y-3 font-mono">
+              <div className="text-3xl">🛡️</div>
+              <div className="text-sm font-bold text-slate-800 dark:text-zinc-200">No Clans or Squads Formed Yet</div>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
+                Form a 5-coder squad on the Squads page to pool XP, unlock team boosts, and climb the clan leaderboard together!
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="hidden sm:grid grid-cols-[3rem_1fr_6rem_6rem] gap-4 px-4 py-2 text-[10px] text-slate-500 dark:text-zinc-500 font-mono uppercase tracking-widest border-b border-slate-200/80 dark:border-white/[0.04] mb-1">
+                <div>Rank</div>
+                <div>Clan / Squad</div>
+                <div className="text-center">Members</div>
+                <div className="text-right">Clan Score</div>
+              </div>
+              {squadRows.map((s, i) => (
             <div
               key={s.id}
               className="flex items-center gap-3 md:gap-4 px-4 py-3 rounded-2xl border transition-all duration-150 backdrop-blur-xl bg-white dark:bg-zinc-900/40 border-slate-200 dark:border-white/[0.06] hover:bg-slate-50 dark:hover:bg-zinc-900/60 shadow-xs"
@@ -675,6 +695,8 @@ export default function LeaderboardPage() {
               </div>
             </div>
           ))}
+            </>
+          )}
         </div>
       ) : tab === "mentors" ? (
         <div className="space-y-2">
@@ -720,7 +742,7 @@ export default function LeaderboardPage() {
                     {m.posts} explanations
                   </div>
                   <div className="w-24 text-right font-mono font-bold text-emerald-500 text-sm">
-                    👍 {m.upvotes}
+                    {m.karma} KP
                   </div>
                 </div>
               ))}

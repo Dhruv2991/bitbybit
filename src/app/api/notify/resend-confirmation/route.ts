@@ -1,48 +1,17 @@
-// ════════════════════════════════════════════════════════════
-// src/app/api/notify/resend-confirmation/route.ts
-// POST /api/notify/resend-confirmation
-//
-// Admin-only. Manually (re)sends the "You're subscribed ✓" email to
-// one specific subscriber — for people who confirmed before the
-// email system existed, or whose original send failed for any
-// reason. Unlike the automatic sends, this always sends when
-// clicked (it's an explicit admin action), and just updates the
-// email_log record to reflect the latest send.
-// ════════════════════════════════════════════════════════════
-
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase';
 import { sendEmail, subscriptionConfirmedEmail } from '@/lib/email';
+import { getVerifiedAdminUser } from '@/lib/serverAuth';
 
 interface Body {
   github: string;
 }
 
-async function getVerifiedAdmin(req: NextRequest): Promise<string | null> {
-  const authHeader = req.headers.get('authorization') || '';
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) return null;
-
-  const authClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { data, error } = await authClient.auth.getUser(token);
-  if (error || !data.user) return null;
-  const github = data.user.user_metadata?.user_name as string | undefined;
-  if (!github) return null;
-
-  const db = createServerSupabaseClient();
-  // eslint-disable-next-line
-  const { data: admin } = await (db.from('admins') as any).select('github').eq('github', github).maybeSingle();
-  return admin ? github : null;
-}
-
 export async function POST(req: NextRequest) {
   try {
-    const admin = await getVerifiedAdmin(req);
+    const admin = await getVerifiedAdminUser(req);
     if (!admin) return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+
 
     const { github }: Body = await req.json();
     if (!github) return NextResponse.json({ error: 'Missing github' }, { status: 400 });
