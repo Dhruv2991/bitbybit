@@ -6,6 +6,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import type { Problem, User } from '@/types/database';
 import { LANG_LABELS, type SupportedLang } from '@/types/database';
 import { isActiveSubscription } from '@/lib/subscription';
+import { collectApprovedProblemIds, isSuccessfulSolve } from '@/lib/solvedProblems';
 import { getRecommendations, getCachedDailyRecommendations, setAiUser } from '@/lib/gemini';
 
 const Workspace = dynamic(() => import('@/app/problems/Workspace'), { ssr: false });
@@ -88,42 +89,25 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
   useEffect(() => {
     if (!user?.github) {
       setSolved([]);
-    } else {
-      try {
-        const cached = localStorage.getItem('bb_solved');
-        if (cached) setSolved(JSON.parse(cached));
-      } catch {}
     }
 
     const db = getSupabaseClient();
 
     if (user?.github) {
-      db.from('submissions')
-        .select('problem_id')
-        .eq('github', user.github)
-        .eq('status', 'approved')
-        .then(({ data }) => {
-          if (!data?.length) return;
-          setSolved(prev => {
-            const merged = [...new Set([...prev, ...data.map((s: any) => s.problem_id)])];
-            try { localStorage.setItem('bb_solved', JSON.stringify(merged)); } catch {}
-            return merged;
-          });
-        });
-
-      // Also check weekly_submissions for approved weekly problems
-      (db.from('weekly_submissions') as any)
-        .select('problem_id')
-        .eq('github', user.github)
-        .eq('status', 'approved')
-        .then(({ data }: any) => {
-          if (!data?.length) return;
-          setSolved(prev => {
-            const merged = [...new Set([...prev, ...data.map((s: any) => s.problem_id)])];
-            try { localStorage.setItem('bb_solved', JSON.stringify(merged)); } catch {}
-            return merged;
-          });
-        });
+      Promise.all([
+        db.from('submissions')
+          .select('problem_id')
+          .eq('github', user.github)
+          .eq('status', 'approved'),
+        (db.from('weekly_submissions') as any)
+          .select('problem_id')
+          .eq('github', user.github)
+          .eq('status', 'approved'),
+      ])
+        .then(([{ data: normal }, { data: weekly }]) => {
+          setSolved(collectApprovedProblemIds(normal || [], weekly || []));
+        })
+        .catch(() => setSolved([]));
     }
 
     // Load personal attempt counts for all problems (submissions + weekly_submissions + practice_attempts)
@@ -275,13 +259,13 @@ export default function ProblemsPage({ user, onNavigate }: ProblemsPageProps) {
     problemId: string,
     details?: { code: string; lang: string; passed: number; total: number; pointsAwarded: number }
   ) {
-    // Update local solved state
-    const wasAlreadySolved = solved.includes(problemId);
+    if (!isSuccessfulSolve(details)) return;
+
+    // Keep the current page responsive after a verified full solve. The next
+    // page load reconciles this state from approved server-side submissions.
     setSolved(prev => {
       if (prev.includes(problemId)) return prev;
-      const next = [...prev, problemId];
-      try { localStorage.setItem('bb_solved', JSON.stringify(next)); } catch {}
-      return next;
+      return [...prev, problemId];
     });
 
     // Note: previously auto-opened a shareable solve card here on every
